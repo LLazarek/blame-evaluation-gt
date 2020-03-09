@@ -12,9 +12,14 @@
          "modgraph.rkt")
 
 (struct mod (path stx) #:transparent)
-(define mod/c (struct/c mod path-string? syntax?))
 (struct program (main others) #:transparent)
-(define program/c (struct/c program mod/c (listof mod/c)))
+
+(define mod/c (struct/c mod path-string? syntax?))
+(define (program-main-not-in-others? a-program)
+  (not (member (program-main a-program)
+               (program-others a-program))))
+(define program/c (and/c (struct/c program mod/c (listof mod/c))
+                         program-main-not-in-others?))
 
 (define (module-path-resolve mod-path [load? #f])
   ((current-module-name-resolver) mod-path #f #f load?))
@@ -35,9 +40,6 @@
        (#:setup-namespace [setup-namespace! (namespace? . -> . void?)]
         #:before-main [do-before-main! (namespace? . -> . any)]
         #:make-result [make-result (namespace? any/c . -> . any/c)])
-       #:pre (a-program)
-       (not (member (program-main a-program)
-                    (program-others a-program)))
 
        [result (-> any)])
 
