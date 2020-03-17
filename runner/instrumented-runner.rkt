@@ -8,7 +8,6 @@
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
-         "../util/read-module.rkt"
          "modgraph.rkt")
 
 (struct mod (path stx) #:transparent)
