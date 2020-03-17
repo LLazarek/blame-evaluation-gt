@@ -17,6 +17,12 @@
 
 (define-logger mutant-runner)
 
+(define mutate-top-level-selector select-define)
+(define mutate-expression-filter (λ (e)
+                                   (syntax-parse e
+                                     [({~datum :} . _) #f]
+                                     [else #t])))
+
 ;; Produce the mutated syntax for the module at the given path
 (define (mutate-module module-stx mutation-index)
   (syntax-parse module-stx
@@ -24,7 +30,9 @@
     [(module name lang {~and mod-body (mod-begin body ...)})
      #:do [(define program-stx #'{body ...})
            (match-define (mutated-program program-stx/mutated mutated-id)
-             (mutate-program/with-id program-stx mutation-index))]
+             (mutate-program program-stx mutation-index
+                             #:top-level-select mutate-top-level-selector
+                             #:expression-filter mutate-expression-filter))]
      #:with program/mutated program-stx/mutated
      #:with mutated-mod-stx
      (datum->syntax #'mod-body
@@ -136,7 +144,7 @@
                     mutated-module
                     mutated-id
                     index)
-  #:transparent)
+  #:prefab)
 
 ;; run-status -> bool
 (define (index-exceeded? rs)
