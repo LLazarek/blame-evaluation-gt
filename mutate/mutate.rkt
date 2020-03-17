@@ -19,7 +19,11 @@
     {#:expression-filter (syntax? . -> . boolean?)
      #:top-level-select top-level-selector/c}
     . ->* .
-    syntax?)])
+    syntax?)]
+
+  [select-all             top-level-selector/c]
+  [select-define/contract top-level-selector/c]
+  [select-define          top-level-selector/c])
  mutation-index-exception?
  (struct-out mutated-program))
 
@@ -550,6 +554,9 @@
              (leftmost-identifier-in #'def.id/sig)
              reconstruct-definition)]
     [_ (values #f #f #f)]))
+;; lltodo: this will select define-type!
+;; want to abstract to a `make-define-form-selector` which takes a predicate to
+;; decide if a given define form should be included
 (define (select-define stx)
   (syntax-parse stx
     [def:definition
