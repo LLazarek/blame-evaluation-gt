@@ -116,9 +116,6 @@
        (maybe-write-module! a-mod)
        stx]))
 
-  ;; ll: Old code had this as first thing eval'd in namespace. Why?
-  ;; (eval '(require "mutate.rkt"))
-
   (define (setup-namespace! ns)
     ;; Make racket/contract come from the same namespace so that
     ;; we can inspect contract violations thrown inside eval
