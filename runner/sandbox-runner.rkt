@@ -23,10 +23,15 @@
                             (exact-floor (* memory-limit-gb (expt 10 9)))))
   (define run
     (λ _
+      (define /dev/null (open-output-nowhere))
       (parameterize ([current-output-port (if suppress-output?
-                                              (open-output-nowhere)
-                                              (current-output-port))])
-        (thunk))))
+                                              /dev/null
+                                              (current-output-port))]
+                     [current-error-port (if suppress-output?
+                                             /dev/null
+                                             (current-error-port))])
+        (begin0 (thunk)
+          (close-output-port /dev/null)))))
   ;; Channel for communicating result of the thunk
   (define outcome-channel (make-async-channel 1))
   (define thread-id
