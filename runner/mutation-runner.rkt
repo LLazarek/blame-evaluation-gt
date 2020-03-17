@@ -13,7 +13,8 @@
          syntax/strip-context
          "../mutate/mutate.rkt"
          "sandbox-runner.rkt"
-         "instrumented-runner.rkt")
+         "instrumented-runner.rkt"
+         "../util/path-utils.rkt")
 
 (define-logger mutant-runner)
 
@@ -170,6 +171,10 @@ Blamed: ~a
            blamed)])
 
 
+(define (type-checker-failure? e)
+  (and (exn:fail:syntax? e)
+       (regexp-match? "Type Checker:"
+                      (exn-message e))))
 
 (define/contract (run-with-mutated-module a-program
                                           module-to-mutate
@@ -220,20 +225,33 @@ Blamed: ~a
       (make-status status-sym
                    blamed
                    mutated-id))
+    (define (extract-blamed e)
+      (define blamed ((compose
+                       (match-lambda [`(function ,id) id]
+                                     [`(definition ,id) id]
+                                     [other other])
+                       blame-positive
+                       exn:fail:contract:blame-object)
+                      e))
+      ((make-status* 'blamed)
+       (cons blamed (exn-continuation-marks e))))
+    (define (extract-type-error-source e)
+      (define failing-stxs (exn:fail:syntax-exprs e))
+      (define module-name
+        (match failing-stxs
+          [(list* (app syntax-source (or (? string? path-str)
+                                         (? path? (app path->string path-str))))
+                  _)
+           (file-name-string-from-path path-str)]
+          [else
+           "??? couldn't extract module name ???"]))
+      ((make-status* 'type-error)
+       module-name))
     (define run/handled
       (λ _
         (with-handlers
-          ([exn:fail:contract:blame?
-            (λ (e)
-              (define blamed ((compose
-                               (match-lambda [`(function ,id) id]
-                                             [`(definition ,id) id]
-                                             [other other])
-                               blame-positive
-                               exn:fail:contract:blame-object)
-                              e))
-              ((make-status* 'blamed)
-                            (cons blamed (exn-continuation-marks e))))]
+          ([exn:fail:contract:blame? extract-blamed]
+           [type-checker-failure? extract-type-error-source]
            [exn:fail:out-of-memory? (λ _ ((make-status* 'oom)))]
            [exn? (make-status* 'crashed)])
           (run)
@@ -249,49 +267,50 @@ Blamed: ~a
 
 (module+ test
   (require ruinit)
-  (define a (mod "a.rkt"
-                 #'(module a racket
-                     (#%module-begin
-                      (require "b.rkt")
-
-                      (define/contract a any/c 1)
-                      (define/contract b any/c 1)
-
-                      (define/contract (foo x y)
-                        (-> number? number? number?)
-                        (if #t
-                            (- y x)
-                            (+ (sleep 1)
-                               (for/vector #:length 4294967296 () #f)
-                               (foo x y))))
-
-                      (displayln (list 'a a))
-                      (displayln (list 'b b))
-                      (foo d c)))))
-  (define b (mod "b.rkt"
-                 #'(module b racket
-                     (#%module-begin
-                      (provide c d)
-
-                      (require "c.rkt")
-
-                      (displayln "B")
-
-                      (define/contract c
-                        any/c
-                        5)
-                      (define/contract d
-                        number?
-                        (if #t 1 "one"))
-                      (displayln (list 'c c))
-                      (displayln (list 'd d))))))
-  (define c (mod "c.rkt"
-                 #'(module c typed/racket
-                     (#%module-begin
-                      (void)))))
-  (define p (program a (list b c)))
   (test-begin
     #:name run-with-mutated-module
+    (ignore
+     (define a (mod "a.rkt"
+                    #'(module a racket
+                        (#%module-begin
+                         (require "b.rkt")
+
+                         (define/contract a any/c 1)
+                         (define/contract b any/c 1)
+
+                         (define/contract (foo x y)
+                           (-> number? number? number?)
+                           (if #t
+                               (- y x)
+                               (+ (sleep 1)
+                                  (for/vector #:length 4294967296 () #f)
+                                  (foo x y))))
+
+                         (displayln (list 'a a))
+                         (displayln (list 'b b))
+                         (foo d c)))))
+     (define b (mod "b.rkt"
+                    #'(module b racket
+                        (#%module-begin
+                         (provide c d)
+
+                         (require "c.rkt")
+
+                         (displayln "B")
+
+                         (define/contract c
+                           any/c
+                           5)
+                         (define/contract d
+                           number?
+                           (if #t 1 "one"))
+                         (displayln (list 'c c))
+                         (displayln (list 'd d))))))
+     (define c (mod "c.rkt"
+                    #'(module c typed/racket
+                        (#%module-begin
+                         (void)))))
+     (define p (program a (list b c))))
     (test-equal?
      (with-output-to-string
        (λ _ (run-with-mutated-module p
@@ -333,7 +352,70 @@ Blamed: ~a
                               2
                               #:timeout/s 10
                               #:memory/gb 0.5)
-     (struct* run-status ([outcome 'oom])))))
+     (struct* run-status ([outcome 'oom]))))
+
+  (test-begin
+    #:name run-with-mutated-module/type-error
+    (ignore
+     (define a (mod "a.rkt"
+                    #'(module a racket
+                        (#%module-begin
+                         (require "b.rkt")
+
+                         (define/contract a any/c 1)
+                         (define/contract b any/c 1)
+
+                         (define/contract (foo x y)
+                           (-> number? number? number?)
+                           (if #t
+                               (- y x)
+                               (+ (sleep 1)
+                                  (for/vector #:length 4294967296 () #f)
+                                  (foo x y))))
+
+                         (displayln (list 'a a))
+                         (displayln (list 'b b))
+                         (foo d c)))))
+     (define b (mod "b.rkt"
+                    #'(module b typed/racket
+                        (#%module-begin
+                         (provide c d)
+                         (require "c.rkt")
+
+                         (: d (List Boolean Natural))
+                         (define d (list #f 1))
+
+                         (: c Boolean)
+                         (define c (list-ref d 0))
+
+                         (displayln (list 'c c))
+                         (displayln (list 'd d))))))
+     (define c (mod "c.rkt"
+                    #'(module c typed/racket
+                        (#%module-begin
+                         (: x One)
+                         (define x 1)
+                         (displayln (list 'x x))))))
+     (define p (program a (list b c))))
+
+    (test-match
+     (run-with-mutated-module p
+                              b
+                              0
+                              #:timeout/s 3
+                              #:memory/gb 1)
+     (struct* run-status ([outcome 'type-error]
+                          ;; because the syntax is from here!
+                          [blamed "mutation-runner.rkt"])))
+    (test-match
+     (run-with-mutated-module p
+                              c
+                              0
+                              #:timeout/s 3
+                              #:memory/gb 1)
+     (struct* run-status ([outcome 'type-error]
+                          ;; because the syntax is from here!
+                          [blamed "mutation-runner.rkt"])))))
 
 
 ;; for debugging
