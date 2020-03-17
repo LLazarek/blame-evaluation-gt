@@ -1,21 +1,37 @@
 #lang at-exp racket
 
 (provide (contract-out
+          [read-benchmark
+           (path-to-existant-directory? . -> . (or/c #f benchmark/c))]
+          [benchmark->mutatable-modules
+           (benchmark/c . -> . (listof string?))]
+          [make-max-bench-config
+           (->i ([bench benchmark/c])
+                [result (bench)
+                        (and/c config/c
+                               (config-for-benchmark? bench))])]
           [configure-benchmark
-           (->i ([dir path-to-benchmark-directory?]
-                 [config (dir)
+           (->i ([bench benchmark/c]
+                 [config (bench)
                          (and/c config/c
-                                (config-for-benchmark? dir))])
-                [result benchmark-configuration?])]))
+                                (config-for-benchmark? bench))])
+                [result benchmark-configuration/c])])
+         (struct-out benchmark-configuration)
+         (struct-out benchmark)
+         benchmark-configuration/c
+         benchmark/c)
 
-(require "config.rkt")
+(require "config.rkt"
+         "../util/path-utils.rkt")
 
 (struct benchmark-configuration (main others base-dir)
   #:transparent)
+(define benchmark-configuration/c
+  (struct/c benchmark-configuration path? (listof path?) path?))
 
-(define (configure-benchmark benchmark-dir config)
+(define (configure-benchmark bench config)
   (match-define (benchmark typed untyped base both)
-    (read-benchmark benchmark-dir))
+    bench)
   (define configured-files
     (for/list ([(file level) (in-hash config)])
       (pick-file-by-name (match level
@@ -34,37 +50,27 @@
                            base))
 
 
-(define (file-name-string-from-path f)
-  (path->string (file-name-from-path f)))
-
-(define (pick-file-by-name files name)
-  (for/first ([f (in-list files)]
-              #:when (string=? (file-name-string-from-path f)
-                               name))
-    f))
-
 (define (sort-file-names names)
   (sort names string<?))
 
 (define (sorted-files-in p)
   (sort-file-names (map path->string (directory-list p))))
 
-(define ((path-ends-with name) p)
-  (define-values {_1 p-name _2} (split-path p))
-  (string=? (path->string p-name)
-            name))
 
 (struct benchmark (typed untyped base both)
   #:transparent)
+(define benchmark/c (struct/c benchmark
+                              (listof path?)
+                              (listof path?)
+                              (or/c #f path?)
+                              (or/c #f path?)))
 
 #;(define benchmark-cache
   (make-weak-hash '()))
-(define/contract (read-benchmark path)
-  (path-string? . -> . (or/c #f benchmark?))
-
+(define (read-benchmark path)
   (cond
     #;[(hash-ref benchmark-cache path #f) => values]
-    [(directory-exists? path)
+    [else
      (define-values {typed untyped}
        (read-typed-untyped-dirs path))
      (define base (build-path path "base"))
@@ -78,9 +84,9 @@
                      (and (directory-exists? base) base)
                      (and (directory-exists? both) both)))
         #;(hash-set! benchmark-cache path result)
-        result])]
-    [else #f]))
+        result])]))
 
+;; path-string? -> (values (listof path?) (listof path?))
 (define (read-typed-untyped-dirs path)
   (apply values
          (for/list ([dir (in-list '("typed" "untyped"))])
@@ -95,20 +101,18 @@
        (equal? (sorted-files-in (benchmark-typed b))
                (sorted-files-in (benchmark-untyped b)))))
 
-(define/contract ((config-for-benchmark? dir) config)
-  (path-to-benchmark-directory? . -> . (config/c . -> . boolean?))
+(define/contract ((config-for-benchmark? b) config)
+  (benchmark/c . -> . (config/c . -> . boolean?))
 
-  (define b (read-benchmark dir))
-  (and b
-       (equal? (sorted-files-in (benchmark-typed b))
-               (sort-file-names (hash-keys config)))))
+  (equal? (sorted-files-in (benchmark-typed b))
+          (sort-file-names (hash-keys config))))
 
 (module+ test
   (require ruinit)
   (define-test-env
     [setup! cleanup!]
     #:directories ([test-temp "./test-temp"]
-                   [a-benchmark "./test-temp/a-benchmark"]
+                   [a-benchmark-dir "./test-temp/a-benchmark"]
                    [typed "./test-temp/a-benchmark/typed"]
                    [untyped "./test-temp/a-benchmark/untyped"]
                    [both "./test-temp/a-benchmark/both"]
@@ -128,19 +132,19 @@
     #:after (cleanup!)
     (test-match (read-benchmark not-a-benchmark)
                 #f)
-    (test-match (read-benchmark a-benchmark)
+    (test-match (read-benchmark a-benchmark-dir)
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            base
                            both))
     (ignore (delete-directory/files base))
-    (test-match (read-benchmark a-benchmark)
+    (test-match (read-benchmark a-benchmark-dir)
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            #f
                            both))
     (ignore (delete-directory/files both))
-    (test-match (read-benchmark a-benchmark)
+    (test-match (read-benchmark a-benchmark-dir)
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            #f
@@ -148,7 +152,7 @@
 
     ;; read-benchmark doesn't check for equivalence of typed/untyped
     (ignore (delete-file a))
-    (test-match (read-benchmark a-benchmark)
+    (test-match (read-benchmark a-benchmark-dir)
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== b))
                            #f
@@ -156,7 +160,7 @@
 
     ;; it does check that both dirs are there though
     (ignore (delete-directory/files typed))
-    (test-match (read-benchmark a-benchmark)
+    (test-match (read-benchmark a-benchmark-dir)
                 #f))
 
   (test-begin
@@ -164,6 +168,7 @@
     #:before (setup!)
     #:after (cleanup!)
 
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
     (test-match (configure-benchmark a-benchmark
                                      (hash (file-name-string-from-path main) 'none
                                            (file-name-string-from-path a) 'none
@@ -185,3 +190,12 @@
                 (benchmark-configuration (== main/t)
                                          (list-no-order (== a/t) (== b) (== adapter))
                                          (== base)))))
+
+(define (benchmark->mutatable-modules a-benchmark)
+  (map file-name-string-from-path
+       (benchmark-typed a-benchmark)))
+
+(define (make-max-bench-config a-benchmark)
+  (define mods (benchmark->mutatable-modules a-benchmark))
+  (for/hash ([mod (in-list mods)])
+    (values mod 'types)))
