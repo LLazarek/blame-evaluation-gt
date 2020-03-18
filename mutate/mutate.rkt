@@ -61,6 +61,17 @@
                        }
     (programs-equal? actual expected)))
 
+
+#|----------------------------------------------------------------------|#
+;; Logger
+(require racket/logging)
+(define-logger mutate)
+
+(define (log-mutation-type type)
+  (log-mutate-info "type: ~a" type))
+
+#|----------------------------------------------------------------------|#
+
 #|----------------------------------------------------------------------|#
 ;; Utilities
 
@@ -80,8 +91,14 @@
                  (and/c counter?
                         (<=/c mutation-index))])
        [result mutated?])
+  (define should-apply-mutation?
+    (and (= mutation-index counter)
+         (not (exprs-equal? old-stx new-stx))))
+  (when should-apply-mutation?
+    (log-mutate-info
+     @~a{Mutating @(syntax->datum old-stx) -> @(syntax->datum new-stx)}))
   (mutated
-   (if (= mutation-index counter)
+   (if should-apply-mutation?
        new-stx
        old-stx)
    (if (exprs-equal? old-stx new-stx)
@@ -119,6 +136,7 @@
         other-mutations ...)
      #'(define (mutator-name stx-name mutation-index counter)
          (define (maybe-mutate* new-stx)
+           (log-mutation-type "datum-replace")
            (maybe-mutate stx-name
                          new-stx
                          mutation-index
@@ -224,6 +242,7 @@
 (define/contract (mutate-condition c mutation-index counter)
   (syntax? mutation-index? counter? . -> . mutated?)
 
+  (log-mutation-type "negate-conditional")
   ;; design decision: only try negating conditions
   (if (or (equal? (syntax->datum c) 'else)
           (> counter mutation-index))
@@ -353,6 +372,7 @@
                      field-type))
           (~or [field-id:id initial-value:expr]
                no-init-field:id) ...)
+         (log-mutation-type "class-initializer-swap")
          (define init-value-stxs (syntax-e (syntax/loc stx
                                              (initial-value ...))))
          (define field-ids (syntax-e (syntax/loc stx
@@ -376,6 +396,7 @@
         ;; mutate function applications:
         ;; Move around arguments, or mutate argument expressions
         [(f:non-keyword arg ...)
+         (log-mutation-type "argument-swap")
          (define args-stxs (syntax-e (syntax/loc stx (arg ...))))
          (mdo [count-with (__ counter)]
               (def args/rearranged (rearrange-in-seq args-stxs
@@ -554,9 +575,12 @@
              (leftmost-identifier-in #'def.id/sig)
              reconstruct-definition)]
     [_ (values #f #f #f)]))
-;; lltodo: this will select define-type!
+;; lltodo:
+;; - This will select define-type!
 ;; want to abstract to a `make-define-form-selector` which takes a predicate to
 ;; decide if a given define form should be included
+;;
+;; - This will also select define/contract and mutate the ctc.
 (define (select-define stx)
   (syntax-parse stx
     [def:definition
@@ -949,6 +973,7 @@ Actual:
 
 (define (mutate-begin-seq orig-stx new-stx mutation-index counter
                           #:filter can-mutate-expr?)
+  (log-mutation-type "statement-deletion")
   (mdo [count-with (__ counter)]
        (def begin-stx (maybe-mutate orig-stx
                                     new-stx
