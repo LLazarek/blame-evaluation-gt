@@ -7,14 +7,18 @@
            (benchmark/c . -> . (listof string?))]
           [make-max-bench-config
            (->i ([bench benchmark/c])
-                [result (bench)
+                [result {bench}
                         (and/c config/c
-                               (config-for-benchmark? bench))])]
+                               (config-for-benchmark/c bench))])]
           [configure-benchmark
            (->i ([bench benchmark/c]
-                 [config (bench)
+                 [config {bench}
                          (and/c config/c
-                                (config-for-benchmark? bench))])
+                                (config-for-benchmark/c bench))])
+                #:pre/desc {bench}
+                (or (->bool (findf (path-ends-with "main.rkt")
+                                   (benchmark-typed bench)))
+                    "Benchmark does not have a main.rkt module.")
                 [result benchmark-configuration/c])])
          (struct-out benchmark-configuration)
          (struct-out benchmark)
@@ -22,12 +26,16 @@
          benchmark/c)
 
 (require "config.rkt"
-         "../util/path-utils.rkt")
+         "../util/path-utils.rkt"
+         "../util/ctc-utils.rkt")
 
 (struct benchmark-configuration (main others base-dir)
   #:transparent)
 (define benchmark-configuration/c
-  (struct/c benchmark-configuration path? (listof path?) path?))
+  (struct/c benchmark-configuration
+            path-string?
+            (listof path-string?)
+            (or/c #f path-string?)))
 
 (define (configure-benchmark bench config)
   (match-define (benchmark typed untyped base both)
@@ -60,10 +68,10 @@
 (struct benchmark (typed untyped base both)
   #:transparent)
 (define benchmark/c (struct/c benchmark
-                              (listof path?)
-                              (listof path?)
-                              (or/c #f path?)
-                              (or/c #f path?)))
+                              (listof path-string?)
+                              (listof path-string?)
+                              (or/c #f path-string?)
+                              (or/c #f path-string?)))
 
 #;(define benchmark-cache
   (make-weak-hash '()))
@@ -101,11 +109,24 @@
        (equal? (sorted-files-in (benchmark-typed b))
                (sorted-files-in (benchmark-untyped b)))))
 
-(define/contract ((config-for-benchmark? b) config)
+(define/contract (config-for-benchmark/c b)
   (benchmark/c . -> . (config/c . -> . boolean?))
 
-  (equal? (sorted-files-in (benchmark-typed b))
-          (sort-file-names (hash-keys config))))
+  (simple-flat-contract-with-explanation
+   (λ (config)
+     (equal? (sort-file-names (map file-name-string-from-path
+                                   (benchmark-typed b)))
+             (sort-file-names (hash-keys config))))
+   @~a{a config for @~e[b]}))
+
+(define (benchmark->mutatable-modules a-benchmark)
+  (map file-name-string-from-path
+       (benchmark-typed a-benchmark)))
+
+(define (make-max-bench-config a-benchmark)
+  (define mods (benchmark->mutatable-modules a-benchmark))
+  (for/hash ([mod (in-list mods)])
+    (values mod 'types)))
 
 (module+ test
   (require ruinit)
@@ -189,13 +210,13 @@
                                            (file-name-string-from-path b) 'none))
                 (benchmark-configuration (== main/t)
                                          (list-no-order (== a/t) (== b) (== adapter))
-                                         (== base)))))
+                                         (== base))))
 
-(define (benchmark->mutatable-modules a-benchmark)
-  (map file-name-string-from-path
-       (benchmark-typed a-benchmark)))
-
-(define (make-max-bench-config a-benchmark)
-  (define mods (benchmark->mutatable-modules a-benchmark))
-  (for/hash ([mod (in-list mods)])
-    (values mod 'types)))
+  (test-begin
+    #:name make-max-bench-config
+    (test-equal? (make-max-bench-config (benchmark '("b/typed/a.rkt" "b/typed/b.rkt")
+                                                   '("b/typed/a.rkt" "b/typed/b.rkt")
+                                                   "b/base"
+                                                   #f))
+                 (hash "a.rkt" 'types
+                       "b.rkt" 'types))))
