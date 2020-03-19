@@ -15,7 +15,6 @@
          racket/format
          racket/match
          racket/system
-         racket/serialize
          racket/set
          racket/port
          racket/file
@@ -57,10 +56,11 @@
            read-mutant-result
            process-outcome
            try-get-blamed
-           config-at-max-precision-for?
-           increment-config-precision-for
-           make-max-bench-config
-           sample-size))
+           try-get-type-error-module
+           sample-size
+
+           copy-factory
+           mutant-error-log))
 
 
 (define MAX-CONFIG 'types)
@@ -91,7 +91,8 @@
                                      (failure-msg 'level msg)
                                      msg))
                   (date->string (current-date) #t)
-                  v ...))))
+                  v ...)
+                 #f)))
 (define (failure-msg failure-type m)
   (string-append "***** " (~a failure-type) " *****\n" m "\n**********"))
 
@@ -99,9 +100,6 @@
 
 ;; see last result of `process`
 (define process-ctl? procedure?)
-(define (module-name? s)
-  (and (string? s)
-       (not (regexp-match? @regexp{[\/]} s))))
 
 (define/contract (spawn-mutant-runner a-benchmark-configuration
                                       module-to-mutate-name
@@ -123,8 +121,14 @@
   (define module-to-mutate
     (resolve-configured-benchmark-module a-benchmark-configuration
                                          module-to-mutate-name))
-  (define others (append others*
-                         (directory-list base-dir #:build? #t)))
+  (define others
+    (map (match-lambda [(? path? p)
+                        (path->string p)]
+                       [other (~a other)])
+         (match base-dir
+           [#f others*]
+           [dir (append others*
+                        (directory-list dir #:build? #t))])))
   (call-with-output-file outfile #:mode 'text
     (λ (outfile-port)
       (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
@@ -233,9 +237,9 @@
              [file               path-to-existant-file?]
              [ctl                process-ctl?]
              [will               will/c]
-             [blame-trail-id     natural?]
-             [revival-count      blame-trail-id?]
-             [increased-limits?  natural?]))
+             [blame-trail-id     blame-trail-id?]
+             [revival-count      natural?]
+             [increased-limits?  boolean?]))
 (define dead-mutant-process/c
   (struct/dc dead-mutant-process
              [mutant             mutant/c]
@@ -290,7 +294,7 @@
       (spawn-mutants/of-module factory-state module-to-mutate-name)))
 
   (log-factory info "Finished spawning all mutant runners.")
-  (babysit-mutants factory-state))
+  (factory-results (babysit-mutants factory-state)))
 
 (define (resolve-any-benchmark-module-path-for a-benchmark a-module-name)
   (match a-benchmark
@@ -315,8 +319,9 @@
   (factory/c module-name? . -> . factory/c)
 
   (define module-to-mutate-path
-    (resolve-any-benchmark-module-path-for (factory-bench the-factory)
-                                           module-to-mutate-name))
+    (resolve-any-benchmark-module-path-for
+     (bench-info-benchmark (factory-bench the-factory))
+     module-to-mutate-name))
   ;; This must be an unbounded loop, number of mutants unknown
   (let next-mutant ([mutation-index 0]
                     [current-factory the-factory])
@@ -362,7 +367,6 @@
                 ;; mutant will
                 (λ (current-factory dead-proc)
                   (match (process-outcome dead-proc)
-                    ;; lltodo: actually detect and produce type-error outcomes
                     ['type-error
                      (log-factory info
                                   "  Mutant ~a @ ~a has type error. Sampling..."
@@ -749,7 +753,7 @@ Active mutant set (ids):
                                                    #:timeout/s timeout/s
                                                    #:memory/gb memory/gb))
            (define mutant-proc
-             (mutant-process (mutant module-to-mutate-name mutation-index)
+             (mutant-process (mutant module-to-mutate-name mutation-index #t)
                              precision-config
                              outfile
                              mutant-ctl
@@ -945,7 +949,7 @@ Attempting revival ~a / ~a
   (call-with-output-file file
     #:mode 'text
     #:exists 'replace
-    (λ (out) (writeln (serialize (cons blame-trail-id result)) out))))
+    (λ (out) (writeln (cons blame-trail-id result) out))))
 
 ;; path-string? natural? -> boolean?
 (define/contract (max-mutation-index-exceeded? module-to-mutate mutation-index)
@@ -969,7 +973,7 @@ Attempting revival ~a / ~a
   (with-output-to-file aggregate-file
     #:exists 'append
     #:mode 'text
-    (λ _ (writeln (serialize (cons blame-trail-id result))))))
+    (λ _ (writeln (cons blame-trail-id result)))))
 
 (define/contract (read-mutant-result mutant-proc)
   (mutant-process/c . -> . (or/c run-status? eof-object?))
@@ -991,23 +995,21 @@ Mutant: [~a] ~a @ ~a with config:
                  id mod index
                  config)
     eof)
-  ;; Unfortunately, `deserialize` doesn't check the validity of its
-  ;; input before doing its thing, so the exceptions that might come
-  ;; from deserializing the wrong value are arbitrary.
   (with-handlers ([exn:fail:read? report-malformed-output])
     (match (with-input-from-file path read)
       [(and (or (struct* run-status
                          ([outcome (or 'crashed
                                        'completed
                                        'timeout
-                                       'oom
-                                       'type-error)]
+                                       'oom)]
                           [blamed #f]))
                 (struct* run-status
-                         ([outcome 'blamed]
+                         ([outcome (or 'blamed
+                                       'type-error)]
                           [blamed (not #f)])))
             result/well-formed)
-       result/well-formed])))
+       result/well-formed]
+      [else (report-malformed-output)])))
 
 ;; dead-mutant-process?
 ;; ->
@@ -1015,7 +1017,7 @@ Mutant: [~a] ~a @ ~a with config:
 (define (process-outcome dead-proc)
   (run-status-outcome (dead-mutant-process-result dead-proc)))
 
-;; result? -> (vector/c (or/c symbol? path-string?) path-string?)
+;; result? -> module-name?
 (define/match (try-get-blamed/from-result result)
   [{(struct* run-status ([outcome 'blamed]
                          [blamed blamed]))}
@@ -1023,7 +1025,7 @@ Mutant: [~a] ~a @ ~a with config:
   [{(struct* run-status ([outcome (not 'blamed)]))}
    #f])
 
-;; dead-mutant-process? -> (vector (or/c symbol? path-string?))
+;; dead-mutant-process? -> module-name?
 (define/match (try-get-blamed dead-proc)
   [{(dead-mutant-process _ _ result _ _ _)}
    (try-get-blamed/from-result result)])
@@ -1064,7 +1066,11 @@ Mutant: [~a] ~a @ ~a with config:
 ~n~n~n~n~n~n~n~n~n~n
 "
                       reason)))
-         (exit 1)]
+         (exit 1)
+         ;; Return continue-val in case of custom exit handler.
+         ;; This should probably only matter for testing, so that the
+         ;; contracts of various functions don't blow up.
+         continue-val]
         [else
          (log-factory warning
                       "Continuing execution despite abort signal...")
