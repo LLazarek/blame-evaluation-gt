@@ -14,7 +14,8 @@
          "../mutate/mutate.rkt"
          "sandbox-runner.rkt"
          "instrumented-runner.rkt"
-         "../util/path-utils.rkt")
+         "../util/path-utils.rkt"
+         "../util/ctc-utils.rkt")
 
 (define-logger mutant-runner)
 
@@ -64,10 +65,16 @@
         #:write-modules-to [write-to-dir (or/c path-string? #f)]
         #:on-module-exists [on-module-exists (or/c 'error 'replace)]
         #:mutator [mutate (syntax? natural? . -> . (values syntax? symbol?))])
-       #:pre/desc (base-path write-to-dir)
-       (or (not (and write-to-dir (not (unsupplied-arg? write-to-dir))
-                     (or (not base-path) (unsupplied-arg? base-path))))
+       #:pre/desc {base-path write-to-dir}
+       (or (not (and write-to-dir
+                     (not (unsupplied-arg? write-to-dir))
+                     (or (not base-path)
+                         (unsupplied-arg? base-path))))
            "must specify #:modules-base-path if #:write-modules-to is specified")
+       #:pre/desc {a-program module-to-mutate}
+       (or (->bool (member module-to-mutate (list* (program-main a-program)
+                                                   (program-others a-program))))
+           "module-to-mutate must be part of a-program")
 
        (values [runner (-> any)]
                [mutated-id symbol?]))
@@ -137,6 +144,15 @@
 
 
 
+(define index-exceeded-outcome 'index-exceeded)
+(define outcomes `(,index-exceeded-outcome
+                   blamed
+                   type-error
+                   oom
+                   timeout
+                   crashed
+                   completed))
+
 (struct run-status (result-value
                     outcome
                     blamed
@@ -145,9 +161,21 @@
                     index)
   #:prefab)
 
+(define run-status/c
+  (struct/dc run-status
+             [result-value    any/c]
+             [outcome         (apply or/c outcomes)]
+             [blamed          {outcome}
+                              (if (member outcome '(blamed type-error))
+                                  module-name?
+                                  #f)]
+             [mutated-module  module-name?]
+             [mutated-id      symbol?]
+             [index           natural?]))
+
 ;; run-status -> bool
 (define (index-exceeded? rs)
-  (equal? (run-status-outcome rs) 'index-exceeded))
+  (equal? (run-status-outcome rs) index-exceeded-outcome))
 
 
 (define report-progress (make-parameter #f))
@@ -200,13 +228,13 @@ Blamed: ~a
                      (or (not base-path) (unsupplied-arg? base-path))))
            "must specify #:modules-base-path if #:write-modules-to is specified")
 
-       [result run-status?])
+       [result run-status/c])
 
   (define (make-status status-sym [blamed #f] [mutated-id #f] [result #f])
     (run-status result
                 status-sym
                 blamed
-                module-to-mutate
+                (file-name-string-from-path (mod-path module-to-mutate))
                 mutated-id
                 mutation-index))
   (with-handlers ([mutation-index-exception?
@@ -231,8 +259,7 @@ Blamed: ~a
                        blame-positive
                        exn:fail:contract:blame-object)
                       e))
-      ((make-status* 'blamed)
-       (cons blamed (exn-continuation-marks e))))
+      ((make-status* 'blamed) blamed))
     (define (extract-type-error-source e)
       (define failing-stxs (exn:fail:syntax-exprs e))
       (define module-name
@@ -242,9 +269,8 @@ Blamed: ~a
                   _)
            (file-name-string-from-path path-str)]
           [else
-           "??? couldn't extract module name ???"]))
-      ((make-status* 'type-error)
-       module-name))
+           "<couldnt-extract-module-name>"]))
+      ((make-status* 'type-error) module-name))
     (define run/handled
       (λ _
         (with-handlers
