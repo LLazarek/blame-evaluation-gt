@@ -73,8 +73,15 @@
     other-module-path-list
     ("`write` form of a list of other module paths."
      "This is a mandatory argument.")
-    (other-modules (call-with-input-string other-module-path-list
-                                           read))]
+    (with-handlers ([exn:fail:read?
+                     (λ _
+                       (fail
+                        @~a{
+                            Unable to read path list
+                            Provided: @~v[other-module-path-list]}))])
+      (other-modules
+       (call-with-input-string other-module-path-list
+                               read)))]
    [("-M" "--module-to-mutate")
     mutate-path
     ("Module to mutate path."
@@ -143,3 +150,52 @@
      #:on-module-exists (on-module-exists)))
 
   (writeln the-run-status))
+
+
+(module+ test
+  (require ruinit)
+
+  (define-test-env {setup! cleanup!}
+    #:directories ()
+    #:files ([test-module-1 "test-mod-1.rkt"
+                           @~a{
+                               #lang racket
+
+                               (require "test-mod-2.rkt")
+
+                               (define (baz x y)
+                                 (if (even? x)
+                                     y
+                                     (/ y x)))
+
+                               (foo (baz 0 1))
+                               }]
+             [test-module-2 "test-mod-2.rkt"
+                           @~a{
+                               #lang typed/racket
+
+                               (provide foo)
+
+                               (: foo (-> Number Number))
+                               (define (foo x)
+                                 (+ x x))
+                               }]))
+  (test-begin
+    #:name mutant-runner
+    #:short-circuit
+    #:before (setup!)
+    #:after (cleanup!)
+
+    (ignore
+     (define test-program (make-program test-module-1
+                                        (list test-module-2)))
+     (define to-mutate (make-mod test-module-1)))
+
+    (or (run-with-mutated-module
+         test-program
+         to-mutate
+         0
+         #:modules-base-path (find-program-base-path test-program)
+         #:write-modules-to "test-mods"
+         #:on-module-exists 'replace)
+        #t)))
