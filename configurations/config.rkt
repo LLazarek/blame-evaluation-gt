@@ -31,3 +31,31 @@
             (for/hash ([(id _) (in-hash mod-config)])
               (values id
                       (random-ref '(none types)))))))
+
+(module+ test
+  (require ruinit)
+
+  (test-begin
+    #:name test:increment-config-precision-for
+    (test-equal? (increment-config-precision-for
+                  "baz.rkt"
+                  (hash "baz.rkt" 'none
+                        "bazzle.rkt" 'types))
+                 (hash "baz.rkt" 'types
+                       "bazzle.rkt" 'types))
+    (test-exn exn:fail?
+              (increment-config-precision-for
+                  "baz.rkt"
+                  (hash "baz.rkt" 'types
+                        "bazzle.rkt" 'types))))
+
+  (test-begin
+    #:name config-at-max-precision-for?
+    (not/test (config-at-max-precision-for?
+               "baz.rkt"
+               (hash "baz.rkt" 'none
+                     "bazzle.rkt" 'types)))
+    (config-at-max-precision-for?
+     "baz.rkt"
+     (hash "baz.rkt" 'types
+           "bazzle.rkt" 'types))))
