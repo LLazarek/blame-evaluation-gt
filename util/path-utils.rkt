@@ -18,6 +18,10 @@
 (define path-to-existant-file?
   (and/c path-string? file-exists?))
 
+(define (module-name? s)
+  (and (string? s)
+       (not (regexp-match? @regexp{[\/]} s))))
+
 (module+ test
   (require ruinit)
   (test-begin
