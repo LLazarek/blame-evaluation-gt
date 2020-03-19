@@ -76,8 +76,9 @@
     (and
      write-to-dir
      (for/fold ([new-paths #hash()])
-               ([old-path (in-list (list* (program-main a-program)
-                                          (program-others a-program)))])
+               ([mod (in-list (list* (program-main a-program)
+                                     (program-others a-program)))])
+       (define old-path (mod-path mod))
        (define rel-path (find-relative-path base-path old-path))
        (define new-path (simple-form-path (build-path write-to-dir rel-path)))
        (hash-set new-paths old-path new-path))))
