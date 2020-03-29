@@ -100,8 +100,9 @@
          (for/list ([dir (in-list '("typed" "untyped"))])
            (define dir-path (build-path path dir))
            (and (directory-exists? dir-path)
-                (directory-list dir-path
-                                #:build? #t)))))
+                (map simple-form-path
+                     (directory-list dir-path
+                                     #:build? #t))))))
 
 (define (path-to-benchmark-directory? path)
   (define b (read-benchmark path))
@@ -140,21 +141,35 @@
                    [base "./test-temp/a-benchmark/base"]
 
                    [not-a-benchmark "./test-temp/not-a-benchmark"])
-    #:files ([main/t  (build-path typed "main.rkt")   ""]
-             [a/t     (build-path typed "a.rkt")      ""]
-             [b/t     (build-path typed "b.rkt")      ""]
-             [main    (build-path untyped "main.rkt") ""]
-             [a       (build-path untyped "a.rkt")    ""]
-             [b       (build-path untyped "b.rkt")    ""]
-             [adapter (build-path both "adapter.rkt") ""]))
+    #:files ([main/t  (build-path typed "main.rkt")   "#lang typed/racket main"]
+             [a/t     (build-path typed "a.rkt")      "#lang typed/racket a"]
+             [b/t     (build-path typed "b.rkt")      "#lang typed/racket b"]
+             [main    (build-path untyped "main.rkt") "#lang racket main"]
+             [a       (build-path untyped "a.rkt")    "#lang racket a"]
+             [b       (build-path untyped "b.rkt")    "#lang racket b"]
+             [adapter (build-path both "adapter.rkt") "#lang typed/racket adapter"]))
+  (test-begin
+    #:name read-typed-untyped-dirs
+    #:before (setup!)
+    #:after (cleanup!)
+    (ignore (define-values {t ut} (read-typed-untyped-dirs a-benchmark-dir)))
+    (test-equal? t
+                 (list a/t b/t main/t))
+    (test-equal? ut
+                 (list a b main)))
+
   (test-begin
     #:name read-benchmark
     #:before (setup!)
     #:after (cleanup!)
     (test-match (read-benchmark not-a-benchmark)
                 #f)
-    (test-match (read-benchmark a-benchmark-dir)
-                (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
+    (test-equal? (read-benchmark a-benchmark-dir)
+                 (benchmark (list a/t b/t main/t)
+                            (list a b main)
+                            base
+                            both)
+                #;(benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            base
                            both))
@@ -163,7 +178,7 @@
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            #f
-                           both))
+                           (== both)))
     (ignore (delete-directory/files both))
     (test-match (read-benchmark a-benchmark-dir)
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
@@ -186,6 +201,7 @@
 
   (test-begin
     #:name configure-benchmark
+    #:short-circuit
     #:before (setup!)
     #:after (cleanup!)
 

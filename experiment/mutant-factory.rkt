@@ -5,12 +5,12 @@
 
 (require "../runner/mutation-runner.rkt"
          "../runner/instrumented-runner.rkt"
+         "../runner/unify-program.rkt"
          "../mutate/mutate.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
-         "program.rkt"
          racket/file
          racket/format
          racket/match
@@ -32,6 +32,7 @@
            (struct-out aggregate-mutant-result)
            (struct-out bench-info)
            (struct-out factory)
+           (struct-out aggregated-result)
            process-limit
            data-output-dir
            benchmarks-dir-path
@@ -57,10 +58,11 @@
            process-outcome
            try-get-blamed
            try-get-type-error-module
-           sample-size
 
+           sample-size
            copy-factory
-           mutant-error-log))
+           mutant-error-log
+           test-mutant-flag))
 
 
 (define MAX-CONFIG 'types)
@@ -218,6 +220,8 @@
                       a-factory:expr field-val-pair:expr ...)
   (struct-copy factory a-factory field-val-pair ...))
 
+(define test-mutant-flag 'test)
+(define sample-flag 'sample)
 
 (define blame-label? module-name?)
 (define mutant/c
@@ -229,12 +233,14 @@
              [abstract? boolean?]))
 (define will/c (factory? dead-mutant-process? . -> . factory?))
 (define result? run-status?)
-(define blame-trail-id? (or/c natural? 'no-blame))
+(define blame-trail-id? (or/c natural?
+                              test-mutant-flag
+                              sample-flag))
 (define mutant-process/c
   (struct/dc mutant-process
              [mutant             mutant/c]
              [config             config/c]
-             [file               path-to-existant-file?]
+             [file               path-string?]
              [ctl                process-ctl?]
              [will               will/c]
              [blame-trail-id     blame-trail-id?]
@@ -260,11 +266,11 @@
   (struct/dc factory
              [bench                   bench-info/c]
              [results                 mutant-results?]
-             [active-mutants (set/c   mutant-process/c)]
+             [active-mutants          (set/c mutant-process/c)]
              [active-mutant-count     {active-mutants}
                                       (and/c natural?
                                              (=/c (set-count active-mutants)))]
-             [mutant-samples (hash/c  mutant/c (set/c config/c))]
+             [mutant-samples          (hash/c mutant/c (set/c config/c))]
              [total-mutants-spawned   natural?]))
 
 
@@ -398,6 +404,7 @@
                                   module-to-mutate-name
                                   mutation-index)
                      current-factory]))
+                #:test-mutant? #t
                 #:timeout/s timeout*
                 #:memory/gb memory*))
 
@@ -408,7 +415,7 @@
   (define max-config (bench-info-max-config (factory-bench the-factory)))
   (define samples (sample-config max-config (sample-size)))
   (define (resample a-factory)
-    (define sample (set-first (sample-config max-config 1)))
+    (define sample (first (sample-config max-config 1)))
     (define samples-seen (hash-ref (factory-mutant-samples a-factory)
                                    mutant-program))
     (cond
@@ -420,13 +427,18 @@
                (add-mutant-sample a-factory mutant-program sample))]))
   (define new-factory
     (for/fold ([current-factory the-factory])
-              ([sampled-config (in-set samples)])
+              ([sampled-config (in-list samples)]
+               [sample-number (in-naturals)])
       (define factory+sample
         (add-mutant-sample current-factory mutant-program sampled-config))
+      (log-factory
+       debug
+       @~a{    Sample: trying to sample root @sample-number for @mutant-program})
       (spawn-blame-trail-root-mutant factory+sample
                                      mutant-program
                                      sampled-config
-                                     resample)))
+                                     resample
+                                     sample-number)))
   (log-factory info
                "    Completed sampling for mutant ~a @ ~a."
                (mutant-module mutant-program)
@@ -458,16 +470,16 @@
 (define/contract (spawn-blame-trail-root-mutant the-factory
                                                 mutant-program
                                                 config
-                                                resample)
+                                                resample
+                                                sample-number)
   (factory/c
    mutant/c
    config/c
    (factory/c . -> . (values config/c factory/c))
+   natural?
    . -> .
    factory/c)
 
-  (log-factory debug
-               "    Sample: trying to spawn blame-following mutant")
   (spawn-mutant the-factory
                 (mutant-module mutant-program)
                 (mutant-index mutant-program)
@@ -477,7 +489,8 @@
                    ;; Try sampling another config
                    (log-factory
                     debug
-                    "    Sample [~a] for ~a @ ~a failed to find blame."
+                    "    Sample ~a (id [~a]) for ~a @ ~a failed to find blame."
+                    sample-number
                     (dead-mutant-process-id dead-proc)
                     (mutant-module (dead-mutant-process-mutant dead-proc))
                     (mutant-index (dead-mutant-process-mutant dead-proc)))
@@ -486,7 +499,9 @@
                    (spawn-blame-trail-root-mutant new-factory
                                                   mutant-program
                                                   new-sample
-                                                  resample)))))
+                                                  resample
+                                                  sample-number)))
+                #:blame-trail-root? #t))
 
 ;; factory? dead-mutant-process? blame-trail-id? -> factory?
 ;;
@@ -520,7 +535,7 @@
          (log-factory debug
                       "Blame trail {~a} ended."
                       blame-trail-id)
-         (unless (blamed-is-bug? blamed/type-error-location result)
+         (unless (blame/type-error-on-buggy-mod? blamed/type-error-location result)
            (log-factory
             error
             "Found mutant with blamed/type-error (~v) at types that is not bug:
@@ -531,15 +546,6 @@
          ;; Blamed region is typed, so the path ends here
          the-factory]
         [else
-         (when (try-get-type-error-module dead-proc)
-           (log-factory
-            warning
-            @~a{
-                Found type error in module that isn't typed?
-                Module: @blamed/type-error-location
-                Config: @config
-                }))
-
          (define config/blamed-region-ctc-strength-incremented
            (increment-config-precision-for blamed/type-error-location config))
          (define (spawn-the-blame-following-mutant a-factory
@@ -550,7 +556,7 @@
                          index
                          config/blamed-region-ctc-strength-incremented
                          will:keep-following-blame
-                         blame-trail-id
+                         #:following-trail blame-trail-id
                          #:timeout/s timeout/s
                          #:memory/gb memory/gb))
          (define will:keep-following-blame
@@ -672,31 +678,44 @@ Predecessor (id [~a]) blamed ~a and had config:
        (no-blame-fallback the-factory dead-proc)])))
 
 
+(define sweep-retry-limit
+  ;; Wait 2 secs per try, so halve the limit
+  (quotient (* 3 (default-timeout/s)) 2))
+
 
 (define/contract (spawn-mutant the-factory
                                module-to-mutate-name
                                mutation-index
                                precision-config
                                mutant-will
-                               [blame-trail-id 'no-blame]
                                [revival-count 0]
                                #:timeout/s [timeout/s #f]
-                               #:memory/gb [memory/gb #f])
-  ({factory/c
-    module-name?
-    natural?
-    config/c
-    will/c}
-   {blame-trail-id?
-    natural?
-    #:timeout/s (or/c #f number?)
-    #:memory/gb (or/c #f number?)}
-   . ->* .
-   factory/c)
+                               #:memory/gb [memory/gb #f]
+                               #:blame-trail-root? [blame-trail-root? #f]
+                               #:following-trail [following-blame-trail-id #f]
+                               #:test-mutant? [test-mutant? #f])
+  (->i ([the-factory factory/c]
+        [module-to-mutate-name module-name?]
+        [mutation-index natural?]
+        [precision-config config/c]
+        [mutant-will will/c])
+       ([revival-count natural?]
+        #:blame-trail-root? [bt-root? boolean?]
+        #:following-trail [maybe-trail-id (or/c #f blame-trail-id?)]
+        #:test-mutant? [test? boolean?]
+        #:timeout/s [t/s (or/c #f number?)]
+        #:memory/gb [m/gb (or/c #f number?)])
+       #:pre/desc {bt-root? maybe-trail-id test?}
+       (or (= 2 (count unsupplied-arg? (list bt-root? maybe-trail-id test?)))
+           @~a{
+               Exactly one of
+               #:blame-trail-root? (@bt-root?),
+               #:following-trail (@maybe-trail-id),
+               and #:test-mutant? (@test?)
+               must be specified.
+               })
+       [result factory/c])
 
-  (define idle-retry-limit
-    ;; Wait 2 secs per try, so halve the limit
-    (quotient (* 3 (default-timeout/s)) 2))
   (let try-again ([current-factory the-factory]
                   [idle-retry-count 0])
     (define active-mutant-count (factory-active-mutant-count current-factory))
@@ -707,7 +726,7 @@ Predecessor (id [~a]) blamed ~a and had config:
             active-mutant-count
             (process-limit)
             idle-retry-count)
-           (when (>= idle-retry-count idle-retry-limit)
+           (when (>= idle-retry-count sweep-retry-limit)
              (log-factory
               error
               "Mutants at limit but unable to sweep any after ~a minutes.
@@ -715,7 +734,7 @@ There are likely zombie mutants about.
 Active mutant set (ids):
 ~v
 "
-              (/ idle-retry-limit 30)
+              (/ sweep-retry-limit 30)
               (set-map (factory-active-mutants current-factory)
                        mutant-process-id)))
            (sleep 2)
@@ -728,7 +747,7 @@ Active mutant set (ids):
                           ;; Also wrap the counter around so that
                           ;; idling doesn't cause above message to be
                           ;; logged every 2 sec
-                          (modulo (add1 idle-retry-count) (add1 idle-retry-limit))
+                          (modulo (add1 idle-retry-count) (add1 sweep-retry-limit))
                           0))]
           [else
            (match-define (factory (bench-info the-benchmark _)
@@ -752,14 +771,19 @@ Active mutant set (ids):
                                                    outfile
                                                    #:timeout/s timeout/s
                                                    #:memory/gb memory/gb))
+           (define mutant-id mutants-spawned)
+           (define mutant-blame-trail-id
+             (cond [blame-trail-root?           sample-flag]
+                   [test-mutant?                test-mutant-flag]
+                   [following-blame-trail-id => values]))
            (define mutant-proc
              (mutant-process (mutant module-to-mutate-name mutation-index #t)
                              precision-config
                              outfile
                              mutant-ctl
                              mutant-will
-                             mutants-spawned
-                             blame-trail-id
+                             mutant-id
+                             mutant-blame-trail-id
                              revival-count
                              ;; coerce to bool
                              (and (or timeout/s memory/gb) #t)))
@@ -767,10 +791,13 @@ Active mutant set (ids):
            (log-factory
             info
             "    Spawned mutant runner with id [~a] for ~a @ ~a > ~a."
-            mutants-spawned
+            mutant-id
             module-to-mutate-name
             mutation-index
-            outfile)
+            (pretty-path outfile))
+           (log-factory
+            debug
+            @~a{    Mutant [@mutant-id] has config @~v[precision-config]})
 
            (copy-factory current-factory
                          [active-mutants (set-add active-mutants mutant-proc)]
@@ -783,14 +810,34 @@ Active mutant set (ids):
 (define/contract (babysit-mutants the-factory)
   (factory/c . -> . factory/c)
 
-  (let check-again ([current-factory the-factory])
+  (let check-again ([current-factory the-factory]
+                    [retries 0])
     (define sweeped-factory (sweep-dead-mutants current-factory))
     (cond [(zero? (factory-active-mutant-count sweeped-factory))
            (log-factory info "Babysitting complete. All mutants are dead.")
            current-factory]
+          [(>= retries sweep-retry-limit)
+           (log-factory
+            error
+            "Unable to sweep any mutants after ~a minutes of babysitting.
+There are likely zombie mutants about.
+Active mutant set (ids):
+~v
+"
+            (/ sweep-retry-limit 30)
+            (set-map (factory-active-mutants current-factory)
+                     mutant-process-id))]
           [else
            (sleep 2)
-           (check-again sweeped-factory)])))
+           (log-factory
+            debug
+            @~a{Babysitting retry: @retries / @sweep-retry-limit})
+           (log-factory
+            debug
+            @~a{Current active set: @~v[(set-map (factory-active-mutants current-factory)
+                                                 mutant-process-id)]})
+           (check-again sweeped-factory
+                        (add1 retries))])))
 
 
 ;; factory? -> factory?
@@ -873,20 +920,20 @@ Attempting revival ~a / ~a
                    index
                    config
                    will
-                   orig-blame-trail
-                   (add1 revival-count))]
-    [(cons 'done-ok result)
+                   (add1 revival-count)
+                   #:following-trail (match orig-blame-trail
+                                       [(== test-mutant-flag) #f]
+                                       [id id])
+                   #:test-mutant? (equal? orig-blame-trail test-mutant-flag))]
+    [(cons 'done-ok (? run-status? result))
      (log-factory info
                   "      Sweeping up dead mutant [~a]: ~a @ ~a, config ~a."
                   id mod index config)
 
      (define blame-trail-id
-       (if (and (equal? orig-blame-trail 'no-blame)
-                (try-get-blamed/from-result result))
-           ;; This mutant wasn't following a pre-existing blame trail,
-           ;; but it found blame, so it is the start of a fresh blame trail
-           id
-           orig-blame-trail))
+       (determine-blame-trail-id-for-dead-mutant result
+                                                 id
+                                                 orig-blame-trail))
      (log-factory info
                   "      Dead mutant [~a] result: ~v"
                   id
@@ -912,6 +959,64 @@ Attempting revival ~a / ~a
 
      (will new-factory dead-mutant-proc)]))
 
+(define/contract (determine-blame-trail-id-for-dead-mutant mutant-result
+                                                           mutant-id
+                                                           mutant-orig-blame-trail)
+  (run-status/c natural? blame-trail-id? . -> . blame-trail-id?)
+
+  (define blamed-module-name
+    (or (try-get-blamed/from-result mutant-result)
+        (try-get-type-error-module/from-result mutant-result)))
+  (match* {(run-status-outcome mutant-result)
+           blamed-module-name
+           mutant-orig-blame-trail}
+    ;; Cases for a new sample
+    [{(not (or 'blamed 'type-error))
+      #f
+      (== sample-flag)}
+     ;; failed sample
+     sample-flag]
+    [{(or 'blamed 'type-error)
+      (? module-name?)
+      (== sample-flag)}
+     ;; Sample found blame, start a new trail
+     mutant-id]
+
+    ;; Cases for following an existing blame trail
+    [{(or 'blamed 'type-error)
+      (? module-name?)
+      (? natural? bt-id)}
+     ;; Continue an existing trail
+     bt-id]
+    [{(not (or 'blamed 'type-error))
+      #f
+      (? natural? bt-id)}
+     (log-factory
+      fatal
+      @~a{
+          Blame disappeared with mutant [@mutant-id] on trail {@bt-id}.
+          result:       @mutant-result
+          })
+     (maybe-abort "Blame disappeared" bt-id)]
+
+    ;; Test mutant: doesn't matter
+    [{_
+      _
+      (== test-mutant-flag)}
+     test-mutant-flag]
+
+    ;; ???
+    [{outcome blamed bt-id}
+     (log-factory
+      error
+      @~a{
+          In an unexpected state while determining blame trail mutant-id for a dead mutant.
+          Outcome:      @outcome
+          Blamed:       @~v[blamed]
+          Blame trail:  @~v[bt-id]
+          })
+     mutant-id]))
+
 ;; mutant-results? dead-mutant-process? path-string? -> mutant-results?
 (define/contract (add-mutant-result mutant-results
                                     dead-mutant-proc
@@ -925,10 +1030,8 @@ Attempting revival ~a / ~a
   (define mutant (dead-mutant-process-mutant dead-mutant-proc))
   (cond [(hash-has-key? mutant-results mutant)
          (define aggregate-results (hash-ref mutant-results mutant))
-         (append-mutant-result!
-          (dead-mutant-process-blame-trail-id dead-mutant-proc)
-          (dead-mutant-process-result dead-mutant-proc)
-          aggregate-results)
+         (append-mutant-result! dead-mutant-proc
+                                aggregate-results)
          (delete-file mutant-proc-file)
          mutant-results]
         [else
@@ -940,16 +1043,22 @@ Attempting revival ~a / ~a
                    mutant
                    aggregate)]))
 
+(struct aggregated-result (blame-trail-id
+                           mutant-id
+                           run-status
+                           config)
+  #:prefab)
+
 (define/contract (create-aggregate-result-file! dead-mutant-proc aggregate-result)
   (dead-mutant-process/c aggregate-mutant-result/c . -> . any)
 
-  (match-define (dead-mutant-process _ _ result _ blame-trail-id _)
+  (match-define (dead-mutant-process _ config result id blame-trail-id _)
     dead-mutant-proc)
   (define file (aggregate-mutant-result-file aggregate-result))
   (call-with-output-file file
     #:mode 'text
     #:exists 'replace
-    (λ (out) (writeln (cons blame-trail-id result) out))))
+    (λ (out) (writeln (aggregated-result blame-trail-id id result config) out))))
 
 ;; path-string? natural? -> boolean?
 (define/contract (max-mutation-index-exceeded? module-to-mutate mutation-index)
@@ -965,15 +1074,17 @@ Attempting revival ~a / ~a
                    mutation-index)
     #f))
 
-;; blame-trail-id? result? aggregate-mutant-result? -> void
-(define/contract (append-mutant-result! blame-trail-id result aggregate-results)
-  (blame-trail-id? result? aggregate-mutant-result/c . -> . any)
+;; dead-mutant-process/c -> void
+(define/contract (append-mutant-result! dead-mutant-proc aggregate-results)
+  (dead-mutant-process/c aggregate-mutant-result/c . -> . any)
 
   (define aggregate-file (aggregate-mutant-result-file aggregate-results))
+  (match-define (dead-mutant-process _ config result id blame-trail-id _)
+    dead-mutant-proc)
   (with-output-to-file aggregate-file
     #:exists 'append
     #:mode 'text
-    (λ _ (writeln (cons blame-trail-id result)))))
+    (λ _ (writeln (aggregated-result blame-trail-id id result config)))))
 
 (define/contract (read-mutant-result mutant-proc)
   (mutant-process/c . -> . (or/c run-status? eof-object?))
@@ -998,8 +1109,7 @@ Mutant: [~a] ~a @ ~a with config:
   (with-handlers ([exn:fail:read? report-malformed-output])
     (match (with-input-from-file path read)
       [(and (or (struct* run-status
-                         ([outcome (or 'crashed
-                                       'completed
+                         ([outcome (or 'completed
                                        'timeout
                                        'oom)]
                           [blamed #f]))
@@ -1030,23 +1140,26 @@ Mutant: [~a] ~a @ ~a with config:
   [{(dead-mutant-process _ _ result _ _ _)}
    (try-get-blamed/from-result result)])
 
-(define/match (try-get-type-error-module dead-proc)
-  [{(struct* dead-mutant-process
-             ([result
-               (struct* run-status
-                        ([outcome 'type-error]
-                         [blamed blamed]))]))}
-   blamed]
-  [{_} #f])
+(define/contract (blame/type-error-on-buggy-mod? blamed-mod-name result)
+  (module-name? run-status/c . -> . boolean?)
 
-(define (blamed-is-bug? blamed result)
-  (match-define (vector blamed-id mod) blamed)
   (match result
-    [(struct* run-status ([mutated-id (== blamed-id)]
-                          [outcome 'blamed]
-                          [blamed (== blamed)]))
+    [(struct* run-status ([outcome (or 'blamed 'type-error)]
+                          [blamed (== blamed-mod-name)]))
      #t]
     [_ #f]))
+
+(define/match (try-get-type-error-module/from-result result)
+  [{(struct* run-status ([outcome 'type-error]
+                         [blamed blamed]))}
+   blamed]
+  [{(struct* run-status ([outcome (not 'blamed)]))}
+   #f])
+(define/match (try-get-type-error-module dead-proc)
+  [{(struct* dead-mutant-process
+             ([result (? run-status? result)]))}
+   (try-get-type-error-module/from-result result)]
+  [{_} #f])
 
 (define (maybe-abort reason continue-val #:force [force? #f])
   ;; Mark the mutant error file before it gets garbled with error
@@ -1076,15 +1189,19 @@ Mutant: [~a] ~a @ ~a with config:
                       "Continuing execution despite abort signal...")
          continue-val]))
 
+(define (pretty-path p)
+  (path->string (find-relative-path (simple-form-path (current-directory))
+                                    (simple-form-path p))))
+
 (module+ main
   (require racket/cmdline)
   (define bench-to-run (make-parameter #f))
   (command-line
    #:once-each
    [("-b" "--benchmark")
-    name
-    "Benchmark to run."
-    (bench-to-run name)]
+    path
+    "Path to benchmark to run."
+    (bench-to-run path)]
    [("-o" "--output-dir")
     dir
     "Data output directory."
@@ -1103,7 +1220,7 @@ Mutant: [~a] ~a @ ~a with config:
    [("-s" "--sample-size")
     n
     "Number of blame trail roots to sample. Default: 96"
-    (sample-size n)])
+    (sample-size (string->number n))])
   (unless (bench-to-run)
     (error 'mutant-factory "Must provide benchmark to run."))
   (when (directory-exists? (data-output-dir))

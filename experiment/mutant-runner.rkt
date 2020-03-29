@@ -10,7 +10,7 @@
          "../runner/mutation-runner.rkt"
          "../runner/instrumented-runner.rkt"
          "../mutate/mutate.rkt"
-         "program.rkt")
+         "../runner/unify-program.rkt")
 
 (define (fail fmt-str . fmt-args)
   (apply eprintf
@@ -122,15 +122,17 @@
      @~a{Error: Missing mandatory argument: @missing-arg}))
 
   (define the-program
-    (make-program (main-module)
-                  (other-modules)))
+    (make-unified-program (main-module)
+                          (other-modules)))
+
+  (define the-program-mods (list* (program-main the-program)
+                                  (program-others the-program)))
 
   (define the-module-to-mutate
-    (make-mod (module-to-mutate)))
+    (find-unified-module-to-mutate (module-to-mutate)
+                                   the-program-mods))
 
-  (unless (member the-module-to-mutate
-                  (list* (program-main the-program)
-                         (program-others the-program)))
+  (unless (member the-module-to-mutate the-program-mods)
     (fail
      @~a{
          Error: Module to mutate not in given program.
@@ -153,11 +155,14 @@
 
 
 (module+ test
-  (require ruinit)
+  (require ruinit
+           racket)
 
   (define-test-env {setup! cleanup!}
-    #:directories ()
-    #:files ([test-module-1 "test-mod-1.rkt"
+    #:directories ([test-bench "./test-bench"]
+                   [ut "./test-bench/untyped"]
+                   [t  "./test-bench/typed"])
+    #:files ([test-module-1 (build-path ut "test-mod-1.rkt")
                            @~a{
                                #lang racket
 
@@ -170,7 +175,7 @@
 
                                (foo (baz 0 1))
                                }]
-             [test-module-2 "test-mod-2.rkt"
+             [test-module-2 (build-path t "test-mod-2.rkt")
                            @~a{
                                #lang typed/racket
 
@@ -187,15 +192,15 @@
     #:after (cleanup!)
 
     (ignore
-     (define test-program (make-program test-module-1
-                                        (list test-module-2)))
-     (define to-mutate (make-mod test-module-1)))
+     (define test-program (make-unified-program test-module-1
+                                                (list test-module-2)))
+     (define to-mutate
+       (find-unified-module-to-mutate test-module-1
+                                      (list* (program-main test-program)
+                                             (program-others test-program)))))
 
     (or (run-with-mutated-module
          test-program
          to-mutate
-         0
-         #:modules-base-path (find-program-base-path test-program)
-         #:write-modules-to "test-mods"
-         #:on-module-exists 'replace)
+         0)
         #t)))

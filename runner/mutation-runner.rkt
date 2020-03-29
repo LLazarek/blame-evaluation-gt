@@ -1,16 +1,17 @@
 #lang at-exp racket
 
 (provide run-with-mutated-module
-         report-progress
          make-mutated-program-runner
          mutate-module
          mutation-index-exception?
          [struct-out run-status]
+         run-status/c
          index-exceeded?)
 
 (require racket/runtime-path
          syntax/parse
          syntax/strip-context
+         syntax/location
          "../mutate/mutate.rkt"
          "sandbox-runner.rkt"
          "instrumented-runner.rkt"
@@ -153,49 +154,32 @@
                    crashed
                    completed))
 
-(struct run-status (result-value
+(struct run-status (mutated-module
+                    index
+                    mutated-id
                     outcome
                     blamed
-                    mutated-module
-                    mutated-id
-                    index)
+                    result-value)
   #:prefab)
 
 (define run-status/c
   (struct/dc run-status
-             [result-value    any/c]
+             [mutated-module  module-name?]
+             [index           natural?]
+             [mutated-id      {outcome}
+                              (if (equal? outcome index-exceeded-outcome)
+                                  #f
+                                  symbol?)]
              [outcome         (apply or/c outcomes)]
              [blamed          {outcome}
                               (if (member outcome '(blamed type-error))
                                   module-name?
-                                  #f)]
-             [mutated-module  module-name?]
-             [mutated-id      symbol?]
-             [index           natural?]))
+                                  any/c)]
+             [result-value    any/c]))
 
 ;; run-status -> bool
 (define (index-exceeded? rs)
   (equal? (run-status-outcome rs) index-exceeded-outcome))
-
-
-(define report-progress (make-parameter #f))
-
-;; run-status -> void
-(define/match (display-run-status rs)
-  [{(run-status result-value outcome blamed
-                mutated-module mutated-id index)}
-   (printf "
-Run: mutated ~a in module ~a at index ~a
-Status: ~a
-Returned: ~a
-Blamed: ~a
-
-"
-           mutated-id mutated-module index
-           outcome
-           result-value
-           blamed)])
-
 
 (define (type-checker-failure? e)
   (and (exn:fail:syntax? e)
@@ -231,12 +215,12 @@ Blamed: ~a
        [result run-status/c])
 
   (define (make-status status-sym [blamed #f] [mutated-id #f] [result #f])
-    (run-status result
+    (run-status (mod->name module-to-mutate)
+                mutation-index
+                mutated-id
                 status-sym
                 blamed
-                (file-name-string-from-path (mod-path module-to-mutate))
-                mutated-id
-                mutation-index))
+                result))
   (with-handlers ([mutation-index-exception?
                    (λ (e) (make-status 'index-exceeded))])
     (define-values {run mutated-id}
@@ -247,7 +231,7 @@ Blamed: ~a
                                    #:write-modules-to write-to-dir
                                    #:on-module-exists on-module-exists
                                    #:mutator mutate))
-    (define ((make-status* status-sym) [blamed #f])
+    (define ((make-status* status-sym) [blamed #f] [result #f])
       (make-status status-sym
                    blamed
                    mutated-id))
@@ -259,25 +243,60 @@ Blamed: ~a
                        blame-positive
                        exn:fail:contract:blame-object)
                       e))
-      ((make-status* 'blamed) blamed))
+      (define blamed-mod-name
+        (match blamed
+          ;; NOTE: This depends on a modification to Typed Racket;
+          ;; Specifically `require/contract` must be modified to change
+          ;; the positive party, by extending the list with
+          ;; ```from #,(syntax->datum #'lib)```
+          [`(interface for ,_ from ,mod-name)
+           mod-name]
+          [(? path-string?)
+           (file-name-string-from-path blamed)]
+          [else
+           (error 'extract-blamed
+                  @~a{Unexpected blamed party shape: @~v[blamed]})]))
+      ((make-status* 'blamed) blamed-mod-name))
     (define (extract-type-error-source e)
       (define failing-stxs (exn:fail:syntax-exprs e))
       (define module-name
         (match failing-stxs
-          [(list* (app syntax-source (or (? string? path-str)
-                                         (? path? (app path->string path-str))))
+          [(list* (app syntax-source-file-name file-name-path)
                   _)
-           (file-name-string-from-path path-str)]
+           (path->string file-name-path)]
           [else
            "<couldnt-extract-module-name>"]))
-      ((make-status* 'type-error) module-name))
+      ((make-status* 'type-error) module-name (exn-message e)))
+    (define (extract-runtime-error-location e)
+      (define ctx (continuation-mark-set->context
+                   (exn-continuation-marks e)))
+      (define mod-with-error
+        (for*/first ([ctx-item (in-list ctx)]
+                     [ctx-mod-path (in-value
+                                    (match ctx-item
+                                      [(cons _ (srcloc (? path? path) _ _ _ _))
+                                       (path->string path)]
+                                      [(cons _ (srcloc (? string? path-str) _ _ _ _))
+                                       (string-trim path-str "\"")]
+                                      [else #f]))]
+                     #:when ctx-mod-path
+                     [mod (in-list (list* (program-main a-program)
+                                          (program-others a-program)))]
+                     #:when (equal? (file-name-string-from-path (mod-path mod))
+                                    (file-name-string-from-path ctx-mod-path)))
+          (file-name-string-from-path ctx-mod-path)))
+      (define mod-with-error-name
+        (match mod-with-error
+          [(? string? name) name]
+          [#f "couldnt-find-mod-name"]))
+      ((make-status* 'blamed) mod-with-error-name))
     (define run/handled
       (λ _
         (with-handlers
           ([exn:fail:contract:blame? extract-blamed]
            [type-checker-failure? extract-type-error-source]
            [exn:fail:out-of-memory? (λ _ ((make-status* 'oom)))]
-           [exn? (make-status* 'crashed)])
+           [exn? extract-runtime-error-location])
           (run)
           ((make-status* 'completed)))))
     (run-with-limits run/handled
@@ -292,7 +311,7 @@ Blamed: ~a
 (module+ test
   (require ruinit)
   (test-begin
-    #:name run-with-mutated-module
+    #:name run-with-mutated-module/mutations
     (ignore
      (define a (mod "a.rkt"
                     #'(module a racket
@@ -379,6 +398,48 @@ Blamed: ~a
      (struct* run-status ([outcome 'oom]))))
 
   (test-begin
+    #:name run-with-mutated-module/ctc-violations
+    (ignore
+     (define main (mod "main.rkt"
+                       #'(module main racket
+                           (#%module-begin
+                            (require "second.rkt")
+                            (define (foo x) (if (positive? x) (foo (- x)) (* x x 3)))
+                            (define (main) (bar (foo 2) "yes"))
+                            (main)))))
+     (define second (mod "second.rkt"
+                         #'(module second typed/racket
+                             (#%module-begin
+                              (: bar (-> Integer String Nonpositive-Integer))
+                              (provide bar)
+                              (define (bar x s) (if (positive? x) (- x) x))))))
+     (define p (program main (list second))))
+    (test-exn exn:fail:contract?
+              ((make-instrumented-runner
+                (program (mod "main.rkt"
+                              #'(module main racket
+                                  (#%module-begin
+                                   (require "second.rkt")
+                                   (define (foo x) (if (positive? x) (foo (- x)) (/ x x 3)))
+                                   (define (main) (bar (foo 2) "yes"))
+                                   (main))))
+                         (list second))
+                (λ (a-mod) (mod-stx a-mod))
+                #:setup-namespace
+                (λ (ns)
+                  (namespace-attach-module (current-namespace)
+                                           'racket/contract
+                                           ns)))))
+    (test-match
+     (run-with-mutated-module p
+                              main
+                              2
+                              #:timeout/s 3
+                              #:memory/gb 1)
+     (struct* run-status ([outcome 'blamed]
+                          [blamed "main.rkt"]))))
+
+  (test-begin
     #:name run-with-mutated-module/type-error
     (ignore
      (define a (mod "a.rkt"
@@ -397,6 +458,9 @@ Blamed: ~a
                                   (for/vector #:length 4294967296 () #f)
                                   (foo x y))))
 
+                         ;; to have errors
+                         (define x (list-ref '(0 1 2 3 4 5) 5))
+
                          (displayln (list 'a a))
                          (displayln (list 'b b))
                          (foo d c)))))
@@ -406,11 +470,11 @@ Blamed: ~a
                          (provide c d)
                          (require "c.rkt")
 
-                         (: d (List Boolean Natural))
+                         (: d (List False One))
                          (define d (list #f 1))
 
                          (: c Boolean)
-                         (define c (list-ref d 0))
+                         (define c (first d))
 
                          (displayln (list 'c c))
                          (displayln (list 'd d))))))
@@ -439,7 +503,97 @@ Blamed: ~a
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
                           ;; because the syntax is from here!
-                          [blamed "mutation-runner.rkt"])))))
+                          [blamed "mutation-runner.rkt"])))
+    (test-match
+     (run-with-mutated-module p
+                              a
+                              11 ;; runtime error -> blame on a.rkt
+                              #:timeout/s 10
+                              #:memory/gb 1)
+     (struct* run-status ([outcome 'blamed]
+                          [blamed "a.rkt"]))))
+
+
+  (define-test-env {setup-test-env! cleanup-test-env!}
+    #:directories ([test-mods-dir "./test-mods"])
+    #:files ([a.rkt (build-path test-mods-dir "a.rkt")
+                    @~a{
+                        #lang racket
+                        (require "b.rkt")
+                        (define x (foo (+ 1) "2" 0))
+                        (x)
+                        (define (main)
+                          (+ "a" "b"))
+                        (main)
+                        }]
+             [b.rkt (build-path test-mods-dir "b.rkt")
+                    @~a{
+                        #lang racket
+                        (provide foo)
+                        (require "c.rkt")
+                        (define (foo x y z)
+                          (when (and (number? x)
+                                     (negative? x))
+                            (list-ref '(1 2 3) x))
+                          (bar x y z))
+                        }]
+             [c.rkt (build-path test-mods-dir "c.rkt")
+                    @~a{
+                        #lang racket
+                        (provide bar)
+                        (define (bar x y z)
+                          (+ (- x) z))
+                        }]))
+  (require "../util/read-module.rkt")
+  (test-begin
+    #:name run-with-mutated-module/runtime-error-locations
+    #:before (setup-test-env!)
+    #:after (cleanup-test-env!)
+    (ignore
+     (define a (mod a.rkt
+                    (read-module a.rkt)))
+     (define b (mod b.rkt
+                    (read-module b.rkt)))
+     (define c (mod c.rkt
+                    (read-module c.rkt)))
+     (define p (program a (list b c))))
+
+    (test-match
+     (run-with-mutated-module p
+                              a
+                              0 ; swap foo x y -> crash in bar
+                              #:timeout/s 10
+                              #:memory/gb 1
+                              #:suppress-output? #f)
+     (struct* run-status ([outcome 'blamed]
+                          [blamed "c.rkt"])))
+    (test-match
+     (run-with-mutated-module p
+                              a
+                              1 ; (+ 1) to (- 1) -> crash in foo
+                              #:timeout/s 10
+                              #:memory/gb 1
+                              #:suppress-output? #f)
+     (struct* run-status ([outcome 'blamed]
+                          [blamed "b.rkt"])))
+    (test-match
+     (run-with-mutated-module p
+                              a
+                              2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
+                              #:timeout/s 10
+                              #:memory/gb 1
+                              #:suppress-output? #f)
+     (struct* run-status ([outcome 'blamed]
+                          [blamed "a.rkt"])))
+    (test-match
+     (run-with-mutated-module p
+                              a
+                              3 ; 0 to 1 -> crash in main
+                              #:timeout/s 10
+                              #:memory/gb 1
+                              #:suppress-output? #f)
+     (struct* run-status ([outcome 'blamed]
+                          [blamed "a.rkt"])))))
 
 
 ;; for debugging

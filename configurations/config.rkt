@@ -19,18 +19,16 @@
      (error 'increment-config-precision-for
             @~a{Given config with value @name already at types: @config})]))
 
-;; Produce a set of `n` random samples of the config whose top element is
-;; `max-config`
+;; Produce a list of `n` random samples (with replacement!) of the config whose
+;; top element is `max-config`
 (define (sample-config max-config n)
-  (for/set ([i (in-range n)])
+  (for/list ([i (in-range n)])
     (random-config-variant max-config)))
 
 (define (random-config-variant a-config)
   (for/hash ([(mod mod-config) (in-hash a-config)])
     (values mod
-            (for/hash ([(id _) (in-hash mod-config)])
-              (values id
-                      (random-ref '(none types)))))))
+            (random-ref '(none types)))))
 
 (module+ test
   (require ruinit)
@@ -58,4 +56,15 @@
     (config-at-max-precision-for?
      "baz.rkt"
      (hash "baz.rkt" 'types
-           "bazzle.rkt" 'types))))
+           "bazzle.rkt" 'types)))
+
+  (test-begin
+    #:name sample-config
+    (for/and/test ([i (in-range 50)])
+                  (test-= (length (sample-config
+                                   (hash "a.rkt" 'types
+                                         "b.rkt" 'types
+                                         "c.rkt" 'types
+                                         "main.rkt" 'types)
+                                   i))
+                          i))))

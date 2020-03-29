@@ -4,11 +4,13 @@
          (struct-out mod)
          (struct-out program)
          mod/c
-         program/c)
+         program/c
+         mod->name)
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
-         "modgraph.rkt")
+         "modgraph.rkt"
+         "../util/path-utils.rkt")
 
 (struct mod (path stx)
   #:transparent
@@ -32,6 +34,9 @@
                (program-others a-program))))
 (define program/c (and/c (struct/c program mod/c (listof mod/c))
                          program-main-not-in-others?))
+
+(define (mod->name m)
+  (file-name-string-from-path (mod-path m)))
 
 (define (module-path-resolve mod-path [load? #f])
   ((current-module-name-resolver) mod-path #f #f load?))
@@ -110,6 +115,11 @@
               (module-path-resolve (instrumented-module-module-path m))]
              [current-directory
               (instrumented-module-containing-directory m)])
+          (displayln @~a{
+                         Eval'ing module inside @(instrumented-module-containing-directory m)
+                         with name @(module-path-resolve (instrumented-module-module-path m))
+                         with stx: @(syntax->datum (instrumented-module-stx m))
+                         })
           (eval (instrumented-module-stx m))))
 
       ;; Run the main module

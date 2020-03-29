@@ -22,6 +22,13 @@
   (and (string? s)
        (not (regexp-match? @regexp{[\/]} s))))
 
+(define (paths=? a b)
+  (equal? (simple-form-path a)
+          (simple-form-path b)))
+
+(define (explode-path/string p)
+  (map path->string (explode-path p)))
+
 (module+ test
   (require ruinit)
   (test-begin
