@@ -1,4 +1,9 @@
 
+* Dependencies
+- require-typed-check
+- ruinit
+- custom-load
+
 * Related work
 
 ** Mutation for type errors
