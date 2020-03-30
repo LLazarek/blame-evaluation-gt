@@ -515,7 +515,8 @@
   (define fatal-msg? (not (zero? (hash-ref log-message-counts 'fatal))))
 
   (and/test/message [(test-= warning-count expected-warnings)
-                     "Not all warnings logged"]
+                     @~a{Not all warnings logged
+                             expected @expected-warnings got @warning-count}]
                     [fatal-msg? "Fatal message not logged"]
                     [(test-equal? expect-exit? (unbox exit-called?))
                      "Abort call recorded does not match expected"]))
@@ -882,6 +883,12 @@
                [abort-on-failure? #f]
                [default-timeout/s 10]
                [default-memory-limit/gb 1])
+  (displayln @~a{
+
+
+
+                 Running full run test. This will take a while.
+                 })
   (test-begin/with-env
    #:name test:full-run
 
