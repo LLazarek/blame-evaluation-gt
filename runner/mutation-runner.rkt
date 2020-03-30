@@ -562,7 +562,7 @@
   (test-begin
     #:name mod/loc-vs-file
     #:before (setup-test-env!)
-    #:after (setup-test-env!)
+    #:after (cleanup-test-env!)
     (ignore
      (define a/ml (mod/loc a.rkt
                            #'(module a racket
