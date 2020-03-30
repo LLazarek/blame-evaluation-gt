@@ -130,7 +130,15 @@
     ;; we can inspect contract violations thrown inside eval
     (namespace-attach-module (current-namespace)
                              'racket/contract
-                             ns))
+                             ns)
+    ;; Require errortrace so that we get accurate runtime error location
+    ;; information
+    ;; lltodo: apparent bug? This fails saying that it can't find errortrace
+    ;; at a path where errortrace exists.
+    #;((namespace-require 'errortrace ns))
+    ;; but this works:
+    (parameterize ([current-namespace ns])
+      (namespace-require 'errortrace)))
 
   (define runner
     (make-instrumented-runner a-program
@@ -439,71 +447,77 @@
      (struct* run-status ([outcome 'blamed]
                           [blamed "main.rkt"]))))
 
+  (define (replace-stx-location stx new-file-name)
+    (define-values {read-port write-port} (make-pipe))
+    (pretty-write (syntax->datum stx) write-port)
+    (read-module/port read-port #:source new-file-name))
+  (define (mod/loc path stx)
+    (mod path
+         (replace-stx-location stx path)))
+
   (test-begin
     #:name run-with-mutated-module/type-error
     (ignore
-     (define a (mod "a.rkt"
-                    #'(module a racket
-                        (#%module-begin
-                         (require "b.rkt")
+     (define a (mod/loc "a.rkt"
+                        #'(module a racket
+                            (#%module-begin
+                             (require "b.rkt")
 
-                         (define/contract a any/c 1)
-                         (define/contract b any/c 1)
+                             (define/contract a any/c 1)
+                             (define/contract b any/c 1)
 
-                         (define/contract (foo x y)
-                           (-> number? number? number?)
-                           (if #t
-                               (- y x)
-                               (+ (sleep 1)
-                                  (for/vector #:length 4294967296 () #f)
-                                  (foo x y))))
+                             (define/contract (foo x y)
+                               (-> number? number? number?)
+                               (if #t
+                                   (- y x)
+                                   (+ (sleep 1)
+                                      (for/vector #:length 4294967296 () #f)
+                                      (foo x y))))
 
-                         ;; to have errors
-                         (define x (list-ref '(0 1 2 3 4 5) 5))
+                             ;; to have errors
+                             (define x (list-ref '(0 1 2 3 4 5) 5))
 
-                         (displayln (list 'a a))
-                         (displayln (list 'b b))
-                         (foo d c)))))
-     (define b (mod "b.rkt"
-                    #'(module b typed/racket
-                        (#%module-begin
-                         (provide c d)
-                         (require "c.rkt")
+                             (displayln (list 'a a))
+                             (displayln (list 'b b))
+                             (foo d c)))))
+     (define b (mod/loc "b.rkt"
+                        #'(module b typed/racket
+                            (#%module-begin
+                             (provide c d)
+                             (require "c.rkt")
 
-                         (: d (List False One))
-                         (define d (list #f 1))
+                             (: d (List False One))
+                             (define d (list #f 1))
 
-                         (: c Boolean)
-                         (define c (first d))
+                             (: c Boolean)
+                             (define c (first d))
 
-                         (displayln (list 'c c))
-                         (displayln (list 'd d))))))
-     (define c (mod "c.rkt"
-                    #'(module c typed/racket
-                        (#%module-begin
-                         (: x One)
-                         (define x 1)
-                         (displayln (list 'x x))))))
+                             (displayln (list 'c c))
+                             (displayln (list 'd d))))))
+     (define c (mod/loc "c.rkt"
+                        #'(module c typed/racket
+                            (#%module-begin
+                             (: x One)
+                             (define x 1)
+                             (displayln (list 'x x))))))
      (define p (program a (list b c))))
 
     (test-match
      (run-with-mutated-module p
                               b
                               0
-                              #:timeout/s 3
+                              #:timeout/s 10
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
-                          ;; because the syntax is from here!
-                          [blamed "mutation-runner.rkt"])))
+                          [blamed "b.rkt"])))
     (test-match
      (run-with-mutated-module p
                               c
                               0
-                              #:timeout/s 3
+                              #:timeout/s 10
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
-                          ;; because the syntax is from here!
-                          [blamed "mutation-runner.rkt"])))
+                          [blamed "c.rkt"])))
     (test-match
      (run-with-mutated-module p
                               a
@@ -546,22 +560,96 @@
                         }]))
   (require "../util/read-module.rkt")
   (test-begin
-    #:name run-with-mutated-module/runtime-error-locations
+    #:name mod/loc-vs-file
     #:before (setup-test-env!)
-    #:after (cleanup-test-env!)
+    #:after (setup-test-env!)
     (ignore
-     (define a (mod a.rkt
-                    (read-module a.rkt)))
-     (define b (mod b.rkt
-                    (read-module b.rkt)))
-     (define c (mod c.rkt
-                    (read-module c.rkt)))
+     (define a/ml (mod/loc a.rkt
+                           #'(module a racket
+                               (#%module-begin
+                                (require "b.rkt")
+                                (define x (foo (+ 1) "2" 0))
+                                (x)
+                                (define (main)
+                                  (+ "a" "b"))
+                                (main)))))
+     (define b/ml (mod/loc b.rkt
+                           #'(module a racket
+                               (#%module-begin
+                                (provide foo)
+                                (require "c.rkt")
+                                (define (foo x y z)
+                                  (when (and (number? x)
+                                             (negative? x))
+                                    (list-ref '(1 2 3) x))
+                                  (bar x y z))))))
+     (define c/ml (mod/loc c.rkt
+                           #'(module a racket
+                               (#%module-begin
+                                (provide bar)
+                                (define (bar x y z)
+                                  (+ (- x) z))))))
+     (define a/f (mod a.rkt
+                      (read-module a.rkt)))
+     (define b/f (mod b.rkt
+                      (read-module b.rkt)))
+     (define c/f (mod c.rkt
+                      (read-module c.rkt)))
+     (define p/ml (program a/ml (list b/ml c/ml)))
+     (define p/f  (program a/f  (list b/f  c/f))))
+    (test-equal? (run-with-mutated-module p/ml
+                                          a/ml
+                                          3
+                                          #:timeout/s 10
+                                          #:memory/gb 1)
+                 (run-with-mutated-module p/f
+                                          a/f
+                                          3
+                                          #:timeout/s 10
+                                          #:memory/gb 1))
+    (test-match (run-with-mutated-module p/ml
+                                         a/ml
+                                         3
+                                         #:timeout/s 10
+                                         #:memory/gb 1)
+                (struct* run-status ([outcome 'blamed]
+                                     [blamed "a.rkt"]))))
+  (test-begin
+    #:name run-with-mutated-module/runtime-error-locations
+    ;; #:before (setup-test-env!)
+    ;; #:after (cleanup-test-env!)
+    (ignore
+     (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
+                        #'(module a racket
+                            (#%module-begin
+                             (require "b.rkt")
+                             (define x (foo (+ 1) "2" 0))
+                             (x)
+                             (define (main)
+                               (+ "a" "b"))
+                             (main)))))
+     (define b (mod/loc (simple-form-path "./test-mods/b.rkt")
+                        #'(module a racket
+                            (#%module-begin
+                             (provide foo)
+                             (require "c.rkt")
+                             (define (foo x y z)
+                               (when (and (number? x)
+                                          (negative? x))
+                                 (list-ref '(1 2 3) x))
+                               (bar x y z))))))
+     (define c (mod/loc (simple-form-path "./test-mods/c.rkt")
+                        #'(module a racket
+                            (#%module-begin
+                             (provide bar)
+                             (define (bar x y z)
+                               (+ (- x) z))))))
      (define p (program a (list b c))))
 
     (test-match
      (run-with-mutated-module p
                               a
-                              0 ; swap foo x y -> crash in bar
+                              0 ; swap x y args of foo -> crash in bar
                               #:timeout/s 10
                               #:memory/gb 1
                               #:suppress-output? #f)
@@ -572,8 +660,7 @@
                               a
                               1 ; (+ 1) to (- 1) -> crash in foo
                               #:timeout/s 10
-                              #:memory/gb 1
-                              #:suppress-output? #f)
+                              #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "b.rkt"])))
     (test-match
@@ -581,8 +668,7 @@
                               a
                               2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
                               #:timeout/s 10
-                              #:memory/gb 1
-                              #:suppress-output? #f)
+                              #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"])))
     (test-match
@@ -590,8 +676,7 @@
                               a
                               3 ; 0 to 1 -> crash in main
                               #:timeout/s 10
-                              #:memory/gb 1
-                              #:suppress-output? #f)
+                              #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"])))))
 
