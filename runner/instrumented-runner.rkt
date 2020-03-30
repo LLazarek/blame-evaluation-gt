@@ -115,11 +115,6 @@
               (module-path-resolve (instrumented-module-module-path m))]
              [current-directory
               (instrumented-module-containing-directory m)])
-          (displayln @~a{
-                         Eval'ing module inside @(instrumented-module-containing-directory m)
-                         with name @(module-path-resolve (instrumented-module-module-path m))
-                         with stx: @(syntax->datum (instrumented-module-stx m))
-                         })
           (eval (instrumented-module-stx m))))
 
       ;; Run the main module
