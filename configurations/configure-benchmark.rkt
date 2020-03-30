@@ -210,23 +210,29 @@
                                      (hash (file-name-string-from-path main) 'none
                                            (file-name-string-from-path a) 'none
                                            (file-name-string-from-path b) 'none))
-                (benchmark-configuration (== main)
-                                         (list-no-order (== a) (== b) (== adapter))
-                                         (== base)))
+                (benchmark-configuration (== main paths=?)
+                                         (list-no-order (== a paths=?)
+                                                        (== b paths=?)
+                                                        (== adapter paths=?))
+                                         (== base paths=?)))
     (test-match (configure-benchmark a-benchmark
                                      (hash (file-name-string-from-path main) 'none
                                            (file-name-string-from-path a) 'types
                                            (file-name-string-from-path b) 'none))
-                (benchmark-configuration (== main)
-                                         (list-no-order (== a/t) (== b) (== adapter))
-                                         (== base)))
+                (benchmark-configuration (== main paths=?)
+                                         (list-no-order (== a/t paths=?)
+                                                        (== b paths=?)
+                                                        (== adapter paths=?))
+                                         (== base paths=?)))
     (test-match (configure-benchmark a-benchmark
                                      (hash (file-name-string-from-path main) 'types
                                            (file-name-string-from-path a) 'types
                                            (file-name-string-from-path b) 'none))
-                (benchmark-configuration (== main/t)
-                                         (list-no-order (== a/t) (== b) (== adapter))
-                                         (== base))))
+                (benchmark-configuration (== main/t paths=?)
+                                         (list-no-order (== a/t paths=?)
+                                                        (== b paths=?)
+                                                        (== adapter paths=?))
+                                         (== base paths=?))))
 
   (test-begin
     #:name make-max-bench-config
