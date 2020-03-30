@@ -5,7 +5,8 @@
            syntax/parse/define
            "../runner/mutation-runner.rkt"
            (only-in (submod "mutant-factory.rkt" test)
-                    mutant-error-log))
+                    mutant-error-log
+                    aggregated-result))
   (provide test-begin/with-env)
 
   (define rt-main-body
@@ -29,11 +30,13 @@
   (define-test-env (setup-test-env! cleanup-test-env!)
     #:directories ([test-mutant-dir (simplify-path "./test-mutants")]
                    [test-bench (simplify-path "./test-bench")]
+                   [test-bench/ut (simplify-path "./test-bench/untyped")]
+                   [test-bench/t (simplify-path "./test-bench/typed")] ; empty
 
                    [realistic-test-bench (simplify-path "./real-test-bench")]
                    [realistic-test-bench/ut (simplify-path "./real-test-bench/untyped")]
                    [realistic-test-bench/t (simplify-path "./real-test-bench/typed")])
-    #:files ([e-path (build-path test-bench "e.rkt")
+    #:files ([e-path (build-path test-bench/ut "e.rkt")
                      @~a{
                          #lang racket
 
@@ -44,7 +47,7 @@
                                y
                                (/ y x)))
                          }]
-             [main-path (build-path test-bench "main.rkt")
+             [main-path (build-path test-bench/ut "main.rkt")
                      @~a{
                          #lang typed/racket
 
@@ -57,7 +60,7 @@
                          (loop)
                          (foo (baz 0 22))
                          }]
-             [loop-path (build-path test-bench "loop.rkt")
+             [loop-path (build-path test-bench/ut "loop.rkt")
                         @~a{
                             #lang typed/racket
                             (provide loop)
@@ -79,7 +82,7 @@
                                                  0
                                                  'foo
                                                  'blamed
-                                                 "./mutant-factory-test.rkt"
+                                                 "mutant-factory-test.rkt"
                                                  #f))]
              [mutant1-path/2 "m12.rktd"
                              (format "~s\n"
@@ -169,11 +172,11 @@
                        (run-status e.rkt
                                    0
                                    'baz
-                                   'crashed
-                                   #f
+                                   'blamed
+                                   e.rkt
                                    #f)
                        42
-                       'no-blame
+                       'sample
                        #f))
 (define dead-e-proc/completed
   (struct-copy dead-mutant-process
@@ -203,9 +206,10 @@
                                    'type-error
                                    main.rkt
                                    #f)]))
-#;(test-begin
+(test-begin
  #:name dead-process-blame/type-errors
- (not/test (try-get-blamed dead-e-proc/crashed))
+ (test-equal? (try-get-blamed dead-e-proc/crashed)
+              e.rkt)
  (not/test (try-get-blamed dead-e-proc/completed))
  (test-equal? (try-get-blamed dead-e-proc/blame-e)
               e.rkt)
@@ -218,7 +222,7 @@
               main.rkt)
 
  (test-equal? (process-outcome dead-e-proc/crashed)
-              'crashed)
+              'blamed)
  (test-equal? (process-outcome dead-e-proc/completed)
               'completed)
  (test-equal? (process-outcome dead-e-proc/blame-e)
@@ -226,7 +230,7 @@
  (test-equal? (process-outcome dead-e-proc/type-error-in-d)
               'type-error))
 
-#;(test-begin/with-env
+(test-begin/with-env
  #:name max-mutation-index-exceeded?
 
  (for/and/test ([i (in-range 3)])
@@ -247,9 +251,12 @@
     @~a{Not all expected mutations of @rt-main happening}]
    [(max-mutation-index-exceeded? rt-main 6)
     @~a{@rt-main has more mutations than expected}]
-   [(not/test (max-mutation-index-exceeded? rt-second 0))
-    @~a{@rt-second doesn't have the expected mutation}]
-   [(max-mutation-index-exceeded? rt-second 1)
+   [(for/and/test ([i (in-range 2)])
+                  (extend-test-message
+                   (not (max-mutation-index-exceeded? rt-second i))
+                   @~a{(stopped at index @i)}))
+    @~a{@rt-second doesn't have the expected mutations}]
+   [(max-mutation-index-exceeded? rt-second 2)
     @~a{@rt-second has more mutations than expected}])))
 
 (define mutant0-mod "mutant0.rkt")
@@ -269,7 +276,7 @@
                                      (λ _ (mutant0-status))
                                      empty-will
                                      0
-                                     'no-blame
+                                     'sample
                                      0
                                      #f))
 (define mutant1 (mutant mutant1-mod 1 #t))
@@ -294,7 +301,7 @@
                                        (λ _ (mutant1-status))
                                        empty-will
                                        2
-                                       'no-blame
+                                       'sample
                                        0
                                        #f))
 
@@ -311,12 +318,12 @@
                                      (λ _ (mutant2-status))
                                      mutant2-will
                                      3
-                                     'no-blame
+                                     'sample
                                      0
                                      #f))
 
 
-#;(test-begin/with-env
+(test-begin/with-env
  #:name mutant-results
  (ignore
   (define mutant1-proc/1-result (call-with-input-file mutant1-path/1 read)))
@@ -338,9 +345,7 @@
                          (mutant-process-blame-trail-id mutant1-proc/1)
                          #f))
   (append-mutant-result!
-   (dead-mutant-process-blame-trail-id dead-mutant1-proc/1)
-   (dead-mutant-process-result dead-mutant1-proc/1)
-   (dead-mutant-process-config dead-mutant1-proc/1)
+   dead-mutant1-proc/1
    (aggregate-mutant-result (mutant-process-mutant mutant1-proc/2)
                             (mutant-process-file mutant1-proc/2))))
  (test-equal?
@@ -356,16 +361,16 @@
 
 
 
-#;(parameterize ([mutant2-called? #f])
+(parameterize ([mutant2-called? #f])
   (test-begin/with-env
    #:name process-dead-mutant
    (ignore
+    ;; aggregated result for mutant1/1
     (define mutant1-proc/1-result (call-with-input-file mutant1-path/1 read))
+    ;; aggregated result for mutant2
     (define mutant2-proc-result (call-with-input-file mutant2-path read))
     (define aggregate-file (mutant-process-file mutant1-proc/2))
-    (define aggregate-file-contents
-      (cons (mutant-process-id mutant1-proc/2)
-            (call-with-input-file aggregate-file read)))
+    (define aggregate-file-contents (file->value mutant1-path/2))
     ;; make the aggregate file be in the right state
     (call-with-output-file aggregate-file #:exists 'replace
       (λ (out) (writeln aggregate-file-contents out)))
@@ -373,12 +378,15 @@
                                                        aggregate-file))
     (define mutant1-proc/1-file (mutant-process-file mutant1-proc/1))
     (define mutant1-proc/1-file-contents
-      (call-with-input-file mutant1-proc/1-file read))
+      (file->value mutant1-proc/1-file))
     (define mutant1-proc/1-file-contents+blame-trail
-      (cons (mutant-process-id mutant1-proc/2)
-            mutant1-proc/1-file-contents))
+      (aggregated-result
+       (mutant-process-blame-trail-id mutant1-proc/1)
+       (mutant-process-id mutant1-proc/1)
+       mutant1-proc/1-file-contents
+       (mutant-process-config mutant1-proc/1)))
     (define mutant2-proc-file (mutant-process-file mutant2-proc))
-    (define mutant2-proc-file-contents (call-with-input-file mutant2-proc-file read))
+    (define mutant2-proc-file-contents (file->value mutant2-proc-file))
     (define orig-results (hash mutant1
                                mutant1-aggregate
                                ;; extra garbage not relevant
@@ -402,8 +410,7 @@
         (process-dead-mutant orig-factory mutant2-proc)))
 
     (define new-aggregate-file-contents
-      (call-with-input-file aggregate-file
-        (λ (in) (list (read in) (read in))))))
+      (file->list aggregate-file)))
 
    (test-equal? new-aggregate-file-contents
                 (list aggregate-file-contents
@@ -432,8 +439,13 @@
    ;; and its file persists as the aggregate file
    (file-exists? mutant2-proc-file)
    ;; but it has its blame trail info included now
-   (test-equal? (call-with-input-file mutant2-proc-file read)
-                (cons 'no-blame mutant2-proc-file-contents))
+   (test-equal? (file->value mutant2-proc-file)
+                (aggregated-result
+                 ;; successful sample so id becomes blame trail
+                 (mutant-process-id mutant2-proc)
+                 (mutant-process-id mutant2-proc)
+                 mutant2-proc-file-contents
+                 (mutant-process-config mutant2-proc)))
    ;; and the will of mutant2 was executed
    (mutant2-called?)))
 
@@ -507,170 +519,170 @@
                     [fatal-msg? "Fatal message not logged"]
                     [(test-equal? expect-exit? (unbox exit-called?))
                      "Abort call recorded does not match expected"]))
-;; (test-begin/with-env
-;;   #:name process-dead-mutant/revival/on-error
-;;   (test-revival mutant0-proc mutant0-status 'done-error 3 #t))
-;; (test-begin/with-env
-;;  #:name process-dead-mutant/revival/no-output
-;;  (test-revival (mutant-process mutant0
-;;                                (hash mutant2-mod 'none
-;;                                      mutant1-mod 'types
-;;                                      mutant0-mod 'none
-;;                                      main.rkt 'none)
-;;                                empty-file-path
-;;                                (λ _ (mutant0-status))
-;;                                empty-will
-;;                                0
-;;                                'no-blame
-;;                                0
-;;                                #f)
-;;                mutant0-status
-;;                'done-ok
-;;                4 ;; 3 revivals + final failure
-;;                #t))
+(test-begin/with-env
+  #:name process-dead-mutant/revival/on-error
+  (test-revival mutant0-proc mutant0-status 'done-error 3 #t))
+(test-begin/with-env
+ #:name process-dead-mutant/revival/no-output
+ (test-revival (mutant-process mutant0
+                               (hash mutant2-mod 'none
+                                     mutant1-mod 'types
+                                     mutant0-mod 'none
+                                     main.rkt 'none)
+                               empty-file-path
+                               (λ _ (mutant0-status))
+                               empty-will
+                               0
+                               'sample
+                               0
+                               #f)
+               mutant0-status
+               'done-ok
+               4 ;; 3 revivals + final failure
+               #t))
 
-;; (test-begin/with-env
-;;  #:name process-dead-mutant/revival/suppress-abort
-;;  (parameterize ([abort-on-failure? #f])
-;;    (test-revival (mutant-process mutant0
-;;                                  (hash mutant2-mod 'none
-;;                                        mutant1-mod 'types
-;;                                        mutant0-mod 'none
-;;                                        main.rkt 'none)
-;;                                  empty-file-path
-;;                                  (λ _ (mutant0-status))
-;;                                  empty-will
-;;                                  0
-;;                                  'no-blame
-;;                                  0
-;;                                  #f)
-;;                  mutant0-status
-;;                  'done-ok
-;;                  5 ;; 3 revival attempts + final failure + 1 ignored abort
-;;                  #f)))
+(test-begin/with-env
+ #:name process-dead-mutant/revival/suppress-abort
+ (parameterize ([abort-on-failure? #f])
+   (test-revival (mutant-process mutant0
+                                 (hash mutant2-mod 'none
+                                       mutant1-mod 'types
+                                       mutant0-mod 'none
+                                       main.rkt 'none)
+                                 empty-file-path
+                                 (λ _ (mutant0-status))
+                                 empty-will
+                                 0
+                                 'sample
+                                 0
+                                 #f)
+                 mutant0-status
+                 'done-ok
+                 5 ;; 3 revival attempts + final failure + 1 ignored abort
+                 #f)))
 
 
 
-;; (define-test (test-blame-disappearing-handler
-;;               outcome has-increased-limits?
-;;               #:exit? expect-exit-called?
-;;               #:respawn test-respawn-call
-;;               #:logged test-logger)
-;;   (define (make-dead-mutant result increased-limits?)
-;;     (dead-mutant-process mutant1
-;;                          (mutant-process-config mutant1-proc/1)
-;;                          result
-;;                          (mutant-process-id mutant1-proc/1)
-;;                          (mutant-process-blame-trail-id mutant1-proc/1)
-;;                          increased-limits?))
-;;   (define orig-dead-mutant
-;;     (make-dead-mutant
-;; (run-status mutant0-mod 0 'foo 'blamed mutant0-mod #f)
-;;       #f))
-;;   (define new-dead-mutant
-;; (make-dead-mutant (run-status mutant0-mod
-;;                               0
-;;                               'foo
-;;                               outcome
-;;                               (match outcome
-;;                                     [(or 'blamed 'type-error)
-;;                                      mutant0-mod]
-;;                                     [else #f])
-;;                                   #f)
-;;                       has-increased-limits?))
-;;   (define respawn-call (box #f))
-;;   (define handler
-;;     (make-blame-disappearing-handler orig-dead-mutant
-;;                                      mutant1-path/1
-;;                                      (λ (f #:timeout/s timeout
-;;                                            #:memory/gb memory)
-;;                                        (set-box! respawn-call
-;;                                                  (list timeout memory))
-;;                                        f)))
-;;   (define the-factory
-;;     (factory (bench-info (benchmark (list mutant2-mod
-;;                                           mutant1-mod
-;;                                           mutant0-mod
-;;                                           main.rkt)
-;;                                     (list mutant2-mod
-;;                                           mutant1-mod
-;;                                           mutant0-mod
-;;                                           main.rkt)
-;;                                     #f #f)
-;;                          (hash))
-;;              (hash)
-;;              (set)
-;;              0
-;;              (hash)
-;;              0))
-;;   (define exit-called? (box #f))
-;;   (define logged
-;;     (with-log-message-counts
-;;       (thunk
-;;        (parameterize ([exit-handler (λ _ (set-box! exit-called? #t))])
-;;          (handler the-factory new-dead-mutant)))))
+(define-test (test-blame-disappearing-handler
+              outcome has-increased-limits?
+              #:exit? expect-exit-called?
+              #:respawn test-respawn-call
+              #:logged test-logger)
+  (define (make-dead-mutant result increased-limits?)
+    (dead-mutant-process mutant1
+                         (mutant-process-config mutant1-proc/1)
+                         result
+                         (mutant-process-id mutant1-proc/1)
+                         (mutant-process-blame-trail-id mutant1-proc/1)
+                         increased-limits?))
+  (define orig-dead-mutant
+    (make-dead-mutant
+     (run-status mutant0-mod 0 'foo 'blamed mutant0-mod #f)
+     #f))
+  (define new-dead-mutant
+    (make-dead-mutant (run-status mutant0-mod
+                                  0
+                                  'foo
+                                  outcome
+                                  (match outcome
+                                    [(or 'blamed 'type-error)
+                                     mutant0-mod]
+                                    [else #f])
+                                  #f)
+                      has-increased-limits?))
+  (define respawn-call (box #f))
+  (define handler
+    (make-blame-disappearing-handler orig-dead-mutant
+                                     (file-name-string-from-path mutant1-path/1)
+                                     (λ (f #:timeout/s timeout
+                                           #:memory/gb memory)
+                                       (set-box! respawn-call
+                                                 (list timeout memory))
+                                       f)))
+  (define the-factory
+    (factory (bench-info (benchmark (list mutant2-mod
+                                          mutant1-mod
+                                          mutant0-mod
+                                          main.rkt)
+                                    (list mutant2-mod
+                                          mutant1-mod
+                                          mutant0-mod
+                                          main.rkt)
+                                    #f #f)
+                         (hash))
+             (hash)
+             (set)
+             0
+             (hash)
+             0))
+  (define exit-called? (box #f))
+  (define logged
+    (with-log-message-counts
+      (thunk
+       (parameterize ([exit-handler (λ _ (set-box! exit-called? #t))])
+         (handler the-factory new-dead-mutant)))))
 
-;;   (and/test (test-respawn-call (unbox respawn-call))
-;;             (test-logger logged)
-;;             (test-equal? (unbox exit-called?) expect-exit-called?)))
+  (and/test (test-respawn-call (unbox respawn-call))
+            (test-logger logged)
+            (test-equal? (unbox exit-called?) expect-exit-called?)))
 
-;; (test-begin/with-env
-;;  #:name make-blame-disappearing-handler
-;;  ;; a mutant that crashes while following blame trail is a clear bug
-;;  (test-blame-disappearing-handler
-;;   'crashed
-;;   #f
-;;   #:exit? #t
-;;   #:respawn false?
-;;   #:logged (λ (logged)
-;;              (test-= (hash-ref logged 'fatal) 2)))
+(test-begin/with-env
+ #:name make-blame-disappearing-handler
+ ;; a mutant that crashes while following blame trail is a clear bug
+ (test-blame-disappearing-handler
+  'crashed
+  #f
+  #:exit? #t
+  #:respawn false?
+  #:logged (λ (logged)
+             (test-= (hash-ref logged 'fatal) 2)))
 
-;;  ;; a mutant that times out or ooms should initially be retried with a warning
-;;  (test-blame-disappearing-handler
-;;   'timeout
-;;   #f
-;;   #:exit? #f
-;;   #:respawn (λ (maybe-respawn-args)
-;;               (test-equal? maybe-respawn-args
-;;                            (list (* 2 (default-timeout/s))
-;;                                  (* 2 (default-memory-limit/gb)))))
-;;   #:logged (λ (logged)
-;;              (and/test/message
-;;               [(test-= (hash-ref logged 'info) 1)
-;;                "info message count wrong"]
-;;               [(test-= (hash-ref logged 'warning) 0)
-;;                "warning message count wrong"]
-;;               [(test-= (hash-ref logged 'fatal) 0)
-;;                "fatal message count wrong"])))
+ ;; a mutant that times out or ooms should initially be retried with a warning
+ (test-blame-disappearing-handler
+  'timeout
+  #f
+  #:exit? #f
+  #:respawn (λ (maybe-respawn-args)
+              (test-equal? maybe-respawn-args
+                           (list (* 2 (default-timeout/s))
+                                 (* 2 (default-memory-limit/gb)))))
+  #:logged (λ (logged)
+             (and/test/message
+              [(test-= (hash-ref logged 'info) 1)
+               "info message count wrong"]
+              [(test-= (hash-ref logged 'warning) 0)
+               "warning message count wrong"]
+              [(test-= (hash-ref logged 'fatal) 0)
+               "fatal message count wrong"])))
 
-;;  ;; a mutant that times out or ooms after have already been retried
-;;  ;; should signal a warning and continue (without trying to respawn again)
-;;  (test-blame-disappearing-handler
-;;   'oom
-;;   #t
-;;   #:exit? #f
-;;   #:respawn false?
-;;   #:logged (λ (logged)
-;;              (and/test/message
-;;               [(test-= (hash-ref logged 'info) 0)
-;;                "info message count wrong"]
-;;               [(test-= (hash-ref logged 'warning) 1)
-;;                "warning message count wrong"]
-;;               [(test-= (hash-ref logged 'fatal) 0)
-;;                "fatal message count wrong"])))
-;;  (test-blame-disappearing-handler
-;;   'timeout
-;;   #t
-;;   #:exit? #f
-;;   #:respawn false?
-;;   #:logged (λ (logged)
-;;              (and/test/message
-;;               [(test-= (hash-ref logged 'info) 0)
-;;                "info message count wrong"]
-;;               [(test-= (hash-ref logged 'warning) 1)
-;;                "warning message count wrong"]
-;;               [(test-= (hash-ref logged 'fatal) 0)
-;;                "fatal message count wrong"]))))
+ ;; a mutant that times out or ooms after have already been retried
+ ;; should signal a warning and continue (without trying to respawn again)
+ (test-blame-disappearing-handler
+  'oom
+  #t
+  #:exit? #f
+  #:respawn false?
+  #:logged (λ (logged)
+             (and/test/message
+              [(test-= (hash-ref logged 'info) 0)
+               "info message count wrong"]
+              [(test-= (hash-ref logged 'warning) 1)
+               "warning message count wrong"]
+              [(test-= (hash-ref logged 'fatal) 0)
+               "fatal message count wrong"])))
+ (test-blame-disappearing-handler
+  'timeout
+  #t
+  #:exit? #f
+  #:respawn false?
+  #:logged (λ (logged)
+             (and/test/message
+              [(test-= (hash-ref logged 'info) 0)
+               "info message count wrong"]
+              [(test-= (hash-ref logged 'warning) 1)
+               "warning message count wrong"]
+              [(test-= (hash-ref logged 'fatal) 0)
+               "fatal message count wrong"]))))
 
 
 
@@ -693,128 +705,173 @@
 (define e-proc-config (hash e.rkt 'types
                             main.rkt 'none
                             loop.rkt 'none))
-;; (parameterize ([data-output-dir test-mutant-dir])
-;;   (test-begin/with-env
-;;    #:name spawn-mutant/simple
-;;    (ignore
-;;     (define new-factory (spawn-mutant orig-factory
-;;                                       e.rkt
-;;                                       0
-;;                                       e-proc-config
-;;                                       empty-will)))
-;;    (test-= (set-count (factory-active-mutants new-factory))
-;;            3)
-;;    (test-= (factory-active-mutant-count new-factory)
-;;            3)
-;;    (test-= (factory-total-mutants-spawned new-factory)
-;;            6)
-;;    ;; spawning a mutant has no effect on the result map
-;;    (test-equal? (factory-results new-factory)
-;;                 (factory-results orig-factory))
-;;    ;; or the current bench
-;;    (test-equal? (factory-bench new-factory)
-;;                 (factory-bench orig-factory))
+(parameterize ([data-output-dir test-mutant-dir])
+  (test-begin/with-env
+   #:name spawn-mutant/simple
+   (ignore
+    (define new-factory (spawn-mutant orig-factory
+                                      e.rkt
+                                      0
+                                      e-proc-config
+                                      empty-will
+                                      #:blame-trail-root? #t)))
+   (test-= (set-count (factory-active-mutants new-factory))
+           3)
+   (test-= (factory-active-mutant-count new-factory)
+           3)
+   (test-= (factory-total-mutants-spawned new-factory)
+           6)
+   ;; spawning a mutant has no effect on the result map
+   (test-equal? (factory-results new-factory)
+                (factory-results orig-factory))
+   ;; or the current bench
+   (test-equal? (factory-bench new-factory)
+                (factory-bench orig-factory))
 
-;;    (ignore (match-define (list-no-order (== mutant1-proc/1)
-;;                                         (== mutant2-proc)
-;;                                         e-proc)
-;;              (set->list (factory-active-mutants new-factory))))
-;;    (test-match e-proc
-;;                (mutant-process (mutant (== e.rkt) 0 #t)
-;;                                (== e-proc-config)
-;;                                _
-;;                                _
-;;                                (== empty-will)
-;;                                _
-;;                                'no-blame
-;;                                0
-;;                                #f)))
-;;   (test-begin/with-env
-;;    #:name spawn-mutant/extended-limits
-;;    ;; Test that spawning a mutant with extended limits is recorded in
-;;    ;; the new mutant-process
-;;    (ignore
-;;     (define new-factory* (spawn-mutant orig-factory
-;;                                        e.rkt
-;;                                        0
-;;                                        e-proc-config
-;;                                        empty-will
-;;                                        #:timeout/s 5
-;;                                        #:memory/gb 30))
-;;     (match-define (list-no-order (== mutant1-proc/1)
-;;                                  (== mutant2-proc)
-;;                                  e-proc*)
-;;       (set->list (factory-active-mutants new-factory*))))
-;;    (test-match e-proc*
-;;                (mutant-process (mutant (== e.rkt) 0 #t)
-;;                                (== e-proc-config)
-;;                                _
-;;                                _
-;;                                (== empty-will)
-;;                                _
-;;                                'no-blame
-;;                                0
-;;                                #t)))
+   (ignore (match-define (list-no-order (== mutant1-proc/1)
+                                        (== mutant2-proc)
+                                        e-proc)
+             (set->list (factory-active-mutants new-factory))))
+   (test-match e-proc
+               (mutant-process (mutant (== e.rkt) 0 #t)
+                               (== e-proc-config)
+                               _
+                               _
+                               (== empty-will)
+                               _
+                               'sample
+                               0
+                               #f)))
+  (test-begin/with-env
+   #:name spawn-mutant/trail-types
+   (ignore
+    (define-test (test-mutant-trail-type #:blame-trail-root? [bt-root? #f]
+                                         #:following-trail [following #f]
+                                         #:test-mutant? [test? #f])
+      (define new-factory (spawn-mutant orig-factory
+                                        e.rkt
+                                        0
+                                        e-proc-config
+                                        empty-will
+                                        #:blame-trail-root? bt-root?
+                                        #:following-trail following
+                                        #:test-mutant? test?))
+      (match-define (list-no-order (== mutant1-proc/1)
+                                   (== mutant2-proc)
+                                   e-proc)
+        (set->list (factory-active-mutants new-factory)))
+      (define ctl (mutant-process-ctl e-proc))
+      (ctl 'kill)
+      (when (file-exists? (mutant-process-file e-proc))
+        (delete-file (mutant-process-file e-proc)))
+      (extend-test-message
+       (test-equal? (mutant-process-blame-trail-id e-proc)
+                    (cond [bt-root?     sample-flag]
+                          [following => values]
+                          [test?        test-mutant-flag]))
+       @~a{Mutant spawned with @(cond [bt-root? '#:blame-trail-root?]
+                                      [following '#:following-trail]
+                                      [test? '#:test-mutant?]) has bad trail:})))
+   (test-mutant-trail-type
+    #:blame-trail-root? #t)
+   (test-mutant-trail-type
+    #:following-trail 42)
+   (test-mutant-trail-type
+    #:test-mutant? #t))
+  (test-begin/with-env
+   #:name spawn-mutant/extended-limits
+   ;; Test that spawning a mutant with extended limits is recorded in
+   ;; the new mutant-process
+   (ignore
+    (define new-factory* (spawn-mutant orig-factory
+                                       e.rkt
+                                       0
+                                       e-proc-config
+                                       empty-will
+                                       #:timeout/s 5
+                                       #:memory/gb 30
+                                       #:following-trail 42))
+    (match-define (list-no-order (== mutant1-proc/1)
+                                 (== mutant2-proc)
+                                 e-proc*)
+      (set->list (factory-active-mutants new-factory*))))
+   (test-match e-proc*
+               (mutant-process (mutant (== e.rkt) 0 #t)
+                               (== e-proc-config)
+                               _
+                               _
+                               (== empty-will)
+                               _
+                               42
+                               0
+                               #t)))
 
-;;   (test-begin/with-env
-;;    #:name spawn-mutant/idle
-;;    ;; Test that an idling factory with zombies logs error messages,
-;;    ;; and at a reasonable rate
-;;    (ignore
-;;     (define logged-messages
-;;       (parameterize ([mutant1-status 'running]
-;;                      [mutant2-status 'running]
-;;                      [process-limit 2]
-;;                      [default-timeout/s 1]
-;;                      [abort-on-failure? #f])
-;;         (with-log-message-counts
-;;           (thunk
-;;            (define thd
-;;              (thread (thunk (spawn-mutant orig-factory
-;;                                           e.rkt
-;;                                           0
-;;                                           e-proc-config
-;;                                           empty-will))))
-;;            (sleep 10)
-;;            (kill-thread thd))))))
-;;    (test-match logged-messages
-;;                ;; ll: need some flexibility here so timing doesn't
-;;                ;; cause intermittent failures
-;;                (hash-table ['error (? (and/c number? (>=/c 1) (<=/c 3)))]
-;;                            ['fatal 0]
-;;                            ['warning 0]
-;;                            _ ___))))
+  (test-begin/with-env
+   #:name spawn-mutant/idle
+   ;; Test that an idling factory with zombies logs error messages,
+   ;; and at a reasonable rate
+   (ignore
+    (define logged-messages
+      (parameterize ([mutant1-status 'running]
+                     [mutant2-status 'running]
+                     [process-limit 2]
+                     [default-timeout/s 1]
+                     [abort-on-failure? #f]
+                     [sweep-delay-seconds 2]
+                     [sweep-retry-limit 2])
+        (with-log-message-counts
+          (thunk
+           (define thd
+             (thread (thunk (spawn-mutant orig-factory
+                                          e.rkt
+                                          0
+                                          e-proc-config
+                                          empty-will
+                                          #:following-trail 42))))
+           (sleep (* (sweep-delay-seconds) (sweep-retry-limit) 2))
+           (kill-thread thd))))))
+   (test-match logged-messages
+               ;; ll: need some flexibility here so timing doesn't
+               ;; cause intermittent failures.
+               ;; Should happen at least once, at most twice.
+               (hash-table ['error (? (and/c number? (between/c 1 2)))]
+                           ['fatal 0]
+                           ['warning 0]
+                           _ ___))))
 
 
-;; (test-begin/with-env
-;;  #:name maybe-spawn-configured-mutants
-;;  (ignore
-;;   (define final-factory (box #f))
-;;   (define logged
-;;     (parameterize ([data-output-dir test-mutant-dir]
-;;                    [default-timeout/s 1]
-;;                    [abort-on-failure? #f])
-;;       (with-log-message-counts
-;;         #:display-intercepted-msgs? #t
-;;         (thunk
-;;          (define fact
-;;            (maybe-spawn-configured-mutants
-;;             (copy-factory orig-factory
-;;                           [active-mutants (set)]
-;;                           [active-mutant-count 0])
-;;             (mutant
-;;              loop.rkt
-;;              0
-;;              #t)))
-;;          (set-box! final-factory
-;;                    (for/fold ([current-factory fact])
-;;                              ([i (in-range 3)])
-;;                      ;; triple the max limit that should be imposed
-;;                      (sleep 6)
-;;                      (sweep-dead-mutants current-factory))))))))
-;;  (test-= (hash-ref logged 'warning) 1) ;; warning about giving up on mutant
-;;  (test-match (unbox final-factory)
-;;              (struct* factory ([active-mutants (? set-empty?)]))))
+(test-begin/with-env
+ #:name maybe-spawn-configured-mutants
+ (ignore
+  (define final-factory (box #f))
+  (define logged
+    (parameterize ([data-output-dir test-mutant-dir]
+                   [default-timeout/s 1]
+                   [abort-on-failure? #f])
+      (with-log-message-counts
+        #:display-intercepted-msgs? #f
+        (thunk
+         (define fact
+           (maybe-spawn-configured-mutants
+            (copy-factory orig-factory
+                          [active-mutants (set)]
+                          [active-mutant-count 0])
+            (mutant
+             loop.rkt
+             0
+             #t)))
+         (set-box! final-factory
+                   (for/fold ([current-factory fact])
+                             ;; first sweep: retry, second: report failure
+                             ;; add a third just in case
+                             ([i (in-range 3)])
+                     ;; it seems to take around 6 seconds on my machine to
+                     ;; detect and sweep a mutant timing out
+                     (sleep (* 6 (+ (default-timeout/s) (sweep-delay-seconds))))
+                     (sweep-dead-mutants current-factory))))))))
+ (test-= (hash-ref logged 'warning) 1) ;; warning about giving up on mutant
+ (test-match (unbox final-factory)
+             (struct* factory ([active-mutants (? set-empty?)]))))
 
 
 
@@ -876,9 +933,9 @@
        (run-with-mutated-module p
                                 mod-to-mutate
                                 index
-                                #:modules-base-path (current-directory)
-                                #:write-modules-to "mutant-factory-test-dump"
-                                #:on-module-exists 'replace
+                                ;; #:modules-base-path (current-directory)
+                                ;; #:write-modules-to "mutant-factory-test-dump"
+                                ;; #:on-module-exists 'replace
                                 #:suppress-output? #f))
       (displayln "Written; Enter to contineu")
       (read-line))
@@ -888,16 +945,17 @@
                                      ("main.rkt" . types)))
     (define mutant-results (run-all-mutants*configs bench))
     (displayln @~a{Mutant errors: @(file->string error-log)})
-    (displayln "Data:")
-    (for ([{m aggregate-result} (in-hash mutant-results)])
-      (displayln
-       @~a{Mutant file @m contents:
-                  @(pretty-format
-                    (file->list
-                     (aggregate-mutant-result-file aggregate-result)))
+    ;; (displayln "Data:")
+    ;; (for ([{m aggregate-result} (in-hash mutant-results)])
+    ;;   (displayln
+    ;;    @~a{Mutant file @m contents:
+    ;;               @(pretty-format
+    ;;                 (file->list
+    ;;                  (aggregate-mutant-result-file aggregate-result)))
 
 
-                  })))
+    ;;               }))
+    )
    (test-= (length (directory-list test-mutant-dir))
            8)
    (for/and/test ([f (in-directory test-mutant-dir)])

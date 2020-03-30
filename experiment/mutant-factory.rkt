@@ -62,7 +62,10 @@
            sample-size
            copy-factory
            mutant-error-log
-           test-mutant-flag))
+           sample-flag
+           test-mutant-flag
+           sweep-retry-limit
+           sweep-delay-seconds))
 
 
 (define MAX-CONFIG 'types)
@@ -80,6 +83,10 @@
 (define abort-on-failure? (make-parameter #t))
 (define default-memory-limit/gb (make-parameter 3))
 (define default-timeout/s (make-parameter (* 5 60)))
+(define sweep-retry-limit
+  ;; Wait 2 secs per try, so halve the limit
+  (make-parameter (quotient (* 3 (default-timeout/s)) 2)))
+(define sweep-delay-seconds (make-parameter 2))
 
 
 (define-logger factory)
@@ -678,11 +685,6 @@ Predecessor (id [~a]) blamed ~a and had config:
        (no-blame-fallback the-factory dead-proc)])))
 
 
-(define sweep-retry-limit
-  ;; Wait 2 secs per try, so halve the limit
-  (quotient (* 3 (default-timeout/s)) 2))
-
-
 (define/contract (spawn-mutant the-factory
                                module-to-mutate-name
                                mutation-index
@@ -706,7 +708,8 @@ Predecessor (id [~a]) blamed ~a and had config:
         #:timeout/s [t/s (or/c #f number?)]
         #:memory/gb [m/gb (or/c #f number?)])
        #:pre/desc {bt-root? maybe-trail-id test?}
-       (or (= 2 (count unsupplied-arg? (list bt-root? maybe-trail-id test?)))
+       (or (= 2 (count (disjoin unsupplied-arg? false?)
+                       (list bt-root? maybe-trail-id test?)))
            @~a{
                Exactly one of
                #:blame-trail-root? (@bt-root?),
@@ -726,7 +729,7 @@ Predecessor (id [~a]) blamed ~a and had config:
             active-mutant-count
             (process-limit)
             idle-retry-count)
-           (when (>= idle-retry-count sweep-retry-limit)
+           (when (>= idle-retry-count (sweep-retry-limit))
              (log-factory
               error
               "Mutants at limit but unable to sweep any after ~a minutes.
@@ -734,10 +737,10 @@ There are likely zombie mutants about.
 Active mutant set (ids):
 ~v
 "
-              (/ sweep-retry-limit 30)
+              (/ (sweep-retry-limit) 30)
               (set-map (factory-active-mutants current-factory)
                        mutant-process-id)))
-           (sleep 2)
+           (sleep (sweep-delay-seconds))
            (define sweeped (sweep-dead-mutants current-factory))
            (try-again sweeped
                       ;; Sweeping may cause a new mutant to be
@@ -747,7 +750,7 @@ Active mutant set (ids):
                           ;; Also wrap the counter around so that
                           ;; idling doesn't cause above message to be
                           ;; logged every 2 sec
-                          (modulo (add1 idle-retry-count) (add1 sweep-retry-limit))
+                          (modulo (add1 idle-retry-count) (add1 (sweep-retry-limit)))
                           0))]
           [else
            (match-define (factory (bench-info the-benchmark _)
@@ -816,7 +819,7 @@ Active mutant set (ids):
     (cond [(zero? (factory-active-mutant-count sweeped-factory))
            (log-factory info "Babysitting complete. All mutants are dead.")
            current-factory]
-          [(>= retries sweep-retry-limit)
+          [(>= retries (sweep-retry-limit))
            (log-factory
             error
             "Unable to sweep any mutants after ~a minutes of babysitting.
@@ -824,14 +827,14 @@ There are likely zombie mutants about.
 Active mutant set (ids):
 ~v
 "
-            (/ sweep-retry-limit 30)
+            (/ (sweep-retry-limit) 30)
             (set-map (factory-active-mutants current-factory)
                      mutant-process-id))]
           [else
-           (sleep 2)
+           (sleep (sweep-delay-seconds))
            (log-factory
             debug
-            @~a{Babysitting retry: @retries / @sweep-retry-limit})
+            @~a{Babysitting retry: @retries / @(sweep-retry-limit)})
            (log-factory
             debug
             @~a{Current active set: @~v[(set-map (factory-active-mutants current-factory)
@@ -921,9 +924,10 @@ Attempting revival ~a / ~a
                    config
                    will
                    (add1 revival-count)
+                   #:blame-trail-root? (equal? orig-blame-trail sample-flag)
                    #:following-trail (match orig-blame-trail
-                                       [(== test-mutant-flag) #f]
-                                       [id id])
+                                       [(? natural? id) id]
+                                       [else            #f])
                    #:test-mutant? (equal? orig-blame-trail test-mutant-flag))]
     [(cons 'done-ok (? run-status? result))
      (log-factory info
@@ -1153,7 +1157,7 @@ Mutant: [~a] ~a @ ~a with config:
   [{(struct* run-status ([outcome 'type-error]
                          [blamed blamed]))}
    blamed]
-  [{(struct* run-status ([outcome (not 'blamed)]))}
+  [{(struct* run-status ([outcome (not 'type-error)]))}
    #f])
 (define/match (try-get-type-error-module dead-proc)
   [{(struct* dead-mutant-process
