@@ -16,15 +16,24 @@
 
 (define dry-run? (make-parameter #t))
 (define (shell* . args)
+  (define args/full-program-path
+    (match args
+      [(list* (and (? string?)
+                   (not (regexp #rx"/"))
+                   name)
+              program-args)
+       (cons (find-executable-path name)
+             program-args)]
+      [else args]))
   (cond [(dry-run?)
          (displayln @~a{
                         Would have run command in @(pretty-path (current-directory)):
-                        $ @(string*-join args)
+                        $ @(string*-join args/full-program-path)
                         })
          #t]
         [else
-         (displayln @~a{Executing $ @(string*-join args)})
-         (apply system* args)]))
+         (displayln @~a{Executing $ @(string*-join args/full-program-path)})
+         (apply system* args/full-program-path)]))
 
 (define (install-racket racket-dir)
   (define-values {parent _}
