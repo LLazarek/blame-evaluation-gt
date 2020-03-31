@@ -880,14 +880,14 @@
 (parameterize ([data-output-dir test-mutant-dir]
                [process-limit (match (gethostname)
                                 [(regexp "quser[0-9]+") 1]
-                                [else 4])]
+                                [else 6])]
                [sample-size (match (gethostname)
                                 [(regexp "quser[0-9]+") 3]
                                 [else 10])]
                [abort-on-failure? #f]
                [default-timeout/s (match (gethostname)
-                                    [(regexp "quser[0-9]+") 20]
-                                    [else 10])]
+                                    [(regexp "quser[0-9]+") 240]
+                                    [else 90])]
                [default-memory-limit/gb 1])
   (displayln @~a{
 
@@ -958,16 +958,16 @@
                                      ("main.rkt" . types)))
     (define mutant-results (run-all-mutants*configs bench))
     (displayln @~a{Mutant errors: @(file->string error-log)})
-    ;; (displayln "Data:")
-    ;; (for ([{m aggregate-result} (in-hash mutant-results)])
-    ;;   (displayln
-    ;;    @~a{Mutant file @m contents:
-    ;;               @(pretty-format
-    ;;                 (file->list
-    ;;                  (aggregate-mutant-result-file aggregate-result)))
+    (displayln "Data:")
+    (for ([{m aggregate-result} (in-hash mutant-results)])
+      (displayln
+       @~a{Mutant file @m contents:
+                  @(pretty-format
+                    (file->list
+                     (aggregate-mutant-result-file aggregate-result)))
 
 
-    ;;               }))
+                  }))
     )
    (test-= (length (directory-list test-mutant-dir))
            8)

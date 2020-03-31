@@ -442,7 +442,7 @@
      (run-with-mutated-module p
                               main
                               2
-                              #:timeout/s 20
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "main.rkt"]))))
