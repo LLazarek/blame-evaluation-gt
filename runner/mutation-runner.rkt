@@ -401,7 +401,7 @@
      (run-with-mutated-module p
                               a
                               2
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 0.5)
      (struct* run-status ([outcome 'oom]))))
 
@@ -442,7 +442,7 @@
      (run-with-mutated-module p
                               main
                               2
-                              #:timeout/s 3
+                              #:timeout/s 20
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "main.rkt"]))))
@@ -506,7 +506,7 @@
      (run-with-mutated-module p
                               b
                               0
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
                           [blamed "b.rkt"])))
@@ -514,7 +514,7 @@
      (run-with-mutated-module p
                               c
                               0
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
                           [blamed "c.rkt"])))
@@ -522,7 +522,7 @@
      (run-with-mutated-module p
                               a
                               11 ;; runtime error -> blame on a.rkt
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"]))))
@@ -600,17 +600,17 @@
     (test-equal? (run-with-mutated-module p/ml
                                           a/ml
                                           3
-                                          #:timeout/s 10
+                                          #:timeout/s 30
                                           #:memory/gb 1)
                  (run-with-mutated-module p/f
                                           a/f
                                           3
-                                          #:timeout/s 10
+                                          #:timeout/s 30
                                           #:memory/gb 1))
     (test-match (run-with-mutated-module p/ml
                                          a/ml
                                          3
-                                         #:timeout/s 10
+                                         #:timeout/s 30
                                          #:memory/gb 1)
                 (struct* run-status ([outcome 'blamed]
                                      [blamed "a.rkt"]))))
@@ -650,7 +650,7 @@
      (run-with-mutated-module p
                               a
                               0 ; swap x y args of foo -> crash in bar
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1
                               #:suppress-output? #f)
      (struct* run-status ([outcome 'blamed]
@@ -659,7 +659,7 @@
      (run-with-mutated-module p
                               a
                               1 ; (+ 1) to (- 1) -> crash in foo
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "b.rkt"])))
@@ -667,7 +667,7 @@
      (run-with-mutated-module p
                               a
                               2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"])))
@@ -675,7 +675,7 @@
      (run-with-mutated-module p
                               a
                               3 ; 0 to 1 -> crash in main
-                              #:timeout/s 10
+                              #:timeout/s 30
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"])))))

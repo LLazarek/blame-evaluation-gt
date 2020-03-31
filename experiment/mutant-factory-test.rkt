@@ -876,12 +876,19 @@
 
 
 
+(require racket/os)
 ;; Full run test
 (parameterize ([data-output-dir test-mutant-dir]
-               [process-limit 4]
-               [sample-size 10]
+               [process-limit (match (gethostname)
+                                [(regexp "quser[0-9]+") 1]
+                                [else 4])]
+               [sample-size (match (gethostname)
+                                [(regexp "quser[0-9]+") 3]
+                                [else 10])]
                [abort-on-failure? #f]
-               [default-timeout/s 10]
+               [default-timeout/s (match (gethostname)
+                                    [(regexp "quser[0-9]+") 20]
+                                    [else 10])]
                [default-memory-limit/gb 1])
   (displayln @~a{
 

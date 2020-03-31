@@ -39,13 +39,15 @@
   (define-values {parent _}
     (basename racket-dir #:with-directory? #t))
   (parameterize ([current-directory parent])
-    (displayln "Downloading Racket...")
-    (shell* "wget"
-            "https://mirror.racket-lang.org/installers/7.6/racket-7.6-x86_64-linux.sh")
-    (shell* "chmod"
-            "u+x"
-            "racket-7.6-x86_64-linux.sh")
-    (displayln "Done.")
+    (define racket-installer-name "racket-7.6-x86_64-linux.sh")
+    (unless (file-exists? racket-installer-name)
+      (displayln "Downloading Racket...")
+      (shell* "wget"
+	      "https://mirror.racket-lang.org/installers/7.6/racket-7.6-x86_64-linux.sh")
+      (shell* "chmod"
+	      "u+x"
+	      racket-installer-name)
+      (displayln "Done."))
 
     (displayln "Installing Racket...")
     (define installer-outfile "./racket-installer-output.txt")
@@ -53,11 +55,11 @@
                                             #:exists 'replace))
     (define install-status
       (cond [(dry-run?)
-             (shell* "./racket-7.6-x86_64-linux.sh")
+             (shell* @~a{./@racket-installer-name})
              'done-ok]
             [else
              (match (process*/ports installer-out #f 'stdout
-                                    "./racket-7.6-x86_64-linux.sh")
+                                    @~a{./@racket-installer-name})
                [(list #f installer-stdin _ #f installer-ctl)
                 ;; shamelessly ripped off from
                 ;; https://github.com/greghendershott/travis-racket/blob/master/install-racket.sh
@@ -88,7 +90,8 @@
             })
        (exit 1)]
       ['done-ok
-       (shell* "rm" "racket-7.6-x86_64-linux.sh")
+       (when (user-prompt! "Do you want to delete the installer?")
+         (shell* "rm" racket-installer-name))
        (install-pkg-dependencies (build-path racket-dir "bin" "raco"))])))
 
 (define (install-pkg-dependencies raco-path)
@@ -96,6 +99,8 @@
   (begin0 (shell* raco-path
                   "pkg"
                   "install"
+                   "-j" "2"
+                  "--skip-installed"
                   "require-typed-check"
                   "custom-load"
                   "ruinit")
@@ -107,28 +112,30 @@
     (basename TR-dir #:with-directory? #t))
   (define installed?
     (parameterize ([current-directory parent])
-      (and (shell* raco-path
-                   "pkg"
-                   "update"
-                   "--no-setup"
-                   "--catalog"
-                   "--batch"
-                   "https://pkgs.racket-lang.org"
-                   "typed-racket")
-           (shell* raco-path
-                   "pkg"
-                   "update"
-                   "--clone"
-                   "--batch"
-                   "typed-racket"))))
-  (when installed?
-    (parameterize ([current-directory TR-dir])
-      (shell* "git"
-              "checkout"
-              "v7.6")))
-  (displayln "Done.")
-  (and installed?
-       (modify-TR TR-dir)))
+      (shell* raco-path
+              "pkg"
+              "update"
+              "-j" "2"
+              "--no-setup"
+              "--catalog"
+              "https://pkgs.racket-lang.org"
+              "typed-racket")
+      (shell* raco-path
+              "pkg"
+              "update"
+              "-j" "2"
+              "--clone"
+              "typed-racket")
+      #t))
+  (cond [(directory-exists? TR-dir)
+         (parameterize ([current-directory TR-dir])
+           (shell* "git"
+                   "checkout"
+                   "v7.6"))
+         (displayln "Done.")
+         (modify-TR TR-dir)]
+        [else
+         #f]))
 
 (define (modify-TR TR-dir)
   (displayln "Modifying typed-racket...")
@@ -240,3 +247,5 @@
    (void (shell* raco-path
                  "test"
                  repo-path))))
+
+(module test racket/base)
