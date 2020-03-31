@@ -636,7 +636,7 @@ Giving up.
                     mod index dead-succ-id outcome)
        current-factory]
       [{(or 'completed 'crashed) _}
-       (log-factory fatal
+       (log-factory error
                     "Blame disappeared while following blame trail {~a}.
 Mutant: ~a @ ~a with id [~a] and config:
 ~v
@@ -887,7 +887,7 @@ Active mutant set (ids):
     [(or (cons 'done-error _)
          (cons 'done-ok (? eof-object?)))
      #:when (>= revival-count MAX-REVIVALS)
-     (log-factory fatal
+     (log-factory error
                   "Runner errored all ~a / ~a tries on mutant:
  [~a] ~a @ ~a with config
 ~v"
@@ -996,7 +996,7 @@ Attempting revival ~a / ~a
       #f
       (? natural? bt-id)}
      (log-factory
-      fatal
+      error
       @~a{
           Blame disappeared with mutant [@mutant-id] on trail {@bt-id}.
           result:       @mutant-result
@@ -1168,7 +1168,7 @@ Mutant: [~a] ~a @ ~a with config:
 (define (maybe-abort reason continue-val #:force [force? #f])
   ;; Mark the mutant error file before it gets garbled with error
   ;; messages from killing the current active mutants
-  (log-factory fatal "Received abort signal with reason: ~a" reason)
+  (log-factory error "Received abort signal with reason: ~a" reason)
   (cond [(or (abort-on-failure?) force?)
          (call-with-output-file (mutant-error-log)
            #:exists 'append #:mode 'text

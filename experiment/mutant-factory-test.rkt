@@ -512,12 +512,12 @@
             (sweep-dead-mutants current-factory))))))
 
   (define warning-count (hash-ref log-message-counts 'warning))
-  (define fatal-msg? (not (zero? (hash-ref log-message-counts 'fatal))))
+  (define error-msg? (not (zero? (hash-ref log-message-counts 'error))))
 
   (and/test/message [(test-= warning-count expected-warnings)
                      @~a{Not all warnings logged
                              expected @expected-warnings got @warning-count}]
-                    [fatal-msg? "Fatal message not logged"]
+                    [error-msg? "Error message not logged"]
                     [(test-equal? expect-exit? (unbox exit-called?))
                      "Abort call recorded does not match expected"]))
 (test-begin/with-env
@@ -636,7 +636,7 @@
   #:exit? #t
   #:respawn false?
   #:logged (λ (logged)
-             (test-= (hash-ref logged 'fatal) 2)))
+             (test-= (hash-ref logged 'error) 2)))
 
  ;; a mutant that times out or ooms should initially be retried with a warning
  (test-blame-disappearing-handler
@@ -653,8 +653,8 @@
                "info message count wrong"]
               [(test-= (hash-ref logged 'warning) 0)
                "warning message count wrong"]
-              [(test-= (hash-ref logged 'fatal) 0)
-               "fatal message count wrong"])))
+              [(test-= (hash-ref logged 'error) 0)
+               "error message count wrong"])))
 
  ;; a mutant that times out or ooms after have already been retried
  ;; should signal a warning and continue (without trying to respawn again)
@@ -669,8 +669,8 @@
                "info message count wrong"]
               [(test-= (hash-ref logged 'warning) 1)
                "warning message count wrong"]
-              [(test-= (hash-ref logged 'fatal) 0)
-               "fatal message count wrong"])))
+              [(test-= (hash-ref logged 'error) 0)
+               "error message count wrong"])))
  (test-blame-disappearing-handler
   'timeout
   #t
@@ -682,8 +682,8 @@
                "info message count wrong"]
               [(test-= (hash-ref logged 'warning) 1)
                "warning message count wrong"]
-              [(test-= (hash-ref logged 'fatal) 0)
-               "fatal message count wrong"]))))
+              [(test-= (hash-ref logged 'error) 0)
+               "error message count wrong"]))))
 
 
 
@@ -836,7 +836,6 @@
                ;; cause intermittent failures.
                ;; Should happen at least once, at most twice.
                (hash-table ['error (? (and/c number? (between/c 1 2)))]
-                           ['fatal 0]
                            ['warning 0]
                            _ ___))))
 
