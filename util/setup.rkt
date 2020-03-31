@@ -1,7 +1,8 @@
 #lang at-exp rscript
 
-(define repo-parent-path "../../")
-(define repo-path "..")
+(define-runtime-paths
+  [repo-parent-path "../../"]
+  [repo-path ".."])
 
 (define (pretty-path p)
   (find-relative-path (simple-form-path (current-directory))
