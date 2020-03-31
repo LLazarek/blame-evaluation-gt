@@ -22,7 +22,7 @@
                         })
          #t]
         [else
-         (displayln @~a(Executing $ @(string*-join args)))
+         (displayln @~a{Executing $ @(string*-join args)})
          (apply system* args)]))
 
 (define (install-racket racket-dir)
