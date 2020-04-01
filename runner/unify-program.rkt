@@ -2,7 +2,8 @@
 
 (require "instrumented-runner.rkt"
          "../util/read-module.rkt"
-         "../util/path-utils.rkt")
+         "../util/path-utils.rkt"
+         "../util/ctc-utils.rkt")
 
 (provide (contract-out
           [make-program
@@ -31,25 +32,32 @@
     [(list _ ... (== dir-name) _) #t]
     [else #f]))
 
+(define (unified-mod/c #:base-or-both-ok? base-both-ok?)
+  (simple-flat-contract-with-explanation
+   (λ (m)
+     ((and/c
+       path-string?
+       (if base-both-ok?
+           (or/c (and/c (not/c path-to-existant-file?)
+                        (path-to-file-in/c unification-directory-name))
+                 (path-to-file-in/c "base")
+                 (path-to-file-in/c "both"))
+           (and/c (not/c path-to-existant-file?)
+                  (path-to-file-in/c unification-directory-name))))
+      (mod-path m)))
+   @~a{
+       a mod/c in the unification directory (@unification-directory-name) @;
+       @(if base-both-ok?
+            "or base/ or both/"
+            "")
+       }))
+
 (define unified-benchmark/c
-  (and/c program/c
-         (struct/dc
-          program
-          [main
-           (λ (m)
-             ((and/c path-string?
-                     (not/c path-to-existant-file?)
-                     (path-to-file-in/c unification-directory-name))
-              (mod-path m)))]
-          [others (main)
-                  (listof
-                   (λ (m)
-                     ((and/c path-string?
-                             (not/c path-to-existant-file?)
-                             (or/c (path-to-file-in/c unification-directory-name)
-                                   (path-to-file-in/c "base")
-                                   (path-to-file-in/c "both")))
-                      (mod-path m))))])))
+  (and/c
+   program/c
+   (struct/dc program
+              [main (unified-mod/c #:base-or-both-ok? #f)]
+              [others (listof (unified-mod/c #:base-or-both-ok? #t))])))
 
 (define (make-mod path-str)
   (define path (simple-form-path path-str))
@@ -237,4 +245,22 @@
                            "both"
                            "lib.rkt")
                           #'(c))))
+              'pos 'neg)
+    (contract unified-benchmark/c
+              (program
+               (mod (build-path
+                     "/proj/blgt/gtp-benchmarks/benchmarks/kcfa"
+                     unification-directory-name
+                     "main.rkt")
+                    #'(a))
+               (list (mod (build-path
+                           "/proj/blgt/gtp-benchmarks/benchmarks/kcfa"
+                           "both"
+                           "benv-adapted.rkt")
+                          #'(a))))
+              'pos 'neg)
+
+    (contract (listof (unified-mod/c #:base-or-both-ok? #t))
+              (list (mod (simple-form-path "../../gtp-benchmarks/benchmarks/kcfa/both/benv-adapted.rkt")
+                         #'()))
               'pos 'neg)))
