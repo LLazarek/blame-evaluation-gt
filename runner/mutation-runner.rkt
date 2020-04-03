@@ -20,7 +20,27 @@
 
 (define-logger mutant-runner)
 
-(define mutate-top-level-selector select-define)
+(define (mutate-top-level-selector stx)
+  (syntax-parse stx
+    #:datum-literals [define :]
+    [({~and define def} id/sig : type body ...)
+     (define body-stxs (syntax-e (syntax/loc stx (body ...))))
+     (define (reconstruct-definition body-stxs/mutated)
+       (quasisyntax/loc stx
+         (def id/sig : type #,@body-stxs/mutated)))
+     (values body-stxs
+             (leftmost-identifier-in #'id/sig)
+             reconstruct-definition)]
+    [({~and define def} id/sig body ...)
+     (define body-stxs (syntax-e (syntax/loc stx (body ...))))
+     (define (reconstruct-definition body-stxs/mutated)
+       (quasisyntax/loc stx
+         (def id/sig #,@body-stxs/mutated)))
+     (values body-stxs
+             (leftmost-identifier-in #'id/sig)
+             reconstruct-definition)]
+    [_ (values #f #f #f)]))
+
 (define mutate-expression-filter (λ (e)
                                    (syntax-parse e
                                      [({~datum :} . _) #f]
@@ -273,7 +293,11 @@
                   _)
            (path->string file-name-path)]
           [else
-           "<couldnt-extract-module-name>"]))
+           (error 'extract-type-error-source
+                  @~a{
+                      couldn't find mod name in type error stxs:
+                      @~v[failing-stxs]
+                      })]))
       ((make-status* 'type-error) module-name (exn-message e)))
     (define (extract-runtime-error-location e)
       (define ctx (continuation-mark-set->context
@@ -296,7 +320,14 @@
       (define mod-with-error-name
         (match mod-with-error
           [(? string? name) name]
-          [#f "couldnt-find-mod-name"]))
+          [#f
+           (error 'extract-runtime-error-location
+                  @~a{
+                      couldn't find a mod name in ctx from runtime error, @;
+                      possibly because the error happened while @;
+                      instantiating a module. Ctx:
+                      @pretty-format[ctx]
+                      })]))
       ((make-status* 'blamed) mod-with-error-name))
     (define run/handled
       (λ _
@@ -318,6 +349,31 @@
 
 (module+ test
   (require ruinit)
+  (define-test (test-stx=? a b)
+    (test-equal? (syntax->datum a) (syntax->datum b)))
+  (define-test (test-mutate-top-level-selector stx
+                                               body-stxs/expected
+                                               id/expected
+                                               test-reconstruct)
+    (define-values {body-stxs id reconstruct}
+      (mutate-top-level-selector stx))
+    (and/test/message
+     [(for/and/test ([part (in-list body-stxs)]
+                     [part/expected (in-list body-stxs/expected)])
+                    (test-stx=? part part/expected))
+      @~a{Body stxs are different:}]
+     [(test-equal? id id/expected)
+      @~a{Mutated ids are different:}]
+     [(test-reconstruct reconstruct)
+      @~a{Reconstruction test failed:}]))
+  (test-begin
+    #:name mutate-top-level-selector
+    (test-mutate-top-level-selector #'(define x 5)
+                                    (list #'5)
+                                    'x
+                                    (λ (reconstruct)
+                                      (test-stx=? (reconstruct (list #'42))
+                                                  #'(define x 42)))))
   (test-begin
     #:name run-with-mutated-module/mutations
     (ignore
@@ -326,11 +382,10 @@
                         (#%module-begin
                          (require "b.rkt")
 
-                         (define/contract a any/c 1)
-                         (define/contract b any/c 1)
+                         (define a 1)
+                         (define b 1)
 
-                         (define/contract (foo x y)
-                           (-> number? number? number?)
+                         (define (foo x y)
                            (if #t
                                (- y x)
                                (+ (sleep 1)
@@ -349,17 +404,16 @@
 
                          (displayln "B")
 
-                         (define/contract c
-                           any/c
+                         (define c
                            5)
-                         (define/contract d
-                           number?
+                         (define d
                            (if #t 1 "one"))
                          (displayln (list 'c c))
                          (displayln (list 'd d))))))
      (define c (mod "c.rkt"
                     #'(module c typed/racket
                         (#%module-begin
+                         (define x : Number 5)
                          (void)))))
      (define p (program a (list b c))))
     (test-equal?
@@ -401,8 +455,8 @@
      (run-with-mutated-module p
                               a
                               2
-                              #:timeout/s 30
-                              #:memory/gb 0.5)
+                              #:timeout/s 60
+                              #:memory/gb 0.3)
      (struct* run-status ([outcome 'oom]))))
 
   (test-begin
@@ -442,7 +496,7 @@
      (run-with-mutated-module p
                               main
                               2
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "main.rkt"]))))
@@ -463,11 +517,10 @@
                             (#%module-begin
                              (require "b.rkt")
 
-                             (define/contract a any/c 1)
-                             (define/contract b any/c 1)
+                             (define a 1)
+                             (define b 1)
 
-                             (define/contract (foo x y)
-                               (-> number? number? number?)
+                             (define (foo x y)
                                (if #t
                                    (- y x)
                                    (+ (sleep 1)
@@ -486,8 +539,7 @@
                              (provide c d)
                              (require "c.rkt")
 
-                             (: d (List False One))
-                             (define d (list #f 1))
+                             (define d : (List False One) (list #f 1))
 
                              (: c Boolean)
                              (define c (first d))
@@ -506,7 +558,7 @@
      (run-with-mutated-module p
                               b
                               0
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
                           [blamed "b.rkt"])))
@@ -514,7 +566,7 @@
      (run-with-mutated-module p
                               c
                               0
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'type-error]
                           [blamed "c.rkt"])))
@@ -522,7 +574,7 @@
      (run-with-mutated-module p
                               a
                               11 ;; runtime error -> blame on a.rkt
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"]))))
@@ -600,17 +652,17 @@
     (test-equal? (run-with-mutated-module p/ml
                                           a/ml
                                           3
-                                          #:timeout/s 30
+                                          #:timeout/s 60
                                           #:memory/gb 1)
                  (run-with-mutated-module p/f
                                           a/f
                                           3
-                                          #:timeout/s 30
+                                          #:timeout/s 60
                                           #:memory/gb 1))
     (test-match (run-with-mutated-module p/ml
                                          a/ml
                                          3
-                                         #:timeout/s 30
+                                         #:timeout/s 60
                                          #:memory/gb 1)
                 (struct* run-status ([outcome 'blamed]
                                      [blamed "a.rkt"]))))
@@ -650,7 +702,7 @@
      (run-with-mutated-module p
                               a
                               0 ; swap x y args of foo -> crash in bar
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1
                               #:suppress-output? #f)
      (struct* run-status ([outcome 'blamed]
@@ -659,7 +711,7 @@
      (run-with-mutated-module p
                               a
                               1 ; (+ 1) to (- 1) -> crash in foo
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "b.rkt"])))
@@ -667,7 +719,7 @@
      (run-with-mutated-module p
                               a
                               2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"])))
@@ -675,7 +727,7 @@
      (run-with-mutated-module p
                               a
                               3 ; 0 to 1 -> crash in main
-                              #:timeout/s 30
+                              #:timeout/s 60
                               #:memory/gb 1)
      (struct* run-status ([outcome 'blamed]
                           [blamed "a.rkt"])))))

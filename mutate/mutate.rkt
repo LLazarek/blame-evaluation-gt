@@ -23,7 +23,8 @@
 
   [select-all             top-level-selector/c]
   [select-define/contract top-level-selector/c]
-  [select-define          top-level-selector/c])
+  [select-any-define      top-level-selector/c]
+  [leftmost-identifier-in (syntax? . -> . symbol?)])
  mutation-index-exception?
  (struct-out mutated-program))
 
@@ -575,13 +576,7 @@
              (leftmost-identifier-in #'def.id/sig)
              reconstruct-definition)]
     [_ (values #f #f #f)]))
-;; lltodo:
-;; - This will select define-type!
-;; want to abstract to a `make-define-form-selector` which takes a predicate to
-;; decide if a given define form should be included
-;;
-;; - This will also select define/contract and mutate the ctc.
-(define (select-define stx)
+(define (select-any-define stx)
   (syntax-parse stx
     [def:definition
      (define body-stxs (syntax-e (syntax/loc stx
@@ -2005,14 +2000,14 @@ Actual:
   (test-begin
     #:name selectors
     (test-selector
-     select-define
+     select-any-define
      #'(define (f x) (+ y y))
      #:name (make-name-test 'f)
      #:parts (make-parts-test (list #'(+ y y)))
      #:reconstructor (make-reconstructor-test (list #'foo)
                                               #'(define (f x) foo)))
     (test-selector
-     select-define
+     select-any-define
      #'(defoobar (f x) (+ y y))
      #:name false?
      #:parts false?
@@ -2049,7 +2044,7 @@ Actual:
                 (- y y))}])
      (λ (stx mi)
        (mutate-syntax stx mi
-                      #:top-level-select select-define)))
+                      #:top-level-select select-any-define)))
     (test-exn mutation-index-exception?
               (mutate-program #'{(foobar)
                                  (define (f x)
@@ -2080,7 +2075,7 @@ Actual:
                                             (syntax-parse e
                                               [({~datum :} . _) #f]
                                               [else #t]))
-                      #:top-level-select select-define)))))
+                      #:top-level-select select-any-define)))))
 
 ;; Potential mutations that have been deferred:
 ;; - Moving occurrences of (super-new) around in class body
