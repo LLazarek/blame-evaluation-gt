@@ -4,7 +4,7 @@
 ;; - remove outdate signature comments
 
 (require "../runner/mutation-runner.rkt"
-         "../runner/instrumented-runner.rkt"
+         "../runner/program.rkt"
          "../runner/unify-program.rkt"
          "../mutate/mutate.rkt"
          "../util/path-utils.rkt"

@@ -1,15 +1,10 @@
 #lang at-exp racket
 
-(require "instrumented-runner.rkt"
-         "../util/read-module.rkt"
+(require "program.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt")
 
 (provide (contract-out
-          [make-program
-           (path-string? (listof path-string?) . -> . program/c)]
-          [make-mod
-           (path-string? . -> . mod/c)]
           [unified-benchmark/c contract?]
           [unify-program-for-running
            (program/c . -> . unified-benchmark/c)]
@@ -59,15 +54,6 @@
               [main (unified-mod/c #:base-or-both-ok? #f)]
               [others (listof (unified-mod/c #:base-or-both-ok? #t))])))
 
-(define (make-mod path-str)
-  (define path (simple-form-path path-str))
-  (mod path
-       (read-module path)))
-
-(define (make-program main others)
-  (program (make-mod main)
-           (map make-mod others)))
-
 ;; Prepares a configured program for running.
 ;;
 ;; A configured program has a mixture of modules from a `typed` directory,
@@ -92,6 +78,10 @@
 ;;
 ;; So to prevent this, we need to put all of the modules together in an
 ;; imaginary directory at the same level as `typed` and `untyped`.
+;;
+;; The modules in the `both` directory also need to be placed in the
+;; same directory as the rest of the program. This takes care of that
+;; too.
 (define (unify-program-for-running a-program)
   (match-define (program raw-main raw-others)
     a-program)
@@ -101,9 +91,9 @@
 (define (unify-module-for-running a-mod)
   (define relocated-path-parts
     (match (explode-path/string (mod-path a-mod))
-      [(list before ... (or "untyped" "typed") name)
+      [(list before ... (or "untyped" "typed" "both") name)
        (append before (list unification-directory-name name))]
-      [(and (list _ ... (or "base" "both") _)
+      [(and (list _ ... "base" _)
             other-parts)
        other-parts]
       [else
@@ -172,7 +162,7 @@
                                                 #'(a b c)))
                  (mod (build-path
                        "/foo/untyped/bar/a-bench"
-                       "both"
+                       unification-directory-name
                        "main.rkt")
                       #'(a b c)))
 
@@ -205,7 +195,7 @@
                              #'(b))
                         (mod (build-path
                               "/foo/untyped/bar/a-bench"
-                              "both"
+                              unification-directory-name
                               "lib.rkt")
                              #'(c))))))
 
@@ -242,7 +232,7 @@
                           #'(b))
                      (mod (build-path
                            "/foo/untyped/bar/a-bench"
-                           "both"
+                           unification-directory-name
                            "lib.rkt")
                           #'(c))))
               'pos 'neg)
@@ -255,7 +245,7 @@
                     #'(a))
                (list (mod (build-path
                            "/proj/blgt/gtp-benchmarks/benchmarks/kcfa"
-                           "both"
+                           unification-directory-name
                            "benv-adapted.rkt")
                           #'(a))))
               'pos 'neg)

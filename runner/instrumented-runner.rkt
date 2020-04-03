@@ -1,42 +1,12 @@
 #lang at-exp racket
 
-(provide make-instrumented-runner
-         (struct-out mod)
-         (struct-out program)
-         mod/c
-         program/c
-         mod->name)
+(provide make-instrumented-runner)
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
          "modgraph.rkt"
+         "program.rkt"
          "../util/path-utils.rkt")
-
-(struct mod (path stx)
-  #:transparent
-  #:methods gen:equal+hash
-  {(define (equal-proc m1 m2 recursive-equal?)
-     (equal? (mod-path m1)
-             (mod-path m2)))
-   (define (hash-proc m recursive-hash)
-     (recursive-hash (mod-path m)))
-   (define (hash2-proc m recursive-hash)
-     (match (mod-path m)
-       [(? string? s) (string-length s)]
-       [(? path? p) (string-length (path->string p))]
-       [else 0]))})
-(struct program (main others)
-  #:transparent)
-
-(define mod/c (struct/c mod path-string? syntax?))
-(define (program-main-not-in-others? a-program)
-  (not (member (program-main a-program)
-               (program-others a-program))))
-(define program/c (and/c (struct/c program mod/c (listof mod/c))
-                         program-main-not-in-others?))
-
-(define (mod->name m)
-  (file-name-string-from-path (mod-path m)))
 
 (define (module-path-resolve mod-path [load? #f])
   ((current-module-name-resolver) mod-path #f #f load?))
@@ -174,16 +144,6 @@
                      m3
                      m2
                      92
-                     
-                     }))
 
-  (test-begin
-    #:name mod-equality
-    (test-equal? (mod "foobar.rkt" #'(1 2 3))
-                 (mod "foobar.rkt" #'(1 2 3)))
-    (test-equal? (mod "foobar.rkt" #'(1 2 3))
-                 (mod "foobar.rkt" #'(1 2 3 4 5)))
-    (not/test
-     (test-equal? (mod "foobar.rkt" #'(1 2 3))
-                  (mod "something-else.rkt" #'(1 2 3))))))
+                     })))
 

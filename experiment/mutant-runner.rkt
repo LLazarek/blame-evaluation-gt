@@ -8,7 +8,7 @@
          racket/port
          racket/format
          "../runner/mutation-runner.rkt"
-         "../runner/instrumented-runner.rkt"
+         "../runner/program.rkt"
          "../mutate/mutate.rkt"
          "../runner/unify-program.rkt")
 
@@ -17,40 +17,6 @@
          (string-append fmt-str "\n")
          fmt-args)
   (exit 1))
-
-(define (find-program-base-path a-program)
-  (define files
-    (map mod-path
-         (list* (program-main a-program)
-                (program-others a-program))))
-  (define main (first files))
-  (define candidate-subpath-parts
-    (in-combinations (explode-path main)))
-  (define ((path-prefix?-of a-path) subpath)
-    (string-prefix? (path->string a-path)
-                    (path->string subpath)))
-  (define candidate-subpaths
-    (sequence-filter
-     (path-prefix?-of main)
-     (sequence-map (match-lambda
-                     ['() (string->path "nothing")]
-                     [parts (apply build-path parts)])
-                   candidate-subpath-parts)))
-  (for/last ([candidate candidate-subpaths]
-             #:when (for/and ([f (in-list files)])
-                      ((path-prefix?-of f) candidate)))
-    candidate))
-
-(module+ test
-  (require ruinit)
-  (test-begin
-    #:name find-program-base-path
-    (test-equal?
-     (find-program-base-path
-      (program (mod (string->path "/foo/bar/bench/untyped/main.rkt") #'())
-               (list (mod (string->path "/foo/bar/bench/typed/baz.rkt") #'())
-                     (mod (string->path "/foo/bar/bench/typed/bez.rkt") #'()))))
-     (string->path "/foo/bar/bench"))))
 
 (module+ main
   (define main-module (make-parameter #f))

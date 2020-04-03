@@ -155,7 +155,7 @@
          'test-helper
          (submod "mutant-factory.rkt" test)
          "../runner/mutation-runner.rkt"
-         "../runner/instrumented-runner.rkt"
+         "../runner/program.rkt"
          "../runner/unify-program.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"

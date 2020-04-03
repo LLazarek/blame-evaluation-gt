@@ -14,6 +14,7 @@
          syntax/location
          "../mutate/mutate.rkt"
          "sandbox-runner.rkt"
+         "program.rkt"
          "instrumented-runner.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt")
