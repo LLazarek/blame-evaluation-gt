@@ -1,5 +1,9 @@
 #lang at-exp racket
 
+;; Very hackish topological sort for modules in a program.
+;; This is not the right way to do this at all.
+;; But for the specific case of the programs in gtp-benchmarks, it works ok.
+
 (provide order-by-dependencies)
 
 (require syntax/to-string
