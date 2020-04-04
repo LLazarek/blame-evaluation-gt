@@ -1,8 +1,5 @@
 #lang at-exp racket
 
-;; lltodo:
-;; - remove outdate signature comments
-
 (require "../runner/mutation-runner.rkt"
          "../runner/program.rkt"
          "../runner/unify-program.rkt"
@@ -324,10 +321,6 @@
          (list* (benchmark-configuration-main a-benchmark-configuration)
                 (benchmark-configuration-others a-benchmark-configuration))))
 
-;; factory?
-;; string?
-;; ->
-;; factory?
 (define/contract (spawn-mutants/of-module the-factory module-to-mutate-name)
   (factory/c module-name? . -> . factory/c)
 
@@ -349,7 +342,6 @@
                                                     mutation-index
                                                     #t)))])))
 
-;; factory? mutant? -> factory?
 ;; Spawns a test mutant and if that mutant has a blame result at
 ;; max contract configuration, then samples the precision lattice
 ;; and spawns mutants for each samples point
@@ -415,7 +407,6 @@
                 #:timeout/s timeout*
                 #:memory/gb memory*))
 
-;; path-string? mutant? -> factory?
 (define/contract (spawn-mutants/precision-sampling the-factory mutant-program)
   (factory/c mutant/c . -> . factory/c)
 
@@ -464,13 +455,6 @@
   (copy-factory the-factory
                 [mutant-samples mutant-samples+sample]))
 
-;; factory?
-;; mutant?
-;; config?
-;; (factory? -> (values config? factory?))
-;; ->
-;; factory?
-;;
 ;; Spawns a mutant that attempts to follow a blame trail,
 ;; if the given `config` doesn't cause blame for `mutant-program`
 ;; then it calls `resample` to get a new configuration and try again.
@@ -510,12 +494,9 @@
                                                   sample-number)))
                 #:blame-trail-root? #t))
 
-;; factory? dead-mutant-process? blame-trail-id? -> factory?
-;;
+;; Spawns a mutant that follows the blame trail starting at `dead-proc`
 ;; ASSUMPTIONS:
 ;; - the output of `dead-proc` has a blame label
-;;
-;; Spawns a mutant that follows the blame trail starting at `dead-proc`
 (define/contract (spawn-mutant/following-blame the-factory
                                                dead-proc
                                                blamed/type-error-location)
@@ -577,11 +558,6 @@
   (values (* 2 (default-timeout/s))
           (* 2 (default-memory-limit/gb))))
 
-;; dead-mutant-process?
-;; blamed?
-;; (factory? #:timeout/s (or #f number?) #:memory/gb (or #f number?))
-;; ->
-;; (factory? dead-mutant-process? -> factory?)
 (define/contract (make-blame-disappearing-handler dead-proc
                                                   blamed
                                                   respawn-mutant)
@@ -659,10 +635,6 @@ Predecessor (id [~a]) blamed ~a and had config:
                     config)
        (maybe-abort "Blame disappeared" current-factory)])))
 
-;; blame-trail-id?
-;; (factory? dead-mutant-process? -> factory?)
-;; ->
-;; (factory? dead-mutant-process? -> factory?)
 (define/contract (make-blame-following-will/with-fallback no-blame-fallback)
   ((factory/c dead-mutant-process/c . -> . factory/c)
    . -> .
@@ -809,7 +781,6 @@ Active mutant set (ids):
 
 
 
-;; factory? -> factory?
 (define/contract (babysit-mutants the-factory)
   (factory/c . -> . factory/c)
 
@@ -843,7 +814,6 @@ Active mutant set (ids):
                         (add1 retries))])))
 
 
-;; factory? -> factory?
 (define/contract (sweep-dead-mutants the-factory)
   (factory/c . -> . factory/c)
 
@@ -858,9 +828,8 @@ Active mutant set (ids):
       (process-dead-mutant the-factory a-freshly-dead-mutant)
       the-factory))
 
-;; factory? mutant-process? -> factory?
-;; Note that processing a dead mutant may cause new mutants to be spawned,
-;; since it executes the will of the dead mutant.,
+;; Processing a dead mutant may cause new mutants to be spawned,
+;; since it executes the will of the dead mutant,
 ;; which, in turn, may cause more dead mutants to be processed!
 (define/contract (process-dead-mutant the-factory mutant-proc)
   (factory/c mutant-process/c . -> . factory/c)
@@ -1021,7 +990,6 @@ Attempting revival ~a / ~a
           })
      mutant-id]))
 
-;; mutant-results? dead-mutant-process? path-string? -> mutant-results?
 (define/contract (add-mutant-result mutant-results
                                     dead-mutant-proc
                                     mutant-proc-file)
@@ -1064,7 +1032,6 @@ Attempting revival ~a / ~a
     #:exists 'replace
     (λ (out) (writeln (aggregated-result blame-trail-id id result config) out))))
 
-;; path-string? natural? -> boolean?
 (define/contract (max-mutation-index-exceeded? module-to-mutate mutation-index)
   (path-to-existant-file?
    natural?
@@ -1078,7 +1045,6 @@ Attempting revival ~a / ~a
                    mutation-index)
     #f))
 
-;; dead-mutant-process/c -> void
 (define/contract (append-mutant-result! dead-mutant-proc aggregate-results)
   (dead-mutant-process/c aggregate-mutant-result/c . -> . any)
 
