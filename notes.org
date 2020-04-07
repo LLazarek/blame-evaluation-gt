@@ -8,4 +8,9 @@
 
 ** Mutation for type errors
 
+- How Good Are Your Types? Using Mutation Analysis to Evaluate the Effectiveness of Type Annotations
+  https://ieeexplore.ieee.org/document/7899045
+
+- 
+
 ** Mutating types
