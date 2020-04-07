@@ -14,6 +14,7 @@
           [rename wait proc-Q-wait
                   (proc-Q? . -> . (and/c proc-Q? proc-Q-empty?))]
           [proc-Q-active-count (proc-Q? . -> . natural?)]
+          [proc-Q-waiting-count (proc-Q? . -> . natural?)]
           [proc-Q-data (proc-Q? . -> . any/c)]
           [proc-Q-data-set (proc-Q? any/c . -> . proc-Q?)]))
 
@@ -96,6 +97,8 @@
              (Q-rest waiting)
              data)]))
 
+(define (proc-Q-waiting-count q)
+  (Q-size (proc-Q-waiting q)))
 
 
 (module+ test
@@ -232,4 +235,8 @@
     (test-= (Q-size (proc-Q-waiting the-q*)) 0)
     (for/and/test ([i (in-range 5)])
                   (test-equal? (vector-ref wills-called? i)
-                               (~a i "\n")))))
+                               (~a i "\n"))))
+
+  (test-begin
+    #:name wait
+    (proc-Q-empty? (wait (make-process-Q 2)))))
