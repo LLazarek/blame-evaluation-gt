@@ -11,6 +11,13 @@
 - How Good Are Your Types? Using Mutation Analysis to Evaluate the Effectiveness of Type Annotations
   https://ieeexplore.ieee.org/document/7899045
 
-- 
+- Evaluation of mutation testing for object-oriented programs
+  https://dl.acm.org/doi/abs/10.1145/1134285.1134437
+
+- Operators for Mutation Testing of Python Programs
+  http://staff.ii.pw.edu.pl/~adr/ADerKHalasResRap2014-1.pdf
+
+
+
 
 ** Mutating types
