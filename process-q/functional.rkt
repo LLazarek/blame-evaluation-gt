@@ -15,9 +15,7 @@
                   (proc-Q? . -> . (and/c proc-Q? proc-Q-empty?))]
           [proc-Q-active-count (proc-Q? . -> . natural?)]
           [proc-Q-data (proc-Q? . -> . any/c)]
-          [proc-Q-data-set (proc-Q? any/c . -> . proc-Q?)]
-
-          [close-process-ports! (process-info/c . -> . any)]))
+          [proc-Q-data-set (proc-Q? any/c . -> . proc-Q?)]))
 
 (require "funq.rkt")
 
@@ -27,14 +25,11 @@
   (struct-copy proc-Q q
                [data v]))
 
-(struct process-info (stdout stdin pid stderr ctl will) #:transparent)
+(struct process-info (data ctl will) #:transparent)
 (define process-will/c (proc-Q? process-info? . -> . proc-Q?))
 (define process-info/c
   (struct/dc process-info
-             [stdout (or/c #f input-port?)]
-             [stdin (or/c #f input-port?)]
-             [pid natural?]
-             [stderr (or/c #f input-port?)]
+             [data any/c]
              [ctl ((or/c 'status 'wait 'interrupt 'kill) . -> . any)]
              [will (proc-Q? process-info? . -> . proc-Q?)]))
 
@@ -101,23 +96,30 @@
              (Q-rest waiting)
              data)]))
 
-(define (close-process-ports! info)
-  (match-define (struct* process-info
-                         ([stdout stdout]
-                          [stdin stdin]
-                          [stderr stderr]))
-    info)
-  (close-output-port stdin)
-  (close-input-port stdout)
-  (close-input-port stderr))
+
 
 (module+ test
   (require ruinit)
 
+  (struct simple-process-info (stdout stdin pid stderr)
+    #:transparent)
   (define (simple-process cmd will)
-    (apply process-info
-           (append (process cmd)
-                   (list will))))
+    (define proc-info+ctl (process cmd))
+    (process-info (apply simple-process-info
+                         (drop-right proc-info+ctl 1))
+                  (last proc-info+ctl)
+                  will))
+
+  (define (close-process-ports! info)
+    (match-define (struct* process-info
+                           ([data (struct* simple-process-info
+                                           ([stdout stdout]
+                                            [stdin stdin]
+                                            [stderr stderr]))]))
+      info)
+    (close-output-port stdin)
+    (close-input-port stdout)
+    (close-input-port stderr))
 
   (test-begin
     #:name basic
@@ -199,7 +201,8 @@
               (λ (the-q* info)
                 (vector-set! wills-called?
                              i
-                             (port->string (process-info-stdout info)))
+                             (port->string (simple-process-info-stdout
+                                            (process-info-data info))))
                 (close-process-ports! info)
                 (match i
                   [(or 0 2)
