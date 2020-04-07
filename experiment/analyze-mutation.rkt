@@ -6,6 +6,7 @@
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
+         "progress-log.rkt"
          racket/runtime-path)
 
 (define-runtime-path mutant-runner-path "mutant-runner.rkt")
@@ -18,6 +19,8 @@
 (define default-timeout/s (make-parameter (* 2 60)))
 
 (define module-name? string?)
+
+(define-logger mutation-analysis)
 
 (define/contract (spawn-mutant-runner a-benchmark-configuration
                                       module-to-mutate-name
@@ -73,8 +76,20 @@
                 (benchmark-configuration-others a-benchmark-configuration))))
 
 
-(define/contract (mutation-info-for-all-mutants bench proc-limit)
-  (benchmark/c natural? . -> . any)
+(define/contract (mutation-info-for-all-mutants bench
+                                                #:process-limit proc-limit
+                                                #:log-progress log-progress!
+                                                #:resume-cache cached-results-for)
+  ({benchmark/c
+    #:process-limit natural?
+
+    #:log-progress
+    (module-name? natural? boolean? string? . -> . any)
+
+    #:resume-cache
+    (module-name? natural? . -> . (or/c #f (list/c boolean? string?)))}
+   {}
+   . ->* . any)
 
   (define mutatable-module-names (benchmark->mutatable-modules bench))
   (define max-config (make-max-bench-config bench))
@@ -92,11 +107,20 @@
                [index (in-mutation-indices module-to-mutate-name
                                            bench)]
                [i-2 (in-naturals)])
-      (enq-process q
-                   (λ _ (mutation-info-for bench
-                                           module-to-mutate-name
-                                           index
-                                           (~a i-1 '- i-2))))))
+      (match (cached-results-for module-to-mutate-name index)
+        [#f (enq-process q
+                         (λ _ (mutation-info-for bench
+                                                 module-to-mutate-name
+                                                 index
+                                                 (~a i-1 '- i-2)
+                                                 #:progress-logger log-progress!)))]
+        [(list type-error? mutation-type)
+         (log-mutation-analysis-info "Pulling cached result:")
+         (log-progress! module-to-mutate-name
+                        index
+                        type-error?
+                        mutation-type)
+         (add-mutation-type-result q type-error? mutation-type)])))
 
   (define q* (proc-Q-wait q))
   (pretty-display (proc-Q-data q*)))
@@ -132,7 +156,8 @@
 (define (mutation-info-for bench
                            module-to-mutate-name
                            index
-                           id)
+                           id
+                           #:progress-logger log-progress!)
   (define max-config (make-max-bench-config bench))
   (define the-benchmark-configuration
     (configure-benchmark bench
@@ -146,21 +171,32 @@
                                    module-to-mutate-name
                                    index
                                    outfile))
+  (log-mutation-analysis-info
+   @~a{Spawned mutant @module-to-mutate-name @"@" @index})
   (define (will:record-type-error q* info)
     (define-values {type-error? mutation-type}
       (extract-mutation-type-and-result outfile))
-    (define (update-inner-hash h)
-      (hash-update h mutation-type add1 0))
-    (define (update h)
-      (define h* (hash-update h "total" add1 0))
-      (hash-update h*
-                   (if type-error? "success" "fail")
-                   update-inner-hash
-                   (hash)))
-    (proc-Q-data-set q* (update (proc-Q-data q*))))
+    (log-progress! module-to-mutate-name
+                   index
+                   type-error?
+                   mutation-type)
+    (add-mutation-type-result q*
+                              type-error?
+                              mutation-type))
   (process-info #f #f 0 #f
                 ctl
                 will:record-type-error))
+
+(define (add-mutation-type-result q type-error? mutation-type)
+  (define (update-inner-hash h)
+    (hash-update h mutation-type add1 0))
+  (define (update h)
+    (define h* (hash-update h "total" add1 0))
+    (hash-update h*
+                 (if type-error? "success" "fail")
+                 update-inner-hash
+                 (hash)))
+  (proc-Q-data-set q (update (proc-Q-data q))))
 
 (define (extract-mutation-type-and-result f)
   (define output-regexp
@@ -188,6 +224,7 @@
 (module+ main
   (require racket/cmdline)
   (define bench-to-run (make-parameter #f))
+  (define progress-log (make-parameter #f))
   (command-line
    #:once-each
    [("-b" "--benchmark")
@@ -205,7 +242,12 @@
    [("-e" "--error-log")
     path
     "File to which to append mutant errors. Default: ./mutant-errors.txt"
-    (mutant-error-log path)])
+    (mutant-error-log path)]
+   [("-l" "--progress-log")
+    path
+    ("Record progress in the given log file."
+     "If it exists and is not empty, resume from the point reached in the log.")
+    (progress-log path)])
   (unless (bench-to-run)
     (error 'mutant-factory "Must provide benchmark to run."))
   (when (directory-exists? (data-output-dir))
@@ -214,5 +256,30 @@
     (match (read)
       [(or 'y 'yes) (delete-directory/files (data-output-dir))]
       [_ (eprintf "Not deleted.~n")]))
+  (define progress
+    (match (progress-log)
+      [(? file-exists? path) (make-hash (file->list path))]
+      [else (hash)]))
+  (define-values {log-progress!/raw finalize-log!}
+    (initialize-progress-log! (progress-log)))
+  (define (log-progress! module-to-mutate-name mutation-index type-error? mutation-type)
+    (log-mutation-analysis-info
+     @~a{
+         Mutant @module-to-mutate-name @"@" @mutation-index @;
+         {@mutation-type} => @(if type-error?
+                                  'hit
+                                  'miss)
+         })
+    (log-progress!/raw (cons (list module-to-mutate-name
+                                   mutation-index)
+                             (list type-error?
+                                   mutation-type))))
+  (define (cached-results-for module-to-mutate-name mutation-index)
+    (hash-ref progress
+              (list module-to-mutate-name mutation-index)
+              #f))
   (mutation-info-for-all-mutants (read-benchmark (bench-to-run))
-                                 (process-limit)))
+                                 #:process-limit (process-limit)
+                                 #:log-progress log-progress!
+                                 #:resume-cache cached-results-for)
+  (finalize-log!))
