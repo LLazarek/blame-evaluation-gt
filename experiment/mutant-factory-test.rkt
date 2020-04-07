@@ -1,158 +1,8 @@
 #lang at-exp racket
 
-(module test-helper racket
-  (require ruinit
-           syntax/parse/define
-           "../runner/mutation-runner.rkt"
-           (only-in (submod "mutant-factory.rkt" test)
-                    mutant-error-log
-                    aggregated-result))
-  (provide test-begin/with-env)
-
-  (define rt-main-body
-    @~a{
-        (define (foo x)
-          (if (positive? x)
-              (foo (- x))
-              (* x x 3)))
-        (define (main)
-          (bar (foo 2) "yes"))
-        (main)
-        })
-  (define rt-second-body
-    @~a{
-        (provide bar)
-        (define (bar x s)
-          (if (positive? x)
-              (- x)
-              x))
-        })
-  (define-test-env (setup-test-env! cleanup-test-env!)
-    #:directories ([test-mutant-dir (simplify-path "./test-mutants")]
-                   [test-bench (simplify-path "./test-bench")]
-                   [test-bench/ut (simplify-path "./test-bench/untyped")]
-                   [test-bench/t (simplify-path "./test-bench/typed")] ; empty
-
-                   [realistic-test-bench (simplify-path "./real-test-bench")]
-                   [realistic-test-bench/ut (simplify-path "./real-test-bench/untyped")]
-                   [realistic-test-bench/t (simplify-path "./real-test-bench/typed")])
-    #:files ([e-path (build-path test-bench/ut "e.rkt")
-                     @~a{
-                         #lang racket
-
-                         (provide baz)
-
-                         (define (baz x y)
-                           (if (even? x)
-                               y
-                               (/ y x)))
-                         }]
-             [main-path (build-path test-bench/ut "main.rkt")
-                     @~a{
-                         #lang typed/racket
-
-                         (require "e.rkt" "loop.rkt")
-
-                         (: foo (-> Number Number))
-                         (define (foo x)
-                           (- x))
-
-                         (loop)
-                         (foo (baz 0 22))
-                         }]
-             [loop-path (build-path test-bench/ut "loop.rkt")
-                        @~a{
-                            #lang typed/racket
-                            (provide loop)
-                            (: loop (-> Number))
-                            (define (loop)
-                              (if #f (loop) 42))
-                            }]
-             [mutant0-path "m0.rktd"
-                           (format "~s\n"
-                                   (run-status "m0.rkt"
-                                               0
-                                               'foo
-                                               'crashed
-                                               #f
-                                               #f))]
-             [mutant1-path/1 "m11.rktd"
-                             (format "~s\n"
-                                     (run-status "m1.rkt"
-                                                 0
-                                                 'foo
-                                                 'blamed
-                                                 "mutant-factory-test.rkt"
-                                                 #f))]
-             [mutant1-path/2 "m12.rktd"
-                             (format "~s\n"
-                                     (run-status "m1.rkt"
-                                                 42
-                                                 'foo
-                                                 'type-error
-                                                 "m1.rkt"
-                                                 #f))]
-             [mutant2-path "m2.rktd"
-                           (format "~s\n"
-                                   (run-status "m1.kt"
-                                               42
-                                               'foo
-                                               'type-error
-                                               "m2.rkt"
-                                               #f))]
-             [empty-file-path "empty-file.rktd"
-                              ""]
-             [error-log (mutant-error-log)
-                        ""]
-
-             [rt-main/ut (build-path realistic-test-bench/ut
-                                     "main.rkt")
-                         @~a{
-                             #lang racket
-                             (require "second.rkt")
-                             @rt-main-body
-                             }]
-             [rt-second/ut (build-path realistic-test-bench/ut
-                                       "second.rkt")
-                           @~a{
-                               #lang racket
-                               @rt-second-body
-                               }]
-             [rt-main/t (build-path realistic-test-bench/t
-                                     "main.rkt")
-                         @~a{
-                             #lang typed/racket
-                             (require require-typed-check)
-                             (require/typed/check
-                              "second.rkt"
-                              [bar (-> Integer String Nonpositive-Integer)])
-                             (: foo (-> Integer Integer))
-                             (: main (-> Integer))
-                             @rt-main-body
-                             }]
-             [rt-second/t (build-path realistic-test-bench/t
-                                       "second.rkt")
-                           @~a{
-                               #lang typed/racket
-                               (: bar (-> Integer String Nonpositive-Integer))
-                               @rt-second-body
-                               }])
-
-    #:provide)
-
-  (define-simple-macro (test-begin/with-env #:name name
-                                            e ...)
-    (test-begin
-      #:name name
-      #:short-circuit
-      #:before (setup-test-env!)
-      #:after (cleanup-test-env!)
-      e ...)))
-
-
 (require ruinit
          racket/logging
-         'test-helper
+         "mutant-factory-test-helper.rkt"
          (submod "mutant-factory.rkt" test)
          "../runner/mutation-runner.rkt"
          "../runner/program.rkt"
@@ -229,35 +79,6 @@
               'blamed)
  (test-equal? (process-outcome dead-e-proc/type-error-in-d)
               'type-error))
-
-(test-begin/with-env
- #:name max-mutation-index-exceeded?
-
- (for/and/test ([i (in-range 3)])
-               (not (max-mutation-index-exceeded? e-path i)))
- (max-mutation-index-exceeded? e-path 3)
-
- (not (max-mutation-index-exceeded? main-path 0))
- (max-mutation-index-exceeded? main-path 1)
-
- (for/and/test
-  ([rt-main (in-list (list rt-main/t rt-main/ut))]
-   [rt-second (in-list (list rt-second/t rt-second/ut))])
-  (and/test/message
-   [(for/and/test ([i (in-range 6)])
-                  (extend-test-message
-                   (not (max-mutation-index-exceeded? rt-main i))
-                   @~a{(stopped at index @i)}))
-    @~a{Not all expected mutations of @rt-main happening}]
-   [(max-mutation-index-exceeded? rt-main 6)
-    @~a{@rt-main has more mutations than expected}]
-   [(for/and/test ([i (in-range 2)])
-                  (extend-test-message
-                   (not (max-mutation-index-exceeded? rt-second i))
-                   @~a{(stopped at index @i)}))
-    @~a{@rt-second doesn't have the expected mutations}]
-   [(max-mutation-index-exceeded? rt-second 2)
-    @~a{@rt-second has more mutations than expected}])))
 
 (define mutant0-mod "mutant0.rkt")
 (define mutant1-mod "mutant1.rkt")
@@ -918,6 +739,9 @@
    ;; - Expect (sample-size) samples for each
    ;; - Expect 8 total mutant files
    (ignore
+    (match (mutant-error-log)
+      [(? file-exists? path) (delete-file path)]
+      [else (void)]) 
     (define bench (read-benchmark realistic-test-bench ))
 
     (define (run-with-mutated-module+ name index config)
@@ -957,7 +781,7 @@
                               '#hash(("second.rkt" . none)
                                      ("main.rkt" . types)))
     (define mutant-results (run-all-mutants*configs bench))
-    (displayln @~a{Mutant errors: @(file->string error-log)})
+    (displayln @~a{Mutant errors: @(file->string (mutant-error-log))})
     (displayln "Data:")
     (for ([{m aggregate-result} (in-hash mutant-results)])
       (displayln

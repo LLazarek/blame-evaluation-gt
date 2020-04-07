@@ -7,74 +7,13 @@
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "progress-log.rkt"
+         "mutant-util.rkt"
          racket/runtime-path)
-
-(define-runtime-path mutant-runner-path "mutant-runner.rkt")
-(define racket-path (find-executable-path (find-system-path 'exec-file)))
 
 (define process-limit (make-parameter 3))
 (define data-output-dir (make-parameter "./mutant-data"))
-(define mutant-error-log (make-parameter "./mutant-errors.txt"))
-(define default-memory-limit/gb (make-parameter 3))
-(define default-timeout/s (make-parameter (* 2 60)))
-
-(define module-name? string?)
 
 (define-logger mutation-analysis)
-
-(define/contract (spawn-mutant-runner a-benchmark-configuration
-                                      module-to-mutate-name
-                                      mutation-index
-                                      outfile
-                                      #:timeout/s [timeout/s #f]
-                                      #:memory/gb [memory/gb #f])
-  ({benchmark-configuration/c
-   module-name?
-   natural?
-   path-string?}
-   {#:timeout/s (or/c #f number?)
-    #:memory/gb (or/c #f number?)}
-   . ->* .
-   procedure?)
-
-  (match-define (benchmark-configuration main others* base-dir)
-    a-benchmark-configuration)
-  (define module-to-mutate
-    (resolve-configured-benchmark-module a-benchmark-configuration
-                                         module-to-mutate-name))
-  (define others
-    (map (match-lambda [(? path? p)
-                        (path->string p)]
-                       [other (~a other)])
-         (match base-dir
-           [#f others*]
-           [dir (append others*
-                        (directory-list dir #:build? #t))])))
-  (call-with-output-file outfile #:mode 'text
-    (λ (outfile-port)
-      (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
-        (λ (error-log-port)
-          (match-define (list #f runner-in _ #f runner-ctl)
-            (process*/ports
-             outfile-port #f error-log-port
-             racket-path "-O" "info@mutate" "--"
-             mutant-runner-path
-             "-m" main
-             "-o" (~s others)
-             "-M" module-to-mutate
-             "-i" (~a mutation-index)
-             "-t" (~a (if timeout/s
-                          timeout/s
-                          (default-timeout/s)))
-             "-g" (~a (if memory/gb memory/gb (default-memory-limit/gb)))))
-          (close-output-port runner-in)
-          runner-ctl)))))
-
-(define (resolve-configured-benchmark-module a-benchmark-configuration a-module-name)
-  (findf (path-ends-with a-module-name)
-         (list* (benchmark-configuration-main a-benchmark-configuration)
-                (benchmark-configuration-others a-benchmark-configuration))))
-
 
 (define/contract (mutation-info-for-all-mutants bench
                                                 #:process-limit proc-limit
@@ -125,34 +64,6 @@
   (define q* (proc-Q-wait q))
   (pretty-display (proc-Q-data q*)))
 
-(define (in-mutation-indices module-to-mutate-name bench)
-  (define max-config (make-max-bench-config bench))
-  (define the-benchmark-configuration
-    (configure-benchmark bench
-                         max-config))
-  (define module-to-mutate
-    (findf (path-ends-with module-to-mutate-name)
-           (list*
-            (benchmark-configuration-main the-benchmark-configuration)
-            (benchmark-configuration-others the-benchmark-configuration))))
-  (let next-index ([i 0])
-    (if (max-mutation-index-exceeded? module-to-mutate i)
-        empty-stream
-        (stream-cons i (next-index (add1 i))))))
-
-(define/contract (max-mutation-index-exceeded? module-to-mutate mutation-index)
-  (path-to-existant-file?
-   natural?
-   . -> .
-   boolean?)
-
-  ;; `mutate-module` throws if index is too large, so just try
-  ;; mutating to see whether or not it throws
-  (with-handlers ([mutation-index-exception? (λ _ #t)])
-    (mutate-module (read-module module-to-mutate)
-                   mutation-index)
-    #f))
-
 (define (mutation-info-for bench
                            module-to-mutate-name
                            index
@@ -183,7 +94,7 @@
     (add-mutation-type-result q*
                               type-error?
                               mutation-type))
-  (process-info #f #f 0 #f
+  (process-info #f
                 ctl
                 will:record-type-error))
 
