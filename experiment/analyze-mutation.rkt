@@ -61,7 +61,14 @@
                         mutation-type)
          (add-mutation-type-result q type-error? mutation-type)])))
 
+  (log-mutation-analysis-info
+   @~a{
+       Done enqueuing mutants. @;
+       Q has @(proc-Q-active-count q) active and @(proc-Q-waiting-count q) waiting. @;
+       Waiting...})
+
   (define q* (proc-Q-wait q))
+  (log-mutation-analysis-info "Done waiting.")
   (pretty-display (proc-Q-data q*)))
 
 (define (mutation-info-for bench
