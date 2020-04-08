@@ -756,7 +756,13 @@
   (require "../util/read-module.rkt"
            ruinit/diff/diff)
   (define (diff-mutation module-to-mutate mutation-index)
-    (define orig-module-stx (read-module module-to-mutate))
+    (define orig-module-stx
+      (match module-to-mutate
+        [(mod _ stx) stx]
+        [(? path-string? path) (read-module path)]
+        [other (raise-argument-error 'diff-mutation
+                                     "either a mod/c or a path-string?"
+                                     other)]))
     (define-values (mutated-program-stx mutated-id)
       (mutate-module orig-module-stx mutation-index))
     (printf "--------------------\nMutated: ~a\n" mutated-id)
