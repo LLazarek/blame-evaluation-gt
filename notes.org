@@ -17,7 +17,33 @@
 - Operators for Mutation Testing of Python Programs
   http://staff.ii.pw.edu.pl/~adr/ADerKHalasResRap2014-1.pdf
 
-
+- Diagnosing type errors with class
+  https://dl.acm.org/doi/abs/10.1145/2737924.2738009
+  [Maybe one way to mutate typed programs is to mess with the way the type system
+  makes decisions rather than simply making random syntactic changes ---
+  this may also apply on how to mutate types]
 
 
 ** Mutating types
+
+- Mutation testing applied to validate specifications based on Petri Nets
+  https://link.springer.com/chapter/10.1007/978-0-387-34945-9_24
+
+- Mutation analysis testing for finite state machines
+  https://ieeexplore.ieee.org/document/341378
+
+- Mutation Testing Applied to Validate Specifications Based on Statecharts
+  https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=809326
+
+- Mutation testing of protocols: Principles and preliminary experimental results
+
+- Contract-based mutation for testing components
+  https://ieeexplore.ieee.org/document/1510143
+
+- Mutation operators for specifications 
+  https://ieeexplore.ieee.org/document/873653  
+
+- Contract-based Mutation Testing in the Refinement Calculus 
+  https://www.sciencedirect.com/science/article/pii/S1571066105825617  
+
+
