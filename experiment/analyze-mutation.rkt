@@ -1,6 +1,7 @@
 #lang at-exp racket
 
-(require "../process-q/functional.rkt"
+(require "../process-q/interface.rkt"
+         "../process-q/functional.rkt"
          "../configurations/configure-benchmark.rkt"
          "../mutate/mutate.rkt"
          "../runner/mutation-runner.rkt"
@@ -47,12 +48,12 @@
                                            bench)]
                [i-2 (in-naturals)])
       (match (cached-results-for module-to-mutate-name index)
-        [#f (enq-process q
-                         (λ _ (mutation-info-for bench
-                                                 module-to-mutate-name
-                                                 index
-                                                 (~a i-1 '- i-2)
-                                                 #:progress-logger log-progress!)))]
+        [#f (process-Q-enq q
+                           (λ _ (mutation-info-for bench
+                                                   module-to-mutate-name
+                                                   index
+                                                   (~a i-1 '- i-2)
+                                                   #:progress-logger log-progress!)))]
         [(list type-error? mutation-type)
          (log-mutation-analysis-info "Pulling cached result:")
          (log-progress! module-to-mutate-name
@@ -69,7 +70,7 @@
 
   (define q* (process-Q-wait q))
   (log-mutation-analysis-info "Done waiting.")
-  (pretty-display (process-Q-data q*)))
+  (pretty-display (process-Q-get-data q*)))
 
 (define (mutation-info-for bench
                            module-to-mutate-name
@@ -115,7 +116,7 @@
                  (if type-error? "success" "fail")
                  update-inner-hash
                  (hash)))
-  (process-Q-data-set q (update (process-Q-data q))))
+  (process-Q-set-data q (update (process-Q-get-data q))))
 
 (define (extract-mutation-type-and-result f)
   (define output-regexp
