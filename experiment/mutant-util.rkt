@@ -36,7 +36,8 @@
                              mutation-index
                              outfile
                              #:timeout/s [timeout/s #f]
-                             #:memory/gb [memory/gb #f])
+                             #:memory/gb [memory/gb #f]
+                             #:log-mutation-info? [log-mutation-info? #f])
   (match-define (benchmark-configuration main others* base-dir)
     a-benchmark-configuration)
   (define module-to-mutate
@@ -55,18 +56,23 @@
       (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
         (λ (error-log-port)
           (match-define (list #f runner-in _ #f runner-ctl)
-            (process*/ports
-             outfile-port #f error-log-port
-             racket-path "-O" "info@mutate" "--"
-             mutant-runner-path
-             "-m" main
-             "-o" (~s others)
-             "-M" module-to-mutate
-             "-i" (~a mutation-index)
-             "-t" (~a (if timeout/s
-                          timeout/s
-                          (default-timeout/s)))
-             "-g" (~a (if memory/gb memory/gb (default-memory-limit/gb)))))
+            (apply process*/ports
+                   outfile-port #f error-log-port
+                   racket-path
+                   (append
+                    (if log-mutation-info?
+                        (list "-O" "info@mutate")
+                        empty)
+                    (list "--"
+                          mutant-runner-path
+                          "-m" main
+                          "-o" (~s others)
+                          "-M" module-to-mutate
+                          "-i" (~a mutation-index)
+                          "-t" (~a (or timeout/s
+                                       (default-timeout/s)))
+                          "-g" (~a (or memory/gb
+                                       (default-memory-limit/gb)))))))
           (close-output-port runner-in)
           runner-ctl)))))
 

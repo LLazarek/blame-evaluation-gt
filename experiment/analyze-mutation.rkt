@@ -88,7 +88,8 @@
   (define ctl (spawn-mutant-runner the-benchmark-configuration
                                    module-to-mutate-name
                                    index
-                                   outfile))
+                                   outfile
+                                   #:log-mutation-info? #t))
   (log-mutation-analysis-info
    @~a{Spawned mutant @module-to-mutate-name @"@" @index})
   (define (will:record-type-error q* info)
