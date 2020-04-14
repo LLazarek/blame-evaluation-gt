@@ -1037,7 +1037,8 @@ Mutant: [~a] ~a @ ~a with config:
     (progress-log path)])
   (unless (bench-to-run)
     (error 'mutant-factory "Must provide benchmark to run."))
-  #;(when (directory-exists? (data-output-dir))
+  (when (and (directory-exists? (data-output-dir))
+             (not (progress-log)))
     (eprintf "Output directory ~a already exists; remove? (y/n): "
              (data-output-dir))
     (match (read)
