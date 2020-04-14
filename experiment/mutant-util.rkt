@@ -47,7 +47,9 @@
     (map (match-lambda [(? path? p)
                         (path->string p)]
                        [other (~a other)])
-         (match base-dir
+         others*
+         ;; This isn't necessary: only the base, typed, and untyped dirs have code.
+         #;(match base-dir
            [#f others*]
            [dir (append others*
                         ;; base-dir sometimes contains other files, like

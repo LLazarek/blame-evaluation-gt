@@ -32,7 +32,8 @@
 
                  [realistic-test-bench (simplify-path "./real-test-bench")]
                  [realistic-test-bench/ut (simplify-path "./real-test-bench/untyped")]
-                 [realistic-test-bench/t (simplify-path "./real-test-bench/typed")])
+                 [realistic-test-bench/t (simplify-path "./real-test-bench/typed")]
+                 [realistic-test-bench/base (simplify-path "./real-test-bench/base")])
   #:files ([e-path (build-path test-bench/ut "e.rkt")
                    @~a{
                        #lang racket
@@ -65,6 +66,8 @@
                           (define (loop)
                             (if #f (loop) 42))
                           }]
+           [a-text-file (build-path realistic-test-bench/base "a-text-file.txt")
+                        @~a{foobar baz}]
            [mutant0-path "m0.rktd"
                          (format "~s\n"
                                  (run-status "m0.rkt"
