@@ -64,12 +64,12 @@
   (log-mutation-analysis-info
    @~a{
        Done enqueuing mutants. @;
-       Q has @(proc-Q-active-count q) active and @(proc-Q-waiting-count q) waiting. @;
+       Q has @(process-Q-active-count q) active and @(process-Q-waiting-count q) waiting. @;
        Waiting...})
 
-  (define q* (proc-Q-wait q))
+  (define q* (process-Q-wait q))
   (log-mutation-analysis-info "Done waiting.")
-  (pretty-display (proc-Q-data q*)))
+  (pretty-display (process-Q-data q*)))
 
 (define (mutation-info-for bench
                            module-to-mutate-name
@@ -114,7 +114,7 @@
                  (if type-error? "success" "fail")
                  update-inner-hash
                  (hash)))
-  (proc-Q-data-set q (update (proc-Q-data q))))
+  (process-Q-data-set q (update (process-Q-data q))))
 
 (define (extract-mutation-type-and-result f)
   (define output-regexp
@@ -168,12 +168,6 @@
     (progress-log path)])
   (unless (bench-to-run)
     (error 'mutant-factory "Must provide benchmark to run."))
-  (when (directory-exists? (data-output-dir))
-    (eprintf "Output directory ~a already exists; remove? (y/n): "
-             (data-output-dir))
-    (match (read)
-      [(or 'y 'yes) (delete-directory/files (data-output-dir))]
-      [_ (eprintf "Not deleted.~n")]))
   (define progress
     (match (progress-log)
       [(? file-exists? path) (make-hash (file->list path))]
