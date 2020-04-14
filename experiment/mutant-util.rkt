@@ -50,7 +50,10 @@
          (match base-dir
            [#f others*]
            [dir (append others*
-                        (directory-list dir #:build? #t))])))
+                        ;; base-dir sometimes contains other files, like
+                        ;; workload replay histories; skip them.
+                        (filter (λ (p) (regexp-match? #rx"\\.rkt$" p))
+                                (directory-list dir #:build? #t)))])))
   (call-with-output-file outfile #:mode 'text
     (λ (outfile-port)
       (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
