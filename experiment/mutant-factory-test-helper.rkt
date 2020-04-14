@@ -2,6 +2,7 @@
 
 (require ruinit
          syntax/parse/define
+         "blame-trail-data.rkt"
          "../runner/mutation-runner.rkt")
 (provide test-begin/with-env)
 
@@ -69,8 +70,8 @@
                                  (run-status "m0.rkt"
                                              0
                                              'foo
-                                             'crashed
-                                             #f
+                                             'blamed
+                                             "m0.rkt"
                                              #f))]
            [mutant1-path/1 "m11.rktd"
                            (format "~s\n"
@@ -78,7 +79,7 @@
                                                0
                                                'foo
                                                'blamed
-                                               "mutant-factory-test.rkt"
+                                               "m1.rkt"
                                                #f))]
            [mutant1-path/2 "m12.rktd"
                            (format "~s\n"
@@ -98,6 +99,25 @@
                                              #f))]
            [empty-file-path "empty-file.rktd"
                             ""]
+           [partial-e-bt-aggregate-file
+            "e.rkt_N.rktd"
+            @~a{
+                @~s[(blame-trail-summary
+                     "e.rkt"
+                     1
+                     42
+                     (list
+                      (mutant-summary 187
+                                      (run-status "e.rkt"
+                                                  1
+                                                  'foo
+                                                  'type-error
+                                                  "e.rkt"
+                                                  #f)
+                                      (hash "main.rkt" 'types
+                                            "e.rkt" 'types
+                                            "loop.rkt" 'types))))]
+                }]
 
            [rt-main/ut (build-path realistic-test-bench/ut
                                    "main.rkt")
