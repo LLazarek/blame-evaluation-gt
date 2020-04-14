@@ -1,57 +1,55 @@
 #lang at-exp racket
 
-(provide (struct-out process-info)
-         (contract-out
-          [proc-Q? (any/c . -> . boolean?)]
-          [proc-Q-empty? (proc-Q? . -> . boolean?)]
+(provide (contract-out
           [make-process-Q
            ({(and/c natural? (>/c 0))}
             {any/c}
             . ->* .
-            (and/c proc-Q? proc-Q-empty?))]
-          [process-info/c contract?]
-          [enq-process (proc-Q? (-> process-info/c) . -> . proc-Q?)]
-          [rename wait proc-Q-wait
-                  (proc-Q? . -> . (and/c proc-Q? proc-Q-empty?))]
-          [proc-Q-active-count (proc-Q? . -> . natural?)]
-          [proc-Q-waiting-count (proc-Q? . -> . natural?)]
-          [proc-Q-data (proc-Q? . -> . any/c)]
-          [proc-Q-data-set (proc-Q? any/c . -> . proc-Q?)]))
+            (and/c process-Q?
+                   fun-process-Q?
+                   process-Q-empty?))]
+          [fun-process-Q? (any/c . -> . boolean?)]))
 
-(require "funq.rkt")
+(require "funq.rkt"
+         "interface.rkt")
 
-(struct proc-Q (active-limit active active-count waiting data))
+(struct fun-process-Q process-Q (active-limit active active-count waiting))
 
-(define (proc-Q-data-set q v)
-  (struct-copy proc-Q q
-               [data v]))
-
-(struct process-info (data ctl will) #:transparent)
-(define process-will/c (proc-Q? process-info? . -> . proc-Q?))
-(define process-info/c
-  (struct/dc process-info
-             [data any/c]
-             [ctl ((or/c 'status 'wait 'interrupt 'kill) . -> . any)]
-             [will (proc-Q? process-info? . -> . proc-Q?)]))
+(define (fun-process-Q-set-data q v)
+  (struct-copy fun-process-Q q
+               [data #:parent process-Q v]))
 
 (define (make-process-Q process-limit [data-init #f])
-  (proc-Q process-limit empty 0 empty-Q data-init))
+  (fun-process-Q fun-process-Q-empty?
+                 enq-process
+                 wait
+                 fun-process-Q-active-count
+                 fun-process-Q-waiting-count
+                 process-Q-data
+                 fun-process-Q-set-data
 
-(define (proc-Q-empty? q)
-  (and (zero? (proc-Q-active-count q))
-       (zero? (Q-size (proc-Q-waiting q)))))
+                 data-init
+
+                 process-limit
+                 empty
+                 0
+                 empty-Q))
+
+(define (fun-process-Q-empty? q)
+  (and (zero? (fun-process-Q-active-count q))
+       (zero? (Q-size (fun-process-Q-waiting q)))))
 
 ;; start-process should return a process-info?
 (define (enq-process q start-process)
   (sweep-dead/spawn-new-processes
-   (struct-copy proc-Q q
-                [waiting (enq (proc-Q-waiting q) start-process)])))
+   (struct-copy fun-process-Q q
+                [waiting (enq (fun-process-Q-waiting q) start-process)])))
 
 (define (wait q #:delay [delay 1])
   (let loop ([current-q q])
     (define new-q (sweep-dead/spawn-new-processes current-q))
     (match new-q
-      [(struct* proc-Q
+      [(struct* fun-process-Q
                 ([active-count 0]
                  [waiting (? empty-Q?)]))
        new-q]
@@ -64,9 +62,9 @@
     (partition (λ (info)
                  (equal? ((process-info-ctl info) 'status)
                          'running))
-               (proc-Q-active q)))
+               (fun-process-Q-active q)))
   (define still-active-count (length still-active))
-  (define temp-q (struct-copy proc-Q q
+  (define temp-q (struct-copy fun-process-Q q
                               [active still-active]
                               [active-count still-active-count]))
   (define temp-q+wills
@@ -74,10 +72,10 @@
               ([dead-proc (in-list dead)])
       ((process-info-will dead-proc) temp-q+wills dead-proc)))
   (define free-spawning-capacity
-    (- (proc-Q-active-limit temp-q+wills)
+    (- (fun-process-Q-active-limit temp-q+wills)
        still-active-count))
   (define procs-waiting-to-spawn
-    (Q-size (proc-Q-waiting temp-q+wills)))
+    (Q-size (fun-process-Q-waiting temp-q+wills)))
   (define procs-to-spawn
     (if (< free-spawning-capacity procs-waiting-to-spawn)
         free-spawning-capacity
@@ -88,17 +86,21 @@
 
 (define (spawn-next-process q)
   (match q
-    [(proc-Q limit active active-count waiting data)
+    [(struct* fun-process-Q
+              ([active-limit limit]
+               [active active]
+               [active-count active-count]
+               [waiting waiting]))
+     (define data (process-Q-data q))
      (define start-process (Q-first waiting))
      (define the-process-info (start-process))
-     (proc-Q limit
-             (cons the-process-info active)
-             (add1 active-count)
-             (Q-rest waiting)
-             data)]))
+     (struct-copy fun-process-Q q
+                  [active (cons the-process-info active)]
+                  [active-count (add1 active-count)]
+                  [waiting (Q-rest waiting)])]))
 
-(define (proc-Q-waiting-count q)
-  (Q-size (proc-Q-waiting q)))
+(define (fun-process-Q-waiting-count q)
+  (Q-size (fun-process-Q-waiting q)))
 
 
 (module+ test
@@ -136,16 +138,16 @@
                                          (set-box! will-called? #t)
                                          (close-process-ports! info)
                                          q))))))
-    (test-= (Q-size (proc-Q-waiting q1)) 0)
+    (test-= (Q-size (fun-process-Q-waiting q1)) 0)
     (not (unbox will-called?))
-    (test-= (proc-Q-active-count q1) 1)
+    (test-= (fun-process-Q-active-count q1) 1)
 
     (ignore (define q1* (wait q1)))
-    (test-= (Q-size (proc-Q-waiting q1*)) 0)
-    (test-= (Q-size (proc-Q-waiting q1)) 0)
+    (test-= (Q-size (fun-process-Q-waiting q1*)) 0)
+    (test-= (Q-size (fun-process-Q-waiting q1)) 0)
     (unbox will-called?)
-    (test-= (proc-Q-active-count q1*) 0)
-    (test-= (proc-Q-active-count q1) 1))
+    (test-= (fun-process-Q-active-count q1*) 0)
+    (test-= (fun-process-Q-active-count q1) 1))
 
   (test-begin
     #:name will
@@ -177,21 +179,21 @@
                                                (set-box! will-3-called? #t)
                                                (close-process-ports! info)
                                                q**))))))))))
-    (test-= (proc-Q-active-count q1) 1)
-    (test-= (Q-size (proc-Q-waiting q1)) 0)
-    (test-= (proc-Q-active-count q2) 1)
-    (test-= (Q-size (proc-Q-waiting q2)) 1)
+    (test-= (fun-process-Q-active-count q1) 1)
+    (test-= (Q-size (fun-process-Q-waiting q1)) 0)
+    (test-= (fun-process-Q-active-count q2) 1)
+    (test-= (Q-size (fun-process-Q-waiting q2)) 1)
     (not (unbox will-1-called?))
     (not (unbox will-2-called?))
     (not (unbox will-3-called?))
 
     (ignore (define q2* (wait q2)))
-    (test-= (Q-size (proc-Q-waiting q1)) 0)
-    (test-= (Q-size (proc-Q-waiting q2)) 1)
-    (test-= (Q-size (proc-Q-waiting q2*)) 0)
-    (test-= (proc-Q-active-count q1) 1)
-    (test-= (proc-Q-active-count q2) 1)
-    (test-= (proc-Q-active-count q2*) 0)
+    (test-= (Q-size (fun-process-Q-waiting q1)) 0)
+    (test-= (Q-size (fun-process-Q-waiting q2)) 1)
+    (test-= (Q-size (fun-process-Q-waiting q2*)) 0)
+    (test-= (fun-process-Q-active-count q1) 1)
+    (test-= (fun-process-Q-active-count q2) 1)
+    (test-= (fun-process-Q-active-count q2*) 0)
     (unbox will-1-called?)
     (unbox will-2-called?)
     (unbox will-3-called?))
@@ -225,18 +227,18 @@
                  (λ _
                    (simple-process @~a{echo @i}
                                    (will-for i)))))))
-    (test-= (proc-Q-active-count the-q) 2)
-    (test-= (Q-size (proc-Q-waiting the-q)) 1)
+    (test-= (fun-process-Q-active-count the-q) 2)
+    (test-= (Q-size (fun-process-Q-waiting the-q)) 1)
 
     (ignore (define the-q* (wait the-q)))
-    (test-= (proc-Q-active-count the-q) 2)
-    (test-= (Q-size (proc-Q-waiting the-q)) 1)
-    (test-= (proc-Q-active-count the-q*) 0)
-    (test-= (Q-size (proc-Q-waiting the-q*)) 0)
+    (test-= (fun-process-Q-active-count the-q) 2)
+    (test-= (Q-size (fun-process-Q-waiting the-q)) 1)
+    (test-= (fun-process-Q-active-count the-q*) 0)
+    (test-= (Q-size (fun-process-Q-waiting the-q*)) 0)
     (for/and/test ([i (in-range 5)])
                   (test-equal? (vector-ref wills-called? i)
                                (~a i "\n"))))
 
   (test-begin
     #:name wait
-    (proc-Q-empty? (wait (make-process-Q 2)))))
+    (fun-process-Q-empty? (wait (make-process-Q 2)))))
