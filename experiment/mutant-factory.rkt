@@ -289,7 +289,6 @@
                     mutation-index)
        current-process-q]))
   (define (result-cache-has-trail? number)
-    ;; lltodo: might be able to explicitly record this info in the cache with a special key?
     (and ((current-result-cache) module-to-mutate-name
                                  mutation-index
                                  number)
@@ -319,6 +318,14 @@
                                mutant-program)]
 
     [0
+     ;; No trails were recorded in the cache. This might either mean that the
+     ;; mutant is irrelevant, or that the mutant wasn't processed yet.
+
+     ;; lltodo: might be able to explicitly record in the cache information to
+     ;; distinguish "haven't tried this mutant yet" from "decided this mutant is
+     ;; irrelevant". It would avoid having to run the test for all irrelevant
+     ;; mutants when resuming.
+
      (log-factory
       info
       @~a{
