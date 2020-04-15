@@ -183,7 +183,7 @@
                    type-error
                    oom
                    timeout
-                   crashed
+                   type-error
                    completed))
 
 (struct run-status (mutated-module
@@ -339,6 +339,7 @@
           ([exn:fail:contract:blame? extract-blamed]
            [type-checker-failure? extract-type-error-source]
            [exn:fail:out-of-memory? (λ _ ((make-status* 'oom)))]
+           [exn:fail:syntax? (λ _ ((make-status* 'syntax-error)))]
            [exn? extract-runtime-error-location])
           (run)
           ((make-status* 'completed)))))

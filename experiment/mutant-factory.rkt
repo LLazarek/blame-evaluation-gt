@@ -585,7 +585,7 @@ Giving up.
                     mod index blame-trail-id
                     dead-succ-id outcome)
        current-process-q]
-      [{(or 'completed 'crashed) _}
+      [{(or 'completed 'syntax-error) _}
        (log-factory error
                     "Blame disappeared while following blame trail ~a @ ~a {~a}.
 Mutant: [~a] and config:
@@ -601,7 +601,7 @@ Predecessor (id [~a]) blamed ~a and had config:
                     dead-succ-config
                     dead-succ-result
                     (if (equal? (run-status-outcome dead-succ-result)
-                                'crashed)
+                                'syntax-error)
                         "Likely due to a buggy contract
    on the region blamed by the predecessor (see below) that crashed"
                         "Something has gone very wrong")
@@ -934,6 +934,7 @@ Mutant: [~a] ~a @ ~a with config:
     (match (with-input-from-file path read)
       [(and (or (struct* run-status
                          ([outcome (or 'completed
+                                       'syntax-error
                                        'timeout
                                        'oom)]
                           [blamed #f]))
@@ -947,7 +948,7 @@ Mutant: [~a] ~a @ ~a with config:
 
 ;; dead-mutant-process?
 ;; ->
-;; (or/c 'blamed 'type-error 'completed 'crashed 'timeout 'oom)
+;; (or/c 'blamed 'type-error 'completed 'syntax-error 'timeout 'oom)
 (define (process-outcome dead-proc)
   (run-status-outcome (dead-mutant-process-result dead-proc)))
 
