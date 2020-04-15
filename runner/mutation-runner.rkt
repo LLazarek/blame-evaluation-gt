@@ -183,7 +183,7 @@
                    type-error
                    oom
                    timeout
-                   type-error
+                   syntax-error
                    completed))
 
 (struct run-status (mutated-module
