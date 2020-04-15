@@ -63,17 +63,16 @@
                  (equal? ((process-info-ctl info) 'status)
                          'running))
                (fun-process-Q-active q)))
-  (define still-active-count (length still-active))
   (define temp-q (struct-copy fun-process-Q q
                               [active still-active]
-                              [active-count still-active-count]))
+                              [active-count (length still-active)]))
   (define temp-q+wills
     (for/fold ([temp-q+wills temp-q])
               ([dead-proc (in-list dead)])
       ((process-info-will dead-proc) temp-q+wills dead-proc)))
   (define free-spawning-capacity
     (- (fun-process-Q-active-limit temp-q+wills)
-       still-active-count))
+       (fun-process-Q-active-count temp-q+wills)))
   (define procs-waiting-to-spawn
     (Q-size (fun-process-Q-waiting temp-q+wills)))
   (define procs-to-spawn
@@ -241,4 +240,70 @@
 
   (test-begin
     #:name wait
-    (fun-process-Q-empty? (wait (make-process-Q 2)))))
+    (fun-process-Q-empty? (wait (make-process-Q 2))))
+
+  (test-begin
+    #:name process-limit
+    ;; observed bug:
+    ;; You have three active procs,
+    ;; 0. running, will: nothing
+    ;; 1. done, will: spawn another
+    ;; 2. running, will: nothing
+    ;;
+    ;; And one waiting proc,
+    ;; 3. waiting, will: nothing
+    ;;
+    ;; Now you call wait. It sweeps 1, and executes its will which enq's another
+    ;; proc (4), which is waiting at first, but then sweep is called again,
+    ;; which decides to spawn 3 because only two procs are active, filling the Q
+    ;; back up to three active and that sweep call returns. But now we return to
+    ;; the first sweep call, which says that it has a `free-spawning-capacity`
+    ;; of 1 and pulls 4 off the waiting list and spawns a proc, making four
+    ;; active procs at once!
+    (ignore (define current-active (box 0))
+            (define active-history (box empty))
+            (define (record-active-proc! do)
+              (define new-active (do (unbox current-active)))
+              (set-box! current-active new-active)
+              (set-box! active-history
+                        (cons new-active
+                              (unbox active-history))))
+            (define (enq-proc! q i)
+              (enq-process q
+                           (λ _
+                             (record-active-proc! add1)
+                             (simple-process
+                              (match i
+                                [2 "echo done"]
+                                [else "sleep 2"])
+                              (λ (q* info)
+                                (record-active-proc! sub1)
+                                (close-process-ports! info)
+                                (match i
+                                  [2 (enq-proc! q* 4)]
+                                  [else q*]))))))
+            (define q (for/fold ([q (make-process-Q 3)])
+                                ([i (in-range 4)])
+                        (enq-proc! q i)))
+            (define q* (wait q)))
+    (extend-test-message
+     (not (findf (>/c 3) (unbox active-history)))
+     "process-Q spawns active processes exceeding the process limit"))
+
+  (test-begin
+    #:name wait/long-running-procs
+    (ignore
+     (define done-vec (vector #f #f #f #f))
+     (define q (for/fold ([q (make-process-Q 2)])
+                         ([i (in-range 4)])
+                 (enq-process q
+                              (λ _
+                                (simple-process
+                                 "sleep 10"
+                                 (λ (q* info)
+                                   (close-process-ports! info)
+                                   (vector-set! done-vec i #t)
+                                   q*))))))
+            (define q/done (wait q)))
+    (fun-process-Q-empty? q/done)
+    (andmap identity (vector->list done-vec))))
