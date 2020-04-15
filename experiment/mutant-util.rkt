@@ -56,7 +56,7 @@
                         ;; workload replay histories; skip them.
                         (filter (λ (p) (regexp-match? #rx"\\.rkt$" p))
                                 (directory-list dir #:build? #t)))])))
-  (call-with-output-file outfile #:mode 'text
+  (call-with-output-file outfile #:mode 'text #:exists 'replace
     (λ (outfile-port)
       (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
         (λ (error-log-port)
