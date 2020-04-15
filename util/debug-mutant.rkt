@@ -7,7 +7,8 @@
          "../configurations/configure-benchmark.rkt"
          "../mutate/mutate.rkt"
          "../runner/unify-program.rkt"
-         (submod "../experiment/mutant-factory.rkt" test)
+         "../experiment/blame-trail-data.rkt"
+         "../experiment/mutant-util.rkt"
          "../util/path-utils.rkt"
          racket/runtime-path)
 
@@ -24,7 +25,7 @@
     [(and (regexp @~a{^#hash})
           hash-string)
      (call-with-input-string hash-string read)]
-    [(regexp @~a{^#s\(aggregated-result .+(#hash.+\)\))}
+    [(regexp @~a{^#s\(mutant-summary.+(#hash.+\)\))}
              (list _ hash-string))
      (call-with-input-string hash-string read)]
     [other
@@ -37,15 +38,16 @@
                       identifier
                       #:diff-mutant? [diff-mutant? #f]
                       #:run? [run? #f]
+                      #:run-process? [run-via-process? #f]
                       #:write-modules-to [dump-dir-name #f]
                       #:suppress-output? [suppress-output? #f])
   (define bench-path (find-benchmark bench-name-or-path))
   (define the-benchmark (read-benchmark bench-path))
   (define config (read-config identifier))
-  (match-define
-    (struct* benchmark-configuration
-             ([main main-path]
-              [others others-paths]))
+  (match-define (and the-benchmark-configuration
+                     (struct* benchmark-configuration
+                              ([main main-path]
+                               [others others-paths])))
     (configure-benchmark the-benchmark config))
   (define module-to-mutate-path
     (pick-file-by-name (list* main-path others-paths)
@@ -68,57 +70,86 @@
 
   (when diff-mutant?
     (diff-mutation the-module-to-mutate index))
-  (when run?
+  (when (or run?
+            run-via-process?)
     (displayln "Running mutant...")
-    (with-handlers ([exn:fail?
-                     (λ (e)
-                       (displayln 'inside-handler)
-                       ((error-display-handler
-                         @~a{
-                             Mutant crashed with exn:
-                             @pretty-format[e]
+    (when (not suppress-output?)
+      (displayln @~a{
+                     Mutant output:
+                     ,------------------------------
+                     }))
+    (match-define (struct* run-status
+                           ([mutated-id mutated-id]
+                            [outcome outcome]
+                            [blamed blamed]
+                            [result-value result-value]))
+      (cond [run?
+             (with-handlers ([exn:fail?
+                              (λ (e)
+                                (displayln 'inside-handler)
+                                ((error-display-handler
+                                  @~a{
+                                      Mutant crashed with exn:
+                                      @pretty-format[e]
 
-                             exn has msg:
-                             }
-                         e)))])
-      (when (not suppress-output?)
-        (displayln @~a{
-                       Mutant output:
-                       ,------------------------------
-                       }))
-      (match-define
-        (struct* run-status
-                 ([mutated-id mutated-id]
-                  [outcome outcome]
-                  [blamed blamed]
-                  [result-value result-value]))
-        (run-with-mutated-module
-         the-program
-         the-module-to-mutate
-         index
-         #:timeout/s (* 10 60)
-         #:memory/gb 5
-         #:modules-base-path (find-program-base-path the-program)
-         #:write-modules-to dump-dir-name
-         #:on-module-exists 'replace
-         #:suppress-output? suppress-output?))
-      (when (not suppress-output?)
-        (displayln @~a{
-                       `------------------------------
-                       }))
-      (displayln
-       @~a{
-           Mutated: @mutated-id
-           Outcome: @outcome @;
-           @(match outcome
-              [(or 'type-error 'blamed)
-               @~a{
+                                      exn has msg:
+                                      }
+                                  e)))])
+               (run-with-mutated-module
+                the-program
+                the-module-to-mutate
+                index
+                #:timeout/s (* 10 60)
+                #:memory/gb 5
+                #:modules-base-path (find-program-base-path the-program)
+                #:write-modules-to dump-dir-name
+                #:on-module-exists 'replace
+                #:suppress-output? suppress-output?))]
+            [run-via-process?
+             (displayln
+              "Running as seperate process via `spawn-mutant-runner`...")
+             (define outfile (make-temporary-file))
+             (define errfile (make-temporary-file))
+             (define ctl
+               (parameterize ([mutant-error-log errfile])
+                 (spawn-mutant-runner
+                  the-benchmark-configuration
+                  mutated-module-name
+                  index
+                  outfile)))
+             (displayln "Waiting up to 6min for mutant to finish...")
+             (define wait-thd
+               (thread (thunk (ctl 'wait))))
+             (sync/timeout (* 6 60) wait-thd)
+             (begin0 (match (ctl 'status)
+                       ['running
+                        (displayln "Mutant is still running. Killing it.")
+                        (ctl 'kill)
+                        (sleep 1)
+                        (displayln "Killed. Error file contents:")
+                        (system @~a{cat @errfile})
+                        (file->string outfile)]
+                       [else
+                        (file->value outfile)])
+               (delete-file outfile)
+               (delete-file errfile))]))
+    (when (not suppress-output?)
+      (displayln @~a{
+                     `------------------------------
+                     }))
+    (displayln
+     @~a{
+         Mutated: @mutated-id
+         Outcome: @outcome @;
+         @(match outcome
+            [(or 'type-error 'blamed)
+             @~a{
 
-                   Blamed:  @blamed
-                   }]
-              [else ""])
-           Result:  @result-value
-           }))))
+                 Blamed:  @blamed
+                 }]
+            [else ""])
+         Result:  @result-value
+         })))
 
 (define debug-mutant/infer
   (make-keyword-procedure
@@ -152,14 +183,14 @@
 ;;   (displayln (~v infer-v))
   (match infer-v
     [(regexp @pregexp{
-                      #s\(aggregated-result \S+ \d+ #s\(run-status ("[^"]+") (\d+) .+(#hash.+\)\))
+                      #s\(mutant-summary \d+ #s\(run-status ("[^"]+") (\d+) .+(#hash.+\)\))
 @;" balance quotes
                       }
              (list _ mod-name index config))
      (values (call-with-input-string mod-name read)
              (call-with-input-string index    read)
              (call-with-input-string config   read))]
-    [(struct* aggregated-result
+    [(struct* mutant-summary
               ([run-status (struct* run-status
                                     ([mutated-module mod-name]
                                      [index index]))]
