@@ -440,8 +440,8 @@
      (log-factory
       info
       @~a{
-          Blame trail @sample-number for mutant @;
-          @module-to-mutate-name @"@" @mutation-index @;
+          Blame trail @;
+          @module-to-mutate-name @"@" @mutation-index {@sample-number} @;
           found in progress cache: @(pretty-path path-to-data-file)
           })
      process-q]))
@@ -755,7 +755,16 @@ Predecessor (id [~a]) blamed ~a and had config:
        (log-factory info
                     @~a{
                         Sweeping up dead mutant [@id]: @mod @"@" @index, @;
-                        result: @~s[(run-status-outcome result)], @;
+                        result: @(match result
+                                   [(struct* run-status
+                                             ([outcome (and outcome
+                                                            (or 'blamed
+                                                                'type-error))]
+                                              [blamed mod-name]))
+                                    (~a outcome " " mod-name)]
+                                   [(struct* run-status
+                                             ([outcome o]))
+                                    o]), @;
                         config: @~s[config]
                         })
        (define dead-mutant-proc
