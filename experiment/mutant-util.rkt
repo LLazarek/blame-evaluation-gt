@@ -7,7 +7,9 @@
              natural?
              path-string?}
             {#:timeout/s (or/c #f number?)
-             #:memory/gb (or/c #f number?)}
+             #:memory/gb (or/c #f number?)
+             #:log-mutation-info? boolean?
+             #:save-output (or/c #f path-string?)}
             . ->* .
             procedure?)]
           [in-mutation-indices
@@ -37,7 +39,8 @@
                              outfile
                              #:timeout/s [timeout/s #f]
                              #:memory/gb [memory/gb #f]
-                             #:log-mutation-info? [log-mutation-info? #f])
+                             #:log-mutation-info? [log-mutation-info? #f]
+                             #:save-output [output-path #f])
   (match-define (benchmark-configuration main others* base-dir)
     a-benchmark-configuration)
   (define module-to-mutate
@@ -77,7 +80,10 @@
                           "-t" (~a (or timeout/s
                                        (default-timeout/s)))
                           "-g" (~a (or memory/gb
-                                       (default-memory-limit/gb)))))))
+                                       (default-memory-limit/gb))))
+                    (if output-path
+                        (list "-O" output-path)
+                        empty))))
           (close-output-port runner-in)
           runner-ctl)))))
 

@@ -27,6 +27,7 @@
   (define on-module-exists (make-parameter 'error))
   (define timeout/s (make-parameter #f))
   (define memory/gb (make-parameter #f))
+  (define mutant-output-path (make-parameter #f))
 
   (command-line
    #:once-each
@@ -72,7 +73,23 @@
    [("-g" "--memory-limit")
     gb
     "Memory limit (GB)"
-    (memory/gb (string->number gb))])
+    (memory/gb (string->number gb))]
+
+   [("-O" "--output")
+    path
+    "Send mutant output to `path` instead of suppressing it."
+    (mutant-output-path path)])
+
+  (define mutant-output-path-port
+    (match (mutant-output-path)
+      [#f #f]
+      [path
+       (define port (open-output-file #:exists 'replace path))
+       (file-stream-buffer-mode port 'line)
+       port]))
+  (define (mutant-output-or get-port)
+    (or mutant-output-path-port
+        (get-port)))
 
   (define missing-arg
     (for/first ([arg (in-list (list (main-module)
@@ -107,15 +124,20 @@
          }))
 
   (define the-run-status
-    (run-with-mutated-module
-     the-program
-     the-module-to-mutate
-     (mutation-index)
-     #:timeout/s (timeout/s)
-     #:memory/gb (memory/gb)
-     #:modules-base-path (find-program-base-path the-program)
-     #:write-modules-to (write-modules-to)
-     #:on-module-exists (on-module-exists)))
+      (parameterize ([current-output-port (mutant-output-or current-output-port)]
+                     [current-error-port  (mutant-output-or current-error-port)])
+        (run-with-mutated-module
+         the-program
+         the-module-to-mutate
+         (mutation-index)
+         #:timeout/s (timeout/s)
+         #:memory/gb (memory/gb)
+         #:modules-base-path (find-program-base-path the-program)
+         #:write-modules-to (write-modules-to)
+         #:on-module-exists (on-module-exists)
+         #:suppress-output? (not (mutant-output-path)))))
+  (when mutant-output-path-port
+    (close-output-port mutant-output-path-port))
 
   (writeln the-run-status))
 

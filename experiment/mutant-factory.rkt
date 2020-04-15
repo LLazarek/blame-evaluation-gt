@@ -64,6 +64,9 @@
            try-get-type-error-module
            mutant->process-will))
 
+(define debug:save-individual-mutant-outputs? #f)
+
+
 (define MAX-CONFIG 'types)
 (define MAX-REVIVALS 3)
 
@@ -680,7 +683,11 @@ Predecessor (id [~a]) blamed ~a and had config:
                            mutation-index
                            outfile
                            #:timeout/s timeout/s
-                           #:memory/gb memory/gb))
+                           #:memory/gb memory/gb
+                           #:save-output (and debug:save-individual-mutant-outputs?
+                                              (build-path (data-output-dir)
+                                                          (format "~a.rktd"
+                                                                  mutant-id)))))
     (define mutant-blame-trail
       (cond [trail-being-followed => values]
             [test-mutant?            (blame-trail test-mutant-flag
