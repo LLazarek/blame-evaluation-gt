@@ -73,7 +73,8 @@
              [get-data       get-data/c]
              [set-data       set-data/c]
 
-             [data           data/c]))
+             [data           (or/c data/c
+                                   (box/c data/c))]))
 
 (define-simple-macro (define-method-shorthands prefix:id [field-name:id ...])
   #:with [accessor ...] (map (λ (field-name) (format-id this-syntax
