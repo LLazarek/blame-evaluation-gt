@@ -6,6 +6,7 @@
                      process-Q-wait
                      process-Q-active-count
                      process-Q-waiting-count
+                     process-Q-data
                      process-Q-get-data
                      process-Q-set-data)
          (struct-out process-info)
@@ -30,6 +31,9 @@
           [process-will/c contract?]
           [process-info/c contract?]))
 
+(module+ internal
+  (provide process-Q-data))
+
 (require syntax/parse/define
          (for-syntax racket/syntax))
 
@@ -41,8 +45,7 @@
                    get-data
                    set-data
 
-                   data)
-  #:transparent)
+                   data))
 
 (struct process-info (data ctl will) #:transparent)
 (define process-will/c (process-Q? process-info? . -> . process-Q?))

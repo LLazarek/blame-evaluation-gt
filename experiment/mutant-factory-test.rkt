@@ -17,7 +17,8 @@
 (module mock racket
   (provide make-mock-Q
            make-recording-mock-Q)
-  (require "../process-q/interface.rkt")
+  (require "../process-q/interface.rkt"
+           (submod "../process-q/interface.rkt" internal))
   (define (make-mock-Q [data-init #f]
                        #:empty? [empty? (λ _ #f)]
                        #:enq [enq (λ (q _) q)]

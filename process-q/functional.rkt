@@ -11,7 +11,8 @@
           [fun-process-Q? (any/c . -> . boolean?)]))
 
 (require "funq.rkt"
-         "interface.rkt")
+         "interface.rkt"
+         (submod "interface.rkt" internal))
 
 (struct fun-process-Q process-Q (active-limit active active-count waiting))
 

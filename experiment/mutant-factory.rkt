@@ -259,7 +259,7 @@
 
     (log-factory info "Finished enqueing all test mutants. Waiting...")
     (define process-q-finished (process-Q-wait process-q))
-    (factory-results (process-Q-data process-q-finished))))
+    (factory-results (process-Q-get-data process-q-finished))))
 
 ;; Spawns a test mutant and if that mutant has a blame result at
 ;; max contract configuration, then samples the precision lattice
@@ -274,7 +274,7 @@
                "  Trying to spawn test mutant for ~a @ ~a."
                module-to-mutate-name
                mutation-index)
-  (define bench (factory-bench (process-Q-data process-q)))
+  (define bench (factory-bench (process-Q-get-data process-q)))
   (define max-config (bench-info-max-config bench))
   (define (will:sample-if-type-error current-process-q dead-proc)
     (match (process-outcome dead-proc)
@@ -346,7 +346,7 @@
 (define/contract (sample-blame-trail-roots process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
-  (define the-factory (process-Q-data process-q))
+  (define the-factory (process-Q-get-data process-q))
   (define max-config (bench-info-max-config (factory-bench the-factory)))
   (define samples (sample-config max-config (sample-size)))
   (define (resample a-factory)
@@ -364,7 +364,7 @@
   (for/fold ([current-process-q process-q])
             ([sampled-config (in-list samples)]
              [sample-number (in-naturals)])
-    (define current-factory (process-Q-data current-process-q))
+    (define current-factory (process-Q-get-data current-process-q))
     (define factory+sample
       (record-sampled-config current-factory mutant-program sampled-config))
     (log-factory
@@ -429,7 +429,7 @@
                        (mutant-module (dead-mutant-process-mutant dead-proc))
                        (mutant-index (dead-mutant-process-mutant dead-proc)))
                       (define-values {new-sample new-factory}
-                        (resample (process-Q-data current-process-q)))
+                        (resample (process-Q-get-data current-process-q)))
                       (define new-process-q (process-Q-set-data current-process-q
                                                                 new-factory))
                       (spawn-blame-trail-root-mutant new-process-q
@@ -494,7 +494,7 @@
          ;; Blamed region is typed, so the path ends here.
          ;; Log the trail and stop following.
          (define new-factory
-           (record-blame-trail! (process-Q-data the-process-q)
+           (record-blame-trail! (process-Q-get-data the-process-q)
                                 the-blame-trail+dead-proc))
          (process-Q-set-data the-process-q
                              new-factory)]
@@ -660,7 +660,7 @@ Predecessor (id [~a]) blamed ~a and had config:
                })
        [result (process-Q/c factory/c)])
 
-  (define current-factory (process-Q-data process-q))
+  (define current-factory (process-Q-get-data process-q))
   (match-define (factory (bench-info the-benchmark _)
                          _
                          _
