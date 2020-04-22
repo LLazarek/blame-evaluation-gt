@@ -10,7 +10,7 @@
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
          "../process-q/interface.rkt"
-         "../process-q/functional.rkt"
+         "../process-q/priority.rkt"
          "mutant-util.rkt"
          "progress-log.rkt"
          "blame-trail-data.rkt"
@@ -716,12 +716,15 @@ Predecessor (id [~a]) blamed ~a and had config:
    debug
    @~a{    Mutant [@mutant-id] has config @~v[precision-config]})
 
+  (define number-of-procs-this-mutant-may-spawn
+    (if test-mutant? (sample-size) 1))
   (process-Q-enq
    (process-Q-set-data process-q
                        (copy-factory current-factory
                                      [total-mutants-spawned
                                       (add1 mutants-spawned)]))
-   spawn-the-mutant))
+   spawn-the-mutant
+   number-of-procs-this-mutant-may-spawn))
 
 ;; There is some common housekeeping that must be performed in every mutant
 ;; will, regardless of what kind of mutant or the details of its particular will
