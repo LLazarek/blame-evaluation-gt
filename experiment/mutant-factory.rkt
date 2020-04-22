@@ -6,6 +6,7 @@
          "../mutate/mutate.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
+         "../util/optional-contracts.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
          "../process-q/interface.rkt"
