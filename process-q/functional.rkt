@@ -41,7 +41,7 @@
        (zero? (Q-size (fun-process-Q-waiting q)))))
 
 ;; start-process should return a process-info?
-(define (enq-process q start-process)
+(define (enq-process q start-process . _)
   (sweep-dead/spawn-new-processes
    (struct-copy fun-process-Q q
                 [waiting (enq (fun-process-Q-waiting q) start-process)])))
