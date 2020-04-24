@@ -1,5 +1,18 @@
 #lang at-exp rscript
 
+;; ==================================================
+;;  Modify these to configure setup
+;; ==================================================
+
+(define PKG-DEPENDENCIES
+  "require-typed-check"
+  "custom-load"
+  "ruinit"
+  "pfds")
+
+;; ==================================================
+;; ==================================================
+
 (define-runtime-paths
   [repo-parent-path "../../"]
   [repo-path ".."])
@@ -96,14 +109,14 @@
 
 (define (install-pkg-dependencies raco-path)
   (displayln "Installing dependencies...")
-  (begin0 (shell* raco-path
-                  "pkg"
-                  "install"
-                   "-j" "2"
-                  "--skip-installed"
-                  "require-typed-check"
-                  "custom-load"
-                  "ruinit")
+  (begin0 (apply shell*
+
+                 raco-path
+                 "pkg"
+                 "install"
+                 "-j" "2"
+                 "--skip-installed"
+                 PKG-DEPENDENCIES)
     (displayln "Done.")))
 
 (define (download-TR raco-path TR-dir)
