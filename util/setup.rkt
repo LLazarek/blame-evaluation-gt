@@ -10,6 +10,9 @@
   "ruinit"
   "pfds")
 
+(define racket-download-url
+  "https://mirror.racket-lang.org/installers/7.6/racket-7.6-x86_64-linux-cs.sh")
+
 ;; ==================================================
 ;; ==================================================
 
@@ -52,11 +55,12 @@
   (define-values {parent _}
     (basename racket-dir #:with-directory? #t))
   (parameterize ([current-directory parent])
-    (define racket-installer-name "racket-7.6-x86_64-linux.sh")
+    (define racket-installer-name
+      (last (string-split racket-download-url "/")))
     (unless (file-exists? racket-installer-name)
       (displayln "Downloading Racket...")
       (shell* "wget"
-	      "https://mirror.racket-lang.org/installers/7.6/racket-7.6-x86_64-linux.sh")
+	      racket-download-url)
       (shell* "chmod"
 	      "u+x"
 	      racket-installer-name)
