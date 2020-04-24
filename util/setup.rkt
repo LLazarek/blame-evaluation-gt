@@ -7,7 +7,7 @@
 (define PKG-DEPENDENCIES
   '("require-typed-check"
     "custom-load"
-    "ruinit"
+    "https://github.com/LLazarek/ruinit.git"
     "pfds"))
 
 (define racket-download-url
