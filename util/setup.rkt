@@ -5,10 +5,10 @@
 ;; ==================================================
 
 (define PKG-DEPENDENCIES
-  "require-typed-check"
-  "custom-load"
-  "ruinit"
-  "pfds")
+  '("require-typed-check"
+    "custom-load"
+    "ruinit"
+    "pfds"))
 
 (define racket-download-url
   "https://mirror.racket-lang.org/installers/7.6/racket-7.6-x86_64-linux-cs.sh")
