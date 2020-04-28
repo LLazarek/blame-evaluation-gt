@@ -100,15 +100,6 @@
     (if (< free-spawning-capacity procs-waiting-to-spawn)
         free-spawning-capacity
         procs-waiting-to-spawn))
-  (displayln
-   @~a{
-       Spawning @procs-to-spawn procs because there are @;
-       @procs-waiting-to-spawn waiting to spawn and @;
-       @(imperative-process-Q-active-count q) @;
-       / @;
-       @(imperative-process-Q-active-limit q) @;
-       active right now
-       })
   (for ([i (in-range procs-to-spawn)])
     (spawn-next-process! q)))
 
