@@ -128,11 +128,8 @@
               (λ ()
                 (define l
                   (for/list ([i (in-range 0 total increment)])
-                    ;; Hack to make sure this loop doesn't get fiddled by the
-                    ;; optimizer
-                    (display (~a i " "))
+                    (collect-garbage)
                     (make-bytes increment)))
-                (display "\r")
                 (and (andmap bytes? l)
                      result))))
     (run-with-limits
