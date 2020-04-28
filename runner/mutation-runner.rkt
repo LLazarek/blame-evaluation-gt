@@ -404,7 +404,15 @@
                            (if #t
                                (- y x)
                                (+ (sleep 1)
-                                  (for/vector #:length 4294967296 () #f)
+                                  ;; Displays useful for debugging memory
+                                  ;; limits.
+                                  (displayln
+                                   (exact->inexact (/ (current-memory-use)
+                                                      (expt 10 9))))
+                                  (make-bytes (expt 10 9)) ; 1gb
+                                  (displayln
+                                   (exact->inexact (/ (current-memory-use)
+                                                      (expt 10 9))))
                                   (foo x y))))
 
                          (displayln (list 'a a))
@@ -465,15 +473,15 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    2
-                                   #:timeout/s 3
-                                   #:memory/gb 1))
+                                   #:timeout/s 5
+                                   #:memory/gb 3))
      (λ (r) (test-match r (struct* run-status ([outcome 'timeout])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
                                    2
                                    #:timeout/s 60
-                                   #:memory/gb 0.1))
+                                   #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'oom]))))))
 
   (test-begin
