@@ -21,7 +21,7 @@
            (submod "../process-q/interface.rkt" internal))
   (define (make-mock-Q [data-init #f]
                        #:empty? [empty? (λ _ #f)]
-                       #:enq [enq (λ (q _) q)]
+                       #:enq [enq (λ (q . _) q)]
                        #:wait [wait (λ (q) q)]
                        #:active-count [active-count (λ (q) 1)]
                        #:waiting-count [waiting-count (λ (q) 1)]
@@ -46,7 +46,7 @@
       (hash-update! h name add1 0))
     (make-mock-Q data-init
                  #:empty? (λ (q) (add-call! 'empty?) #f)
-                 #:enq (λ (q v) (add-call! 'enq) q)
+                 #:enq (λ (q v . _) (add-call! 'enq) q)
                  #:wait (λ (q) (add-call! 'wait) q)
                  #:active-count (λ (q) (add-call! 'active-count) 1)
                  #:waiting-count (λ (q) (add-call! 'waiting-count) 1)))
@@ -61,7 +61,7 @@
         #:empty? (λ _
                    (hash-set! call-hash 'empty? #t)
                    #f)
-        #:enq (λ (q _)
+        #:enq (λ (q . _)
                 (hash-set! call-hash 'enq #t)
                 q)
         #:wait (λ (q)
@@ -273,7 +273,7 @@
     (define enqueued (box #f))
     (define mock-q
       (make-mock-Q (make:m0-factory)
-                   #:enq (λ (q spawn-proc)
+                   #:enq (λ (q spawn-proc . _)
                            (define the-process-info (spawn-proc))
                            (set-box! enqueued (process-info-data the-process-info))
                            ((process-info-ctl the-process-info) 'kill)
@@ -354,7 +354,7 @@
     (define enqueued (box #f))
     (define mock-q
       (make-mock-Q (make:m0-factory)
-                   #:enq (λ (q spawn-proc)
+                   #:enq (λ (q spawn-proc . _)
                            (define the-process-info (spawn-proc))
                            (set-box! enqueued (process-info-data the-process-info))
                            ((process-info-ctl the-process-info) 'kill)
@@ -396,7 +396,7 @@
     (define respawned?-box (box #f))
     (define mock-Q
       (make-mock-Q (make:m0-factory)
-                   #:enq (λ (q spawn-proc)
+                   #:enq (λ (q spawn-proc . _)
                            (set-box! respawned?-box #t)
                            q)))
     (process-will:housekeeping+do-nothing
