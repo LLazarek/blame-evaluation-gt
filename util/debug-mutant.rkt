@@ -213,12 +213,27 @@
     (test-equal? (find-benchmark "/foo/bar/baz")
                  "/foo/bar/baz"))
 
+  (define test-summary
+    '#s(mutant-summary
+        552
+        #s(run-status "ai.rkt"
+                      18
+                      next
+                      type-error
+                      "ai.rkt"
+                      #f)
+        #hash(("ai.rkt" . types)
+              ("benv.rkt" . none)
+              ("denotable.rkt" . none)
+              ("main.rkt" . none)
+              ("structs.rkt" . types)
+              ("time.rkt" . types)
+              ("ui.rkt" . types))))
+
   (test-begin
     #:name read-config
-    (test-equal? (read-config @~a{
-#s(aggregated-result test 0 #s(run-status "ai.rkt" 0 atom-eval blamed "couldnt-find-mod-name" #f) #hash(("ai.rkt" . types) ("benv.rkt" . types) ("denotable.rkt" . types) ("main.rkt" . types) ("structs.rkt" . types) ("time.rkt" . types) ("ui.rkt" . types)))
-})
-                 #hash(("ai.rkt" . types) ("benv.rkt" . types) ("denotable.rkt" . types) ("main.rkt" . types) ("structs.rkt" . types) ("time.rkt" . types) ("ui.rkt" . types))))
+    (test-equal? (read-config (~s test-summary))
+                 (mutant-summary-config test-summary)))
 
   (define-test (test-with-values generator . receiver-tests)
     (call-with-values generator
@@ -234,31 +249,15 @@
                                       (test result)))))
   (test-begin
     #:name infer-debug-mutant-arguments
+    (ignore
+     )
     (test-with-values
-     (λ _ (infer-debug-mutant-arguments
-           '#s(aggregated-result test
-                                 0
-                                 #s(run-status "ai.rkt"
-                                               0
-                                               atom-eval
-                                               blamed
-                                               "couldnt-find-mod-name"
-                                               #f)
-                                 #hash(("ai.rkt" . types)))))
+     (λ _ (infer-debug-mutant-arguments test-summary))
      (λ (mod-name) (test-equal? mod-name "ai.rkt"))
-     (λ (index) (test-= index 0))
-     (λ (config) (test-equal? config #hash(("ai.rkt" . types)))))
+     (λ (index) (test-= index 18))
+     (λ (config) (test-equal? config (mutant-summary-config test-summary))))
     (test-with-values
-     (λ _ (infer-debug-mutant-arguments
-           @~a{#s(aggregated-result test @;
-                                    0 @;
-                                    #s(run-status "ai.rkt" @;
-                                                  0 @;
-                                                  atom-eval @;
-                                                  blamed @;
-                                                  "couldnt-find-mod-name" @;
-                                                  #f) @;
-                                    #hash(("ai.rkt" . types)))}))
+     (λ _ (infer-debug-mutant-arguments (~s test-summary)))
      (λ (mod-name) (test-equal? mod-name "ai.rkt"))
-     (λ (index) (test-= index 0))
-     (λ (config) (test-equal? config #hash(("ai.rkt" . types)))))))
+     (λ (index) (test-= index 18))
+     (λ (config) (test-equal? config (mutant-summary-config test-summary))))))
