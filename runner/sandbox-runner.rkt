@@ -116,4 +116,52 @@
                   #:timeout/s 60
                   #:memory/gb 3
                   #:exn-handler (λ (e) 'foobar))
-                 'foobar)))
+                 'foobar))
+
+  (test-begin
+    #:name oom-limits
+    (ignore (define gb (expt 10 9))
+            (define (human-readable bytes) (exact->inexact (/ bytes gb)))
+            (define (make-incremental-memory-allocator total
+                                                       [result #t])
+              (define increment (exact-floor (* 0.1 gb)))
+              (λ ()
+                (define l
+                  (for/list ([i (in-range 0 total increment)])
+                    ;; Hack to make sure this loop doesn't get fiddled by the
+                    ;; optimizer
+                    (display (~a i " "))
+                    (make-bytes increment)))
+                (display "\r")
+                (and (andmap bytes? l)
+                     result))))
+    (run-with-limits
+     (make-incremental-memory-allocator (* 0.1 gb))
+     #:timeout/s 30
+     #:memory/gb 1
+     #:oom-result (const #f)
+     #:timeout-result (const #f))
+    (run-with-limits
+     (make-incremental-memory-allocator (* 0.9 gb))
+     #:timeout/s 30
+     #:memory/gb 1
+     #:oom-result (const #f)
+     #:timeout-result (const #f))
+    (not (run-with-limits
+          (make-incremental-memory-allocator (* 1.5 gb))
+          #:timeout/s 30
+          #:memory/gb 1
+          #:oom-result (const #f)
+          #:timeout-result (const #f)))
+    (not (run-with-limits
+          (make-incremental-memory-allocator (* 3 gb))
+          #:timeout/s 30
+          #:memory/gb 1
+          #:oom-result (const #f)
+          #:timeout-result (const #f)))
+    (run-with-limits
+     (make-incremental-memory-allocator (* 3 gb))
+     #:timeout/s 30
+     #:memory/gb 4
+     #:oom-result (const #f)
+     #:timeout-result (const #f))))
