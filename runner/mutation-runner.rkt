@@ -308,13 +308,20 @@
                    (exn-continuation-marks e)))
       (define mod-with-error
         (for*/first ([ctx-item (in-list ctx)]
-                     [ctx-mod-path (in-value
-                                    (match ctx-item
-                                      [(cons _ (srcloc (? path? path) _ _ _ _))
-                                       (path->string path)]
-                                      [(cons _ (srcloc (? string? path-str) _ _ _ _))
-                                       (string-trim path-str "\"")]
-                                      [else #f]))]
+                     [ctx-mod-path
+                      (in-value
+                       (match ctx-item
+                         [(cons _ (srcloc (? path? path) _ _ _ _))
+                          (path->string path)]
+                         [(cons _ (srcloc (? string? path-str) _ _ _ _))
+                          (string-trim path-str "\"")]
+                         [(cons (? symbol?
+                                   (app symbol->string
+                                        (regexp @regexp{^body of "(.+)"$}
+                                                (list _ path-str))))
+                                _)
+                          path-str]
+                         [else #f]))]
                      #:when ctx-mod-path
                      [mod (in-list (list* (program-main a-program)
                                           (program-others a-program)))]
@@ -379,6 +386,9 @@
                                     (λ (reconstruct)
                                       (test-stx=? (reconstruct (list #'42))
                                                   #'(define x 42)))))
+  (define-test (test/no-error run-thunk test-thunk)
+    (with-handlers ([exn:fail? (λ (e) (fail (exn-message e)))])
+      (test-thunk (run-thunk))))
   (test-begin
     #:name run-with-mutated-module/mutations
     (ignore
@@ -421,48 +431,50 @@
                          (define x : Number 5)
                          (void)))))
      (define p (program a (list b c))))
-    (test-equal?
-     (with-output-to-string
-       (λ _ (run-with-mutated-module p
-                                     a
-                                     0
-                                     #:suppress-output? #f)))
-     "B
+    (test/no-error
+     (λ _ (with-output-to-string
+            (λ _ (run-with-mutated-module p
+                                          a
+                                          0
+                                          #:suppress-output? #f))))
+     (λ (output) (test-equal? output
+                              "B
 (c 5)
 (d 1)
 (a 0)
 (b 1)
 4
-")
+")))
 
-    (test-equal?
-     (with-output-to-string
-       (λ _ (run-with-mutated-module p
-                                     b
-                                     0
-                                     #:suppress-output? #f)))
-     "B
+    (test/no-error
+     (λ _ (with-output-to-string
+            (λ _ (run-with-mutated-module p
+                                          b
+                                          0
+                                          #:suppress-output? #f))))
+     (λ (output) (test-equal? output
+                              "B
 (c -1)
 (d 1)
 (a 1)
 (b 1)
 -2
-")
+")))
 
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              2
-                              #:timeout/s 3
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'timeout])))
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              2
-                              #:timeout/s 60
-                              #:memory/gb 0.1)
-     (struct* run-status ([outcome 'oom]))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   2
+                                   #:timeout/s 3
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'timeout])))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   2
+                                   #:timeout/s 60
+                                   #:memory/gb 0.1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'oom]))))))
 
   (test-begin
     #:name run-with-mutated-module/ctc-violations
@@ -497,14 +509,14 @@
                   (namespace-attach-module (current-namespace)
                                            'racket/contract
                                            ns)))))
-    (test-match
-     (run-with-mutated-module p
-                              main
-                              2
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'blamed]
-                          [blamed "main.rkt"]))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   main
+                                   2
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "main.rkt"]))))))
 
   (define (replace-stx-location stx new-file-name)
     (define-values {read-port write-port} (make-pipe))
@@ -559,30 +571,30 @@
                              (displayln (list 'x x))))))
      (define p (program a (list b c))))
 
-    (test-match
-     (run-with-mutated-module p
-                              b
-                              0
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'type-error]
-                          [blamed "b.rkt"])))
-    (test-match
-     (run-with-mutated-module p
-                              c
-                              0
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'type-error]
-                          [blamed "c.rkt"])))
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              11 ;; runtime error -> blame on a.rkt
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'blamed]
-                          [blamed "a.rkt"]))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   b
+                                   0
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
+                                               [blamed "b.rkt"])))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   c
+                                   0
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
+                                               [blamed "c.rkt"])))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   11 ;; runtime error -> blame on a.rkt
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "a.rkt"]))))))
 
 
   (define-test-env {setup-test-env! cleanup-test-env!}
@@ -654,23 +666,27 @@
                       (read-module c.rkt)))
      (define p/ml (program a/ml (list b/ml c/ml)))
      (define p/f  (program a/f  (list b/f  c/f))))
-    (test-equal? (run-with-mutated-module p/ml
-                                          a/ml
-                                          3
-                                          #:timeout/s 60
-                                          #:memory/gb 1)
-                 (run-with-mutated-module p/f
-                                          a/f
-                                          3
-                                          #:timeout/s 60
-                                          #:memory/gb 1))
-    (test-match (run-with-mutated-module p/ml
-                                         a/ml
-                                         3
-                                         #:timeout/s 60
-                                         #:memory/gb 1)
-                (struct* run-status ([outcome 'blamed]
-                                     [blamed "a.rkt"]))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p/ml
+                                   a/ml
+                                   3
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-equal?
+             r
+             (run-with-mutated-module p/f
+                                      a/f
+                                      3
+                                      #:timeout/s 60
+                                      #:memory/gb 1))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p/ml
+                                   a/ml
+                                   3
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "a.rkt"]))))))
   (test-begin
     #:name run-with-mutated-module/runtime-error-locations
     ;; #:before (setup-test-env!)
@@ -703,39 +719,39 @@
                                (+ (- x) z))))))
      (define p (program a (list b c))))
 
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              0 ; swap x y args of foo -> crash in bar
-                              #:timeout/s 60
-                              #:memory/gb 1
-                              #:suppress-output? #f)
-     (struct* run-status ([outcome 'blamed]
-                          [blamed "c.rkt"])))
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              1 ; (+ 1) to (- 1) -> crash in foo
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'blamed]
-                          [blamed "b.rkt"])))
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'blamed]
-                          [blamed "a.rkt"])))
-    (test-match
-     (run-with-mutated-module p
-                              a
-                              3 ; 0 to 1 -> crash in main
-                              #:timeout/s 60
-                              #:memory/gb 1)
-     (struct* run-status ([outcome 'blamed]
-                          [blamed "a.rkt"]))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   0 ; swap x y args of foo -> crash in bar
+                                   #:timeout/s 60
+                                   #:memory/gb 1
+                                   #:suppress-output? #f))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "c.rkt"])))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   1 ; (+ 1) to (- 1) -> crash in foo
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "b.rkt"])))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "a.rkt"])))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   3 ; 0 to 1 -> crash in main
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed "a.rkt"]))))))
 
   (test-begin
     #:name mutate-expression-filter
