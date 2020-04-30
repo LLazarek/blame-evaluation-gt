@@ -319,19 +319,39 @@
 
 
 ;; negates
-(define/contract (mutate-condition c mutation-index counter)
-  (syntax? mutation-index? counter? . -> . mutated?)
+(define/contract (mutate-condition c
+                                   mutation-index
+                                   counter
+                                   mutate-expr)
+  (syntax?
+   mutation-index?
+   counter?
+   (syntax? mutation-index? counter? . -> . mutated?)
+   . -> .
+   mutated?)
 
-  (log-mutation-type "negate-conditional")
-  ;; design decision: only try negating conditions
-  (if (or (equal? (syntax->datum c) 'else)
-          (> counter mutation-index))
-      (mutated c counter)
-      (maybe-mutate c
-                    (quasisyntax/loc c
-                      (not #,c))
-                    mutation-index
-                    counter)))
+  (define is-complex-condition?
+    (syntax-parse c
+      [(e ...)        #t]
+      [a-single-value #f]))
+  (define (negate-cond c current-counter)
+    (log-mutation-type "negate-conditional")
+    (maybe-mutate c
+                  (quasisyntax/loc c
+                    (not #,c))
+                  mutation-index
+                  current-counter))
+  (mdo (count-with [__ counter])
+       (def negated-c (if (and (not (equal? (syntax->datum c) 'else))
+                               (<= __ mutation-index))
+                          (negate-cond c __)
+                          (mutated c __)))
+       (def mutated-c (if is-complex-condition?
+                          (mutate-expr negated-c
+                                       mutation-index
+                                       __)
+                          (mutated negated-c __)))
+       [return mutated-c]))
 
 (struct class-parts (superclass body-stxs) #:transparent)
 ;; lltodo: rename mutate-expr* to mutate-subexprs
@@ -937,7 +957,8 @@ Actual:
            #''a
            #'(test? 2))
      mutate-in-seq
-     mutate-condition
+     (curryr mutate-condition
+             mutate-expr)
      (curry map syntax->datum)
      `(#;[0 (,#'#t
            ,#''a
@@ -945,18 +966,16 @@ Actual:
        [0 (,#'(not #t)
            ,#''a
            ,#'(test? 2))]
-       ;; lltodo: shouldn't mutate-condition also descend into its expr?
-       ;; Maybe as long as it's not just a single datum.
        [1 (,#'#t
            ,#'(not 'a)
            ,#'(test? 2))]
        [2 (,#'#t
            ,#''a
            ,#'(not (test? 2)))]
-       ;; mutation index exceeded size of list, no more will be mutated
+       ;; After negating conds, we descend into complex ones
        [3 (,#'#t
            ,#''a
-           ,#'(test? 2))]
+           ,#'(test? -2))]
        #| ... |#))))
 
 
@@ -1072,16 +1091,22 @@ Actual:
     (listof (listof syntax?))
     (map rest unwrapped-clauses))
   (mdo [count-with (__ counter)]
-       (def conditions (mutate-in-seq condition-stxs
-                                      mutation-index
-                                      __
-                                      mutate-condition))
-       (def bodies* (mutate-in-seq* body-stxs*
-                                    mutation-index
-                                    __
-                                    (curry mutate-expr
-                                           #:filter can-mutate-expr?)))
-       [return (map cons conditions bodies*)]))
+       (def mutated-conditions
+         (mutate-in-seq condition-stxs
+                        mutation-index
+                        __
+                        (curryr mutate-condition
+                                (curry mutate-expr
+                                       #:filter can-mutate-expr?))))
+       (def mutated-body-stxs
+         (mutate-in-seq* body-stxs*
+                         mutation-index
+                         __
+                         (curry mutate-expr
+                                #:filter can-mutate-expr?)))
+       [return (map cons
+                    mutated-conditions
+                    mutated-body-stxs)]))
 
 (module+ test
   (define-test (test-mutation/in-conds orig-seq
@@ -1127,84 +1152,96 @@ Actual:
        [1 (,#'[#t 1 2 3.0]
            ,#'[(not (bool? 5)) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
+       [2 (,#'[#t 1 2 3.0]
+           ,#'[(bool? -5) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [3 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5.0) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [4 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 0) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [5 (,#'[#t 1 2 3.0]
+           ,#'[(bool? #f) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
        ;; end conditions, enter bodies
        ;; row 1
        ;; 1,1
-       [2 (,#'[#t -1 2 3.0]
+       [6 (,#'[#t -1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [3 (,#'[#t 1.0 2 3.0]
+       [7 (,#'[#t 1.0 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [4 (,#'[#t 0 2 3.0]
+       [8 (,#'[#t 0 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [5 (,#'[#t #f 2 3.0]
+       [9 (,#'[#t #f 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; 1,2
-       [6 (,#'[#t 1 -2 3.0]
+       [10 (,#'[#t 1 -2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [7 (,#'[#t 1 2.0 3.0]
+       [11 (,#'[#t 1 2.0 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [8 (,#'[#t 1 0 3.0]
+       [12 (,#'[#t 1 0 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [9 (,#'[#t 1 #f 3.0]
+       [13 (,#'[#t 1 #f 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; 1,3
-       [10 (,#'[#t 1 2 -3.0]
+       [14 (,#'[#t 1 2 -3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [11 (,#'[#t 1 2 0]
+       [15 (,#'[#t 1 2 0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [12 (,#'[#t 1 2 #f]
+       [16 (,#'[#t 1 2 #f]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; row 2
-       [13 (,#'[#t 1 2 3.0]
+       [17 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0.0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [14 (,#'[#t 1 2 3.0]
+       [18 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 1)]
            ,#'[else (bar (+ x 2) #f)])]
-       [15 (,#'[#t 1 2 3.0]
+       [19 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo #f)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; row 3
-       [16 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar #f (+ x 2))])]
-       [17 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ 2 x) #f)])]
-       [18 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (- x 2) #f)])]
-       [19 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x -2) #f)])]
        [20 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x 2.0) #f)])]
+           ,#'[else (bar #f (+ x 2))])]
        [21 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x 0) #f)])]
+           ,#'[else (bar (+ 2 x) #f)])]
        [22 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x #f) #f)])]
+           ,#'[else (bar (- x 2) #f)])]
        [23 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x 2) #t)])]
+           ,#'[else (bar (+ x -2) #f)])]
        [24 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2.0) #f)])]
+       [25 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 0) #f)])]
+       [26 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x #f) #f)])]
+       [27 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2) #t)])]
+       [28 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) 0)])]
        ;; no more left
-       [25 (,#'[#t 1 2 3.0]
+       [29 (,#'[#t 1 2 3.0]
             ,#'[(bool? 5) (foo 0)]
             ,#'[else (bar (+ x 2) #f)])]
        #| ... |#))))
@@ -1390,6 +1427,16 @@ Actual:
      `([0 ,#'{(define/contract (f x)
                 any/c
                 (sub1 x))
+              (define/contract b positive? 2)}]))
+
+    (test-mutation/sequence
+     #'{(define/contract (f x)
+          any/c
+          (car x))
+        (define/contract b positive? 2)}
+     `([0 ,#'{(define/contract (f x)
+                any/c
+                (cdr x))
               (define/contract b positive? 2)}]))
 
     (test-mutation/sequence
@@ -1707,9 +1754,27 @@ Actual:
                 (class
                   o
                   (define/public (my-method x y)
-                    (+ #| <- |# x y))))}])))
+                    (+ #| <- |# x y))))}]))
 
-  ;; Test that condition expressions are only ever considered for
+    ;; super-new replacement
+    (test-mutation/sequence
+     #'{(define/contract c
+          any/c
+          (class o
+            (super-new)
+            (define/public x 5)))}
+     `([1 ,#'{(define/contract c
+                any/c
+                (class o
+                  (void)
+                  (define/public x 5)))}]
+       [2 ,#'{(define/contract c
+                any/c
+                (class o
+                  (super-new)
+                  (define/private x 5)))}])))
+
+  ;; Test that simple condition expressions are only ever considered for
   ;; mutation once: to negate them
   (test-begin
     #:name conditions-only-considered-for-negation
@@ -1735,7 +1800,7 @@ Actual:
         (define/contract c any/c x)
         (define/contract d any/c
           (cond [#t 1]
-                [(foobar (+ 1 2)) -1 5]
+                [(foobar (+ x y)) -1 5]
                 [else (error (quote wrong))]))
         (displayln (quasiquote (c (unquote c))))
         (displayln (quasiquote (d (unquote d))))}
@@ -1744,7 +1809,7 @@ Actual:
               (define/contract c any/c x)
               (define/contract d any/c
                 (cond [(not #t) 1]
-                      [(foobar (+ 1 2)) -1 5]
+                      [(foobar (+ x y)) -1 5]
                       [else (error (quote wrong))]))
               (displayln (quasiquote (c (unquote c))))
               (displayln (quasiquote (d (unquote d))))}]
@@ -1752,32 +1817,48 @@ Actual:
               (define/contract c any/c x)
               (define/contract d any/c
                 (cond [#t 1]
-                      [(not (foobar (+ 1 2))) -1 5]
+                      [(not (foobar (+ x y))) -1 5]
+                      [else (error (quote wrong))]))
+              (displayln (quasiquote (c (unquote c))))
+              (displayln (quasiquote (d (unquote d))))}]
+       [2 ,#'{(displayln "B")
+              (define/contract c any/c x)
+              (define/contract d any/c
+                (cond [#t 1]
+                      [(foobar (+ y x)) -1 5]
+                      [else (error (quote wrong))]))
+              (displayln (quasiquote (c (unquote c))))
+              (displayln (quasiquote (d (unquote d))))}]
+       [3 ,#'{(displayln "B")
+              (define/contract c any/c x)
+              (define/contract d any/c
+                (cond [#t 1]
+                      [(foobar (- x y)) -1 5]
                       [else (error (quote wrong))]))
               (displayln (quasiquote (c (unquote c))))
               (displayln (quasiquote (d (unquote d))))}]
        ;; then the bodies in sequence
-       [2 ,#'{(displayln "B")
+       [4 ,#'{(displayln "B")
               (define/contract c any/c x)
               (define/contract d any/c
                 (cond [#t -1]
-                      [(foobar (+ 1 2)) -1 5]
+                      [(foobar (+ x y)) -1 5]
                       [else (error (quote wrong))]))
               (displayln (quasiquote (c (unquote c))))
               (displayln (quasiquote (d (unquote d))))}]
-       [6 ,#'{(displayln "B")
+       [8 ,#'{(displayln "B")
               (define/contract c any/c x)
               (define/contract d any/c
                 (cond [#t 1]
-                      [(foobar (+ 1 2)) 1 5]
+                      [(foobar (+ x y)) 1 5]
                       [else (error (quote wrong))]))
               (displayln (quasiquote (c (unquote c))))
               (displayln (quasiquote (d (unquote d))))}]
-       [10 ,#'{(displayln "B")
+       [12 ,#'{(displayln "B")
                (define/contract c any/c x)
                (define/contract d any/c
                  (cond [#t 1]
-                       [(foobar (+ 1 2)) -1 -5]
+                       [(foobar (+ x y)) -1 -5]
                        [else (error (quote wrong))]))
                (displayln (quasiquote (c (unquote c))))
                (displayln (quasiquote (d (unquote d))))}])))
@@ -2362,12 +2443,28 @@ Actual:
                                             (syntax-parse e
                                               [({~datum :} . _) #f]
                                               [else #t]))
-                      #:top-level-select select-any-define)))))
+                      #:top-level-select select-any-define))))
+
+  (test-begin
+    #:name data-structure-swaps
+    (test-mutation
+     0
+     #'{(define/contract x any/c (make-hash '()))}
+     #'{(define/contract x any/c (make-immutable-hash '()))})
+    (test-mutation
+     0
+     #'{(define/contract x any/c (make-immutable-hash '()))}
+     #'{(define/contract x any/c (make-hash '()))})
+    (test-mutation
+     0
+     #'{(define/contract x any/c (vector 1))}
+     #'{(define/contract x any/c (vector-immutable 1))})
+    (test-mutation
+     0
+     #'{(define/contract x any/c (vector-immutable 1))}
+     #'{(define/contract x any/c (vector 1))})))
 
 ;; Potential mutations that have been deferred:
-;; - Moving occurrences of (super-new) around in class body
-
-;; lltodo:
-;; - test data structure swaps
-;; - test class mutations
-;; - verify if any other new mutations need tests
+;; - (hash a b ...) ~> (make-hash (list (cons a b) ...))
+;;   Why? That form is not used in the benchmarks: only `zordoz` uses it, and
+;;   only on a single line at that.
