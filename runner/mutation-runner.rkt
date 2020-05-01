@@ -449,7 +449,7 @@
                               "B
 (c 5)
 (d 1)
-(a 0)
+(a -1)
 (b 1)
 4
 ")))
@@ -462,24 +462,24 @@
                                           #:suppress-output? #f))))
      (λ (output) (test-equal? output
                               "B
-(c -1)
+(c -5)
 (d 1)
 (a 1)
 (b 1)
--2
+-6
 ")))
 
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
-                                   2
+                                   10
                                    #:timeout/s 5
                                    #:memory/gb 3))
      (λ (r) (test-match r (struct* run-status ([outcome 'timeout])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
-                                   2
+                                   10
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'oom]))))))
@@ -747,7 +747,7 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
-                                   2 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
+                                   4 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
@@ -755,7 +755,7 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
-                                   3 ; 0 to 1 -> crash in main
+                                   8 ; 0 to 1 -> crash in main
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]

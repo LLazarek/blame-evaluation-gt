@@ -516,24 +516,41 @@
    #:name test:full-run
 
    ;; Mutations expected:
-   ;; - Mutations: 8
-   ;;   - main.rkt: 6
-   ;;     - foo: negate cond (@0), - to + (@1), * to / (@2), 3 to 4 (@3)
-   ;;     - main: swap bar args (@4), 2 to 3 (@5)
+   ;; - Mutations: 17
+   ;;   - main.rkt: 15
+   ;;     - foo: negate cond (@0), - -> + (@1), * -> / (@2),
+   ;;            3 -> [-3 3.0 0 3+0.0i #f] (@3, 4, 5, 6, 7)
+   ;;     - main: swap bar args (@8),
+   ;;             2 -> [-2 2.0 0 2+0.0i #f] (@ 9, 10, 11, 12, 13),
+   ;;             "yes" -> #"yes" (@14)
    ;;   - second.rkt: 2
-   ;;     - bar: negate cond (@0), - to + (@1)
-   ;; - Mutations that make type errors: 3
-   ;;   - main.rkt: 2
-   ;;     - foo: * to /
-   ;;     - main: swap bar args
-   ;;   - second.rkt: 1
-   ;;     - bar: negate cond, - to +
+   ;;     - bar: negate cond (@0), - -> + (@1)
+   ;; - Mutations that make type errors: 11
+   ;;   - main.rkt: 9
+   ;;     - foo: * -> /, 3 -> 3.0, 3 -> 3+0.0i, 3 -> #f
+   ;;     - main: swap bar args, 2 -> 2.0, 2 -> 2+0.0i, 2 -> #f, "yes" -> #"yes"
+   ;;   - second.rkt: 2
+   ;;     - bar: negate cond, - -> +
    ;;
-   ;; - Expect 4 decisions to sample (so 4 total files):
-   ;;   - main.rkt @ 2, main.rkt @ 4
-   ;;   - second.rkt @ 0, second.rkt @ 1
+   ;; - Expect 11 decisions to sample (so 11 total files):
+   ;;   - main.rkt @ [2, 4, 6, 7, 8, 10, 12, 13, 14]
+   ;;   - second.rkt @ [0, 1]
    ;; - Expect (sample-size) samples for each
    (ignore
+    (define expected-relevant-mutants
+      '(("main.rkt" 2)
+        ("main.rkt" 4)
+        ("main.rkt" 6)
+        ("main.rkt" 7)
+        ("main.rkt" 8)
+        ("main.rkt" 10)
+        ("main.rkt" 12)
+        ("main.rkt" 13)
+        ("main.rkt" 14)
+
+        ("second.rkt" 0)
+        ("second.rkt" 1)))
+
     (match (mutant-error-log)
       [(? file-exists? path) (delete-file path)]
       [else (void)])
@@ -578,19 +595,19 @@
     (define mutant-results (run-all-mutants*configs bench
                                                     #:log-progress void
                                                     #:resume-cache (const #f)))
-    (displayln @~a{Mutant errors: @(file->string (mutant-error-log))})
-    (displayln "Data:")
-    (for ([{m aggregate-file} (in-hash mutant-results)])
-      (displayln
-       @~a{Mutant file @m contents:
-                  @(pretty-format
-                    (file->list aggregate-file))
+    ;; (displayln @~a{Mutant errors: @(file->string (mutant-error-log))})
+    ;; (displayln "Data:")
+    ;; (for ([{m aggregate-file} (in-hash mutant-results)])
+    ;;   (displayln
+    ;;    @~a{Mutant file @m contents:
+    ;;               @(pretty-format
+    ;;                 (file->list aggregate-file))
 
 
-                  }))
+    ;;               }))
     )
    (test-= (length (directory-list test-mutant-dir))
-           4)
+           (length expected-relevant-mutants))
    (for/and/test ([f (in-directory test-mutant-dir)])
                  (not/test (test-= (file-size f) 0)))
 
@@ -620,10 +637,7 @@
       (length blame-trail-ids)))
 
    (for/and/test
-    ([mutant-info (in-list '(("main.rkt" 2)
-                             ("main.rkt" 4)
-                             ("second.rkt" 0)
-                             ("second.rkt" 1)))])
+    ([mutant-info (in-list expected-relevant-mutants)])
     (define mutant-file (find-mutant-file (first mutant-info)
                                           (second mutant-info)))
     (and/test/message

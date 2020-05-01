@@ -128,9 +128,9 @@
   (test-begin/with-env
    #:name max-mutation-index-exceeded?
 
-   (for/and/test ([i (in-range 3)])
+   (for/and/test ([i (in-range 2)])
                  (not (max-mutation-index-exceeded? e-path i)))
-   (max-mutation-index-exceeded? e-path 3)
+   (max-mutation-index-exceeded? e-path 2)
 
    (not (max-mutation-index-exceeded? main-path 0))
    (max-mutation-index-exceeded? main-path 1)
@@ -139,12 +139,12 @@
     ([rt-main (in-list (list rt-main/t rt-main/ut))]
      [rt-second (in-list (list rt-second/t rt-second/ut))])
     (and/test/message
-     [(for/and/test ([i (in-range 6)])
+     [(for/and/test ([i (in-range 15)])
                     (extend-test-message
                      (not (max-mutation-index-exceeded? rt-main i))
                      @~a{(stopped at index @i)}))
       @~a{Not all expected mutations of @rt-main happening}]
-     [(max-mutation-index-exceeded? rt-main 6)
+     [(max-mutation-index-exceeded? rt-main 15)
       @~a{@rt-main has more mutations than expected}]
      [(for/and/test ([i (in-range 2)])
                     (extend-test-message
@@ -159,6 +159,6 @@
    #:name in-mutation-indices
    (ignore (define bench (read-benchmark realistic-test-bench)))
    (test-equal? (stream->list (in-mutation-indices "main.rkt" bench))
-                '(0 1 2 3 4 5))
+                (build-list 15 values))
    (test-equal? (stream->list (in-mutation-indices "second.rkt" bench))
-                '(0 1))))
+                (build-list 2  values))))
