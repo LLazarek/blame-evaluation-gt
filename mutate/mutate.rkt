@@ -237,6 +237,7 @@
                      (? zero?))           1]
                [(and (? number?)
                      (? (negate zero?)))  0]
+               [(? real?)                 (* 1+0.0i value)]
                ;; this kind of narrowing probably doesn't help
                ;; [(? inexact?)          (exact-floor value)]
 
@@ -307,12 +308,12 @@
      [x -> x]
 
      ;; Constants
-     [1 -> [-1 1.0 0 #f]]
-     [5 -> [-5 5.0 0 #f]]
-     [2.5 -> [-2.5 0 #f]]
+     [1 -> [-1 1.0 0 1+0.0i #f]]
+     [5 -> [-5 5.0 0 5+0.0i #f]]
+     [2.5 -> [-2.5 0 2.5+0.0i #f]]
      [0 -> [0.0 1 #f]]
-     [0.0 -> [-0.0 1 #f]]
-     [-42 -> [42 -42.0 0 #f]]
+     [0.0 -> [-0.0 1 0.0+0.0i #f]]
+     [-42 -> [42 -42.0 0 -42-0.0i #f]]
      [#t -> [#f 1]]
      [#f -> [#t 0]]
      ["a" -> [#"a"]])))
@@ -935,18 +936,22 @@ Actual:
            ,#'(+ 1 2))]
        [5 (,#'#t
            ,#''a
+           ,#'1+0.0i
+           ,#'(+ 1 2))]
+       [6 (,#'#t
+           ,#''a
            ,#'#f
            ,#'(+ 1 2))]
        ;; other elements aren't touched, regardless of mutation-index
-       [6 (,#'#t
-           ,#''a
-           ,#'1
-           ,#'(+ 1 2))]
        [7 (,#'#t
            ,#''a
            ,#'1
            ,#'(+ 1 2))]
        [8 (,#'#t
+           ,#''a
+           ,#'1
+           ,#'(+ 1 2))]
+       [9 (,#'#t
            ,#''a
            ,#'1
            ,#'(+ 1 2))]
@@ -1031,19 +1036,22 @@ Actual:
            (,#''a ,#'0)
            (,#'(test? 2)))]
        [7 ((,#'#t ,#'#f)
+           (,#''a ,#'1+0.0i)
+           (,#'(test? 2)))]
+       [8 ((,#'#t ,#'#f)
            (,#''a ,#'#f)
            (,#'(test? 2)))]
 
        ;; third row
-       [8 ((,#'#t ,#'#f)
+       [9 ((,#'#t ,#'#f)
            (,#''a ,#'1)
            ;; mutate-datum won't change applications...
            ;; [[but%20mutate-expr%20will!]]
            (,#'(test? 2)))]
        ;; mutation index exceeded size of list, no more will be mutated
-       [9 ((,#'#t ,#'#f)
-           (,#''a ,#'1)
-           (,#'(test? 2)))]
+       [10 ((,#'#t ,#'#f)
+            (,#''a ,#'1)
+            (,#'(test? 2)))]
        #| ... |#))
 
     (test-mutation/in-seq
@@ -1054,21 +1062,21 @@ Actual:
      mutate-expr
      (curry map
             (curry map syntax->datum))
-     `([8 ((,#'#t ,#'#f)
+     ;; ... but mutate-expr will!
+     `([9 ((,#'#t ,#'#f)
            (,#''a ,#'1)
-           ;; ... but mutate-expr will!
            (,#'(test? -2)))]
-       [9 ((,#'#t ,#'#f)
-           (,#''a ,#'1)
-           ;; ... but mutate-expr will!
-           (,#'(test? 2.0)))]
        [10 ((,#'#t ,#'#f)
             (,#''a ,#'1)
-            ;; ... but mutate-expr will!
-            (,#'(test? 0)))]
+            (,#'(test? 2.0)))]
        [11 ((,#'#t ,#'#f)
             (,#''a ,#'1)
-            ;; ... but mutate-expr will!
+            (,#'(test? 0)))]
+       [12 ((,#'#t ,#'#f)
+            (,#''a ,#'1)
+            (,#'(test? 2+0.0i)))]
+       [13 ((,#'#t ,#'#f)
+            (,#''a ,#'1)
             (,#'(test? #f)))]))))
 
 (define cond-clause? (syntax-parser
@@ -1162,86 +1170,101 @@ Actual:
            ,#'[(bool? 0) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        [5 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5+0.0i) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [6 (,#'[#t 1 2 3.0]
            ,#'[(bool? #f) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; end conditions, enter bodies
        ;; row 1
        ;; 1,1
-       [6 (,#'[#t -1 2 3.0]
+       [7 (,#'[#t -1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [7 (,#'[#t 1.0 2 3.0]
+       [8 (,#'[#t 1.0 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [8 (,#'[#t 0 2 3.0]
+       [9 (,#'[#t 0 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [9 (,#'[#t #f 2 3.0]
+       [10 (,#'[#t 1+0.0i 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [11 (,#'[#t #f 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; 1,2
-       [10 (,#'[#t 1 -2 3.0]
+       [12 (,#'[#t 1 -2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [11 (,#'[#t 1 2.0 3.0]
+       [13 (,#'[#t 1 2.0 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [12 (,#'[#t 1 0 3.0]
+       [14 (,#'[#t 1 0 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [13 (,#'[#t 1 #f 3.0]
+       [15 (,#'[#t 1 2+0.0i 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [16 (,#'[#t 1 #f 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; 1,3
-       [14 (,#'[#t 1 2 -3.0]
+       [17 (,#'[#t 1 2 -3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [15 (,#'[#t 1 2 0]
+       [18 (,#'[#t 1 2 0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [16 (,#'[#t 1 2 #f]
+       [19 (,#'[#t 1 2 3.0+0.0i]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2) #f)])]
+       [20 (,#'[#t 1 2 #f]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; row 2
-       [17 (,#'[#t 1 2 3.0]
+       [21 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0.0)]
            ,#'[else (bar (+ x 2) #f)])]
-       [18 (,#'[#t 1 2 3.0]
+       [22 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 1)]
            ,#'[else (bar (+ x 2) #f)])]
-       [19 (,#'[#t 1 2 3.0]
+       [23 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo #f)]
            ,#'[else (bar (+ x 2) #f)])]
        ;; row 3
-       [20 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar #f (+ x 2))])]
-       [21 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ 2 x) #f)])]
-       [22 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (- x 2) #f)])]
-       [23 (,#'[#t 1 2 3.0]
-           ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x -2) #f)])]
        [24 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x 2.0) #f)])]
+           ,#'[else (bar #f (+ x 2))])]
        [25 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x 0) #f)])]
+           ,#'[else (bar (+ 2 x) #f)])]
        [26 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x #f) #f)])]
+           ,#'[else (bar (- x 2) #f)])]
        [27 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
-           ,#'[else (bar (+ x 2) #t)])]
+           ,#'[else (bar (+ x -2) #f)])]
        [28 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2.0) #f)])]
+       [29 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 0) #f)])]
+       [30 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2+0.0i) #f)])]
+       [31 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x #f) #f)])]
+       [32 (,#'[#t 1 2 3.0]
+           ,#'[(bool? 5) (foo 0)]
+           ,#'[else (bar (+ x 2) #t)])]
+       [33 (,#'[#t 1 2 3.0]
            ,#'[(bool? 5) (foo 0)]
            ,#'[else (bar (+ x 2) 0)])]
        ;; no more left
-       [29 (,#'[#t 1 2 3.0]
+       [34 (,#'[#t 1 2 3.0]
             ,#'[(bool? 5) (foo 0)]
             ,#'[else (bar (+ x 2) #f)])]
        #| ... |#))))
@@ -1330,7 +1353,7 @@ Actual:
         (define/contract b positive? 2)}
      `([0 ,#'{(define/contract a positive? -1)
               (define/contract b positive? 2)}]
-       [4 ,#'{(define/contract a positive? 1)
+       [5 ,#'{(define/contract a positive? 1)
               (define/contract b positive? -2)}]))
 
     (test-mutation
@@ -1351,7 +1374,7 @@ Actual:
      `([0 ,#'{(define/contract a any/c (+ 2 1))}]
        [1 ,#'{(define/contract a any/c (- 1 2))}]
        [2 ,#'{(define/contract a any/c (+ -1 2))}]
-       [6 ,#'{(define/contract a any/c (+ 1 -2))}]))
+       [7 ,#'{(define/contract a any/c (+ 1 -2))}]))
 
     (test-mutation/sequence
      #'{(define/contract (f x)
@@ -1572,34 +1595,34 @@ Actual:
               (define/contract (g x)
                 any/c
                 (if x 1 2))}]
-       [9 ,#'{(define/contract (f x)
-                any/c
-                (or x #t))
-              (define/contract b positive? (begin 1 -2))
-              (define/contract (g x)
-                any/c
-                (if x 1 2))}]
-       [13 ,#'{(define/contract (f x)
-                any/c
-                (or x #t))
-              (define/contract b positive? (begin 1 2))
-              (define/contract (g x)
-                any/c
-                (if (not x) 1 2))}]
-       [14 ,#'{(define/contract (f x)
+       [10 ,#'{(define/contract (f x)
+                 any/c
+                 (or x #t))
+               (define/contract b positive? (begin 1 -2))
+               (define/contract (g x)
+                 any/c
+                 (if x 1 2))}]
+       [15 ,#'{(define/contract (f x)
+                 any/c
+                 (or x #t))
+               (define/contract b positive? (begin 1 2))
+               (define/contract (g x)
+                 any/c
+                 (if (not x) 1 2))}]
+       [16 ,#'{(define/contract (f x)
                 any/c
                 (or x #t))
               (define/contract b positive? (begin 1 2))
               (define/contract (g x)
                 any/c
                 (if x -1 2))}]
-       [18 ,#'{(define/contract (f x)
-                any/c
-                (or x #t))
-              (define/contract b positive? (begin 1 2))
-              (define/contract (g x)
-                any/c
-                (if x 1 -2))}])))
+       [21 ,#'{(define/contract (f x)
+                 any/c
+                 (or x #t))
+               (define/contract b positive? (begin 1 2))
+               (define/contract (g x)
+                 any/c
+                 (if x 1 -2))}])))
 
   (test-begin
     #:name out-of-mutations
@@ -1611,7 +1634,7 @@ Actual:
                         (define/contract b positive? (begin 1 2))
                         (define/contract (g x)
                           any/c
-                          (if x 1 2))}
+                          (if x 1 x))}
                      22
                      #:top-level-select select-define/contract)))
 
@@ -1680,7 +1703,7 @@ Actual:
                                                 [z #f]
                                                 w
                                                 y)))}]
-       [7 ,#'{(define/contract c any/c (class o
+       [8 ,#'{(define/contract c any/c (class o
                                          (field [v (foo bar)]
                                                 [x 5]
                                                 [a (g 0.0)]
@@ -1688,7 +1711,7 @@ Actual:
                                                 [z #f]
                                                 w
                                                 y)))}]
-       [10 ,#'{(define/contract c any/c (class o
+       [11 ,#'{(define/contract c any/c (class o
                                           (field [v (foo bar)]
                                                  [x 5]
                                                  [a (g 0)]
@@ -1846,7 +1869,7 @@ Actual:
                       [else (error (quote wrong))]))
               (displayln (quasiquote (c (unquote c))))
               (displayln (quasiquote (d (unquote d))))}]
-       [8 ,#'{(displayln "B")
+       [9 ,#'{(displayln "B")
               (define/contract c any/c x)
               (define/contract d any/c
                 (cond [#t 1]
@@ -1854,7 +1877,7 @@ Actual:
                       [else (error (quote wrong))]))
               (displayln (quasiquote (c (unquote c))))
               (displayln (quasiquote (d (unquote d))))}]
-       [12 ,#'{(displayln "B")
+       [14 ,#'{(displayln "B")
                (define/contract c any/c x)
                (define/contract d any/c
                  (cond [#t 1]
@@ -1884,15 +1907,15 @@ Actual:
        ;; mutate inner + args
        [4 ,#'{(define/contract a any/c (+ (+ -1 2)
                                           (- 3 4)))}]
-       ;; . . . . . . .
+       ;; . . . . . . . . .
        ;; flip inner args 2
-       [12 ,#'{(define/contract a any/c (+ (+ 1 2)
+       [14 ,#'{(define/contract a any/c (+ (+ 1 2)
                                            (- 4 3)))}]
        ;; negate inner -
-       [13 ,#'{(define/contract a any/c (+ (+ 1 2)
+       [15 ,#'{(define/contract a any/c (+ (+ 1 2)
                                            (+ 3 4)))}]
        ;; mutate inner - args
-       [14 ,#'{(define/contract a any/c (+ (+ 1 2)
+       [16 ,#'{(define/contract a any/c (+ (+ 1 2)
                                            (- -3 4)))}]))
     (test-mutation
      2
@@ -1914,7 +1937,7 @@ Actual:
        [2 ,#'{(define/contract a any/c ((if #t - -) 1 2))}]
        [3 ,#'{(define/contract a any/c ((if #t + +) 1 2))}]
        [4 ,#'{(define/contract a any/c ((if #t + -) -1 2))}]
-       [8 ,#'{(define/contract a any/c ((if #t + -) 1 -2))}])))
+       [9 ,#'{(define/contract a any/c ((if #t + -) 1 -2))}])))
 
   (test-begin
     #:name mutated-id-reporting
@@ -1925,7 +1948,7 @@ Actual:
             any/c
             (<= x 2))
           (define/contract b positive? 2)}
-       4))
+       5))
      'f)
     (test-equal?
      (mutated-program-mutated-id
@@ -1934,7 +1957,7 @@ Actual:
             any/c
             (<= x 2))
           (define/contract b positive? 2)}
-       5))
+       6))
      'b)
     (test-equal?
      (mutated-program-mutated-id
@@ -1947,7 +1970,7 @@ Actual:
                   [else (error (quote wrong))]))
           (displayln (quasiquote (c (unquote c))))
           (displayln (quasiquote (d (unquote d))))}
-       4))
+       5))
      'd))
 
   (test-begin
@@ -1961,14 +1984,14 @@ Actual:
           (and (list? x)
                (not (null? x))
                (null? (cdr x))))}
-     `([4 ,#'{(define/contract b positive? 2)
+     `([5 ,#'{(define/contract b positive? 2)
               (define/contract (singleton-list? x)
                 (configurable-ctc)
 
                 (and (not (null? x))
                      (list? x)
                      (null? (cdr x))))}]
-       [5 ,#'{(define/contract b positive? 2)
+       [6 ,#'{(define/contract b positive? 2)
               (define/contract (singleton-list? x)
                 (configurable-ctc)
 
