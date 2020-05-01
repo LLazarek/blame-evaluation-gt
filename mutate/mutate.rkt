@@ -30,8 +30,11 @@
 
 (require (for-syntax syntax/parse)
          syntax/parse
+         syntax/parse/define
          racket/match
-         "mutated.rkt")
+         "mutated.rkt"
+         "mutator-lib.rkt"
+         "logger.rkt")
 
 #|----------------------------------------------------------------------|#
 ;; Data; see mutated.rkt
@@ -42,209 +45,75 @@
 
 #|----------------------------------------------------------------------|#
 ;; Test setup
-(define (exprs-equal? a b)
-  (equal? (syntax->datum a)
-          (syntax->datum b)))
 (module+ test
   (require ruinit
-           ruinit/diff/diff)
-
-  (define programs-equal? exprs-equal?)
-
-  (define (diff-programs/string actual expected)
-    (dumb-diff-lines/string (pretty-format (syntax->datum actual))
-                            (pretty-format (syntax->datum expected))))
-
-  (define-simple-test (test-programs-equal? actual expected)
-    #:fail-message @~a{
-                       Programs are not equal. Diff (expected <):
-                       @(diff-programs/string expected actual)
-                       }
-    (programs-equal? actual expected)))
+           "mutate-test-common.rkt"))
 
 
 #|----------------------------------------------------------------------|#
-;; Logger
-(require racket/logging)
-(define-logger mutate)
-
-(define (log-mutation-type type)
-  (log-mutate-info "type: ~a" type))
-
-#|----------------------------------------------------------------------|#
-
-#|----------------------------------------------------------------------|#
-;; Utilities
-
-;; Base mutator: all mutation happens through this function
-;;
-;; Manages the decision of whether or not to apply a mutation based on
-;; `mutation-index` and `counter`, recording the consideration of a
-;; valid mutation (in terms of the counter).
-;;
-;; If `old-stx` is syntactically identical to `new-stx`, the mutation
-;; will not be considered.
-(define/contract (maybe-mutate old-stx new-stx mutation-index counter)
-  (->i ([old-stx syntax?]
-        [new-stx syntax?]
-        [mutation-index mutation-index?]
-        [counter (mutation-index)
-                 (and/c counter?
-                        (<=/c mutation-index))])
-       [result mutated?])
-  (define should-apply-mutation?
-    (and (= mutation-index counter)
-         (not (exprs-equal? old-stx new-stx))))
-  (when should-apply-mutation?
-    (log-mutate-info
-     @~a{Mutating @(syntax->datum old-stx) -> @(syntax->datum new-stx)}))
-  (mutated
-   (if should-apply-mutation?
-       new-stx
-       old-stx)
-   (if (exprs-equal? old-stx new-stx)
-       counter
-       ;; This was a mutation that could be applied, so increment
-       ;; counter, indicating that a mutatable expr has been
-       ;; considered.
-       (add1 counter))))
-
-(module+ test
-  (test-begin
-    #:name maybe-mutate
-    ;; Valid mutation, but counter is not yet high enough
-    (test-equal? (mmap syntax->datum (maybe-mutate #'a #'b 5 0))
-                 (mmap syntax->datum (mutated #'a 1)))
-    ;; Valid mutation, counter is right
-    (test-equal? (mmap syntax->datum (maybe-mutate #'a #'b 5 5))
-                 (mmap syntax->datum (mutated #'b 6)))
-    ;; Valid mutation but it is syntactically identical
-    ;; This can happen when swapping argument positions
-    ;; e.g. for (foo '() '())
-    (test-equal? (mmap syntax->datum (maybe-mutate #'('() '()) #'('() '())
-                                                   5
-                                                   5))
-                 (mmap syntax->datum (mutated #'('() '()) 5)))))
-
-(define-syntax (define-mutators stx)
-  (syntax-parse stx
-    #:datum-literals (-> <->)
-    [(_ mutator-name
-        (~or (orig -> new)
-             (left <-> right)) ...
-        (match-datum datum-name:id
-                     [pat res] ...)
-        other-mutations ...)
-     #'(define (mutator-name stx-name mutation-index counter)
-         (define (maybe-mutate* new-stx)
-           (log-mutation-type "datum-replace")
-           (maybe-mutate stx-name
-                         new-stx
-                         mutation-index
-                         counter))
-         (if (and make-mutants
-                  (<= counter mutation-index))
-             (syntax-parse stx-name
-               #:datum-literals (orig ... left ... right ...)
-               [orig
-                (maybe-mutate* (syntax/loc stx-name new))]
-               ...
-               [left
-                (maybe-mutate* (syntax/loc stx-name right))]
-               ...
-               [right
-                (maybe-mutate* (syntax/loc stx-name left))]
-               ...
-               [(~and a-value-datum
-                      (~not (fn arg (... ...))))
-                (define (maybe-mutate-value old-v new-v current-counter)
-                  (cond [(> current-counter mutation-index)
-                         (mutated old-v
-                                  current-counter)]
-                        [else
-                         (match (maybe-mutate (datum->syntax #f old-v)
-                                              (datum->syntax #f new-v)
-                                              mutation-index
-                                              current-counter)
-                           [(mutated chosen-stx
-                                     updated-counter)
-                            (mutated (syntax->datum chosen-stx)
-                                     updated-counter)])]))
-                (mdo [count-with (__ counter)]
-                     (def/value value/mutated (syntax->datum #'a-value-datum))
-                     (def value/mutated
-                       (maybe-mutate-value
-                        value/mutated
-                        (match value/mutated
-                          [(and datum-name pat)
-                           (log-mutation-type "datum-replace")
-                           res]
-                          [else value/mutated])
-                        __))
-                     ...
-                     [return (datum->syntax stx-name
-                                            value/mutated
-                                            stx-name
-                                            stx-name)])]
-               other-mutations
-               ...
-               [other
-                (mutated stx-name
-                         counter)])
-             (mutated stx-name
-                      counter)))]))
-
-
 
 #|----------------------------------------------------------------------|#
 ;; Mutators: perform simple syntactic mutations
 
-;; mutate-datum: stx nat nat -> mutated
-(define-mutators mutate-datum
+(define-id-mutator mutate-arithmetic-op
+  #:type "arithmetic-op-swap"
+  [+ #:<-> -]
+  [* #:-> /]
+  [quotient #:-> /]
+  [modulo #:-> /]
+  [add1 #:<-> sub1])
 
-  ;; Arithmetic operators
-  [+ <-> -]
-  [* -> /]
-  [quotient -> /]
-  [modulo -> /]
-  [add1 <-> sub1]
+(define-id-mutator mutate-boolean-op
+  #:type "boolean-op-swap"
+  [and #:<-> or])
 
-  ;; Boolean operators
-  [and <-> or]
+(define-id-mutator mutate-class-publicity
+  #:type "class:publicity"
+  [define/public #:<-> define/private])
 
-  ;; Class operators
-  [define/public <-> define/private]
-  [super-new -> void]
+(define-id-mutator mutate-super-new
+  #:type "class:super-new"
+  [super-new #:-> void])
 
-  ;; Data structures
-  [make-hash <-> make-immutable-hash]
-  [vector <-> vector-immutable]
+(define-id-mutator mutate-data-structure
+  #:type "data-structure-mutability"
+  [make-hash #:<-> make-immutable-hash]
+  [vector #:<-> vector-immutable])
 
-  ;; Other builtins
-  [car <-> cdr]
+(define-id-mutator mutate-data-accessors
+  #:type "data-accessor-swap"
+  [car #:<-> cdr])
 
-  ;; Constant mutation: these will *all* be tried in sequence, even after one
-  ;; matches. I.e. they are *not* like branches in a match pattern where only
-  ;; one gets selected.
-  (match-datum value
-               ;; May mess with occurrence typing
-               [(? boolean?)              (not value)]
+(define-value-mutator mutate-constant
+  #:type "constant-swap"
+  #:bind-value value
+  ;; May mess with occurrence typing
+  [(? boolean?)              #:-> (not value)]
 
-               ;; Type generalization or subdivision swaps
-               [(? number?)               (- value)]
-               [(? integer?)              (exact->inexact value)]
-               [(and (? number?)
-                     (? zero?))           1]
-               [(and (? number?)
-                     (? (negate zero?)))  0]
-               [(? real?)                 (* 1+0.0i value)]
-               ;; this kind of narrowing probably doesn't help
-               ;; [(? inexact?)          (exact-floor value)]
+  ;; Type generalization or subdivision swaps
+  [(? number?)               #:-> (- value)]
+  [(? integer?)              #:-> (exact->inexact value)]
+  [(and (? number?)
+        (? zero?))           #:-> 1]
+  [(and (? number?)
+        (? (negate zero?)))  #:-> 0]
+  [(? real?)                 #:-> (* 1+0.0i value)]
+  ;; this kind of narrowing probably doesn't help
+  ;; [(? inexact?)          (exact-floor value)]
 
-               ;; Blatantly ill-typed swaps
-               [(? boolean?)              (if value 1 0)]
-               [(? number?)               #f]
-               [(? string?)               (string->bytes/utf-8 value)]))
+  ;; Blatantly ill-typed swaps
+  [(? boolean?)              #:-> (if value 1 0)]
+  [(? number?)               #:-> #f]
+  [(? string?)               #:-> (string->bytes/utf-8 value)])
+
+(define mutate-datum (compose-mutators mutate-arithmetic-op
+                                       mutate-boolean-op
+                                       mutate-class-publicity
+                                       mutate-super-new
+                                       mutate-data-structure
+                                       mutate-data-accessors
+                                       mutate-constant))
+
 
 (module+ test
   (define-test (test-datum-mutation-seq orig-v new-vs)
