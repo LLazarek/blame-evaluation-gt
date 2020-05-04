@@ -94,15 +94,22 @@
         #;(hash-set! benchmark-cache path result)
         result])]))
 
+(define (has-.rkt-extension? path)
+  (path-has-extension? path ".rkt"))
+
 ;; path-string? -> (values (listof path?) (listof path?))
 (define (read-typed-untyped-dirs path)
   (apply values
          (for/list ([dir (in-list '("typed" "untyped"))])
            (define dir-path (build-path path dir))
-           (and (directory-exists? dir-path)
-                (map simple-form-path
-                     (directory-list dir-path
-                                     #:build? #t))))))
+           (cond [(directory-exists? dir-path)
+                  (define all-files
+                    (map simple-form-path
+                         (directory-list dir-path
+                                         #:build? #t)))
+                  (filter has-.rkt-extension?
+                          all-files)]
+                 [else #f]))))
 
 (define (path-to-benchmark-directory? path)
   (define b (read-benchmark path))
@@ -144,6 +151,7 @@
     #:files ([main/t  (build-path typed "main.rkt")   "#lang typed/racket main"]
              [a/t     (build-path typed "a.rkt")      "#lang typed/racket a"]
              [b/t     (build-path typed "b.rkt")      "#lang typed/racket b"]
+             [garbage (build-path typed "garbage")    "some dumb garbage"]
              [main    (build-path untyped "main.rkt") "#lang racket main"]
              [a       (build-path untyped "a.rkt")    "#lang racket a"]
              [b       (build-path untyped "b.rkt")    "#lang racket b"]
