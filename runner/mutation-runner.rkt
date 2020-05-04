@@ -288,7 +288,16 @@
            (file-name-string-from-path blamed)]
           [else
            (error 'extract-blamed
-                  @~a{Unexpected blamed party shape: @~v[blamed]})]))
+                  @~a{
+                      Unexpected blamed party shape: @~v[blamed]
+                      Mutant info:
+                      @(format-mutant-info a-program
+                                           module-to-mutate
+                                           mutation-index)
+
+                      The blame error message is:
+                      @(exn-message e)
+                      })]))
       ((make-status* 'blamed) blamed-mod-name))
     (define (extract-type-error-source e)
       (define failing-stxs (exn:fail:syntax-exprs e))
@@ -300,7 +309,13 @@
           [else
            (error 'extract-type-error-source
                   @~a{
-                      couldn't find mod name in type error stxs:
+                      Couldn't find mod name in type error stxs.
+                      Program:
+                      @(format-mutant-info a-program
+                                           module-to-mutate
+                                           mutation-index)
+
+                      Stxs:
                       @~v[failing-stxs]
 
                       The type error message is:
@@ -338,9 +353,15 @@
           [#f
            (error 'extract-runtime-error-location
                   @~a{
-                      couldn't find a mod name in ctx from runtime error, @;
+                      Couldn't find a mod name in ctx from runtime error, @;
                       possibly because the error happened while @;
-                      instantiating a module. Ctx:
+                      instantiating a module.
+                      Program:
+                      @(format-mutant-info a-program
+                                           module-to-mutate
+                                           mutation-index)
+
+                      Ctx:
                       @pretty-format[ctx]
 
                       The runtime error message is:
@@ -363,6 +384,19 @@
                      #:memory/gb memory/gb
                      #:oom-result (make-status* 'oom)
                      #:suppress-output? suppress-output?)))
+
+(define (format-mutant-info a-program module-to-mutate mutation-index)
+  (define program-paths
+    (match a-program
+      [(program (mod main-path _)
+                (list (mod other-paths _) ...))
+       (list* main-path other-paths)]))
+  (define mutant-info
+    (list* 'mutant-info
+           (path->string (mod-path module-to-mutate))
+           mutation-index
+           (map path->string program-paths)))
+  (pretty-format mutant-info #:mode 'write))
 
 
 
