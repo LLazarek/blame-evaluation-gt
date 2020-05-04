@@ -303,7 +303,9 @@
       (define failing-stxs (exn:fail:syntax-exprs e))
       (define module-name
         (match failing-stxs
-          [(list* (app syntax-source-file-name (? path? file-name-path))
+          [(list* (app syntax-source-file-name #f)
+                  ...
+                  (app syntax-source-file-name (? path? file-name-path))
                   _)
            (path->string file-name-path)]
           [else
@@ -340,6 +342,12 @@
                                                 (list _ path-str))))
                                 _)
                           path-str]
+                         [(cons (? symbol?
+                                   (app symbol->string
+                                        (regexp @regexp{^body of '(.+)$}
+                                                (list _ mod-name-sym))))
+                                _)
+                          (~a mod-name-sym ".rkt")]
                          [else #f]))]
                      #:when ctx-mod-path
                      [mod (in-list (list* (program-main a-program)
