@@ -268,13 +268,14 @@
                    blamed
                    mutated-id))
     (define (extract-blamed e)
-      (define blamed ((compose
-                       (match-lambda [`(function ,id) id]
-                                     [`(definition ,id) id]
-                                     [other other])
-                       blame-positive
-                       exn:fail:contract:blame-object)
-                      e))
+      (define blame-obj (exn:fail:contract:blame-object e))
+      (define blamed
+        (match (blame-positive blame-obj)
+          [`(function ,id) id]
+          [`(definition ,id) id]
+          [(or 'cast 'typed-world)
+           (srcloc-source (blame-source blame-obj))]
+          [other other]))
       (define blamed-mod-name
         (match blamed
           ;; NOTE: This depends on a modification to Typed Racket;
