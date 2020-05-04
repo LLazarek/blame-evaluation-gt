@@ -293,7 +293,7 @@
       (define failing-stxs (exn:fail:syntax-exprs e))
       (define module-name
         (match failing-stxs
-          [(list* (app syntax-source-file-name file-name-path)
+          [(list* (app syntax-source-file-name (? path? file-name-path))
                   _)
            (path->string file-name-path)]
           [else
@@ -301,6 +301,9 @@
                   @~a{
                       couldn't find mod name in type error stxs:
                       @~v[failing-stxs]
+
+                      The type error message is:
+                      @(exn-message e)
                       })]))
       ((make-status* 'type-error) module-name (exn-message e)))
     (define (extract-runtime-error-location e)
@@ -338,6 +341,9 @@
                       possibly because the error happened while @;
                       instantiating a module. Ctx:
                       @pretty-format[ctx]
+
+                      The runtime error message is:
+                      @(exn-message e)
                       })]))
       ((make-status* 'blamed) mod-with-error-name))
     (define run/handled
