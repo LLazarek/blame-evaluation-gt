@@ -180,6 +180,7 @@
 (define index-exceeded-outcome 'index-exceeded)
 (define outcomes `(,index-exceeded-outcome
                    blamed
+                   runtime-error
                    type-error
                    oom
                    timeout
@@ -359,23 +360,25 @@
         (match mod-with-error
           [(? string? name) name]
           [#f
-           (error 'extract-runtime-error-location
-                  @~a{
-                      Couldn't find a mod name in ctx from runtime error, @;
-                      possibly because the error happened while @;
-                      instantiating a module.
-                      Program:
-                      @(format-mutant-info a-program
-                                           module-to-mutate
-                                           mutation-index)
+           (eprintf @~a{
+                        Couldn't find a mod name in ctx from runtime error, @;
+                        possibly because the error happened while @;
+                        instantiating a module.
+                        Program:
+                        @(format-mutant-info a-program
+                                             module-to-mutate
+                                             mutation-index)
 
-                      Ctx:
-                      @pretty-format[ctx]
+                        Ctx:
+                        @pretty-format[ctx]
 
-                      The runtime error message is:
-                      @(exn-message e)
-                      })]))
-      ((make-status* 'blamed) mod-with-error-name))
+                        The runtime error message is:
+                        @(exn-message e)
+
+                        Assuming that errortrace failed us and moving on.
+                        })
+           #f]))
+      ((make-status* 'runtime-error) mod-with-error-name))
     (define run/handled
       (λ _
         (with-handlers

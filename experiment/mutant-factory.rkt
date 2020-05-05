@@ -766,16 +766,23 @@ Predecessor (id [~a]) blamed ~a and had config:
        (log-factory info
                     @~a{
                         Sweeping up dead mutant [@id]: @mod @"@" @index, @;
-                        result: @(match result
-                                   [(struct* run-status
-                                             ([outcome (and outcome
-                                                            (or 'blamed
-                                                                'type-error))]
-                                              [blamed mod-name]))
-                                    (~a outcome " " mod-name)]
-                                   [(struct* run-status
-                                             ([outcome o]))
-                                    o]), @;
+                        result: @;
+                        @(match result
+                           [(struct* run-status
+                                     ([outcome (and outcome
+                                                    (or 'blamed
+                                                        'type-error
+                                                        'runtime-error))]
+                                      [blamed (? string? mod-name)]))
+                            (~a outcome " blaming " mod-name)]
+                           [(struct* run-status
+                                     ([outcome (and outcome
+                                                    'runtime-error)]
+                                      [blamed #f]))
+                            "runtime-error without inferred blame"]
+                           [(struct* run-status
+                                     ([outcome o]))
+                            o]), @;
                         config: @~s[config]
                         })
        (define dead-mutant-proc
@@ -940,11 +947,13 @@ Mutant: [~a] ~a @ ~a with config:
                          ([outcome (or 'completed
                                        'syntax-error
                                        'timeout
-                                       'oom)]
+                                       'oom
+                                       'runtime-error)]
                           [blamed #f]))
                 (struct* run-status
                          ([outcome (or 'blamed
-                                       'type-error)]
+                                       'type-error
+                                       'runtime-error)]
                           [blamed (not #f)])))
             result/well-formed)
        result/well-formed]
@@ -961,7 +970,11 @@ Mutant: [~a] ~a @ ~a with config:
   [{(struct* run-status ([outcome 'blamed]
                          [blamed blamed]))}
    blamed]
-  [{(struct* run-status ([outcome (not 'blamed)]))}
+  [{(struct* run-status ([outcome 'runtime-error]
+                         [blamed (and blamed
+                                      (not #f))]))}
+   blamed]
+  [{(struct* run-status ([outcome _]))}
    #f])
 
 ;; dead-mutant-process? -> module-name?
@@ -973,7 +986,7 @@ Mutant: [~a] ~a @ ~a with config:
   (module-name? run-status/c . -> . boolean?)
 
   (match result
-    [(struct* run-status ([outcome (or 'blamed 'type-error)]
+    [(struct* run-status ([outcome (or 'blamed 'type-error 'runtime-error)]
                           [blamed (== blamed-mod-name)]))
      #t]
     [_ #f]))
