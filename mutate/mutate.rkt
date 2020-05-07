@@ -75,7 +75,9 @@
   #:type "class:super-new"
   [super-new #:-> void])
 
-(define-id-mutator mutate-data-structure
+;; The benchmarks were written before this distinction was made in TR
+;; so these mutations aren't useful
+#;(define-id-mutator mutate-data-structure
   #:type "data-structure-mutability"
   [make-hash #:<-> make-immutable-hash]
   [vector #:<-> vector-immutable])
@@ -110,7 +112,6 @@
                                        mutate-boolean-op
                                        mutate-class-publicity
                                        mutate-super-new
-                                       mutate-data-structure
                                        mutate-data-accessors
                                        mutate-constant))
 
