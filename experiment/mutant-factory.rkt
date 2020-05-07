@@ -61,9 +61,10 @@
            spawn-mutant
            read-mutant-result
            process-outcome
-           try-get-blamed
+           try-get-blamed-module
            try-get-type-error-module
-           mutant->process-will))
+           mutant->process-will
+           make-blame-following-will/fallback))
 
 (define debug:save-individual-mutant-outputs? #f)
 
@@ -487,11 +488,16 @@
          (unless (blame/type-error-on-buggy-mod? blamed/type-error-location result)
            (log-factory
             error
-            "Found mutant with blamed/type-error (~v) at types that is not bug:
-~v
-"
-            blamed/type-error-location
-            dead-proc))
+            @~a{
+                BT VIOLATION: @;
+                Found mutant with blamed/type-error at types that is not bug.
+                Blamed: @~v[blamed/type-error-location]
+
+                Mutant: @;
+                @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
+                With config:
+                @~v[config]
+                }))
          ;; Blamed region is typed, so the path ends here.
          ;; Log the trail and stop following.
          (define new-factory
@@ -547,7 +553,7 @@
 
   (match-define (dead-mutant-process (mutant mod index #t)
                                      config
-                                     _
+                                     result
                                      id
                                      (blame-trail blame-trail-id _)
                                      _)
@@ -587,8 +593,9 @@ Giving up.
                     dead-succ-id outcome)
        current-process-q]
       [{(or 'completed 'syntax-error) _}
-       (log-factory error
-                    "Blame disappeared while following blame trail ~a @ ~a {~a}.
+       (log-factory
+        error
+        "BT VIOLATION: Blame disappeared while following blame trail ~a @ ~a {~a}.
 Mutant: [~a] and config:
 ~v
 
@@ -597,25 +604,39 @@ produced result: ~v
 
 Predecessor (id [~a]) blamed ~a and had config:
 ~v"
-                    mod index blame-trail-id
-                    dead-succ-id
-                    dead-succ-config
-                    dead-succ-result
-                    (if (equal? (run-status-outcome dead-succ-result)
-                                'syntax-error)
-                        "Likely due to a buggy contract
+        mod index blame-trail-id
+        dead-succ-id
+        dead-succ-config
+        dead-succ-result
+        (if (equal? (run-status-outcome dead-succ-result)
+                    'syntax-error)
+            "Likely due to a buggy contract
    on the region blamed by the predecessor (see below) that crashed"
-                        "Something has gone very wrong")
-                    id blamed
-                    config)
-       (maybe-abort "Blame disappeared" current-process-q)])))
+            "Something has gone very wrong")
+        id blamed
+        config)
+       (maybe-abort "Blame disappeared" current-process-q)]
+      [{(or 'blamed 'type-error) _}
+       #:when (library-path? (run-status-blamed dead-succ-result))
+       (log-factory
+        error
+        @~a{
+            BT VIOLATION: @;
+            Blame entered library code while following blame trail @;
+            @mod @"@" @index {@blame-trail-id}. @;
+            Giving up on following the trail.
+            Mutant: [@dead-succ-id] and config:
+            @~v[dead-succ-config]
+
+            Blamed: @(run-status-blamed result)
+            })])))
 
 (define/contract (make-blame-following-will/fallback no-blame-fallback)
   (mutant-will/c . -> . mutant-will/c)
 
   (λ (the-process-q dead-proc)
     (cond
-      [(or (try-get-blamed dead-proc)
+      [(or (try-get-blamed-module dead-proc)
            (try-get-type-error-module dead-proc))
        => (λ (blamed/type-error-location)
             (log-factory debug
@@ -966,9 +987,9 @@ Mutant: [~a] ~a @ ~a with config:
   (run-status-outcome (dead-mutant-process-result dead-proc)))
 
 ;; result? -> module-name?
-(define/match (try-get-blamed/from-result result)
+(define/match (try-get-blamed-module/from-result result)
   [{(struct* run-status ([outcome 'blamed]
-                         [blamed blamed]))}
+                         [blamed (? module-name? blamed)]))}
    blamed]
   [{(struct* run-status ([outcome 'runtime-error]
                          [blamed (and blamed
@@ -978,9 +999,9 @@ Mutant: [~a] ~a @ ~a with config:
    #f])
 
 ;; dead-mutant-process? -> module-name?
-(define/match (try-get-blamed dead-proc)
+(define/match (try-get-blamed-module dead-proc)
   [{(dead-mutant-process _ _ result _ _ _)}
-   (try-get-blamed/from-result result)])
+   (try-get-blamed-module/from-result result)])
 
 (define/contract (blame/type-error-on-buggy-mod? blamed-mod-name result)
   (module-name? run-status/c . -> . boolean?)

@@ -206,7 +206,12 @@
              [outcome         (apply or/c outcomes)]
              [blamed          {outcome}
                               (if (member outcome '(blamed type-error))
-                                  module-name?
+                                  (or/c module-name?
+                                        ;; This case allows the benchmarks to
+                                        ;; blame library code, which happens for
+                                        ;; instance in the quadU mutant
+                                        ;; "quad-main.rkt" @ 79
+                                        library-path?)
                                   any/c)]
              [result-value    any/c]))
 

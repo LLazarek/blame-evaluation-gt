@@ -202,12 +202,12 @@
 
 (test-begin
  #:name dead-process-blame/type-errors
- (test-equal? (try-get-blamed dead-e-proc/crashed)
+ (test-equal? (try-get-blamed-module dead-e-proc/crashed)
               e.rkt)
- (not/test (try-get-blamed dead-e-proc/completed))
- (test-equal? (try-get-blamed dead-e-proc/blame-e)
+ (not/test (try-get-blamed-module dead-e-proc/completed))
+ (test-equal? (try-get-blamed-module dead-e-proc/blame-e)
               e.rkt)
- (not/test (try-get-blamed dead-e-proc/type-error-in-d))
+ (not/test (try-get-blamed-module dead-e-proc/type-error-in-d))
 
  (not/test (try-get-type-error-module dead-e-proc/crashed))
  (not/test (try-get-type-error-module dead-e-proc/completed))
@@ -301,7 +301,22 @@
                                     e.rkt))
    (extend-test-message
     (not (unbox enqueued))
-    "Enqueued a mutant following blame on e.rkt when it's already at max")))
+    "Enqueued a mutant following blame on e.rkt when it's already at max")
+
+   (ignore
+    (set-box! enqueued #f)
+    (define dead-e-proc/blame-lib
+      (struct-copy dead-mutant-process dead-e-proc/blame-e
+                   [result
+                    (struct-copy run-status
+                                 (dead-mutant-process-result dead-e-proc/blame-e)
+                                 [blamed "../base/csp.rkt"])]))
+    ((make-blame-following-will/fallback (λ _ (set-box! enqueued 'fallback)))
+     mock-q
+     dead-e-proc/blame-lib))
+   (extend-test-message
+    (test-equal? (unbox enqueued) 'fallback)
+    "Enqueued a mutant following blame into a library?")))
 
 (parameterize ([abort-on-failure? #f])
   (test-begin/with-env
@@ -345,7 +360,21 @@
                   dead-e-proc/completed))
    (extend-test-message
     (not (unbox increased-limits?-box))
-    "true blame disappearing not recognized")))
+    "true blame disappearing not recognized")
+
+   (ignore
+    (set-box! increased-limits?-box #f)
+    (define dead-e-proc/blamed-lib
+      (struct-copy dead-mutant-process dead-e-proc/blame-e
+                   [result
+                    (struct-copy run-status
+                                 (dead-mutant-process-result dead-e-proc/blame-e)
+                                 [blamed "../base/csp.rkt"])]))
+    (fallback/oom (make-mock-Q (make:m0-factory))
+                  dead-e-proc/blamed-lib))
+   (extend-test-message
+    (not (unbox increased-limits?-box))
+    "blame disappearing into library not recognized")))
 
 (parameterize ([data-output-dir test-mutant-dir])
   (test-begin/with-env
@@ -678,6 +707,7 @@
                                                                     ([outcome
                                                                       (or 'type-error
                                                                           'blamed
+                                                                          'runtime-error
                                                                           'completed
                                                                           'oom
                                                                           'timeout)]))

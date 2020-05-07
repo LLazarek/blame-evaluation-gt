@@ -22,6 +22,10 @@
   (and (string? s)
        (not (regexp-match? @regexp{[\/]} s))))
 
+(define (library-path? s)
+  (and (string? s)
+       (regexp-match? @regexp{^\.\./base/} s)))
+
 (define (paths=? a b)
   (equal? (simple-form-path a)
           (simple-form-path b)))
