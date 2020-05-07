@@ -125,7 +125,7 @@
      (equal? (sort-file-names (map file-name-string-from-path
                                    (benchmark-typed b)))
              (sort-file-names (hash-keys config))))
-   @~a{a config for @~e[b]}))
+   @~a{a config for @~v[b]}))
 
 (define (benchmark->mutatable-modules a-benchmark)
   (map file-name-string-from-path

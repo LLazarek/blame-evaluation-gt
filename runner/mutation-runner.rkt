@@ -653,7 +653,7 @@
                                    11 ;; runtime error -> blame on a.rkt
                                    #:timeout/s 60
                                    #:memory/gb 1))
-     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed "a.rkt"]))))))
 
 
@@ -745,7 +745,7 @@
                                    3
                                    #:timeout/s 60
                                    #:memory/gb 1))
-     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed "a.rkt"]))))))
   (test-begin
     #:name run-with-mutated-module/runtime-error-locations
@@ -786,7 +786,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1
                                    #:suppress-output? #f))
-     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed "c.rkt"])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
@@ -794,7 +794,7 @@
                                    1 ; (+ 1) to (- 1) -> crash in foo
                                    #:timeout/s 60
                                    #:memory/gb 1))
-     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed "b.rkt"])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
@@ -802,7 +802,7 @@
                                    4 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
                                    #:timeout/s 60
                                    #:memory/gb 1))
-     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed "a.rkt"])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
@@ -810,7 +810,7 @@
                                    8 ; 0 to 1 -> crash in main
                                    #:timeout/s 60
                                    #:memory/gb 1))
-     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed "a.rkt"]))))))
 
   (test-begin
