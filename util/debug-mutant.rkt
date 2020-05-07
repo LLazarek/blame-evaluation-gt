@@ -19,7 +19,7 @@
     [(regexp #rx"/") name-or-path]
     [name (build-path benchmarks-dir name)]))
 
-(define (read-config identifier)
+(define (read-config identifier the-benchmark)
   (match identifier
     [(? hash? h) h]
     [(and (regexp @~a{^#hash})
@@ -28,6 +28,11 @@
     [(regexp @~a{^#s\(mutant-summary.+(#hash.+\)\))}
              (list _ hash-string))
      (call-with-input-string hash-string read)]
+    [(and (or 'types 'none) level)
+     (define mods (map file-name-string-from-path
+                       (benchmark-untyped the-benchmark)))
+     (for/hash ([mod (in-list mods)])
+       (values mod level))]
     [other
      (raise-user-error
       @~a{Unable to extract configuration from identifier: @~v[other]})]))
@@ -43,7 +48,7 @@
                       #:suppress-output? [suppress-output? #f])
   (define bench-path (find-benchmark bench-name-or-path))
   (define the-benchmark (read-benchmark bench-path))
-  (define config (read-config identifier))
+  (define config (read-config identifier the-benchmark))
   (match-define (and the-benchmark-configuration
                      (struct* benchmark-configuration
                               ([main main-path]
@@ -72,6 +77,17 @@
     (diff-mutation the-module-to-mutate index))
   (when (or run?
             run-via-process?)
+    (with-handlers ([exn:fail?
+                     (λ (e)
+                       (displayln @~a{
+                                      Mutant crashed with exn:
+                                      @pretty-format[e]
+
+                                      exn has msg:
+                                      })
+                       ((error-display-handler)
+                        ""
+                        e))])
     (displayln "Running mutant...")
     (when (not suppress-output?)
       (displayln @~a{
@@ -84,27 +100,16 @@
                             [blamed blamed]
                             [result-value result-value]))
       (cond [run?
-             (with-handlers ([exn:fail?
-                              (λ (e)
-                                (displayln 'inside-handler)
-                                ((error-display-handler
-                                  @~a{
-                                      Mutant crashed with exn:
-                                      @pretty-format[e]
-
-                                      exn has msg:
-                                      }
-                                  e)))])
-               (run-with-mutated-module
-                the-program
-                the-module-to-mutate
-                index
-                #:timeout/s (* 10 60)
-                #:memory/gb 5
-                #:modules-base-path (find-program-base-path the-program)
-                #:write-modules-to dump-dir-name
-                #:on-module-exists 'replace
-                #:suppress-output? suppress-output?))]
+             (run-with-mutated-module
+              the-program
+              the-module-to-mutate
+              index
+              #:timeout/s (* 10 60)
+              #:memory/gb 5
+              #:modules-base-path (find-program-base-path the-program)
+              #:write-modules-to dump-dir-name
+              #:on-module-exists 'replace
+              #:suppress-output? suppress-output?)]
             [run-via-process?
              (displayln
               "Running as seperate process via `spawn-mutant-runner`...")
@@ -149,7 +154,7 @@
                  }]
             [else ""])
          Result:  @result-value
-         })))
+         }))))
 
 (define debug-mutant/infer
   (make-keyword-procedure
@@ -196,6 +201,19 @@
                                      [index index]))]
                [config config]))
      (values mod-name index config)]
+    [(regexp @regexp{^\(mutant-info})
+     (infer-debug-mutant-arguments (call-with-input-string infer-v read))]
+    [(list* 'mutant-info
+            module-to-mutate-path
+            mutation-index
+            configured-mods)
+     (define config (for/hash ([mod (in-list configured-mods)])
+                      (define name (file-name-string-from-path mod))
+                      (define untyped? (string-contains? mod "untyped"))
+                      (values name (if untyped? 'none 'types))))
+     (values (file-name-string-from-path module-to-mutate-path)
+             mutation-index
+             config)]
     [other
      (raise-user-error
       @~a{Unable to infer `debug-mutant` arguments from @~v[other]})]))
@@ -232,8 +250,18 @@
 
   (test-begin
     #:name read-config
-    (test-equal? (read-config (~s test-summary))
-                 (mutant-summary-config test-summary)))
+    (test-equal? (read-config (~s test-summary) #f)
+                 (mutant-summary-config test-summary))
+    (test-equal? (read-config 'types
+                              (read-benchmark
+                               (find-benchmark "kcfa")))
+                 #hash(("ai.rkt" . types)
+                       ("benv.rkt" . types)
+                       ("denotable.rkt" . types)
+                       ("main.rkt" . types)
+                       ("structs.rkt" . types)
+                       ("time.rkt" . types)
+                       ("ui.rkt" . types))))
 
   (define-test (test-with-values generator . receiver-tests)
     (call-with-values generator
