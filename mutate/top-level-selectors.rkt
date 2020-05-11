@@ -1,12 +1,19 @@
-#lang at-exp racket
+#lang at-exp racket/base
 
+(require racket/contract/base)
 (provide (contract-out
           [top-level-selector/c    contract?]
           [select-all              top-level-selector/c]
           [select-define/contract  top-level-selector/c]
           [select-any-define       top-level-selector/c]))
 
-(require syntax/parse)
+(require racket/bool
+         racket/contract/region
+         racket/format
+         racket/function
+         racket/list
+         racket/match
+         syntax/parse)
 
 (define-syntax-class contracted-definition
   #:description "define/contract form"
@@ -44,7 +51,7 @@
 
 (define (select-all stx)
   (define name (leftmost-identifier-in stx))
-  (match (syntax-e stx)
+  (match (syntax->list stx)
     [(? list? stx/list)
      (values stx/list
              name
@@ -66,8 +73,8 @@
 (define (select-define/contract stx)
   (syntax-parse stx
     [def:contracted-definition
-      (define body-stxs (syntax-e (syntax/loc stx
-                                    (def.body ...))))
+      (define body-stxs (syntax->list (syntax/loc stx
+                                        (def.body ...))))
       (define (reconstruct-definition body-stxs/mutated)
         (quasisyntax/loc stx
           (def.def/c def.id/sig def.ctc
@@ -79,8 +86,8 @@
 (define (select-any-define stx)
   (syntax-parse stx
     [def:definition
-      (define body-stxs (syntax-e (syntax/loc stx
-                                    (def.body ...))))
+      (define body-stxs (syntax->list (syntax/loc stx
+                                        (def.body ...))))
       (define (reconstruct-definition body-stxs/mutated)
         (quasisyntax/loc stx
           (def.def-form def.id/sig

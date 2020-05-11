@@ -4,7 +4,8 @@
          test-programs-equal?
          test-mutator
          test-mutator*
-         test-mutation/in-seq)
+         test-mutation/in-seq
+         test-failure-diff-programs?)
 
 (require racket/format
          racket/list
@@ -17,14 +18,26 @@
   (equal? (syntax->datum a)
           (syntax->datum b)))
 
+(define test-failure-diff-programs? (make-parameter #t))
+
 (define (diff-programs/string actual expected)
-  (dumb-diff-lines/string (pretty-format (syntax->datum actual))
-                          (pretty-format (syntax->datum expected))))
+  (define actual-str (pretty-format (syntax->datum actual)))
+  (define expected-str (pretty-format (syntax->datum expected)))
+  (if (test-failure-diff-programs?)
+      (dumb-diff-lines/string actual-str expected-str)
+      @~a{
+          Expected:
+          @expected-str
+
+          Actual:
+          @actual-str
+
+          }))
 
 (define-simple-test (test-programs-equal? actual expected)
   #:fail-message @~a{
                      Programs are not equal. Diff (expected <):
-                     @(diff-programs/string expected actual)
+                     @(diff-programs/string actual expected)
                      }
   (programs-equal? actual expected))
 

@@ -1,4 +1,6 @@
-#lang at-exp racket
+#lang at-exp racket/base
+
+(require racket/contract/base)
 
 (provide (contract-out
           [make-program-mutator ({mutator/c}
@@ -17,13 +19,15 @@
             . -> .
             (unconstrained-domain-> syntax?))])
 
-         (struct-out mutated-program))
+         (struct-out mutated-program)
+         mutation-index-exception?)
 
-(require "mutated.rkt"
-         "mutator-lib.rkt"
+(require racket/match
+         syntax/parse
          "mutate-util.rkt"
-         "top-level-selectors.rkt"
-         syntax/parse)
+         "mutated.rkt"
+         "mutator-lib.rkt"
+         "top-level-selectors.rkt")
 
 (struct mutated-program (stx mutated-id) #:transparent)
 (struct mutation-index-exception ())
@@ -94,4 +98,4 @@
 (define (syntax-only mutate-program)
   (compose1 (match-lambda [(mutated-program stx mutated-id)
                            stx])
-            without-counter))
+            (without-counter mutate-program)))

@@ -1,26 +1,33 @@
-#lang at-exp racket
+#lang at-exp racket/base
 
+(require racket/contract/base)
 (provide (contract-out
-          [mutate-arithmetic-op        mutator/c]
-          [mutate-boolean-op           mutator/c]
-          [mutate-class-publicity      mutator/c]
-          [mutate-super-new            mutator/c]
-          [mutate-data-accessors       mutator/c]
-          [mutate-constant             mutator/c]
+          [arithmetic-op-swap          mutator/c]
+          [boolean-op-swap             mutator/c]
+          [class-method-publicity-swap mutator/c]
+          [delete-super-new            mutator/c]
+          [data-accessor-swap          mutator/c]
+
+          [replace-constants           mutator/c]
+
           [delete-begin-result-expr    mutator/c]
           [negate-conditionals         mutator/c]
           [replace-class-parent        mutator/c]
           [swap-class-initializers     mutator/c]
           [rearrange-positional-exprs  mutator/c]))
 
-(require "mutator-lib.rkt"
-         "mutated.rkt"
-         "mutate-util.rkt"
-         "mutate-expr.rkt"
+(require racket/class
+         racket/contract/region
+         racket/function
+         racket/match
+         syntax/parse
          "logger.rkt"
-         syntax/parse)
+         "mutate-expr.rkt"
+         "mutate-util.rkt"
+         "mutated.rkt"
+         "mutator-lib.rkt")
 
-(define-id-mutator mutate-arithmetic-op
+(define-id-mutator arithmetic-op-swap
   #:type "arithmetic-op-swap"
   [+ #:<-> -]
   [* #:-> /]
@@ -28,30 +35,28 @@
   [modulo #:-> /]
   [add1 #:<-> sub1])
 
-(define-id-mutator mutate-boolean-op
+(define-id-mutator boolean-op-swap
   #:type "boolean-op-swap"
   [and #:<-> or])
 
-(define-id-mutator mutate-class-publicity
+(define-id-mutator class-method-publicity-swap
   #:type "class:publicity"
   [define/public #:<-> define/private])
 
-(define-id-mutator mutate-super-new
+(define-id-mutator delete-super-new
   #:type "class:super-new"
   [super-new #:-> void])
 
-;; The benchmarks were written before this distinction was made in TR
-;; so these mutations aren't useful
-#;(define-id-mutator mutate-data-structure
+(define-id-mutator mutate-data-structure
   #:type "data-structure-mutability"
   [make-hash #:<-> make-immutable-hash]
   [vector #:<-> vector-immutable])
 
-(define-id-mutator mutate-data-accessors
+(define-id-mutator data-accessor-swap
   #:type "data-accessor-swap"
   [car #:<-> cdr])
 
-(define-value-mutator mutate-constant
+(define-value-mutator replace-constants
   #:type "constant-swap"
   #:bind-value value
   ;; May mess with occurrence typing
@@ -75,13 +80,15 @@
 
 (module+ test
   (require ruinit
+           racket
            "mutate-test-common.rkt")
-  (define mutate-datum (compose-mutators mutate-arithmetic-op
-                                         mutate-boolean-op
-                                         mutate-class-publicity
-                                         mutate-super-new
-                                         mutate-data-accessors
-                                         mutate-constant))
+  (define mutate-datum (compose-mutators arithmetic-op-swap
+                                         boolean-op-swap
+                                         class-method-publicity-swap
+                                         delete-super-new
+                                         mutate-data-structure
+                                         data-accessor-swap
+                                         replace-constants))
 
 
   (define-test (test-datum-mutation-seq orig-v new-vs)
@@ -134,9 +141,9 @@
      [define/public <-> define/private]
      [super-new -> void]
 
-     ;; ;; Data structures
-     ;; [make-hash <-> make-immutable-hash]
-     ;; [vector <-> vector-immutable]
+     ;; Data structures
+     [make-hash <-> make-immutable-hash]
+     [vector <-> vector-immutable]
 
      ;; Other builtins
      [car <-> cdr]
@@ -153,7 +160,31 @@
      [-42 -> [42 -42.0 0 -42-0.0i #f]]
      [#t -> [#f 1]]
      [#f -> [#t 0]]
-     ["a" -> [#"a"]])))
+     ["a" -> [#"a"]]))
+
+  (test-begin
+    #:name mutate-datum/preserve-guards
+    (mtest mutation-guarded?
+           (mutate-datum (mutation-guard #'(not #t))
+                         0
+                         1))
+    (mtest (negate mutation-guarded?)
+           (mutate-datum #'(not #t)
+                         0
+                         1))
+    (mtest (compose1 mutation-guarded?
+                     second
+                     syntax->list)
+           (mutate-datum #`(if #,(mutation-guard #'(not #t)) a b)
+                         0
+                         1))
+    (mtest (compose1 not
+                     mutation-guarded?
+                     second
+                     syntax->list)
+           (mutate-datum #'(if (not #t) a b)
+                         0
+                         1))))
 
 
 (define (delete-begin-result-expr stx mutation-index counter)
@@ -255,7 +286,33 @@
                                  [else 33])
                          #'(cond [first 42]
                                  [(second?) => values]
-                                 [else 33])))))
+                                 [else 33])))
+
+    (for/and/test
+     ([cond-expr (in-list (list #'#t #'(+ 2 2)))]
+      [simple-cond? (in-list '(#t #f))]
+      #:when #t
+      [index (in-range 2)]
+      [mutated-cond-expr (in-list (list #`(not #,cond-expr) cond-expr))])
+     (define mutated-result (negate-conditionals #`(if #,cond-expr + -)
+                                                 index
+                                                 0))
+     (define stx (mutated-stx mutated-result))
+     (define mutated-cond
+       (second (syntax->list stx)))
+     (and/test/message
+      [(test-programs-equal? stx #`(if #,mutated-cond-expr + -))
+       @~a{Mutation is different than expected.}]
+      [(if simple-cond?
+           (mutation-guarded? mutated-cond)
+           (not (mutation-guarded? mutated-cond)))
+       @~a{@(if simple-cond?
+                "simple"
+                "complex") @;
+           cond expr is @;
+           @(if simple-cond?
+                "not guarded when it should be"
+                "guarded when it shouldn't be")}]))))
 
 (define (replace-class-parent stx mutation-index counter)
   (log-mutation-type "class:parent-swap")
@@ -294,11 +351,11 @@
                              (define/public (foo x) x))))))
 
 (define (swap-class-initializers stx mutation-index counter)
-  (define (swap-initializers-in-class-field-group group-stx
-                                                           mutation-index
-                                                           counter)
+  (define (swap-initializers-in-class-field-group stx
+                                                  mutation-index
+                                                  counter)
     (log-mutation-type "class:initializer-swap")
-    (syntax-parse group-stx
+    (syntax-parse stx
       [({~and {~or {~datum init-field}
                    {~datum field}}
               field-type}
@@ -371,7 +428,31 @@
                                 [c 3]
                                 [d 4]
                                 [e 5]))))
-      @~a{Field: @field-name}))))
+      @~a{Field: @field-name}))
+
+    (test-mutator* swap-class-initializers
+                   #'(class a-super
+                       (super-new)
+                       (define/public (f x) x))
+                   (list #'(class a-super
+                             (super-new)
+                             (define/public (f x) x))))
+    (test-mutator* swap-class-initializers
+                   #'(class a-super
+                       (super-new)
+                       (field [a 5]
+                              [b 6])
+                       (define/public (f x) x))
+                   (list #'(class a-super
+                             (super-new)
+                             (field [a 6]
+                                    [b 5])
+                             (define/public (f x) x))
+                         #'(class a-super
+                             (super-new)
+                             (field [a 5]
+                                    [b 6])
+                             (define/public (f x) x))))))
 
 (define (rearrange-positional-exprs stx mutation-index counter)
   (log-mutation-type "position-swap")

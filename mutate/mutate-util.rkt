@@ -1,4 +1,6 @@
-#lang at-exp racket
+#lang at-exp racket/base
+
+(require racket/contract/base)
 
 (provide (contract-out
           [compound-expr? (syntax? . -> . boolean?)]
@@ -14,9 +16,12 @@
                              . -> .
                              (mutated/c (listof syntax?)))]))
 
-(require "mutated.rkt"
-         "mutator-lib.rkt"
-         syntax/parse)
+(require racket/contract/region
+         racket/list
+         racket/match
+         syntax/parse
+         "mutated.rkt"
+         "mutator-lib.rkt")
 
 (define (compound-expr? stx)
   (syntax-parse stx
@@ -111,29 +116,29 @@
                 empty))))
 
 (define (unpair-off pairs remainder)
-  (append (flatten (map syntax-e pairs)) remainder))
+  (append (flatten (map syntax->list pairs)) remainder))
 
 (module+ test
   (test-begin
     #:name rearrange-in-seq
     (test-programs-equal?
      #`(#,@(mutated-stx (rearrange-in-seq
-                         (syntax-e #'(a (+ 1 2)))
+                         (syntax->list #'(a (+ 1 2)))
                          0 0)))
      #'((+ 1 2) a))
     (test-programs-equal?
      #`(#,@(mutated-stx (rearrange-in-seq
-                         (syntax-e #'(a (+ 1 2) b))
+                         (syntax->list #'(a (+ 1 2) b))
                          0 0)))
      #'((+ 1 2) a b))
     (test-programs-equal?
      #`(#,@(mutated-stx (rearrange-in-seq
-                         (syntax-e #'(a (+ 1 2) b (foo 3)))
+                         (syntax->list #'(a (+ 1 2) b (foo 3)))
                          1 0)))
      #'(a (+ 1 2) (foo 3) b))
     (test-programs-equal?
      #`(#,@(mutated-stx (rearrange-in-seq
-                         (syntax-e #'(a (+ 1 2) b (foo 3) (bar 3 4 5)))
+                         (syntax->list #'(a (+ 1 2) b (foo 3) (bar 3 4 5)))
                          2 0)))
      #'(a (+ 1 2) b (foo 3) (bar 3 4 5)))
     #| ... |#))

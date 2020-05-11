@@ -1,4 +1,6 @@
-#lang at-exp racket
+#lang at-exp racket/base
+
+(require racket/contract/base)
 
 (provide (contract-out
           [make-expr-mutator ({mutator/c}
@@ -8,10 +10,10 @@
           [mutation-guard    (syntax? . -> . syntax?)]
           [mutation-guarded? (syntax? . -> . boolean?)]))
 
-(require "mutator-lib.rkt"
-         "mutated.rkt"
+(require racket/function
          "mutate-util.rkt"
-         syntax/parse)
+         "mutated.rkt"
+         "mutator-lib.rkt")
 
 (define stx-prop:mutation-guarded? 'mutation-guarded?)
 (define (mutation-guard stx)
@@ -34,7 +36,7 @@
                   (cond [(and (compound-expr? outer-level-mutated-stx)
                               (should-mutate? outer-level-mutated-stx))
                          (mdo* (def inner-parts-mutated-stx-split
-                                 (mutate-in-seq (syntax-e outer-level-mutated-stx)
+                                 (mutate-in-seq (syntax->list outer-level-mutated-stx)
                                                 mutation-index
                                                 __
                                                 mutate-expr))
@@ -54,7 +56,57 @@
 
 (module+ test
   (require ruinit
+           racket
+           syntax/parse
            "mutate-test-common.rkt")
+  (test-begin
+    #:name make-expr-mutator/traversal
+    (ignore
+     (define exprs-mutated
+       (box empty))
+     (define (record-expr! stx)
+       (define hist (unbox exprs-mutated))
+       (set-box! exprs-mutated (cons stx hist)))
+     (define recording-mutator
+       (make-guarded-mutator (const #t)
+                             (λ (stx)
+                               (record-expr! stx)
+                               stx)))
+     (define recording-mutate-expr
+       (make-expr-mutator recording-mutator)))
+    (test-mutator recording-mutate-expr
+                  #'(class parent
+                      (field a)
+                      (define/public (f x) x)
+                      (define/private (g x) x))
+                  #'(class parent
+                      (field a)
+                      (define/public (f x) x)
+                      (define/private (g x) x)))
+    (test-equal? (map syntax->datum
+                      (reverse (unbox exprs-mutated)))
+                 '((class parent
+                     (field a)
+                     (define/public (f x) x)
+                     (define/private (g x) x))
+                   class
+                   parent
+                   (field a)
+                   field
+                   a
+                   (define/public (f x) x)
+                   define/public
+                   (f x)
+                   f
+                   x
+                   x
+                   (define/private (g x) x)
+                   define/private
+                   (g x)
+                   g
+                   x
+                   x)))
+
   (test-begin
     #:name make-expr-mutator
     (ignore

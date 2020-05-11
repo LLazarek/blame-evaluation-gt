@@ -94,17 +94,23 @@
   #:with [left-right-pair ...] #'[{~@ (left . right) (right . left)} ...]
   (begin
     (define swaps '((orig . new) ... left-right-pair ...))
-    (define (name datum-stx mutation-index counter)
-      (mmap (λ (swapped)
-              (datum->syntax datum-stx
-                             swapped
-                             datum-stx
-                             datum-stx))
-            (apply-swap-alist (syntax->datum datum-stx)
-                              swaps
-                              mutation-index
-                              counter
-                              #:type type)))))
+    (define (name maybe-atom-stx mutation-index counter)
+      (if (syntax->list maybe-atom-stx)
+          ;; Value mutators only make sense for atoms, so don't even try to apply
+          ;; them on syntax-lists. This prevents accidentally stripping
+          ;; syntax-properties from inner syntax objects of syntax-lists due to
+          ;; the conversion from stx to datum and back.
+          (no-mutation maybe-atom-stx mutation-index counter)
+          (mmap (λ (swapped)
+                  (datum->syntax maybe-atom-stx
+                                 swapped
+                                 maybe-atom-stx
+                                 maybe-atom-stx))
+                (apply-swap-alist (syntax->datum maybe-atom-stx)
+                                  swaps
+                                  mutation-index
+                                  counter
+                                  #:type type))))))
 
 (define (apply-swap-alist original-value
                           swap-alist
@@ -126,7 +132,7 @@
                        #:type type:expr
                        #:bind-value value-name:id
                        [pat:expr #:-> replacement:expr] ...)
-  (define (name datum-stx mutation-index counter)
+  (define (name maybe-atom-stx mutation-index counter)
     (define the-type type)
     (define mutation-sequence
       (list
@@ -137,15 +143,18 @@
                                             (log-mutation-type the-type)
                                             replacement]))
        ...))
-    (mmap (λ (mutated)
-            (datum->syntax datum-stx
-                           mutated
-                           datum-stx
-                           datum-stx))
-          (apply-mutators (syntax->datum datum-stx)
-                          mutation-sequence
-                          mutation-index
-                          counter))))
+    (if (syntax->list maybe-atom-stx)
+        ;; See note in `define-id-mutator`
+        (no-mutation maybe-atom-stx mutation-index counter)
+        (mmap (λ (mutated)
+                (datum->syntax maybe-atom-stx
+                               mutated
+                               maybe-atom-stx
+                               maybe-atom-stx))
+              (apply-mutators (syntax->datum maybe-atom-stx)
+                              mutation-sequence
+                              mutation-index
+                              counter)))))
 
 (define (apply-mutators start
                         mutator-sequence

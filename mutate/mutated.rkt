@@ -1,16 +1,33 @@
-#lang racket
+#lang racket/base
 
+(require racket/contract/base)
+(define A any/c) ;; Instead of parametric ctcs
+(define B any/c)
 (provide mutation-index?
          counter?
          mutated/c
-         mmap
-         mbind
-         mtest
+         (contract-out
+          [mmap ((A . -> . B)
+                 (mutated/c A)
+                 . -> .
+                 (mutated/c B))]
+          [mbind ((A counter? . -> . (mutated/c B))
+                  (mutated/c A)
+                  . -> .
+                  (mutated/c B))]
+          [mtest ((A . -> . boolean?)
+                  (mutated/c A)
+                  . -> .
+                  boolean?)])
          mdo
          mdo*
          (struct-out mutated))
 
-(require (for-syntax syntax/parse))
+(require (for-syntax syntax/parse
+                     racket/base)
+         racket/contract/region
+         racket/match
+         racket/math)
 
 (define mutation-index? natural?)
 (define counter? natural?)
@@ -25,35 +42,15 @@
 
 (define (mutated/c a) (struct/c mutated a counter?))
 
-;; lltodo: use parametric->/c?
-(define A any/c)
-(define B any/c)
-(define C any/c)
-;; maps over mutated-stx
-(define/contract (mmap f m)
-  ((A . -> . B)
-   (mutated/c A)
-   . -> .
-   (mutated/c B))
-
+(define (mmap f m)
   (mutated (f (mutated-stx m))
            (mutated-new-counter m)))
 
-(define/contract (mbind f m)
-  ((A counter? . -> . (mutated/c B))
-   (mutated/c A)
-   . -> .
-   (mutated/c B))
-
+(define (mbind f m)
   (f (mutated-stx m)
      (mutated-new-counter m)))
 
-(define/contract (mtest f m)
-  ((A . -> . boolean?)
-   (mutated/c A)
-   . -> .
-   boolean?)
-
+(define (mtest f m)
   (f (mutated-stx m)))
 
 ;; Performs sequential mutations with automatic threading of the
