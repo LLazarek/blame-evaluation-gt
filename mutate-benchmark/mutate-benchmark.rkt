@@ -22,6 +22,7 @@
                                        replace-class-parent
                                        swap-class-initializers
                                        rearrange-positional-exprs
+                                       add-extra-class-method
                                        mutate-datum)
                      #:filter filter))
 
@@ -429,13 +430,20 @@
                 (class object%
                   (define/public (f x) x)
                   (define/private (g x) x)))}]
-       ;; method visibility
+       ;; extra method
        [1 ,#'{(define/contract c
+                any/c
+                (class my-parent
+                  (define/public (a-nonexistant-method x) x)
+                  (define/public (f x) x)
+                  (define/private (g x) x)))}]
+       ;; method visibility
+       [2 ,#'{(define/contract c
                 any/c
                 (class my-parent
                   (define/private (f x) x)
                   (define/private (g x) x)))}]
-       [2 ,#'{(define/contract c
+       [3 ,#'{(define/contract c
                 any/c
                 (class my-parent
                   (define/public (f x) x)
@@ -469,7 +477,20 @@
                                                 [z #f]
                                                 w
                                                 y)))}]
-       [3 ,#'{(define/contract c any/c (class o
+       ;; add method
+       [3 ,#'{(define/contract c
+                any/c
+                (class o
+                  (define/public (a-nonexistant-method x) x)
+                  (field [v (foo bar)]
+                         [x 5]
+                         [a (g 0)]
+                         [b f]
+                         [z #f]
+                         w
+                         y)))}]
+       ;; swap ordering
+       [4 ,#'{(define/contract c any/c (class o
                                          (field [x 5]
                                                 [v (foo bar)]
                                                 [a (g 0)]
@@ -477,7 +498,7 @@
                                                 [z #f]
                                                 w
                                                 y)))}]
-       [4 ,#'{(define/contract c any/c (class o
+       [5 ,#'{(define/contract c any/c (class o
                                          (field [v (foo bar)]
                                                 [x 5]
                                                 [b f]
@@ -485,7 +506,7 @@
                                                 [z #f]
                                                 w
                                                 y)))}]
-       [5 ,#'{(define/contract c any/c (class o
+       [6 ,#'{(define/contract c any/c (class o
                                          (field [v (foo bar)]
                                                 [x 5]
                                                 [a (g 0)]
@@ -495,7 +516,7 @@
                                                 y)))}]
        ;; Descend into mutating initializer values
        ;; Note that final odd initializer is NOT swapped
-       [6 ,#'{(define/contract c any/c (class o
+       [7 ,#'{(define/contract c any/c (class o
                                          (field [v (foo bar)]
                                                 [x -5]
                                                 [a (g 0)]
@@ -503,7 +524,7 @@
                                                 [z #f]
                                                 w
                                                 y)))}]
-       [11 ,#'{(define/contract c any/c (class o
+       [12 ,#'{(define/contract c any/c (class o
                                           (field [v (foo bar)]
                                                  [x 5]
                                                  [a (g 0.0)]
@@ -511,7 +532,7 @@
                                                  [z #f]
                                                  w
                                                  y)))}]
-       [14 ,#'{(define/contract c any/c (class o
+       [15 ,#'{(define/contract c any/c (class o
                                           (field [v (foo bar)]
                                                  [x 5]
                                                  [a (g 0)]
@@ -558,21 +579,28 @@
                 any/c
                 (class
                   o
-                  (define/private #| <- |# (my-method x y)
+                  (define/public (a-nonexistant-method x) x) ; <-
+                  (define/public (my-method x y)
                     (- x y))))}]
        [2 ,#'{(define/contract c
                 any/c
                 (class
                   o
-                  (define/public (my-method y x #| <- |#)
+                  (define/private #| <- |# (my-method x y)
                     (- x y))))}]
        [3 ,#'{(define/contract c
                 any/c
                 (class
                   o
+                  (define/public (my-method y x #| <- |#)
+                    (- x y))))}]
+       [4 ,#'{(define/contract c
+                any/c
+                (class
+                  o
                   (define/public (my-method x y)
                     (- y #| <-> |# x))))}]
-       [4 ,#'{(define/contract c
+       [5 ,#'{(define/contract c
                 any/c
                 (class
                   o
@@ -586,12 +614,12 @@
           (class o
             (super-new)
             (define/public x 5)))}
-     `([1 ,#'{(define/contract c
+     `([2 ,#'{(define/contract c
                 any/c
                 (class o
                   (void)
                   (define/public x 5)))}]
-       [2 ,#'{(define/contract c
+       [3 ,#'{(define/contract c
                 any/c
                 (class o
                   (super-new)
@@ -829,10 +857,12 @@
                 (unless (p v) (error 'assert))
                 v)
 
+
               (define/contract command%
                 command%/c
                 (class object%
-                  (void)
+                  (define/public (a-nonexistant-method x) x)
+                  (super-new)
                   (init-field
                    id
                    descr
@@ -903,6 +933,77 @@
               (define/contract command%
                 command%/c
                 (class object%
+                  (void)
+                  (init-field
+                   id
+                   descr
+                   exec)))
+
+              (define ((env-with/c cmd-ids) env)
+                (cond [(env? env)
+                       (define env-cmd-ids
+                         (for/list ([env-cmd (in-list env)])
+                           (get-field id env-cmd)))
+                       (for/and ([c (in-list cmd-ids)])
+                         (member c env-cmd-ids))]
+                      [else #f]))
+
+
+
+              ;; True if the argument is a list with one element
+              (define/contract (singleton-list? x)
+                (configurable-ctc
+                 [max (->i ([x list?])
+                           [result (x) (if (empty? x)
+                                           #f
+                                           (empty? (rest x)))])]
+                 [types (list? . -> . boolean?)])
+
+                (and (list? x)
+                     (not (null? x))
+                     (null? (cdr x))))}]
+       [2 ,#'{(provide
+               command%
+               CMD*
+               )
+
+              (require
+               racket/match
+               racket/class
+               (only-in racket/string string-join string-split)
+               (for-syntax racket/base racket/syntax syntax/parse)
+               racket/contract
+               "../../../ctcs/precision-config.rkt"
+               (only-in racket/function curry)
+               (only-in racket/list empty? first second rest)
+               (only-in "../../../ctcs/common.rkt"
+                        class/c*
+                        or-#f/c
+                        command%/c
+                        command%?
+                        command%?-with-exec
+                        stack?
+                        env?
+                        list-with-min-size/c
+                        equal?/c)
+               )
+              (require (only-in "stack.rkt"
+                                stack-drop
+                                stack-dup
+                                stack-init
+                                stack-over
+                                stack-pop
+                                stack-push
+                                stack-swap
+                                ))
+
+              (define (assert v p)
+                (unless (p v) (error 'assert))
+                v)
+
+              (define/contract command%
+                command%/c
+                (class object%
                   (super-new)
                   (init-field
                    descr
@@ -932,7 +1033,7 @@
                 (and (list? x)
                      (not (null? x))
                      (null? (cdr x))))}]
-       [2 ,#'{(provide
+       [3 ,#'{(provide
                command%
                CMD*
                )
@@ -1003,7 +1104,7 @@
                 (and (not (null? x))
                      (list? x)
                      (null? (cdr x))))}]
-       [3 ,#'{(provide
+       [4 ,#'{(provide
                command%
                CMD*
                )
@@ -1150,7 +1251,7 @@
             (and (list? x)
                  (not (null? x))
                  (null? (cdr x))))}
-       2))
+       3))
      'singleton-list?))
 
   (define-test (test-selector selector

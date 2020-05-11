@@ -14,7 +14,8 @@
           [negate-conditionals         mutator/c]
           [replace-class-parent        mutator/c]
           [swap-class-initializers     mutator/c]
-          [rearrange-positional-exprs  mutator/c]))
+          [rearrange-positional-exprs  mutator/c]
+          [add-extra-class-method      mutator/c]))
 
 (require racket/class
          racket/contract/region
@@ -514,3 +515,35 @@
                    (list #'(a-function c b d)
                          #'(a-function b c d)))))
 
+(define (add-extra-class-method stx mutation-index counter)
+  (log-mutation-type "class:add-extra-method")
+  (syntax-parse stx
+    [(~or ({~and {~datum class}  class-form} superclass:expr . body)
+          ({~and {~datum class*} class-form} superclass:expr
+                                             interfaces:expr . body))
+     (mdo* (def extra-method-stx
+             (maybe-mutate (syntax/loc stx [])
+                           (syntax/loc stx
+                             [(define/public (a-nonexistant-method x) x)])
+                           mutation-index
+                           counter))
+           [return
+            (quasisyntax/loc stx
+              (class-form superclass
+                          {~? interfaces}
+                          #,@extra-method-stx
+                          . body))])]
+    [else
+     (no-mutation stx mutation-index counter)]))
+
+(module+ test
+  (test-begin
+    #:name add-extra-class-method
+    (test-mutator* add-extra-class-method
+                   #'(class a-parent
+                       (field a))
+                   (list #'(class a-parent
+                             (define/public (a-nonexistant-method x) x)
+                             (field a))
+                         #'(class a-parent
+                             (field a))))))
