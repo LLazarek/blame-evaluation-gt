@@ -5,11 +5,10 @@
          mutated/c
          mmap
          mbind
+         mtest
          mdo
          mdo*
-         (struct-out mutated)
-         (struct-out mutated-program)
-         mutation-applied-already?)
+         (struct-out mutated))
 
 (require (for-syntax syntax/parse))
 
@@ -48,6 +47,14 @@
 
   (f (mutated-stx m)
      (mutated-new-counter m)))
+
+(define/contract (mtest f m)
+  ((A . -> . boolean?)
+   (mutated/c A)
+   . -> .
+   boolean?)
+
+  (f (mutated-stx m)))
 
 ;; Performs sequential mutations with automatic threading of the
 ;; counter
@@ -104,8 +111,3 @@
   (mdo [count-with (unused #f)]
        def-clause
        result-clause))
-
-(struct mutated-program (stx mutated-id) #:transparent)
-
-(define (mutation-applied-already? mutation-index counter)
-  (> counter mutation-index))

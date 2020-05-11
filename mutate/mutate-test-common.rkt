@@ -3,9 +3,11 @@
 (provide programs-equal?
          test-programs-equal?
          test-mutator
-         test-mutator*)
+         test-mutator*
+         test-mutation/in-seq)
 
 (require racket/format
+         racket/list
          racket/pretty
          ruinit
          ruinit/diff/diff
@@ -41,3 +43,29 @@
                               orig-stx
                               expected-stx
                               counter)))
+
+(define-test (test-mutation/in-seq orig-seq
+                                   seq-mutator
+                                   mutator
+                                   pretty-printer
+                                   expects)
+  (for ([index (in-list (map first expects))]
+        [expect (in-list (map second expects))])
+    (define ms (mutated-stx (seq-mutator orig-seq
+                                         index
+                                         0
+                                         mutator)))
+    (unless (andmap programs-equal?
+                    (flatten ms)
+                    (flatten expect))
+      (fail "Result does not match expected output.
+Mutation index: ~v
+Expected:
+~a
+
+Actual:
+~a
+"
+            index
+            (pretty-printer expect)
+            (pretty-printer ms)))))

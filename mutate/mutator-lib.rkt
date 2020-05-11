@@ -9,14 +9,13 @@
           ;; Base mutator
           ;; essentially a more restricted mutator/c
           [maybe-mutate
-           (->i ([old any/c]
-                 [new any/c]
-                 [mutation-index mutation-index?]
-                 [counter (mutation-index)
-                          (and/c counter?
-                                 (<=/c mutation-index))])
-                (#:equivalent? [equivalent? (any/c any/c . -> . boolean?)])
-                [result mutated?])]
+           ({any/c
+             any/c
+             mutation-index?
+             counter?}
+            {#:equivalent? (any/c any/c . -> . boolean?)}
+            . ->* .
+            mutated?)]
           ;; Mutation sequence applier
           [apply-mutators (any/c
                            (listof mutator/c)
@@ -158,6 +157,10 @@
              (mutate v mutation-index current-counter))
            current-value)))
 
+;; A limitation of `make-guarded-mutator` is that you can't use it if your
+;; mutator needs to guard any syntax from mutation, because the application of
+;; `maybe-mutate` is out of your control, and guarding must be done outside of
+;; that.
 (define (make-guarded-mutator should-apply? apply)
   (λ (orig-v mutation-index counter)
     (if (and (<= counter mutation-index)
