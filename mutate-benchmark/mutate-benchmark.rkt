@@ -9,12 +9,12 @@
          "../mutate/mutator-lib.rkt"
          "../mutate/mutators.rkt")
 
-(define mutate-datum (compose-mutators arithmetic-op-swap
-                                       boolean-op-swap
-                                       class-method-publicity-swap
-                                       delete-super-new
-                                       data-accessor-swap
-                                       replace-constants))
+(define mutate-atom (compose-mutators arithmetic-op-swap
+                                      boolean-op-swap
+                                      class-method-publicity-swap
+                                      delete-super-new
+                                      data-accessor-swap
+                                      replace-constants))
 
 (define (mutate-benchmark program-stx mutation-index
                         #:top-level-select top-level-selector
@@ -30,7 +30,7 @@
                        rearrange-positional-exprs
                        add-extra-class-method
                        replace-ids-with-top-level-defs
-                       mutate-datum)
+                       mutate-atom)
      #:filter expression-filter))
   (define mutate-program
     (make-program-mutator mutate-expr
@@ -50,21 +50,12 @@
            "../mutate/mutators.rkt"
            "../mutate/top-level-selectors.rkt")
 
-  (define (make-filtered-expr-mutator [filter (const #t)])
-    (make-expr-mutator
-     (compose-mutators delete-begin-result-expr
-                       negate-conditionals
-                       replace-class-parent
-                       swap-class-initializers
-                       rearrange-positional-exprs
-                       add-extra-class-method
-                       mutate-datum)
-     #:filter filter))
-  (define mutate-expr (make-filtered-expr-mutator))
-
-  (define mutate-program
-    (make-program-mutator mutate-expr
-                          select-define/contract))
+  (define (mutate-program stx mutation-index
+                          #:top-level-select [top-level-selector select-define/contract]
+                          #:expression-filter [filter (const #t)])
+    (mutate-benchmark stx mutation-index
+                      #:top-level-select top-level-selector
+                      #:expression-filter filter))
 
   (define mutate-syntax
     (syntax-only mutate-program))
@@ -1345,10 +1336,8 @@
               (define (f x)
                 (- y y))}])
      (λ (stx mi)
-       (define mutate-syntax
-         (syntax-only (make-program-mutator mutate-expr
-                                            select-any-define)))
-       (mutate-syntax stx mi)))
+       (mutate-syntax stx mi
+                      #:top-level-select select-any-define)))
     (test-exn mutation-index-exception?
               (mutate-program #'{(foobar)
                                  (define (f x)
@@ -1374,14 +1363,67 @@
                 (define y (+ x x))
                 (- y y))}])
      (λ (stx mi)
-       (define mutate-expr (make-filtered-expr-mutator (λ (e)
-                                                         (syntax-parse e
-                                                           [({~datum :} . _) #f]
-                                                           [else #t]))))
-       (define mutate-syntax
-         (syntax-only (make-program-mutator mutate-expr
-                                            select-any-define)))
-       (mutate-syntax stx mi)))))
+       (mutate-syntax stx mi
+                      #:top-level-select select-any-define
+                      #:expression-filter (λ (e)
+                                            (syntax-parse e
+                                              [({~datum :} . _) #f]
+                                              [else #t]))))))
+
+  (test-begin
+    #:name top-level-id-swap
+    (test-mutation/sequence
+     #'{(require foobar)
+        (define (f x) (add1 x))
+        (define (g x) (if x f g))
+        (define (main) (if #t (f x) (g x)))}
+     `([0 ,#'{(require foobar)
+              (define (f x) (sub1 x))
+              (define (g x) (if x f g))
+              (define (main) (if #t (f x) (g x)))}]
+       [1 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if (not x) f g))
+              (define (main) (if #t (f x) (g x)))}]
+       [2 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x g g))
+              (define (main) (if #t (f x) (g x)))}]
+       [3 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x main g))
+              (define (main) (if #t (f x) (g x)))}]
+       [4 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f f))
+              (define (main) (if #t (f x) (g x)))}]
+       [5 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f main))
+              (define (main) (if #t (f x) (g x)))}]
+       [6 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f g))
+              (define (main) (if (not #t) (f x) (g x)))}]
+       [7 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f g))
+              (define (main) (if #t (g x) (g x)))}]
+       [8 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f g))
+              (define (main) (if #t (main x) (g x)))}]
+       [9 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f g))
+              (define (main) (if #t (f x) (f x)))}]
+       [10 ,#'{(require foobar)
+              (define (f x) (add1 x))
+              (define (g x) (if x f g))
+              (define (main) (if #t (f x) (main x)))}])
+     (λ (stx mi)
+       (mutate-syntax stx mi
+                      #:top-level-select select-any-define)))))
 
 ;; Potential mutations that have been deferred:
 ;; - (hash a b ...) ~> (make-hash (list (cons a b) ...))

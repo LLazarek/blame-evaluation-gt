@@ -559,6 +559,7 @@
       (define (replace-with-top-level-id stx mutation-index counter)
         (syntax-parse stx
           [ref:id
+           #:when (member #'ref all-top-level-identifiers free-identifier=?)
            (maybe-mutate (attribute ref)
                          top-level-id
                          mutation-index
@@ -566,8 +567,10 @@
           [else
            (no-mutation stx mutation-index counter)]))
       replace-with-top-level-id))
-  (apply compose-mutators
-         top-level-id-swap-mutators))
+  (match top-level-id-swap-mutators
+    ['()  no-mutation]
+    [else (apply compose-mutators
+                 top-level-id-swap-mutators)]))
 
 (define top-level-definitions
   (syntax-parser
@@ -596,18 +599,30 @@
         #'{(require foobar)
            (define (f x) x)
            (+ 2 2)
-           (define (g a b) (/ a b))})))
+           (define (g a b) (/ (f a) b))})))
     (test-mutator* top-level-id-swap-mutator
                    #'x
-                   (list #'f
-                         #'g
-                         #'x))
+                   (list #'x))
     (test-mutator* top-level-id-swap-mutator
                    #'a
-                   (list #'f
-                         #'g
-                         #'a))
+                   (list #'a))
     (test-mutator* top-level-id-swap-mutator
                    #'f
                    (list #'g
-                         #'f))))
+                         #'f))
+    (test-mutator* top-level-id-swap-mutator
+                   #'g
+                   (list #'f
+                         #'g))
+
+    (ignore
+     (define top-level-id-swap-mutator/no-ids
+       (make-top-level-id-swap-mutator
+        #'{(require foobar)
+           (+ 2 y)})))
+    (test-mutator* top-level-id-swap-mutator/no-ids
+                   #'x
+                   (list #'x))
+    (test-mutator* top-level-id-swap-mutator/no-ids
+                   #'y
+                   (list #'y))))
