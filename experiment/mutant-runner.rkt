@@ -9,7 +9,6 @@
          racket/format
          "../runner/mutation-runner.rkt"
          "../runner/program.rkt"
-         "../mutate/mutate.rkt"
          "../runner/unify-program.rkt")
 
 (define (fail fmt-str . fmt-args)

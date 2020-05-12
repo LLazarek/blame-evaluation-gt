@@ -5,7 +5,9 @@
           [top-level-selector/c    contract?]
           [select-all              top-level-selector/c]
           [select-define/contract  top-level-selector/c]
-          [select-any-define       top-level-selector/c]))
+          [select-any-define       top-level-selector/c]
+
+          [leftmost-identifier-in  (syntax? . -> . symbol?)]))
 
 (require racket/bool
          racket/contract/region

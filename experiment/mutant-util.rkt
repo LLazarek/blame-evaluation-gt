@@ -125,6 +125,8 @@
   (require ruinit
            "mutant-factory-test-helper.rkt")
 
+  (define main-mutation-count 17)
+  (define second-mutation-count 2)
   (test-begin/with-env
    #:name max-mutation-index-exceeded?
 
@@ -139,19 +141,19 @@
     ([rt-main (in-list (list rt-main/t rt-main/ut))]
      [rt-second (in-list (list rt-second/t rt-second/ut))])
     (and/test/message
-     [(for/and/test ([i (in-range 15)])
+     [(for/and/test ([i (in-range main-mutation-count)])
                     (extend-test-message
                      (not (max-mutation-index-exceeded? rt-main i))
                      @~a{(stopped at index @i)}))
       @~a{Not all expected mutations of @rt-main happening}]
-     [(max-mutation-index-exceeded? rt-main 15)
+     [(max-mutation-index-exceeded? rt-main main-mutation-count)
       @~a{@rt-main has more mutations than expected}]
-     [(for/and/test ([i (in-range 2)])
+     [(for/and/test ([i (in-range second-mutation-count)])
                     (extend-test-message
                      (not (max-mutation-index-exceeded? rt-second i))
                      @~a{(stopped at index @i)}))
       @~a{@rt-second doesn't have the expected mutations}]
-     [(max-mutation-index-exceeded? rt-second 2)
+     [(max-mutation-index-exceeded? rt-second second-mutation-count)
       @~a{@rt-second has more mutations than expected}])))
 
   ;; equiv to above, but as a stream
@@ -159,6 +161,6 @@
    #:name in-mutation-indices
    (ignore (define bench (read-benchmark realistic-test-bench)))
    (test-equal? (stream->list (in-mutation-indices "main.rkt" bench))
-                (build-list 15 values))
+                (build-list main-mutation-count values))
    (test-equal? (stream->list (in-mutation-indices "second.rkt" bench))
-                (build-list 2  values))))
+                (build-list second-mutation-count values))))

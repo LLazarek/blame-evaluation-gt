@@ -5,7 +5,6 @@
          "../runner/program.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
-         "../mutate/mutate.rkt"
          "../runner/unify-program.rkt"
          "../experiment/blame-trail-data.rkt"
          "../experiment/mutant-util.rkt"

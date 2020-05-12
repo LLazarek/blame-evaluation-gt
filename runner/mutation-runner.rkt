@@ -12,7 +12,10 @@
          syntax/parse
          syntax/strip-context
          syntax/location
-         "../mutate/mutate.rkt"
+         "../mutate-benchmark/mutate-benchmark.rkt"
+         "../mutate/mutated.rkt"
+         "../mutate/mutate-program.rkt"
+         "../mutate/top-level-selectors.rkt"
          "sandbox-runner.rkt"
          "program.rkt"
          "instrumented-runner.rkt"
@@ -56,10 +59,12 @@
     #:datum-literals [module]
     [(module name lang {~and mod-body (mod-begin body ...)})
      #:do [(define program-stx #'{body ...})
-           (match-define (mutated-program program-stx/mutated mutated-id)
-             (mutate-program program-stx mutation-index
-                             #:top-level-select mutate-top-level-selector
-                             #:expression-filter mutate-expression-filter))]
+           (match-define (mutated (mutated-program program-stx/mutated
+                                                   mutated-id)
+                                  _)
+             (mutate-benchmark program-stx mutation-index
+                               #:top-level-select mutate-top-level-selector
+                               #:expression-filter mutate-expression-filter))]
      #:with program/mutated program-stx/mutated
      #:with mutated-mod-stx
      (datum->syntax #'mod-body
@@ -577,7 +582,7 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    main
-                                   2
+                                   3
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]

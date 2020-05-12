@@ -545,37 +545,60 @@
    #:name test:full-run
 
    ;; Mutations expected:
-   ;; - Mutations: 17
-   ;;   - main.rkt: 15
-   ;;     - foo: negate cond (@0), - -> + (@1), * -> / (@2),
-   ;;            3 -> [-3 3.0 0 3+0.0i #f] (@3, 4, 5, 6, 7)
-   ;;     - main: swap bar args (@8),
-   ;;             2 -> [-2 2.0 0 2+0.0i #f] (@ 9, 10, 11, 12, 13),
-   ;;             "yes" -> #"yes" (@14)
+   ;; - Mutations: 19
+   ;;   - main.rkt: 17
+   ;;     - foo: negate cond (@0)
+   ;;            foo -> main
+   ;;            - -> +
+   ;;            * -> /
+   ;;            3 -> [-3
+   ;;                  3.0
+   ;;                  0
+   ;;                  3+0.0i
+   ;;                  #f]
+   ;;     - main: swap bar args (@9)
+   ;;             foo -> main
+   ;;             2 -> [-2
+   ;;                   2.0
+   ;;                   0
+   ;;                   2+0.0i
+   ;;                   #f]
+   ;;             "yes" -> #"yes"
    ;;   - second.rkt: 2
-   ;;     - bar: negate cond (@0), - -> + (@1)
-   ;; - Mutations that make type errors: 11
-   ;;   - main.rkt: 9
-   ;;     - foo: * -> /, 3 -> 3.0, 3 -> 3+0.0i, 3 -> #f
-   ;;     - main: swap bar args, 2 -> 2.0, 2 -> 2+0.0i, 2 -> #f, "yes" -> #"yes"
+   ;;     - bar: negate cond (@0)
+   ;;            - -> +
+   ;; - Mutations that make type errors: 13
+   ;;   - main.rkt: 11
+   ;;     - foo: foo -> main
+   ;;            * -> /
+   ;;            3 -> 3.0
+   ;;            3 -> 3+0.0i
+   ;;            3 -> #f
+   ;;     - main: swap bar args
+   ;;             foo -> main
+   ;;             2 -> 2.0
+   ;;             2 -> 2+0.0i
+   ;;             2 -> #f
+   ;;             "yes" -> #"yes"
    ;;   - second.rkt: 2
-   ;;     - bar: negate cond, - -> +
+   ;;     - bar: negate cond
+   ;;            - -> +
    ;;
-   ;; - Expect 11 decisions to sample (so 11 total files):
-   ;;   - main.rkt @ [2, 4, 6, 7, 8, 10, 12, 13, 14]
-   ;;   - second.rkt @ [0, 1]
+   ;; - Expect 13 decisions to sample (so 13 total files) (below)
    ;; - Expect (sample-size) samples for each
    (ignore
     (define expected-relevant-mutants
-      '(("main.rkt" 2)
-        ("main.rkt" 4)
-        ("main.rkt" 6)
+      '(("main.rkt" 1)
+        ("main.rkt" 3)
+        ("main.rkt" 5)
         ("main.rkt" 7)
         ("main.rkt" 8)
+        ("main.rkt" 9)
         ("main.rkt" 10)
         ("main.rkt" 12)
-        ("main.rkt" 13)
         ("main.rkt" 14)
+        ("main.rkt" 15)
+        ("main.rkt" 16)
 
         ("second.rkt" 0)
         ("second.rkt" 1)))
@@ -683,7 +706,7 @@
 
    ;; check that mixed configurations work as expected:
    ;; this is just one mixed config that I know should produce a ctc violation
-   (test-match (hash-ref data (find-mutant-file "main.rkt" 2))
+   (test-match (hash-ref data (find-mutant-file "main.rkt" 3))
                (list-no-order
                 (struct* blame-trail-summary
                          ([mutants

@@ -3,7 +3,6 @@
 (require "../process-q/interface.rkt"
          "../process-q/functional.rkt"
          "../configurations/configure-benchmark.rkt"
-         "../mutate/mutate.rkt"
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"

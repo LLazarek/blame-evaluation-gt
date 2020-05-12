@@ -3,7 +3,6 @@
 (require "../runner/mutation-runner.rkt"
          "../runner/program.rkt"
          "../runner/unify-program.rkt"
-         "../mutate/mutate.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "../util/optional-contracts.rkt"
