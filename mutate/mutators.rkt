@@ -15,7 +15,9 @@
           [replace-class-parent        mutator/c]
           [swap-class-initializers     mutator/c]
           [rearrange-positional-exprs  mutator/c]
-          [add-extra-class-method      mutator/c]))
+          [add-extra-class-method      mutator/c]
+
+          [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]))
 
 (require racket/class
          racket/contract/region
@@ -547,3 +549,65 @@
                              (field a))
                          #'(class a-parent
                              (field a))))))
+
+(require syntax/parse/lib/function-header)
+(define (make-top-level-id-swap-mutator program-stx)
+  (define all-top-level-identifiers
+    (top-level-definitions program-stx))
+  (define top-level-id-swap-mutators
+    (for/list ([top-level-id (in-list all-top-level-identifiers)])
+      (define (replace-with-top-level-id stx mutation-index counter)
+        (syntax-parse stx
+          [ref:id
+           (maybe-mutate (attribute ref)
+                         top-level-id
+                         mutation-index
+                         counter)]
+          [else
+           (no-mutation stx mutation-index counter)]))
+      replace-with-top-level-id))
+  (apply compose-mutators
+         top-level-id-swap-mutators))
+
+(define top-level-definitions
+  (syntax-parser
+    #:datum-literals [define]
+    [{{~or (define header:function-header . _)
+           (define value-name:id . _)
+           _} ...}
+     (syntax->list #'[header.name ... value-name ...])]))
+
+(module+ test
+  (test-begin
+    #:name top-level-definitions
+    (test-equal? (map syntax->datum
+                      (top-level-definitions
+                       #'{(require foo x y)
+                          (define v 42)
+                          (+ v v)
+                          (define (f x) (define y x) y)
+                          (f v)}))
+                 '(f v)))
+  (test-begin
+    #:name make-top-level-id-swap-mutator
+    (ignore
+     (define top-level-id-swap-mutator
+       (make-top-level-id-swap-mutator
+        #'{(require foobar)
+           (define (f x) x)
+           (+ 2 2)
+           (define (g a b) (/ a b))})))
+    (test-mutator* top-level-id-swap-mutator
+                   #'x
+                   (list #'f
+                         #'g
+                         #'x))
+    (test-mutator* top-level-id-swap-mutator
+                   #'a
+                   (list #'f
+                         #'g
+                         #'a))
+    (test-mutator* top-level-id-swap-mutator
+                   #'f
+                   (list #'g
+                         #'f))))

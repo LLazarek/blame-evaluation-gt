@@ -1,9 +1,9 @@
 #lang at-exp racket/base
 
-(provide make-program-mutator
-         make-filtered-expr-mutator)
+(provide mutate-benchmark)
 
 (require racket/function
+         syntax/parse
          "../mutate/mutate-expr.rkt"
          "../mutate/mutate-program.rkt"
          "../mutate/mutator-lib.rkt"
@@ -16,15 +16,26 @@
                                        data-accessor-swap
                                        replace-constants))
 
-(define (make-filtered-expr-mutator [filter (const #t)])
-  (make-expr-mutator (compose-mutators delete-begin-result-expr
-                                       negate-conditionals
-                                       replace-class-parent
-                                       swap-class-initializers
-                                       rearrange-positional-exprs
-                                       add-extra-class-method
-                                       mutate-datum)
-                     #:filter filter))
+(define (mutate-benchmark program-stx mutation-index
+                        #:top-level-select top-level-selector
+                        #:expression-filter expression-filter)
+  (define replace-ids-with-top-level-defs
+    (make-top-level-id-swap-mutator program-stx))
+  (define mutate-expr
+    (make-expr-mutator
+     (compose-mutators delete-begin-result-expr
+                       negate-conditionals
+                       replace-class-parent
+                       swap-class-initializers
+                       rearrange-positional-exprs
+                       add-extra-class-method
+                       replace-ids-with-top-level-defs
+                       mutate-datum)
+     #:filter expression-filter))
+  (define mutate-program
+    (make-program-mutator mutate-expr
+                          top-level-selector))
+  (mutate-program program-stx mutation-index))
 
 (module+ test
   (require racket
@@ -39,6 +50,16 @@
            "../mutate/mutators.rkt"
            "../mutate/top-level-selectors.rkt")
 
+  (define (make-filtered-expr-mutator [filter (const #t)])
+    (make-expr-mutator
+     (compose-mutators delete-begin-result-expr
+                       negate-conditionals
+                       replace-class-parent
+                       swap-class-initializers
+                       rearrange-positional-exprs
+                       add-extra-class-method
+                       mutate-datum)
+     #:filter filter))
   (define mutate-expr (make-filtered-expr-mutator))
 
   (define mutate-program
