@@ -557,6 +557,7 @@
   (define top-level-id-swap-mutators
     (for/list ([top-level-id (in-list all-top-level-identifiers)])
       (define (replace-with-top-level-id stx mutation-index counter)
+        (log-mutation-type "top-level-id-swap")
         (syntax-parse stx
           [ref:id
            #:when (member #'ref all-top-level-identifiers free-identifier=?)
