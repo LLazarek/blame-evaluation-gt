@@ -27,19 +27,13 @@
 (define (mutate-top-level-selector stx)
   (syntax-parse stx
     #:datum-literals [define :]
-    [({~and define def} id/sig : type body ...)
+    [({~and define def} id/sig
+                        {~optional {~seq : type}}
+                        body ...)
      (define body-stxs (syntax-e (syntax/loc stx (body ...))))
      (define (reconstruct-definition body-stxs/mutated)
        (quasisyntax/loc stx
-         (def id/sig : type #,@body-stxs/mutated)))
-     (values body-stxs
-             (leftmost-identifier-in #'id/sig)
-             reconstruct-definition)]
-    [({~and define def} id/sig body ...)
-     (define body-stxs (syntax-e (syntax/loc stx (body ...))))
-     (define (reconstruct-definition body-stxs/mutated)
-       (quasisyntax/loc stx
-         (def id/sig #,@body-stxs/mutated)))
+         (def id/sig {~? {~@ : type}} #,@body-stxs/mutated)))
      (values body-stxs
              (leftmost-identifier-in #'id/sig)
              reconstruct-definition)]
