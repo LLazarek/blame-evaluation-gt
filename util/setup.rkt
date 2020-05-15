@@ -11,7 +11,7 @@
     "pfds"))
 
 (define racket-download-url
-  "https://mirror.racket-lang.org/installers/7.6/racket-7.6-x86_64-linux-cs.sh")
+  "https://mirror.racket-lang.org/installers/7.7/racket-7.7-x86_64-linux-cs.sh")
 
 ;; ==================================================
 ;; ==================================================
