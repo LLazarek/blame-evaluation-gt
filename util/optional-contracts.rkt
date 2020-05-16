@@ -1,16 +1,34 @@
 #lang racket/base
 
-(provide define/contract)
+(provide (rename-out
+          [optional:define/contract define/contract]
+          [optional:contract-out contract-out]))
 
-(require syntax/parse/define
-         (prefix-in r/c: racket/contract)
-         (for-syntax racket/base))
+(require (for-syntax racket/base
+                     racket/provide-transform)
+         racket/contract/base
+         racket/contract/region
+         syntax/parse/define)
 
 (define-for-syntax ENABLE-CONTRACTS #f)
 
-(define-simple-macro (define/contract id/sig ctc . body)
+(define-simple-macro (optional:define/contract id/sig ctc . body)
   #:with [definer {~optional maybe-ctc}]
   (if ENABLE-CONTRACTS
-      #'(r/c:define/contract ctc)
+      #'(define/contract ctc)
       #'(define))
   (definer id/sig {~? maybe-ctc} . body))
+
+
+(define-syntax optional:contract-out
+  (make-provide-pre-transformer
+   (λ (stx modes)
+     (syntax-parse stx
+       [(_ {~and clause [id _]} ...)
+        (pre-expand-export
+         (if ENABLE-CONTRACTS
+             (syntax/loc this-syntax
+               (contract-out clause ...))
+             (syntax/loc this-syntax
+               (contract-out [id any/c] ...)))
+         modes)]))))

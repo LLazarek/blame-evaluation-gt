@@ -1,6 +1,9 @@
 #lang racket/base
 
-(require racket/contract/base)
+(require "../util/optional-contracts.rkt"
+         (except-in racket/contract/base
+                    contract-out))
+
 (define A any/c) ;; Instead of parametric ctcs
 (define B any/c)
 (provide mutation-index?
@@ -25,7 +28,6 @@
 
 (require (for-syntax syntax/parse
                      racket/base)
-         racket/contract/region
          racket/match
          racket/math)
 

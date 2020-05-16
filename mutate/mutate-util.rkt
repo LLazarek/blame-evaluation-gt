@@ -1,6 +1,6 @@
 #lang at-exp racket/base
 
-(require racket/contract/base)
+(require "../util/optional-contracts.rkt")
 
 (provide (contract-out
           [compound-expr? (syntax? . -> . boolean?)]
@@ -16,8 +16,7 @@
                              . -> .
                              (mutated/c (listof syntax?)))]))
 
-(require racket/contract/region
-         racket/list
+(require racket/list
          racket/match
          syntax/parse
          "mutated.rkt"

@@ -1,6 +1,9 @@
 #lang at-exp racket/base
 
-(require racket/contract/base)
+(require "../util/optional-contracts.rkt"
+         (except-in racket/contract
+                    define/contract
+                    contract-out))
 (provide (contract-out
           [top-level-selector/c    contract?]
           [select-all              top-level-selector/c]
@@ -10,7 +13,6 @@
           [leftmost-identifier-in  (syntax? . -> . symbol?)]))
 
 (require racket/bool
-         racket/contract/region
          racket/format
          racket/function
          racket/list

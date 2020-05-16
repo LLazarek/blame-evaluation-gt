@@ -1,6 +1,6 @@
 #lang at-exp racket/base
 
-(require racket/contract/base)
+(require "../util/optional-contracts.rkt")
 (provide (contract-out
           [arithmetic-op-swap          mutator/c]
           [boolean-op-swap             mutator/c]
@@ -20,7 +20,6 @@
           [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]))
 
 (require racket/class
-         racket/contract/region
          racket/function
          racket/match
          syntax/parse

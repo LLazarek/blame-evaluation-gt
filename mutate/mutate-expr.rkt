@@ -1,6 +1,6 @@
 #lang at-exp racket/base
 
-(require racket/contract/base)
+(require "../util/optional-contracts.rkt")
 
 (provide (contract-out
           [make-expr-mutator ({mutator/c}

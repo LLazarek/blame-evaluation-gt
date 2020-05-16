@@ -1,6 +1,8 @@
 #lang at-exp racket/base
 
-(require racket/contract/base)
+(require "../util/optional-contracts.rkt"
+         (except-in racket/contract/base
+                    contract-out))
 
 (provide (contract-out
           [make-program-mutator ({mutator/c}
