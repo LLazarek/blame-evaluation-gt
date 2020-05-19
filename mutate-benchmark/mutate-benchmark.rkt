@@ -18,7 +18,7 @@
 
 (define (mutate-benchmark program-stx mutation-index
                         #:top-level-select top-level-selector
-                        #:expression-filter expression-filter)
+                        #:expression-select expression-selector)
   (define replace-ids-with-top-level-defs
     (make-top-level-id-swap-mutator program-stx))
   (define mutate-expr
@@ -31,7 +31,7 @@
                        add-extra-class-method
                        replace-ids-with-top-level-defs
                        mutate-atom)
-     #:filter expression-filter))
+     #:select expression-selector))
   (define mutate-program
     (make-program-mutator mutate-expr
                           top-level-selector))
@@ -48,14 +48,15 @@
            "../mutate/mutate-test-common.rkt"
            "../mutate/mutator-lib.rkt"
            "../mutate/mutators.rkt"
-           "../mutate/top-level-selectors.rkt")
+           "../mutate/top-level-selectors.rkt"
+           "../mutate/expression-selectors.rkt")
 
   (define (mutate-program stx mutation-index
                           #:top-level-select [top-level-selector select-define/contract]
-                          #:expression-filter [filter (const #t)])
+                          #:expression-select [select select-any-expr])
     (mutate-benchmark stx mutation-index
                       #:top-level-select top-level-selector
-                      #:expression-filter filter))
+                      #:expression-select select))
 
   (define mutate-syntax
     (syntax-only mutate-program))
@@ -1348,6 +1349,28 @@
     #:name expr-filtering
     (test-mutation/sequence
      #'{(: f (-> Number Number))
+        (define/contract (f x) any/c
+          (: y Number)
+          (define y (+ x x))
+          (+ y y))}
+     `([0 ,#'{(: f (-> Number Number))
+              (define/contract (f x) any/c
+                (: y Number)
+                (define y (- x x))
+                (+ y y))}]
+       [1 ,#'{(: f (-> Number Number))
+              (define/contract (f x) any/c
+                (: y Number)
+                (define y (+ x x))
+                (- y y))}])
+     (λ (stx mi)
+       (mutate-syntax stx mi
+                      #:expression-select select-exprs-as-if-untyped))))
+
+  (test-begin
+    #:name expr-filtering+top-level-selection
+    (test-mutation/sequence
+     #'{(: f (-> Number Number))
         (define (f x)
           (: y Number)
           (define y (+ x x))
@@ -1365,10 +1388,7 @@
      (λ (stx mi)
        (mutate-syntax stx mi
                       #:top-level-select select-any-define
-                      #:expression-filter (λ (e)
-                                            (syntax-parse e
-                                              [({~datum :} . _) #f]
-                                              [else #t]))))))
+                      #:expression-select select-exprs-as-if-untyped))))
 
   (test-begin
     #:name top-level-id-swap

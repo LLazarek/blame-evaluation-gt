@@ -36,7 +36,7 @@
 
 (define-simple-test (test-programs-equal? actual expected)
   #:fail-message @~a{
-                     Programs are not equal. Diff (expected <):
+                     Programs are not equal. Diff (expected >):
                      @(diff-programs/string actual expected)
                      }
   (programs-equal? actual expected))

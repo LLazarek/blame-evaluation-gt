@@ -16,6 +16,7 @@
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
          "../mutate/top-level-selectors.rkt"
+         "../mutate/expression-selectors.rkt"
          "sandbox-runner.rkt"
          "program.rkt"
          "instrumented-runner.rkt"
@@ -39,14 +40,6 @@
              reconstruct-definition)]
     [_ (values #f #f #f)]))
 
-(define mutate-expression-filter (λ (e)
-                                   (syntax-parse e
-                                     ;; Ignore expressions with `:` anywhere.
-                                     ;; e.g. syntax of for contains : not at the
-                                     ;; head of the expr
-                                     [(_ ... {~datum :} _ ...) #f]
-                                     [else #t])))
-
 ;; Produce the mutated syntax for the module at the given path
 (define (mutate-module module-stx mutation-index)
   (syntax-parse module-stx
@@ -58,7 +51,7 @@
                                   _)
              (mutate-benchmark program-stx mutation-index
                                #:top-level-select mutate-top-level-selector
-                               #:expression-filter mutate-expression-filter))]
+                               #:expression-select select-exprs-as-if-untyped))]
      #:with program/mutated program-stx/mutated
      #:with mutated-mod-stx
      (datum->syntax #'mod-body
@@ -815,17 +808,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "a.rkt"]))))))
-
-  (test-begin
-    #:name mutate-expression-filter
-    (mutate-expression-filter #'(+ 2 2))
-    (not (mutate-expression-filter #'(: foo Value)))
-    (not (mutate-expression-filter #'[element-in-for : Type (in-list l)]))
-    ;; but do descend into the rest of the for
-    (mutate-expression-filter #'(for ([x : Type (in-list l)]) x))
-    ;; or the clauses
-    (mutate-expression-filter #'([x : Type (in-list l)]))))
+                                               [blamed "a.rkt"])))))))
 
 
 ;; for debugging

@@ -1,6 +1,8 @@
 #lang at-exp racket/base
 
-(require "../util/optional-contracts.rkt")
+(require "../util/optional-contracts.rkt"
+         (except-in racket/contract/base
+                    contract-out))
 (provide (contract-out
           [arithmetic-op-swap          mutator/c]
           [boolean-op-swap             mutator/c]

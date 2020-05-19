@@ -1,19 +1,23 @@
 #lang at-exp racket/base
 
-(require "../util/optional-contracts.rkt")
+(require "../util/optional-contracts.rkt"
+         (except-in racket/contract/base
+                    contract-out))
 
 (provide (contract-out
           [make-expr-mutator ({mutator/c}
-                              {#:filter (syntax? . -> . boolean?)}
+                              {#:select expression-selector/c}
                               . ->* .
                               mutator/c)]
           [mutation-guard    (syntax? . -> . syntax?)]
           [mutation-guarded? (syntax? . -> . boolean?)]))
 
 (require racket/function
+         racket/match
          "mutate-util.rkt"
          "mutated.rkt"
-         "mutator-lib.rkt")
+         "mutator-lib.rkt"
+         "expression-selectors.rkt")
 
 (define stx-prop:mutation-guarded? 'mutation-guarded?)
 (define (mutation-guard stx)
@@ -22,35 +26,38 @@
   (syntax-property stx stx-prop:mutation-guarded?))
 
 (define (make-expr-mutator mutator
-                          #:filter [can-mutate? (const #t)])
-  (define (should-mutate? expr)
+                           #:select [select-expr select-any-expr])
+  (define (select? expr)
     (and (not (mutation-guarded? expr))
-         (can-mutate? expr)))
+         (select-expr expr)))
 
   (define (mutate-expr stx mutation-index counter)
-    (cond [(and (<= counter mutation-index)
-                (should-mutate? stx))
-           (mdo (count-with [__ counter])
-                (def outer-level-mutated-stx (mutator stx mutation-index __))
-                (def result
-                  (cond [(and (compound-expr? outer-level-mutated-stx)
-                              (should-mutate? outer-level-mutated-stx))
-                         (mdo* (def inner-parts-mutated-stx-split
-                                 (mutate-in-seq (syntax->list outer-level-mutated-stx)
-                                                mutation-index
-                                                __
-                                                mutate-expr))
-                               [return
-                                (datum->syntax stx
-                                               inner-parts-mutated-stx-split
-                                               stx
-                                               stx)])]
-                        [else (no-mutation outer-level-mutated-stx
-                                           mutation-index
-                                           __)]))
-                [return result])]
-          [else
-           (no-mutation stx mutation-index counter)]))
+    (match (and (<= counter mutation-index)
+                (select? stx))
+      [(list selected-stx reconstruct-original-stx)
+       (mdo (count-with [__ counter])
+            (def outer-level-mutated-stx
+              (mutator selected-stx mutation-index __))
+            (def result
+              (cond
+                [(and (compound-expr? outer-level-mutated-stx)
+                      (not (mutation-guarded? outer-level-mutated-stx)))
+                 (mdo* (def inner-parts-mutated-stx-split
+                         (mutate-in-seq (syntax->list outer-level-mutated-stx)
+                                        mutation-index
+                                        __
+                                        mutate-expr))
+                       [return
+                        (datum->syntax stx
+                                       inner-parts-mutated-stx-split
+                                       stx
+                                       stx)])]
+                [else (no-mutation outer-level-mutated-stx
+                                   mutation-index
+                                   __)]))
+            [return (reconstruct-original-stx result)])]
+      [else
+       (no-mutation stx mutation-index counter)]))
 
   mutate-expr)
 
@@ -155,9 +162,9 @@
     (ignore
      (define replace-datums-not-under-define-with-0
        (make-expr-mutator replace-any-datum-with-0
-                          #:filter (syntax-parser
+                          #:select (syntax-parser
                                      [({~datum define} . _) #f]
-                                     [else #t]))))
+                                     [else (list this-syntax values)]))))
     (test-mutator* replace-datums-not-under-define-with-0
                    #'(#%module-begin
                       (define x 5)
