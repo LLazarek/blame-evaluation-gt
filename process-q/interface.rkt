@@ -56,7 +56,10 @@
              [will process-will/c]))
 
 (define empty?/c (process-Q? . -> . boolean?))
-(define enq/c (process-Q? (-> process-info/c) any/c ... . -> . process-Q?))
+(define enq/c ({process-Q? (-> process-info/c)}
+               {any/c}
+               . ->* .
+               process-Q?))
 (define wait/c (process-Q? . -> . (and/c process-Q? process-Q-empty?)))
 (define active-count/c (process-Q? . -> . natural?))
 (define waiting-count/c (process-Q? . -> . natural?))

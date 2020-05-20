@@ -311,7 +311,9 @@
                     (struct-copy run-status
                                  (dead-mutant-process-result dead-e-proc/blame-e)
                                  [blamed "../base/csp.rkt"])]))
-    ((make-blame-following-will/fallback (λ _ (set-box! enqueued 'fallback)))
+    ((make-blame-following-will/fallback (λ (q _)
+                                           (set-box! enqueued 'fallback)
+                                           q))
      mock-q
      dead-e-proc/blame-lib))
    (extend-test-message

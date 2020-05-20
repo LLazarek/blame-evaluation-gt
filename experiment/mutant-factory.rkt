@@ -628,7 +628,8 @@ Predecessor (id [~a]) blamed ~a and had config:
             @~v[dead-succ-config]
 
             Blamed: @(run-status-blamed result)
-            })])))
+            })
+       current-process-q])))
 
 (define/contract (make-blame-following-will/fallback no-blame-fallback)
   (mutant-will/c . -> . mutant-will/c)

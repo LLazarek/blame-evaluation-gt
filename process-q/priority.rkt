@@ -53,7 +53,7 @@
        (zero? (priority-process-Q-waiting-count q))))
 
 ;; start-process should return a process-info?
-(define (enq-process q start-process priority)
+(define (enq-process q start-process [priority 0])
   (sweep-dead/spawn-new-processes
    (struct-copy priority-process-Q q
                 [waiting (PQ:insert (process start-process priority)
