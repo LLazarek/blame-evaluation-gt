@@ -26,6 +26,14 @@
   (list expr
         identity))
 
+(define-splicing-syntax-class type-annotation
+  #:datum-literals [:]
+  #:attributes [(annotation-parts 1)]
+  [pattern {~seq : T}
+           #:with [annotation-parts ...] #'[: T]]
+  [pattern (: e ...)
+           #:with [annotation-parts ...] #'[(: e ...)]])
+
 ;; If `expr` contains no type annotation subexprs, select the expr as-is.
 ;; If `expr` contains type annotations, select all subexprs of `expr` not
 ;; associated with the type annotations; the reconstructor puts the annotations
@@ -58,10 +66,10 @@
            (λ (new-e)
              (quasisyntax/loc expr
                (the-annotation-thing #,new-e T ...))))]
-    [({~and e-1 {~not :}}
+    [({~and e-1 {~not {~or* : (: . _)}}}
       ...+
-      {~seq : T
-            {~and e-i {~not :}} ...}
+      {~seq annot:type-annotation
+            {~and e-i {~not {~or* : (: . _)}}} ...}
       ...+)
      (define e-1-count (length (attribute e-1)))
      (define e-i-counts (map length (attribute e-i)))
@@ -94,7 +102,7 @@
         (with-syntax ([[mutated-e-1 ...] mutated-e-1s]
                       [[[mutated-e-i ...] ...] mutated-e-is])
           (syntax/loc expr
-            (mutated-e-1 ... {~@ : T mutated-e-i ...} ...)))))]
+            (mutated-e-1 ... {~@ annot.annotation-parts ... mutated-e-i ...} ...)))))]
     [{~or* atom
            ({~and e-1 {~not :}} ...)}
      #:when (or (not (attribute atom))
@@ -164,6 +172,9 @@
                        (displayln v)))
     (test-selector select-exprs-as-if-untyped
                    #'(define (f [x : T]) : R (+ x 2))
+                   #'(define (f [x : T]) (+ x 2)))
+    (test-selector select-exprs-as-if-untyped
+                   #'(define (f [x : T]) (: y R) (+ x 2))
                    #'(define (f [x : T]) (+ x 2))))
 
   (test-begin
