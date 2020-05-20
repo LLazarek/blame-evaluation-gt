@@ -62,7 +62,7 @@
       ...+
       {~seq : T
             {~and e-i {~not :}} ...}
-      ...)
+      ...+)
      (define e-1-count (length (attribute e-1)))
      (define e-i-counts (map length (attribute e-i)))
      (list
@@ -95,8 +95,10 @@
                       [[[mutated-e-i ...] ...] mutated-e-is])
           (syntax/loc expr
             (mutated-e-1 ... {~@ : T mutated-e-i ...} ...)))))]
-    [atom
-     #:when (false? (syntax->list #'atom))
+    [{~or* atom
+           ({~and e-1 {~not :}} ...)}
+     #:when (or (not (attribute atom))
+                (false? (syntax->list #'atom)))
      (list this-syntax
            identity)]
     [other
@@ -128,6 +130,9 @@
     (test-selector select-exprs-as-if-untyped
                    #'42
                    #'42)
+    (test-selector select-exprs-as-if-untyped
+                   #'()
+                   #'())
     (test-selector select-exprs-as-if-untyped
                    #'(: a T)
                    #f)
