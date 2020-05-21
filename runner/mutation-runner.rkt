@@ -830,9 +830,9 @@
     (define-values (mutated-program-stx mutated-id)
       (mutate-module orig-module-stx mutation-index))
     (printf "--------------------\nMutated: ~a\n" mutated-id)
-    (displayln (dumb-diff-lines/string
-                (pretty-format (syntax->datum orig-module-stx))
-                (pretty-format (syntax->datum mutated-program-stx)))))
+    (dumb-diff-lines/string
+     (pretty-format (syntax->datum orig-module-stx))
+     (pretty-format (syntax->datum mutated-program-stx))))
   (define (mutant-count module-to-mutate)
     (define module-stx (read-module module-to-mutate))
     (let next-mutant ([index 0])

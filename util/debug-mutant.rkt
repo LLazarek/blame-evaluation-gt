@@ -41,6 +41,7 @@
                       index
                       identifier
                       #:diff-mutant? [diff-mutant? #f]
+                      #:stop-diff-early? [stop-diff-early? #f]
                       #:run? [run? #f]
                       #:run-process? [run-via-process? #f]
                       #:write-modules-to [dump-dir-name #f]
@@ -73,7 +74,20 @@
          }))
 
   (when diff-mutant?
-    (diff-mutation the-module-to-mutate index))
+    (define diff (diff-mutation the-module-to-mutate index))
+    (if stop-diff-early?
+        (for/fold ([after-ctx #f])
+                  ([line (in-list (string-split diff "\n"))]
+                   #:break (and after-ctx
+                                (> after-ctx 3)))
+          (displayln line)
+          (match* {after-ctx line}
+            [{#f (regexp "^[<>]")}
+             0]
+            [{(? integer? n) _}
+             (add1 n)]
+            [{_ _} #f]))
+        (displayln diff)))
   (when (or run?
             run-via-process?)
     (with-handlers ([exn:fail?
