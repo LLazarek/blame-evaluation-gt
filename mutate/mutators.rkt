@@ -574,13 +574,22 @@
     [else (apply compose-mutators
                  top-level-id-swap-mutators)]))
 
+;; Analagous to `function-header` but:
+;; - matches for plain ids as well as function headers
+;; - doesn't check the shape of arguments, so that it can recognize headers with
+;;   type annotations too
+(define-syntax-class simple-function-or-value-header
+  #:attributes [name]
+  (pattern {(~or header:simple-function-or-value-header name*:id) . _}
+           #:attr name   #'{~? header.name name*})
+  (pattern name:id))
+
 (define top-level-definitions
   (syntax-parser
     #:datum-literals [define]
-    [{{~or (define header:function-header . _)
-           (define value-name:id . _)
+    [{{~or (define header:simple-function-or-value-header . _)
            _} ...}
-     (syntax->list #'[header.name ... value-name ...])]))
+     (syntax->list #'[header.name ...])]))
 
 (module+ test
   (test-begin
@@ -592,7 +601,29 @@
                           (+ v v)
                           (define (f x) (define y x) y)
                           (f v)}))
-                 '(f v)))
+                 '(v f))
+    (test-equal?
+     (map
+      syntax->datum
+      (top-level-definitions
+       #'{(define (word->hyphenation-points word
+                                            [min-l  default-min-length]
+                                            [min-ll  default-min-left-length]
+                                            [min-rl  default-min-right-length])
+            42)}))
+     '(word->hyphenation-points))
+    (test-equal?
+     (map
+      syntax->datum
+      (top-level-definitions
+       #'{(: word->hyphenation-points (->* (String) (Index Index Index) (Listof String)))
+          (define (word->hyphenation-points word
+                                            [min-l : Index default-min-length]
+                                            [min-ll : Index default-min-left-length]
+                                            [min-rl : Index default-min-right-length])
+            (: add-no-hyphen-zone (-> (Listof Index) (Listof Integer)))
+            42)}))
+     '(word->hyphenation-points)))
   (test-begin
     #:name make-top-level-id-swap-mutator
     (ignore
