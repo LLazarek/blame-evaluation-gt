@@ -202,10 +202,17 @@
                  Untyped mutates: @untyped-mutated
 
                  })]
-      [anything-else
+      [(result #f #f)
+       (log-parity-info @~a{@complete-msg : has no mutants})
+       (done 'ok)]
+      [(result index anything-else)
        (raise-user-error
         'verify-mutation-parity
-        @~a{Unexpected result from worker: @~v[anything-else]})]))
+        @~a{
+            Unexpected result from worker: @;
+            @benchmark-name module @mod-to-mutate index @index : @;
+            @~v[anything-else]
+            })]))
   (report-parity-results! parity-worker-result)
   current-process-q)
 
