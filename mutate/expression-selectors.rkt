@@ -103,7 +103,9 @@
                       [[[mutated-e-i ...] ...] mutated-e-is])
           (syntax/loc expr
             (mutated-e-1 ... {~@ annot.annotation-parts ... mutated-e-i ...} ...)))))]
-    [{~or* atom
+    ;; ll: this is a bit naive, see tests below for #''(: a b c)
+    [{~or* ({~or* {~literal quote} {~literal quasiquote}} atom)
+           atom
            ({~and e-1 {~not :}} ...)}
      #:when (or (not (attribute atom))
                 (false? (syntax->list #'atom)))
@@ -175,7 +177,22 @@
                    #'(define (f [x : T]) (+ x 2)))
     (test-selector select-exprs-as-if-untyped
                    #'(define (f [x : T]) (: y R) (+ x 2))
-                   #'(define (f [x : T]) (+ x 2))))
+                   #'(define (f [x : T]) (+ x 2)))
+    (test-selector select-exprs-as-if-untyped
+                   #'(define x ':)
+                   #'(define x ':))
+    (test-selector select-exprs-as-if-untyped
+                   #'':
+                   #'':)
+    (test-selector select-exprs-as-if-untyped
+                   #'`:
+                   #'`:)
+    ;; Note that the simple handling of the above makes this sort of thing
+    ;; happen. For now as long as we can reconstruct the sexp I'm going to say
+    ;; it's fine.
+    (test-selector select-exprs-as-if-untyped
+                   #''(: a b c)
+                   #'(quote)))
 
   (test-begin
     #:name select-exprs-as-if-untyped/reconstructor
