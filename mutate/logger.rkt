@@ -2,7 +2,8 @@
 
 (provide log-mutate-info
          log-mutate-debug
-         log-mutation-type)
+         log-mutation-type
+         mutate-logger)
 
 (define-logger mutate)
 
