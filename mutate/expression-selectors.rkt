@@ -74,10 +74,14 @@
      (define e-1-count (length (attribute e-1)))
      (define e-i-counts (map length (attribute e-i)))
      (list
-      #'([e-1 ...] [e-i ...] ...)
+      #'(e-1 ... {~@ <ANN> e-i ...} ...)
       (λ (mutated-stx)
         (syntax-parse mutated-stx
-          [([mutated-e-1 ...] [mutated-e-i ...] ...)
+          #:datum-literals [<ANN>]
+          [({~and mutated-e-1 {~not <ANN>}}
+            ...
+            {~seq <ANN> {~and mutated-e-i {~not <ANN>}} ...}
+            ...)
            (syntax/loc expr
              (mutated-e-1 ... {~@ annot.annotation-parts ... mutated-e-i ...} ...))])))]
     ;; ll: this is a bit naive, see tests below for #''(: a b c)
@@ -140,21 +144,21 @@
                    #'(f a b 42 c))
     (test-selector select-exprs-as-if-untyped
                    #'[a : Natural 42]
-                   #'[[a] [42]])
+                   #'[a <ANN> 42])
     (test-selector select-exprs-as-if-untyped
                    #'(λ ([x : T]) : R (+ 2 2))
-                   #'([λ ([x : T])] [(+ 2 2)]))
+                   #'(λ ([x : T]) <ANN> (+ 2 2)))
     (test-selector select-exprs-as-if-untyped
                    #'(for : T ([v : Boolean (in-list bools)])
                           (displayln v))
-                   #'([for] [([v : Boolean (in-list bools)])
-                             (displayln v)]))
+                   #'(for <ANN> ([v : Boolean (in-list bools)])
+                          (displayln v)))
     (test-selector select-exprs-as-if-untyped
                    #'(define (f [x : T]) : R (+ x 2))
-                   #'([define (f [x : T])] [(+ x 2)]))
+                   #'(define (f [x : T]) <ANN> (+ x 2)))
     (test-selector select-exprs-as-if-untyped
                    #'(define (f [x : T]) (: y R) (+ x 2))
-                   #'([define (f [x : T])] [(+ x 2)]))
+                   #'(define (f [x : T]) <ANN> (+ x 2)))
     (test-selector select-exprs-as-if-untyped
                    #'(define x ':)
                    #'(define x ':))
@@ -172,7 +176,7 @@
     ;; it's fine.
     (test-selector select-exprs-as-if-untyped
                    #''(: a b c)
-                   #'((quote) ())))
+                   #'(quote <ANN>)))
 
   (test-begin
     #:name select-exprs-as-if-untyped/reconstructor
