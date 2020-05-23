@@ -74,35 +74,12 @@
      (define e-1-count (length (attribute e-1)))
      (define e-i-counts (map length (attribute e-i)))
      (list
-      #'(e-1 ... {~@ e-i ...} ...)
+      #'([e-1 ...] [e-i ...] ...)
       (λ (mutated-stx)
-        (define mutated-stx-parts (syntax->list mutated-stx))
-        (unless (= (length mutated-stx-parts)
-                   (apply + (cons e-1-count e-i-counts)))
-          (raise-user-error
-           'select-exprs-as-if-untyped
-           @~a{
-               Assumption violated: @;
-               Mutated syntax given to reconstructor contains @;
-               a different number of subexprs as original stx. @;
-               Original @(length mutated-stx-parts): @expr
-               Mutated  @(apply + (cons e-1-count e-i-counts)): @mutated-stx
-               }))
-        (define-values {mutated-e-1s remaining-stx-parts}
-          (split-at mutated-stx-parts e-1-count))
-        (define mutated-e-is
-          (for/fold ([remaining-stx-parts remaining-stx-parts]
-                     [mutated-e-is empty]
-                     #:result (reverse mutated-e-is))
-                    ([e-i-count (in-list e-i-counts)])
-            (define-values {e-is now-remaining-stx}
-              (split-at remaining-stx-parts e-i-count))
-            (values now-remaining-stx
-                    (cons e-is mutated-e-is))))
-        (with-syntax ([[mutated-e-1 ...] mutated-e-1s]
-                      [[[mutated-e-i ...] ...] mutated-e-is])
-          (syntax/loc expr
-            (mutated-e-1 ... {~@ annot.annotation-parts ... mutated-e-i ...} ...)))))]
+        (syntax-parse mutated-stx
+          [([mutated-e-1 ...] [mutated-e-i ...] ...)
+           (syntax/loc expr
+             (mutated-e-1 ... {~@ annot.annotation-parts ... mutated-e-i ...} ...))])))]
     ;; ll: this is a bit naive, see tests below for #''(: a b c)
     [{~or* ({~or* quote quasiquote} atom)
            atom
@@ -163,21 +140,21 @@
                    #'(f a b 42 c))
     (test-selector select-exprs-as-if-untyped
                    #'[a : Natural 42]
-                   #'[a 42])
+                   #'[[a] [42]])
     (test-selector select-exprs-as-if-untyped
                    #'(λ ([x : T]) : R (+ 2 2))
-                   #'(λ ([x : T]) (+ 2 2)))
+                   #'([λ ([x : T])] [(+ 2 2)]))
     (test-selector select-exprs-as-if-untyped
                    #'(for : T ([v : Boolean (in-list bools)])
                           (displayln v))
-                   #'(for ([v : Boolean (in-list bools)])
-                       (displayln v)))
+                   #'([for] [([v : Boolean (in-list bools)])
+                             (displayln v)]))
     (test-selector select-exprs-as-if-untyped
                    #'(define (f [x : T]) : R (+ x 2))
-                   #'(define (f [x : T]) (+ x 2)))
+                   #'([define (f [x : T])] [(+ x 2)]))
     (test-selector select-exprs-as-if-untyped
                    #'(define (f [x : T]) (: y R) (+ x 2))
-                   #'(define (f [x : T]) (+ x 2)))
+                   #'([define (f [x : T])] [(+ x 2)]))
     (test-selector select-exprs-as-if-untyped
                    #'(define x ':)
                    #'(define x ':))
@@ -195,7 +172,7 @@
     ;; it's fine.
     (test-selector select-exprs-as-if-untyped
                    #''(: a b c)
-                   #'(quote)))
+                   #'((quote) ())))
 
   (test-begin
     #:name select-exprs-as-if-untyped/reconstructor
