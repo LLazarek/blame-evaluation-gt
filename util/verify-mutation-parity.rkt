@@ -181,12 +181,25 @@
         #:logger mutate-logger
         'info
         'mutate))
-    (define mutation
-      (match (regexp-match #px"(?m:mutate: Mutating .*)"
+    (define mutation-str
+      (match (regexp-match #px"(?m:mutate: type: .*\nmutate: Mutating .*)"
                            read-end)
-        [(list str) str]))
+        [(list (regexp (pregexp @~a{
+                                    ^@;
+                                    mutate: type: (\S+)
+                                    mutate: Mutating (.+)@;
+                                    $
+                                    })
+                       (list _
+                             (app bytes->string/utf-8 mutation-type)
+                             (app bytes->string/utf-8 mutation-stx))))
+         ;; (define mutation-stx/no-paths (strip-paths mutation-stx))
+         ;; (if (string-contains? mutation-stx/no-paths ":")
+         ;;     (~a "type " mutation-type)
+         ;;     (~a "mutation " mutation-stx/no-paths))
+         (~a "type " mutation-type)]))
     (list mutated-id
-          (strip-paths mutation)))
+          mutation-str))
 
   (define (strip-paths str)
     (define stx-path-rx @~a{#<syntax:.+\.rkt:\d+:\d+})
