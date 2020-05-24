@@ -182,7 +182,7 @@
         'info
         'mutate))
     (define mutation-str
-      (match (regexp-match #px"(?m:mutate: type: .*\nmutate: Mutating .*)"
+      (match (regexp-match #px"(?m:mutate: type: .*\nmutate: Mutating .*\n)"
                            read-end)
         [(list (regexp (pregexp @~a{
                                     ^@;
@@ -321,10 +321,8 @@
        (done @~a{
                  Typed/untyped disagree in @benchmark-name @;
                  module @mod-to-mutate starting at mutation index @index
-                 Typed mutates:   @(first typed-mutated)
-                 Mutation:        @(second typed-mutated)
-                 Untyped mutates: @(first untyped-mutated)
-                 Mutation:        @(second untyped-mutated)
+                 Typed mutates:   @typed-mutated
+                 Untyped mutates: @untyped-mutated
 
                  })]
       [(result index anything-else)
