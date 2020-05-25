@@ -19,7 +19,8 @@
            (struct-out try-go-lower)
            (struct-out go-lower)
            (struct-out go-higher)
-           (struct-out exhausted))
+           (struct-out exhausted)
+           index-ranges)
 
   (define INDEX-SEARCH-RANGE 20000)
 
@@ -153,11 +154,35 @@
                                 [(? (between/c 2 9) i) (try-go-lower (~a i))]
                                 [(? (</c 2)) (go-higher)]))))
       (test-match (search)
-                  (result 2 "2")))))
+                  (result 2 "2"))))
+
+  (define (time-cost-f index)
+    #;(* index 6.5e-4)
+    (* 0.2536138770204011 (exp (* 1.9720252428451186e-4 index))))
+  (define INDEX-RANGE-DESIRED-SECS (* 10 60))
+  (define index-ranges
+    (let loop ([groups '()]
+               [start 0])
+      (cond [(> start INDEX-SEARCH-RANGE)
+             (reverse (cons (list start +inf.0)
+                            groups))]
+            [else
+             (define new-start
+               (for/fold ([end start]
+                          [time-sum 0]
+                          #:result end)
+                         ([i (in-naturals start)]
+                          #:break (> time-sum INDEX-RANGE-DESIRED-SECS))
+                 (define time (time-cost-f i))
+                 (values i (+ time-sum time))))
+             (loop (cons (list start new-start)
+                         groups)
+                   (add1 new-start))]))))
 
 (module parity-check rscript
   (provide (struct-out no-more-mutants)
-           process-parity-check-main
+           process-parity-check-main/binary-search
+           process-parity-check-main/exhaustive
            mutated-id-for-typed/untyped-agrees?)
 
   (require "../configurations/configure-benchmark.rkt"
@@ -166,6 +191,7 @@
            "../runner/mutation-runner.rkt"
            "../runner/program.rkt"
            "../util/path-utils.rkt"
+           "for-first-star.rkt"
            (submod ".." common)
            racket/logging)
 
@@ -248,18 +274,46 @@
         [#t                (go-higher)]
         [(list a b)        (try-go-lower (list a b))]))
     (define search (lowest-upper-bound-binary-search result-for-index))
-    (search))
+    (search #:increase-max? #t))
 
-  (define (process-parity-check-main)
+  (define (parity-check/exhaustive the-benchmark
+                                   the-module-to-mutate
+                                   index-range)
+    (for/first*
+     ([i (apply in-range index-range)])
+     (match (mutated-id-for-typed/untyped-agrees? the-benchmark
+                                                  the-module-to-mutate
+                                                  i)
+       [(no-more-mutants) (result (sub1 i) (exhausted))]
+       [#t #f]
+       [(? list? difference) (result i difference)])))
+
+  (define (process-parity-check-main/binary-search)
     (define a-benchmark (apply benchmark (read)))
     (define a-module-to-mutate (read))
     (define result
       (parity-check/binary-search a-benchmark
                                   a-module-to-mutate))
+    (writeln result))
+
+  (define (process-parity-check-main/exhaustive)
+    (define a-benchmark (apply benchmark (read)))
+    (define a-module-to-mutate (read))
+    (define index-range (read))
+    (define result
+      (parity-check/exhaustive a-benchmark
+                               a-module-to-mutate
+                               index-range))
     (writeln result)))
 
 (define (process-checker-for a-benchmark
-                             mod-to-mutate)
+                             mod-to-mutate
+                             mode
+                             maybe-index-range)
+  (define function-name
+    (match mode
+      ['quick      'process-parity-check-main/binary-search]
+      ['exhaustive 'process-parity-check-main/exhaustive]))
   (match-define (list stdout stdin _ #f ctl)
     (process/ports #f #f (current-error-port)
                    @~a{
@@ -267,7 +321,7 @@
                        -e '(require @;
                             (submod (file "@this-file-path") @;
                                     parity-check))' @;
-                       -e '(process-parity-check-main)'
+                       -e '(@function-name)'
                        }))
   (writeln (match a-benchmark
              [(benchmark t ut base both)
@@ -277,6 +331,9 @@
                     (if both (path->string both) both))])
            stdin)
   (writeln mod-to-mutate stdin)
+  (match mode
+    ['exhaustive (writeln maybe-index-range stdin)]
+    ['quick      (void)])
   (close-output-port stdin)
   (values stdout ctl))
 
@@ -285,17 +342,18 @@
 
 (define-logger parity)
 (define-runtime-path this-file-path "verify-mutation-parity.rkt")
-(struct parity-checker-process (stdout mod-name benchmark-name spawn-ms))
+(struct mod-checker (benchmark-name mod-name id))
+(struct parity-checker-process (stdout
+                                spawn-ms
+                                mode
+                                checker))
 (struct done (result))
 (require 'common)
 
 (define (process-will:report-mutant-parity current-process-q
                                            info)
-  (match-define (parity-checker-process stdout
-                                        mod-to-mutate
-                                        benchmark-name
-                                        spawn-ms)
-    (process-info-data info))
+  (define stdout
+    (parity-checker-process-stdout (process-info-data info)))
   (define mutated-id-results
     #;(let ([str (port->string stdout)])
         (displayln "output:")
@@ -304,64 +362,227 @@
         (call-with-input-string str read))
     (read stdout))
   (close-input-port stdout)
+  (report-parity-results! mutated-id-results
+                          info
+                          current-process-q))
+
+(define (report-parity-results! result
+                                the-process-info
+                                current-process-q)
+  (match-define (parity-checker-process stdout
+                                        spawn-ms
+                                        mode
+                                        (and (mod-checker benchmark-name
+                                                          mod-to-mutate
+                                                          id)
+                                             the-mod-checker))
+    (process-info-data the-process-info))
   (define time-elapsed-mins
     (/ (- (current-inexact-milliseconds)
           spawn-ms)
        1000
        60))
   (define complete-msg
-   @~a{@benchmark-name "@mod-to-mutate" complete in @time-elapsed-mins min})
-  (define parity-worker-result
-    (match mutated-id-results
-      [(result index (exhausted))
-       (log-parity-info @~a{@complete-msg : ok, max index @index})
-       (done 'ok)]
-      [(result index (list typed-mutated untyped-mutated))
-       (log-parity-info @~a{@complete-msg : divergence found})
-       (done @~a{
-                 Typed/untyped disagree in @benchmark-name @;
-                 module @mod-to-mutate starting at mutation index @index
-                 Typed mutates:   @typed-mutated
-                 Untyped mutates: @untyped-mutated
+    @~a{
+        @benchmark-name "@mod-to-mutate" [@id] complete @;
+        in @time-elapsed-mins min
+        })
+  (match mode
+    ['quick
+     (report-parity-result! result
+                            complete-msg)
+     current-process-q]
+    ['exhaustive
+     (define new-q
+       (record-parity-result current-process-q
+                             the-mod-checker
+                             result))
+     (maybe-report-exhaustive-parity-result! new-q
+                                             the-mod-checker
+                                             complete-msg)]))
 
-                 })]
-      [(result index anything-else)
-       (raise-user-error
-        'verify-mutation-parity
-        @~a{
-            Unexpected result from worker: @;
-            @benchmark-name module @mod-to-mutate index @index : @;
-            @~v[anything-else]
-            })]))
-  (report-parity-results! parity-worker-result)
-  current-process-q)
+(module+ test
+  (define a-quick-process-info
+    (process-info (parity-checker-process #f
+                                          0
+                                          'quick
+                                          (mod-checker "benchmark"
+                                                       "mod-to-mutate.rkt"
+                                                       -1))
+                  (const #f)
+                  (const #f)))
+  (define (make-exhaustive-process-info id)
+    (process-info (parity-checker-process #f
+                                          0
+                                          'exhaustive
+                                          (mod-checker "benchmark"
+                                                       "mod-to-mutate.rkt"
+                                                       id))
+                  (const #f)
+                  (const #f)))
 
-(define (report-parity-results! result)
-  (match result
-    [(done 'ok) (void)]
-    [(done msg) (displayln msg)]))
+  (require (submod "../experiment/mutant-factory-test.rkt" mock))
+  (log-parity-info "1")
+  (void (report-parity-results! (result 30 (exhausted))
+                                a-quick-process-info
+                                (make-mock-Q (hash))))
+  (log-parity-info "2")
+  (void (report-parity-results! (result 30 (list 'a 'b))
+                                a-quick-process-info
+                                (make-mock-Q (hash))))
+  (log-parity-info "3")
+  (define q2 (report-parity-results! (result 30 (exhausted))
+                                     (make-exhaustive-process-info 3)
+                                     (make-mock-Q (hash))))
+  (process-Q-get-data q2)
+  (log-parity-info "4")
+  (define q3 (for/fold ([q (make-mock-Q (hash))])
+                       ([rng (in-list index-ranges)]
+                        [i (in-naturals)])
+               (report-parity-results! (result (first rng) (exhausted))
+                                       (make-exhaustive-process-info i)
+                                       q)))
+  (process-Q-get-data q3)
+  (log-parity-info "5")
+  (define q4 (for/fold ([q (make-mock-Q (hash))])
+                       ([rng (in-list index-ranges)]
+                        [i (in-naturals)])
+               (report-parity-results!
+                (result (cond [(< i 3) (second rng)]
+                              [(= i 3)
+                               (define result (+ (first rng) 10))
+                               (displayln result)
+                               result]
+                              [else (first rng)])
+                        (exhausted))
+                (make-exhaustive-process-info i)
+                q)))
+  (process-Q-get-data q4))
+
+(define (report-parity-result! the-result prefix)
+  (match the-result
+    [(result index (exhausted))
+     (log-parity-info @~a{@prefix : ok, max index @index})]
+    [(result index (list typed-mutated untyped-mutated))
+     (log-parity-info @~a{@prefix : divergence found})
+     (displayln @~a{
+                    @prefix
+                    Typed/untyped disagree starting at mutation index @index
+                    Typed mutates:   @typed-mutated
+                    Untyped mutates: @untyped-mutated
+
+                    })]))
+
+;; process-Q-data:
+;; (hash/c (list/c benchmark-name? mod-name?) (hash/c id? result?))
+(define (record-parity-result current-process-q
+                              the-mod-checker
+                              result)
+  (match-define (mod-checker benchmark-name
+                             mod-to-mutate
+                             id)
+    the-mod-checker)
+  (define results-map (process-Q-get-data current-process-q))
+  (define new-results-map
+    (hash-update results-map
+                 (list benchmark-name mod-to-mutate)
+                 (λ (mod-results)
+                   (hash-set mod-results id result))
+                 (hash)))
+  (process-Q-set-data current-process-q
+                      new-results-map))
+(define (maybe-report-exhaustive-parity-result! current-process-q
+                                                the-mod-checker
+                                                prefix)
+  (match-define (mod-checker benchmark-name
+                             mod-to-mutate
+                             id)
+    the-mod-checker)
+  (define mod-results (hash-ref (process-Q-get-data current-process-q)
+                                (list benchmark-name mod-to-mutate)))
+  (match mod-results
+    [(hash-table [ids results] ...)
+     #:when (all-ids-present? ids)
+     (match results
+       [(list (result _ (exhausted)) ...)
+        ;; ok: max index
+        (define max-index-result
+          (or (result-with-max-index ids results)
+              (first results)))
+        (report-parity-result! max-index-result
+                               prefix)
+        current-process-q]
+       [results-with-divergences
+        (define divergences (filter (match-lambda [(result _ (? list?)) #t]
+                                                  [_ #f])
+                                    results-with-divergences))
+        (define lowest-divergence
+          (argmin result-index divergences))
+        (report-parity-result! lowest-divergence
+                               prefix)
+        current-process-q])]
+    [else current-process-q]))
+
+(define (result-with-max-index ids results)
+  (match-define (list (list sorted-ids sorted-results) ...)
+    (sort (map list ids results)
+          <
+          #:key first))
+  (for/first* ([id (in-list sorted-ids)]
+               [result (in-list sorted-results)])
+              (displayln @~a{
+                             Considering result @result @;
+                             with id @id => id-max @(id-range-max id)
+                             })
+              (and (not (= (result-index result) (id-range-max id)))
+                   (displayln @~a{Picking it})
+                   result)))
+
+(define (id-range-max id)
+  (second (list-ref index-ranges id)))
+
+(define (all-ids-present? list-of-ids)
+  (equal? (sort list-of-ids <)
+          (build-list (length index-ranges) values)))
 
 
 (require 'parity-check)
-(define (verify-mutation-parity-for a-benchmark process-q)
+(define (verify-mutation-parity-for a-benchmark process-q mode)
   (define benchmark-name (benchmark->name a-benchmark))
 
   (define (enq-mutant-parity-checker-for current-process-q
                                          mod-to-mutate)
-    (process-Q-enq
-     current-process-q
-     (thunk
-      (log-parity-info
-       @~a{Spawning checker for @benchmark-name "@mod-to-mutate"})
-      (define-values {stdout ctl}
-        (process-checker-for a-benchmark
-                             mod-to-mutate))
-      (process-info (parity-checker-process stdout
-                                            mod-to-mutate
-                                            benchmark-name
-                                            (current-inexact-milliseconds))
-                    ctl
-                    process-will:report-mutant-parity))))
+    (define max-id (sub1 (length index-ranges)))
+    (define (make-process-checker-spawner id index-range)
+      (thunk
+       (log-parity-info
+        @~a{
+            Spawning checker [@id / @max-id] @;
+            for @benchmark-name "@mod-to-mutate"
+            })
+       (define-values {stdout ctl}
+         (process-checker-for a-benchmark
+                              mod-to-mutate
+                              mode
+                              index-range))
+       (process-info (parity-checker-process stdout
+                                             (current-inexact-milliseconds)
+                                             mode
+                                             (mod-checker benchmark-name
+                                                          mod-to-mutate
+                                                          id))
+                     ctl
+                     process-will:report-mutant-parity)))
+    (match mode
+      ['quick
+       (process-Q-enq current-process-q
+                      (make-process-checker-spawner -1 #f))]
+      ['exhaustive
+       (for/fold ([q current-process-q])
+                 ([index-range (in-list index-ranges)]
+                  [i (in-naturals)])
+         (process-Q-enq q
+                        (make-process-checker-spawner i index-range)))]))
 
   (for/fold ([current-process-q process-q])
             ([mod-path (in-list (benchmark-typed a-benchmark))])
@@ -377,19 +598,22 @@
      name]))
 
 (define (verify-benchmarks-mutation-parity list-of-benchmarks
-                                           process-q)
+                                           process-q
+                                           mode)
   (for/fold ([current-process-q process-q])
             ([a-benchmark list-of-benchmarks])
-    (verify-mutation-parity-for a-benchmark current-process-q)))
+    (verify-mutation-parity-for a-benchmark current-process-q mode)))
 
 (define (verify-mutation-parity-of-all-benchmarks-in dir
-                                                     process-q)
+                                                     process-q
+                                                     mode)
   (define benchmarks
     (for/list ([a-benchmark-path (in-list (directory-list dir #:build? #t))]
                #:when (directory-exists? a-benchmark-path))
       (read-benchmark a-benchmark-path)))
   (verify-benchmarks-mutation-parity benchmarks
-                                     process-q))
+                                     process-q
+                                     mode))
 
 (main
  #:arguments {[flags (list benchmarks-dir)]
@@ -399,15 +623,22 @@
                ("Specify the number of parallel processes to use."
                 "Default: 1")
                #:collect ["N" take-latest "1"]]
+              [("-e" "--exhaustive")
+               'exhaustive?
+               ("Perform an exhaustive parity comparison."
+                "By default, performs a quick search that may be conservative.")
+               #:record]
               #:args [benchmarks-dir]}
  (file-stream-buffer-mode (current-output-port) 'line)
  (define n-processes (string->number (hash-ref flags 'procs)))
+ (define mode (if (hash-ref flags 'exhaustive?) 'exhaustive 'quick))
  (define start-ms (current-inexact-milliseconds))
  (define q
    (verify-mutation-parity-of-all-benchmarks-in
     benchmarks-dir
     (make-process-Q n-processes
-                    (hash))))
+                    (hash))
+    mode))
  (void (process-Q-wait q))
  (define end-ms (current-inexact-milliseconds))
  (define total-minutes (/ (- end-ms start-ms) 1000 60))
