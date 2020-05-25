@@ -188,6 +188,7 @@
   (require "../configurations/configure-benchmark.rkt"
            "../mutate/mutate-program.rkt"
            "../mutate/logger.rkt"
+           "../mutate/expression-selectors.rkt"
            "../runner/mutation-runner.rkt"
            "../runner/program.rkt"
            "../util/path-utils.rkt"
@@ -197,41 +198,30 @@
 
   (struct no-more-mutants () #:prefab)
   (define (extract-mutation stx index)
-    (define-values {read-end write-end} (make-pipe))
+    (define mutated-expr (box #f))
     (define mutated-id
-      (with-logging-to-port write-end
+      (with-intercepted-logging
+        (match-lambda
+          [(vector _ _ (list before after) _)
+           (set-box! mutated-expr (list before after))]
+          [other (void)])
         (thunk
          (define-values {_ id}
            (mutate-module stx index))
          id)
         #:logger mutate-logger
-        'info
-        'mutate))
-    (define mutation-str
-      (match (regexp-match #px"(?m:mutate: type: .*\nmutate: Mutating .*\n)"
-                           read-end)
-        [(list (regexp (pregexp @~a{
-                                    ^@;
-                                    mutate: type: (\S+)
-                                    mutate: Mutating (.+)@;
-                                    $
-                                    })
-                       (list _
-                             (app bytes->string/utf-8 mutation-type)
-                             (app bytes->string/utf-8 mutation-stx))))
-         ;; (define mutation-stx/no-paths (strip-paths mutation-stx))
-         ;; (if (string-contains? mutation-stx/no-paths ":")
-         ;;     (~a "type " mutation-type)
-         ;;     (~a "mutation " mutation-stx/no-paths))
-         (~a "type " mutation-type)]))
+        'info))
+    (define mutated-expr/annotations-stripped
+      (strip-annotations (unbox mutated-expr)))
     (list mutated-id
-          mutation-str))
+          mutated-expr/annotations-stripped))
 
-  (define (strip-paths str)
-    (define stx-path-rx @~a{#<syntax:.+\.rkt:\d+:\d+})
-    (regexp-replace* (pregexp @~a{@stx-path-rx (.+)> -> @stx-path-rx (.+)>})
-                     str
-                     @~a{\1 -> \2}))
+  (define (strip-annotations mutated-expr)
+    (define stripped-expr (first (select-exprs-as-if-untyped mutated-expr)))
+    (match (syntax->list stripped-expr)
+      [(? list? subexprs)
+       (map strip-annotations subexprs)]
+      [#f (syntax->datum stripped-expr)]))
 
   (define/contract (mutated-id-for-typed/untyped-agrees? a-benchmark
                                                          a-module-to-mutate

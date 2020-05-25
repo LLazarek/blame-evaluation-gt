@@ -63,7 +63,7 @@
     (and (= mutation-index counter)
          (not (equivalent? old new))))
   (when should-apply-mutation?
-    (log-mutate-info @~a{Mutating @old -> @new}))
+    (log-mutation old new))
   (mutated
    (if should-apply-mutation?
        new
