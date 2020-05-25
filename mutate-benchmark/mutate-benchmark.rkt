@@ -473,7 +473,20 @@
                           [b f]
                           [z #f])))}
      ;; Swap first pair of initializers
-     `([1 ,#'{(define/contract c any/c (class o
+     `(;; add method
+       [1 ,#'{(define/contract c
+                any/c
+                (class o
+                  (define/public (a-nonexistant-method x) x)
+                  (field [v (foo bar)]
+                         w
+                         [x 5]
+                         [a (g 0)]
+                         y
+                         [b f]
+                         [z #f])))}]
+       ;; Swap first pair of initializers
+       [2 ,#'{(define/contract c any/c (class o
                                          (field [v 5]
                                                 [x (foo bar)]
                                                 [a (g 0)]
@@ -482,7 +495,7 @@
                                                 w
                                                 y)))}]
        ;; Swap second pair of initializers
-       [2 ,#'{(define/contract c any/c (class o
+       [3 ,#'{(define/contract c any/c (class o
                                          (field [v (foo bar)]
                                                 [x 5]
                                                 [a f]
@@ -490,18 +503,6 @@
                                                 [z #f]
                                                 w
                                                 y)))}]
-       ;; add method
-       [3 ,#'{(define/contract c
-                any/c
-                (class o
-                  (define/public (a-nonexistant-method x) x)
-                  (field [v (foo bar)]
-                         [x 5]
-                         [a (g 0)]
-                         [b f]
-                         [z #f]
-                         w
-                         y)))}]
        ;; swap ordering
        [4 ,#'{(define/contract c any/c (class o
                                          (field [x 5]
@@ -565,7 +566,7 @@
                                [b f]
                                [z #f])))}
      ;; Swap first pair of initializers
-     `([1 ,#'{(define/contract c any/c (class o
+     `([2 ,#'{(define/contract c any/c (class o
                                          (init-field [v 5]
                                                      [x (foo bar)]
                                                      [a (g 0)]

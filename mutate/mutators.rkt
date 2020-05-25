@@ -355,49 +355,25 @@
                              (define/public (foo x) x))))))
 
 (define (swap-class-initializers stx mutation-index counter)
-  (define (swap-initializers-in-class-field-group stx
-                                                  mutation-index
-                                                  counter)
-    (log-mutation-type "class:initializer-swap")
-    (syntax-parse stx
-      [({~and {~or {~datum init-field}
-                   {~datum field}}
-              field-type}
-        {~or [field-id:id initial-value:expr]
-             no-init-field:id}
-        ...)
-       (define init-value-stxs (attribute initial-value))
-       (mdo* (def rearranged-init-value-stxs
-               (rearrange-in-seq init-value-stxs
-                                 mutation-index
-                                 counter))
-             [return
-              (syntax-parse rearranged-init-value-stxs
-                [[new-init-value ...]
-                 (quasisyntax/loc stx
-                   (field-type [field-id new-init-value] ...
-                               no-init-field ...))])])]
-      [else
-       (no-mutation stx mutation-index counter)]))
-
+  (log-mutation-type "class:initializer-swap")
   (syntax-parse stx
-    [({~or {~seq {~and {~datum class}  class-form}
-                 superclass:expr}
-           {~seq {~and {~datum class*} class-form}
-                 superclass:expr
-                 interfaces:expr}}
-      body-expr ...)
-     (define body-expr-stxs (attribute body-expr))
-     (mdo* (def body-expr-stxs/mutated-initializer-groups
-             (mutate-in-seq body-expr-stxs
-                            mutation-index
-                            counter
-                            swap-initializers-in-class-field-group))
+    [({~and {~or {~datum init-field}
+                 {~datum field}}
+            field-type}
+      {~or [field-id:id initial-value:expr]
+           no-init-field:id}
+      ...)
+     (define init-value-stxs (attribute initial-value))
+     (mdo* (def rearranged-init-value-stxs
+             (rearrange-in-seq init-value-stxs
+                               mutation-index
+                               counter))
            [return
-            (quasisyntax/loc stx
-              (class-form superclass
-                          {~? interfaces}
-                          #,@body-expr-stxs/mutated-initializer-groups))])]
+            (syntax-parse rearranged-init-value-stxs
+              [[new-init-value ...]
+               (quasisyntax/loc stx
+                 (field-type [field-id new-init-value] ...
+                             no-init-field ...))])])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -408,55 +384,27 @@
      ([field-name (in-list (list #'field #'init-field))])
      (extend-test-message
       (test-mutator* swap-class-initializers
-                     #`(class a-super
-                         (#,field-name [a 1]
-                          [b 2]
-                          [c 3]
-                          [d 4]
-                          [e 5]))
-                     (list #`(class a-super
-                               (#,field-name [a 2]
-                                [b 1]
-                                [c 3]
-                                [d 4]
-                                [e 5]))
-                           #`(class a-super
-                               (#,field-name [a 1]
-                                [b 2]
-                                [c 4]
-                                [d 3]
-                                [e 5]))
-                           #`(class a-super
-                               (#,field-name [a 1]
-                                [b 2]
-                                [c 3]
-                                [d 4]
-                                [e 5]))))
-      @~a{Field: @field-name}))
-
-    (test-mutator* swap-class-initializers
-                   #'(class a-super
-                       (super-new)
-                       (define/public (f x) x))
-                   (list #'(class a-super
-                             (super-new)
-                             (define/public (f x) x))))
-    (test-mutator* swap-class-initializers
-                   #'(class a-super
-                       (super-new)
-                       (field [a 5]
-                              [b 6])
-                       (define/public (f x) x))
-                   (list #'(class a-super
-                             (super-new)
-                             (field [a 6]
-                                    [b 5])
-                             (define/public (f x) x))
-                         #'(class a-super
-                             (super-new)
-                             (field [a 5]
-                                    [b 6])
-                             (define/public (f x) x))))))
+                     #`(#,field-name [a 1]
+                        [b 2]
+                        [c 3]
+                        [d 4]
+                        [e 5])
+                     (list #`(#,field-name [a 2]
+                              [b 1]
+                              [c 3]
+                              [d 4]
+                              [e 5])
+                           #`(#,field-name [a 1]
+                              [b 2]
+                              [c 4]
+                              [d 3]
+                              [e 5])
+                           #`(#,field-name [a 1]
+                              [b 2]
+                              [c 3]
+                              [d 4]
+                              [e 5])))
+      @~a{Field: @field-name}))))
 
 (define (rearrange-positional-exprs stx mutation-index counter)
   (log-mutation-type "position-swap")
