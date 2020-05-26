@@ -194,7 +194,8 @@
            "../util/path-utils.rkt"
            "for-first-star.rkt"
            (submod ".." common)
-           racket/logging)
+           racket/logging
+           syntax/parse)
 
   (struct no-more-mutants () #:prefab)
   (define (extract-mutation stx index)
@@ -219,6 +220,11 @@
   (define (strip-annotations mutated-expr)
     (define stripped-expr (first (select-exprs-as-if-untyped mutated-expr)))
     (match (syntax->list stripped-expr)
+      [(list lone-subexpr)
+       #:when (syntax-parse mutated-expr
+                [[name:id {~datum :} T] #t]
+                [else #f])
+       (strip-annotations lone-subexpr)]
       [(? list? subexprs)
        (map strip-annotations subexprs)]
       [#f (syntax->datum stripped-expr)]))
@@ -458,8 +464,8 @@
      (displayln @~a{
                     @prefix
                     Typed/untyped disagree starting at mutation index @index
-                    Typed mutates:   @typed-mutated
-                    Untyped mutates: @untyped-mutated
+                    Typed mutates:   @~v[typed-mutated]
+                    Untyped mutates: @~v[untyped-mutated]
 
                     })]))
 
