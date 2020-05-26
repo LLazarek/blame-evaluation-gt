@@ -512,6 +512,16 @@
         (define divergences (filter (match-lambda [(result _ (? list?)) #t]
                                                   [_ #f])
                                     results-with-divergences))
+        (when (empty? divergences)
+          (raise-user-error
+           'maybe-report-exhaustive-parity-result!
+           @~a{
+               Results for @benchmark-name @mod-to-mutate [@id] @;
+               not of expected shape. Should have at least one @;
+               divergence, but apparently does not:
+               @(pretty-format results-with-divergences)
+
+               }))
         (define lowest-divergence
           (argmin result-index divergences))
         (report-parity-result! lowest-divergence
