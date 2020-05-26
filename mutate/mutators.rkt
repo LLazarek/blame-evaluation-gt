@@ -360,7 +360,7 @@
     [({~and {~or {~datum init-field}
                  {~datum field}}
             field-type}
-      {~or [field-id:id initial-value:expr]
+      {~or [field-id:id other-field-stuff ... initial-value:expr]
            no-init-field:id}
       ...)
      (define init-value-stxs (attribute initial-value))
@@ -372,7 +372,7 @@
             (syntax-parse rearranged-init-value-stxs
               [[new-init-value ...]
                (quasisyntax/loc stx
-                 (field-type [field-id new-init-value] ...
+                 (field-type [field-id other-field-stuff ... new-init-value] ...
                              no-init-field ...))])])]
     [else
      (no-mutation stx mutation-index counter)]))
@@ -387,22 +387,22 @@
                      #`(#,field-name [a 1]
                         [b 2]
                         [c 3]
-                        [d 4]
+                        [d : T1 4]
                         [e 5])
                      (list #`(#,field-name [a 2]
                               [b 1]
                               [c 3]
-                              [d 4]
+                              [d : T1 4]
                               [e 5])
                            #`(#,field-name [a 1]
                               [b 2]
                               [c 4]
-                              [d 3]
+                              [d : T1 3]
                               [e 5])
                            #`(#,field-name [a 1]
                               [b 2]
                               [c 3]
-                              [d 4]
+                              [d : T1 4]
                               [e 5])))
       @~a{Field: @field-name}))))
 
