@@ -275,14 +275,17 @@
   (define (parity-check/exhaustive the-benchmark
                                    the-module-to-mutate
                                    index-range)
-    (for/first*
-     ([i (apply in-range index-range)])
-     (match (mutated-id-for-typed/untyped-agrees? the-benchmark
-                                                  the-module-to-mutate
-                                                  i)
-       [(no-more-mutants) (result (sub1 i) (exhausted))]
-       [#t #f]
-       [(? list? difference) (result i difference)])))
+    (define mid-range-end
+      (for/first*
+       ([i (apply in-range index-range)])
+       (match (mutated-id-for-typed/untyped-agrees? the-benchmark
+                                                    the-module-to-mutate
+                                                    i)
+         [(no-more-mutants) (result (sub1 i) (exhausted))]
+         [#t #f]
+         [(? list? difference) (result i difference)])))
+    (or mid-range-end
+        (result (second index-range) (exhausted))))
 
   (define (process-parity-check-main/binary-search)
     (define a-benchmark (apply benchmark (read)))
