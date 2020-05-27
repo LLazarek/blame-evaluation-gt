@@ -22,7 +22,7 @@
            (struct-out exhausted)
            index-ranges)
 
-  (define INDEX-SEARCH-RANGE 20000)
+  (define INDEX-SEARCH-RANGE 20100)
 
   (struct result (index value) #:prefab)
   (struct try-go-lower (value) #:prefab)
@@ -311,8 +311,10 @@
                              maybe-index-range)
   (define function-name
     (match mode
-      ['quick      'process-parity-check-main/binary-search]
-      ['exhaustive 'process-parity-check-main/exhaustive]))
+      ['quick
+       'process-parity-check-main/binary-search]
+      [(or 'exhaustive 'simple-exhaustive)
+       'process-parity-check-main/exhaustive]))
   (match-define (list stdout stdin _ #f ctl)
     (process/ports #f #f (current-error-port)
                    @~a{
@@ -331,7 +333,7 @@
            stdin)
   (writeln mod-to-mutate stdin)
   (match mode
-    ['exhaustive (writeln maybe-index-range stdin)]
+    [(or 'exhaustive 'simple-exhaustive) (writeln maybe-index-range stdin)]
     ['quick      (void)])
   (close-output-port stdin)
   (values stdout ctl))
@@ -387,7 +389,7 @@
         in @time-elapsed-mins min
         })
   (match mode
-    ['quick
+    [(or 'quick 'simple-exhaustive)
      (report-parity-result! result
                             complete-msg)
      current-process-q]
@@ -586,7 +588,11 @@
                  ([index-range (in-list index-ranges)]
                   [i (in-naturals)])
          (process-Q-enq q
-                        (make-process-checker-spawner i index-range)))]))
+                        (make-process-checker-spawner i index-range)))]
+      ['simple-exhaustive
+       (process-Q-enq
+        current-process-q
+        (make-process-checker-spawner -2 (list 0 INDEX-SEARCH-RANGE)))]))
 
   (for/fold ([current-process-q process-q])
             ([mod-path (in-list (benchmark-typed a-benchmark))])
@@ -632,10 +638,20 @@
                ("Perform an exhaustive parity comparison."
                 "By default, performs a quick search that may be conservative.")
                #:record]
+              [("-E" "--simple-exhaustive")
+               'simple-exhaustive?
+               ("Like --exhaustive, but use a very simple search strategy that"
+                "may be slower than --exhaustive.")
+               #:conflicts '(exhaustive?)
+               #:record]
               #:args [benchmarks-dir]}
  (file-stream-buffer-mode (current-output-port) 'line)
  (define n-processes (string->number (hash-ref flags 'procs)))
- (define mode (if (hash-ref flags 'exhaustive?) 'exhaustive 'quick))
+ (define mode (cond [(hash-ref flags 'exhaustive?)
+                     'exhaustive]
+                    [(hash-ref flags 'simple-exhaustive?)
+                     'simple-exhaustive]
+                    [else 'quick]))
  (define start-ms (current-inexact-milliseconds))
  (define q
    (verify-mutation-parity-of-all-benchmarks-in
