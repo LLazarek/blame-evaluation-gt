@@ -539,12 +539,7 @@
           #:key first))
   (for/first* ([id (in-list sorted-ids)]
                [result (in-list sorted-results)])
-              (displayln @~a{
-                             Considering result @result @;
-                             with id @id => id-max @(id-range-max id)
-                             })
               (and (not (= (result-index result) (id-range-max id)))
-                   (displayln @~a{Picking it})
                    result)))
 
 (define (id-range-max id)
