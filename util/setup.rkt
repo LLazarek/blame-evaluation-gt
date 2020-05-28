@@ -8,6 +8,7 @@
   '("require-typed-check"
     "custom-load"
     "https://github.com/LLazarek/ruinit.git"
+    "https://github.com/LLazarek/rscript.git"
     "pfds"))
 
 (define racket-download-url
@@ -107,8 +108,7 @@
        (exit 1)]
       ['done-ok
        (when (user-prompt! "Do you want to delete the installer?")
-         (shell* "rm" racket-installer-name))
-       (install-pkg-dependencies (build-path racket-dir "bin" "raco"))])))
+         (shell* "rm" racket-installer-name))])))
 
 (define (install-pkg-dependencies raco-path)
   (displayln "Installing dependencies...")
@@ -117,6 +117,7 @@
                  raco-path
                  "pkg"
                  "install"
+                 "-D"
                  "-j" "2"
                  "--skip-installed"
                  PKG-DEPENDENCIES)
@@ -228,8 +229,8 @@
 
  (define raco-path (build-path racket-dir "bin" "raco"))
 
+ (install-pkg-dependencies raco-path)
  (when (hash-ref flags 'deps-only)
-   (install-pkg-dependencies raco-path)
    (exit 0))
 
  (cond [(directory-exists? TR-dir)
