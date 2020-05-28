@@ -14,7 +14,6 @@
   "https://mirror.racket-lang.org/installers/7.7/racket-7.7-x86_64-linux-cs.sh")
 
 ;; ==================================================
-;; ==================================================
 
 (define-runtime-paths
   [repo-parent-path "../../"]
@@ -169,12 +168,16 @@
 (define (install-gtp-repo gtp-dir)
   (define-values {parent _}
     (basename gtp-dir #:with-directory? #t))
+  (displayln "Installing gtp-benchmarks...")
   (parameterize ([current-directory parent])
-    (displayln "Installing gtp-benchmarks...")
-    (begin0 (shell* "git"
-                    "clone"
-                    "https://github.com/bennn/gtp-benchmarks.git")
-      (displayln "Done."))))
+    (shell* "git"
+            "clone"
+            "https://github.com/bennn/gtp-benchmarks.git"))
+  (parameterize ([current-directory gtp-dir])
+    (shell* "git"
+            "checkout"
+            "hash-top"))
+  (displayln "Done."))
 
 (main
  #:arguments {[flags args]
