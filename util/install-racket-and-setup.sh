@@ -11,15 +11,26 @@ esac
 
 pushd "$1"
 
-INSTALLER="racket-7.7-x86_64-linux-cs.sh"
-wget "https://mirror.racket-lang.org/installers/7.7/$INSTALLER"
-chmod u+x ./$INSTALLER
-./$INSTALLER
+printf "Installing Racket if necessary\n\n\n"
+if [ -d "./racket" ]; then
+    echo "$(pwd)/racket already exists; skipping installing racket"
+else
+    INSTALLER="racket-7.7-x86_64-linux-cs.sh"
+    wget "https://mirror.racket-lang.org/installers/7.7/$INSTALLER"
+    chmod u+x ./$INSTALLER
+    ./$INSTALLER
+fi
 
-git clone https://github.com/LLazarek/ruinit.git
-git clone https://github.com/LLazarek/rscript.git
-./racket/bin/raco pkg install -D ./ruinit ./rscript
+printf "Installing setup script dependencies if necessary\n\n\n"
+if [ ! -d "./ruinit" ]; then
+    git clone https://github.com/LLazarek/ruinit.git
+fi
+if [ ! -d "./rscript" ]; then
+    git clone https://github.com/LLazarek/rscript.git
+fi
+./racket/bin/raco pkg install --skip-installed -D ./ruinit ./rscript
 
+printf "Running setup script\n\n\n"
 ./racket/bin/racket blame-evaluation-gt/util/setup.rkt
 
 popd
