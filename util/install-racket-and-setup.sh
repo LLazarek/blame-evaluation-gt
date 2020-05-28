@@ -11,8 +11,8 @@ esac
 
 pushd "$1"
 
-INSTALLER="racket-7.6-x86_64-linux-cs.sh"
-wget "https://mirror.racket-lang.org/installers/7.6/$INSTALLER"
+INSTALLER="racket-7.7-x86_64-linux-cs.sh"
+wget "https://mirror.racket-lang.org/installers/7.7/$INSTALLER"
 chmod u+x ./$INSTALLER
 ./$INSTALLER
 
