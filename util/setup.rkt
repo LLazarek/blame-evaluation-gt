@@ -154,14 +154,15 @@
         [else
          #f]))
 
+(define TR-modified-module-rel-path
+  (build-path "typed-racket-lib"
+              "typed-racket"
+              "utils"
+              "require-contract.rkt"))
 (define (modify-TR TR-dir)
   (displayln "Modifying typed-racket...")
   (unless (dry-run?)
-    (replace-in-file! (build-path TR-dir
-                                  "typed-racket-lib"
-                                  "typed-racket"
-                                  "utils"
-                                  "require-contract.rkt")
+    (replace-in-file! (build-path TR-dir TR-modified-module-rel-path)
                       (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm))})
                       @~a{'(interface for #,(syntax->datum #'nm.nm) from #,(syntax->datum #'lib))}))
   (displayln "Done."))
@@ -180,9 +181,59 @@
             "hash-top"))
   (displayln "Done."))
 
+(define (check-install-configuration racket-dir TR-dir gtp-dir)
+  (define racket-version-str
+    (system/string @~a{@|racket-dir|/bin/racket --version}))
+  (define gtp-branches-str
+    (parameterize ([current-directory gtp-dir])
+      (system/string "git branch")))
+
+  (define racket-version-ok?
+    (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
+  (define gtp-branch-ok?
+    (regexp-match? @regexp{\* hash-top} gtp-branches-str))
+  (define TR-modified-line-present?
+    (shell* "grep"
+            "interface for.*from"
+            (build-path TR-dir TR-modified-module-rel-path)))
+  (unless racket-version-ok?
+    (displayln
+     @~a{
+         The installed racket has the wrong version.
+         installed: @racket-version-str
+         required:  Racket v7.7 [cs]
+         }))
+  (unless gtp-branch-ok?
+    (displayln
+     @~a{
+         The wrong branch of gtp-benchmarks is present.
+         current branch:  @gtp-branches-str
+         required branch: hash-top
+         }))
+  (unless TR-modified-line-present?
+    (displayln
+     @~a{
+         The installed version of typed-racket doesn't appear @;
+         to have the required modifications.
+         Run this setup script to make them.
+         }))
+  (and racket-version-ok?
+       gtp-branch-ok?
+       TR-modified-line-present?))
+
 (main
  #:arguments {[flags args]
               #:once-each
+              [("-D" "--deps-only")
+               'deps-only
+               ("Only install pkg dependencies.")
+               #:record]
+              [("-v" "--verify-install")
+               'verify-install
+               ("Verify the current installation to ensure that"
+                "all dependencies have the right versions or customizations.")
+               #:conflicts '(deps-only)
+               #:record]
               [("--dry-run")
                'dry-run
                ("Perform a dry run, printing commands instead of running them.")
@@ -192,10 +243,6 @@
                ("The root path, where dependencies reside or should be installed."
                 @~a{Default: @(pretty-path repo-parent-path)})
                #:collect ["path" take-latest repo-parent-path]]
-              [("-D" "--deps-only")
-               'deps-only
-               ("Only install pkg dependencies.")
-               #:record]
               [("-t" "--tr-path")
                'tr-path
                ("Path to the typed-racket installation to use."
@@ -221,6 +268,15 @@
                     (build-path root "typed-racket")))
  (define gtp-dir (or (hash-ref flags 'gtp-path)
                      (build-path root "gtp-benchmarks")))
+
+ (when (hash-ref flags 'verify-install)
+   (match (check-install-configuration racket-dir TR-dir gtp-dir)
+     [#t
+      (displayln "Install is configured correctly.")
+      (exit 0)]
+     [#f
+      (displayln "Install is misconfigured.")
+      (exit 1)]))
 
  (unless (or (directory-exists? racket-dir)
              (install-racket racket-dir))
