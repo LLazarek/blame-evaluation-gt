@@ -16,8 +16,9 @@ wget "https://mirror.racket-lang.org/installers/7.7/$INSTALLER"
 chmod u+x ./$INSTALLER
 ./$INSTALLER
 
+git clone https://github.com/LLazarek/ruinit.git
 git clone https://github.com/LLazarek/rscript.git
-./racket/bin/raco pkg install ./rscript
+./racket/bin/raco pkg install -D ./ruinit ./rscript
 
 ./racket/bin/racket blame-evaluation-gt/util/setup.rkt
 
