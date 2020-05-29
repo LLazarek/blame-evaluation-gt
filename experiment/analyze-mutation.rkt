@@ -54,11 +54,11 @@
                                                    (~a i-1 '- i-2)
                                                    #:progress-logger log-progress!)))]
         [(list type-error? mutation-type)
-         (log-mutation-analysis-info "Pulling cached result:")
-         (log-progress! module-to-mutate-name
-                        index
-                        type-error?
-                        mutation-type)
+         (log-mutation-analysis-info
+          @~a{
+              Pulling cached result for @;
+              @module-to-mutate-name @"@" @index
+              })
          (add-mutation-type-result q type-error? mutation-type)])))
 
   (log-mutation-analysis-info
@@ -179,7 +179,8 @@
       [(? file-exists? path) (make-hash (file->list path))]
       [else (hash)]))
   (define-values {log-progress!/raw finalize-log!}
-    (initialize-progress-log! (progress-log)))
+    (initialize-progress-log! (progress-log)
+                              #:exists 'append))
   (define (log-progress! module-to-mutate-name mutation-index type-error? mutation-type)
     (log-mutation-analysis-info
      @~a{
