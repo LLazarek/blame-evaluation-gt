@@ -14,6 +14,8 @@
             procedure?)]
           [in-mutation-indices
            (module-name? benchmark/c . -> . (stream/c natural?))]
+          [max-mutation-index-exceeded?
+           (path-to-existant-file? natural? . -> . boolean?)]
 
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
@@ -23,7 +25,8 @@
          "../configurations/configure-benchmark.rkt"
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
-         "../util/read-module.rkt")
+         "../util/read-module.rkt"
+         "../util/binary-search.rkt")
 
 (define-runtime-path mutant-runner-path "mutant-runner.rkt")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
@@ -99,21 +102,21 @@
     (configure-benchmark bench
                          max-config))
   (define module-to-mutate
-    (findf (path-ends-with module-to-mutate-name)
-           (list*
-            (benchmark-configuration-main the-benchmark-configuration)
-            (benchmark-configuration-others the-benchmark-configuration))))
-  (let next-index ([i 0])
-    (if (max-mutation-index-exceeded? module-to-mutate i)
-        empty-stream
-        (stream-cons i (next-index (add1 i))))))
+    (findf
+     (path-ends-with module-to-mutate-name)
+     (list*
+      (benchmark-configuration-main the-benchmark-configuration)
+      (benchmark-configuration-others the-benchmark-configuration))))
+  (define max-index
+    ((lowest-upper-bound-binary-search
+      (λ (index)
+        (if (max-mutation-index-exceeded? module-to-mutate index)
+            (go-lower)
+            (go-higher))))
+     #:increase-max? #t))
+  (in-range (add1 max-index)))
 
-(define/contract (max-mutation-index-exceeded? module-to-mutate mutation-index)
-  (path-to-existant-file?
-   natural?
-   . -> .
-   boolean?)
-
+(define (max-mutation-index-exceeded? module-to-mutate mutation-index)
   ;; `mutate-module` throws if index is too large, so just try
   ;; mutating to see whether or not it throws
   (with-handlers ([mutation-index-exception? (λ _ #t)])
