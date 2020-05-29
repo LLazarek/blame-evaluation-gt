@@ -93,6 +93,11 @@
   (log-mutation-analysis-info
    @~a{Spawned mutant @module-to-mutate-name @"@" @index})
   (define (will:record-type-error q* info)
+    (log-mutation-analysis-debug
+     @~a{
+         Executing will. Q size: @;
+         {active: @(process-Q-active-count q*), @(process-Q-waiting-count q*)}
+         })
     (define-values {type-error? mutation-type}
       (extract-mutation-type-and-result outfile))
     (log-progress! module-to-mutate-name
