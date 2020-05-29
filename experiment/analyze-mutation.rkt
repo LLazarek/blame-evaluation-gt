@@ -1,4 +1,4 @@
-#lang at-exp racket
+#lang at-exp rscript
 
 (require "../process-q/interface.rkt"
          "../process-q/functional.rkt"
@@ -96,7 +96,10 @@
     (log-mutation-analysis-debug
      @~a{
          Executing will. Q size: @;
-         {active: @(process-Q-active-count q*), @(process-Q-waiting-count q*)}
+         { @;
+          active: @(process-Q-active-count q*), @;
+          waiting: @(process-Q-waiting-count q*) @;
+          }
          })
     (define-values {type-error? mutation-type}
       (extract-mutation-type-and-result outfile))
@@ -123,18 +126,20 @@
   (process-Q-set-data q (update (process-Q-get-data q))))
 
 (define (extract-mutation-type-and-result f)
+  (define trimmed-output
+    (system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f}))
   (define output-regexp
     (pregexp @~a{
                  mutate: type: (\S+)
                  mutate: Mutating.+
                  #s\(run-status "[^"]+" \d+ \S+ (\S+)
 @; close "{
-                 }))
+           }))
   #;(displayln (list output-regexp
-                   (file->string f)
-                   (regexp-match output-regexp
-                                 (file->string f))))
-  (match (file->string f)
+                     (file->string f)
+                     (regexp-match output-regexp
+                                   (file->string f))))
+  (match trimmed-output
     [(regexp output-regexp
              (list _ mutation-type outcome))
      (define type-error? (string=? outcome "type-error"))
@@ -145,60 +150,59 @@
                            @other-contents
                            })]))
 
-(module+ main
-  (require racket/cmdline)
-  (define bench-to-run (make-parameter #f))
-  (define progress-log (make-parameter #f))
-  (command-line
-   #:once-each
-   [("-b" "--benchmark")
-    path
-    "Path to benchmark to run."
-    (bench-to-run path)]
-   [("-o" "--output-dir")
-    dir
-    "Data output directory."
-    (data-output-dir dir)]
-   [("-n" "--process-limit")
-    n
-    "Number of processes to have running at once."
-    (process-limit (string->number n))]
-   [("-e" "--error-log")
-    path
-    "File to which to append mutant errors. Default: ./mutant-errors.txt"
-    (mutant-error-log path)]
-   [("-l" "--progress-log")
-    path
-    ("Record progress in the given log file."
-     "If it exists and is not empty, resume from the point reached in the log.")
-    (progress-log path)])
-  (unless (bench-to-run)
-    (error 'mutant-factory "Must provide benchmark to run."))
-  (define progress
-    (match (progress-log)
-      [(? file-exists? path) (make-hash (file->list path))]
-      [else (hash)]))
-  (define-values {log-progress!/raw finalize-log!}
-    (initialize-progress-log! (progress-log)
-                              #:exists 'append))
-  (define (log-progress! module-to-mutate-name mutation-index type-error? mutation-type)
-    (log-mutation-analysis-info
-     @~a{
-         Mutant @module-to-mutate-name @"@" @mutation-index @;
-         {@mutation-type} => @(if type-error?
-                                  'hit
-                                  'miss)
-         })
-    (log-progress!/raw (cons (list module-to-mutate-name
-                                   mutation-index)
-                             (list type-error?
-                                   mutation-type))))
-  (define (cached-results-for module-to-mutate-name mutation-index)
-    (hash-ref progress
-              (list module-to-mutate-name mutation-index)
-              #f))
-  (mutation-info-for-all-mutants (read-benchmark (bench-to-run))
-                                 #:process-limit (process-limit)
-                                 #:log-progress log-progress!
-                                 #:resume-cache cached-results-for)
-  (finalize-log!))
+(define (set-parameter p [transform values])
+  (λ (new _) (p (transform new))))
+(main
+ #:arguments {[flags args]
+              #:once-each
+              [("-b" "--benchmark")
+               'bench-to-run
+               "Path to benchmark to run."
+               #:mandatory
+               #:collect ["path" take-latest #f]]
+              [("-o" "--output-dir")
+               'data-output-dir
+               "Data output directory."
+               #:collect ["path" (set-parameter data-output-dir) #f]]
+              [("-n" "--process-limit")
+               'process-limit
+               "Number of processes to have running at once."
+               #:collect ["N" (set-parameter process-limit string->number) #f]]
+              [("-e" "--error-log")
+               'error-log
+               "File to which to append mutant errors. Default: ./mutant-errors.txt"
+               #:collect ["path" (set-parameter mutant-error-log) #f]]
+              [("-l" "--progress-log")
+               'progress-log
+               ("Record progress in the given log file."
+                "If it exists and is not empty, resume from the point reached in the log.")
+               #:collect ["path" take-latest #f]]}
+ (define progress-log (hash-ref flags 'progress-log))
+ (define progress
+   (match progress-log
+     [(? file-exists? path) (make-hash (file->list path))]
+     [else (hash)]))
+ (define-values {log-progress!/raw finalize-log!}
+   (initialize-progress-log! progress-log
+                             #:exists 'append))
+ (define (log-progress! module-to-mutate-name mutation-index type-error? mutation-type)
+   (log-mutation-analysis-info
+    @~a{
+        Mutant @module-to-mutate-name @"@" @mutation-index @;
+        {@mutation-type} => @(if type-error?
+                                 'hit
+                                 'miss)
+        })
+   (log-progress!/raw (cons (list module-to-mutate-name
+                                  mutation-index)
+                            (list type-error?
+                                  mutation-type))))
+ (define (cached-results-for module-to-mutate-name mutation-index)
+   (hash-ref progress
+             (list module-to-mutate-name mutation-index)
+             #f))
+ (mutation-info-for-all-mutants (read-benchmark (hash-ref flags 'bench-to-run))
+                                #:process-limit (process-limit)
+                                #:log-progress log-progress!
+                                #:resume-cache cached-results-for)
+ (finalize-log!))
