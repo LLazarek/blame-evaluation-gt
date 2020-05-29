@@ -108,12 +108,12 @@
       (benchmark-configuration-main the-benchmark-configuration)
       (benchmark-configuration-others the-benchmark-configuration))))
   (define max-index
-    ((lowest-upper-bound-binary-search
-      (λ (index)
-        (if (max-mutation-index-exceeded? module-to-mutate index)
-            (go-lower)
-            (go-higher))))
-     #:increase-max? #t))
+    (result-index ((lowest-upper-bound-binary-search
+                    (λ (index)
+                      (if (max-mutation-index-exceeded? module-to-mutate index)
+                          (go-lower)
+                          (go-higher))))
+                   #:increase-max? #t)))
   (in-range (add1 max-index)))
 
 (define (max-mutation-index-exceeded? module-to-mutate mutation-index)
