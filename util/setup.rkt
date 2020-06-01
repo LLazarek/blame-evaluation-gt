@@ -127,32 +127,40 @@
   (displayln "Downloading typed-racket...")
   (define-values {parent _}
     (basename TR-dir #:with-directory? #t))
-  (define installed?
-    (parameterize ([current-directory parent])
-      (shell* raco-path
-              "pkg"
-              "update"
-              "-j" "2"
-              "--no-setup"
-              "--catalog"
-              "https://pkgs.racket-lang.org"
-              "typed-racket")
-      (shell* raco-path
-              "pkg"
-              "update"
-              "-j" "2"
-              "--clone"
-              "typed-racket")
-      #t))
-  (cond [(directory-exists? TR-dir)
-         (parameterize ([current-directory TR-dir])
-           (shell* "git"
-                   "checkout"
-                   "v7.6"))
-         (displayln "Done.")
-         (modify-TR TR-dir)]
-        [else
-         #f]))
+  (parameterize ([current-directory parent])
+    (shell* raco-path
+            "pkg"
+            "update"
+            "-j" "2"
+            "--no-setup"
+            "--catalog"
+            "https://pkgs.racket-lang.org"
+            "typed-racket")
+    (shell* raco-path
+            "pkg"
+            "update"
+            "-j" "2"
+            "--clone"
+            "typed-racket"))
+  (directory-exists? TR-dir))
+
+(define (setup-existing-TR-dir! raco-path TR-dir)
+  (displayln @~a{Installing existing TR at @TR-dir})
+  (define TR-subpaths
+    (for/list ([dir (in-list '("source-syntax"
+                               "typed-racket-compatibility"
+                               "typed-racket-doc"
+                               "typed-racket-lib"
+                               "typed-racket-more"
+                               "typed-racket"))])
+      (build-path TR-dir dir)))
+  (apply shell*
+         raco-path
+         "pkg"
+         "update"
+         "-D"
+         "--link"
+         TR-subpaths))
 
 (define TR-modified-module-rel-path
   (build-path "typed-racket-lib"
@@ -161,6 +169,15 @@
               "require-contract.rkt"))
 (define (modify-TR TR-dir)
   (displayln "Modifying typed-racket...")
+  (unless (parameterize ([current-directory TR-dir])
+            (shell* "git"
+                    "checkout"
+                    "v7.6"))
+    (user-prompt! @~a{
+
+                      Help! Unable to checkout branch v7.6 in @TR-dir
+                      Please resolve the problem and checkout the branch before continuing.
+                      }))
   (unless (dry-run?)
     (replace-in-file! (build-path TR-dir TR-modified-module-rel-path)
                       (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm))})
@@ -181,6 +198,42 @@
             "hash-top"))
   (displayln "Done."))
 
+(define (check-TR-install racket-dir
+                          TR-dir
+                          #:display-failures? [display-failures? #f])
+  (define show-str
+    (system/string @~a{@|racket-dir|/bin/raco pkg show -ld typed-racket}))
+  (define TR-dir-installed?
+    (match (regexp-match* @regexp{"/[^"]+"} @; close "
+                          show-str)
+      [(list path) (string-contains? path (path->string racket-dir))]
+      [else #f]))
+
+  (define TR-modified-line-present?
+    (shell* "grep"
+            "interface for.*from"
+            (build-path TR-dir TR-modified-module-rel-path)))
+
+  (when (and (not TR-dir-installed?)
+             display-failures?)
+    (displayln
+     @~a{
+
+         ERROR: The local version of typed-racket is not installed.
+         Run this setup script to install it.
+         }))
+  (when (and (not TR-modified-line-present?)
+             display-failures?)
+    (displayln
+     @~a{
+
+         ERROR: The installed version of typed-racket doesn't appear @;
+         to have the required modifications.
+         Run this setup script to make them.
+         }))
+  (and TR-dir-installed?
+       TR-modified-line-present?))
+
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
@@ -192,34 +245,27 @@
     (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
   (define gtp-branch-ok?
     (regexp-match? @regexp{\* hash-top} gtp-branches-str))
-  (define TR-modified-line-present?
-    (shell* "grep"
-            "interface for.*from"
-            (build-path TR-dir TR-modified-module-rel-path)))
+
   (unless racket-version-ok?
     (displayln
      @~a{
-         The installed racket has the wrong version.
+
+         ERROR: The installed racket has the wrong version.
          installed: @racket-version-str
          required:  Racket v7.7 [cs]
          }))
   (unless gtp-branch-ok?
     (displayln
      @~a{
-         The wrong branch of gtp-benchmarks is present.
+
+         ERROR: The wrong branch of gtp-benchmarks is present.
          current branch:  @gtp-branches-str
          required branch: hash-top
          }))
-  (unless TR-modified-line-present?
-    (displayln
-     @~a{
-         The installed version of typed-racket doesn't appear @;
-         to have the required modifications.
-         Run this setup script to make them.
-         }))
+
   (and racket-version-ok?
        gtp-branch-ok?
-       TR-modified-line-present?))
+       (check-TR-install racket-dir TR-dir #:display-failures? #t)))
 
 (main
  #:arguments {[flags args]
@@ -263,20 +309,24 @@
 
  (dry-run? (hash-ref flags 'dry-run))
  (define root (hash-ref flags 'root-path))
- (define racket-dir (build-path root "racket"))
- (define TR-dir (or (hash-ref flags 'tr-path)
-                    (build-path root "typed-racket")))
- (define gtp-dir (or (hash-ref flags 'gtp-path)
-                     (build-path root "gtp-benchmarks")))
+ (define racket-dir (simple-form-path (build-path root "racket")))
+ (define TR-dir
+   (simple-form-path (or (hash-ref flags 'tr-path)
+                         (build-path root "typed-racket"))))
+ (define gtp-dir
+   (simple-form-path (or (hash-ref flags 'gtp-path)
+                         (build-path root "gtp-benchmarks"))))
 
- (when (hash-ref flags 'verify-install)
+ (define (verify-install!)
    (match (check-install-configuration racket-dir TR-dir gtp-dir)
      [#t
-      (displayln "Install is configured correctly.")
+      (displayln "\nInstall is configured correctly.")
       (exit 0)]
      [#f
-      (displayln "Install is misconfigured.")
+      (displayln "\nInstall is misconfigured.")
       (exit 1)]))
+ (when (hash-ref flags 'verify-install)
+   (verify-install!))
 
  (unless (or (directory-exists? racket-dir)
              (install-racket racket-dir))
@@ -289,29 +339,17 @@
  (when (hash-ref flags 'deps-only)
    (exit 0))
 
- (cond [(directory-exists? TR-dir)
-        (cond [(user-prompt!
-                @~a{
+ (cond [(not (directory-exists? TR-dir))
+        (download-TR raco-path TR-dir)]
+       [(not (check-TR-install racket-dir TR-dir))
+        (setup-existing-TR-dir! raco-path TR-dir)]
+       [else (void)])
+ (modify-TR TR-dir)
 
-                    @TR-dir already exists, but we require a modified
-                    version of TR. Do you want to modify that copy as we
-                    need?
-                    Modification is idempotent: if you have already done
-                    it to that copy, trying to do it again has no effect.
+ (unless (directory-exists? gtp-dir)
+   (install-gtp-repo gtp-dir))
 
-                    })
-               (modify-TR TR-dir)]
-              [else
-               (displayln "Skipping modification.")])]
-       [(download-TR raco-path TR-dir) (void)]
-       [else
-        (eprintf "Something went wrong installing TR.~n")
-        (exit 1)])
-
- (unless (or (directory-exists? gtp-dir)
-             (install-gtp-repo gtp-dir))
-   (eprintf "Something went wrong installing gtp-benchmarks.~n")
-   (exit 1))
+ (verify-install!)
 
  (when (user-prompt!
         @~a{
