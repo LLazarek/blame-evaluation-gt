@@ -16,6 +16,8 @@
 
 ;; ==================================================
 
+(require syntax/location)
+
 (define-runtime-paths
   [repo-parent-path "../../"]
   [repo-path ".."])
@@ -201,27 +203,28 @@
 (define (check-TR-install racket-dir
                           TR-dir
                           #:display-failures? [display-failures? #f])
-  (define show-str
-    (system/string @~a{@|racket-dir|/bin/raco pkg show -ld typed-racket}))
-  (define TR-dir-installed?
-    (match (regexp-match* @regexp{"/[^"]+"} @; close "
-                          show-str)
-      [(list path) (string-contains? path (path->string racket-dir))]
-      [else #f]))
+  ;;;; This doesn't seem to work
+  ;; (define show-str
+  ;;   (system/string @~a{@|racket-dir|/bin/raco pkg show -ld typed-racket}))
+  ;; (define TR-dir-installed?
+  ;;   (match (regexp-match* @regexp{"/[^"]+"} @; close "
+  ;;                         show-str)
+  ;;     [(list path) (string-contains? path (path->string racket-dir))]
+  ;;     [else #f]))
 
   (define TR-modified-line-present?
     (shell* "grep"
             "interface for.*from"
             (build-path TR-dir TR-modified-module-rel-path)))
 
-  (when (and (not TR-dir-installed?)
-             display-failures?)
-    (displayln
-     @~a{
+  (define (error-has-interface-from? e)
+    (equal? (blame-positive (exn:fail:contract:blame-object e))
+            '(interface for first from (only-in racket first))))
+  (define modified-TR-active?
+    (with-handlers ([exn:fail:contract:blame? error-has-interface-from?])
+      (dynamic-require `(submod (file ,(quote-source-file)) check-modified-TR) #f)
+      #f))
 
-         ERROR: The local version of typed-racket is not installed.
-         Run this setup script to install it.
-         }))
   (when (and (not TR-modified-line-present?)
              display-failures?)
     (displayln
@@ -231,8 +234,20 @@
          to have the required modifications.
          Run this setup script to make them.
          }))
-  (and TR-dir-installed?
-       TR-modified-line-present?))
+  (when (and (not modified-TR-active?)
+             display-failures?)
+    (displayln
+     @~a{
+
+         ERROR: The modified version of typed-racket is not installed or active.
+         Run this setup script to install it.
+         }))
+  (and TR-modified-line-present?
+       modified-TR-active?))
+(module check-modified-TR typed/racket
+  (require/typed (only-in racket first)
+    [first ((Listof Any) . -> . Boolean)])
+  (first '(5)))
 
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
   (define racket-version-str
@@ -341,7 +356,9 @@
 
  (cond [(not (directory-exists? TR-dir))
         (download-TR raco-path TR-dir)]
-       [else (setup-existing-TR-dir! raco-path TR-dir)])
+       [(not (check-TR-install racket-dir TR-dir))
+        (setup-existing-TR-dir! raco-path TR-dir)]
+       [else (void)])
  (modify-TR TR-dir)
 
  (unless (directory-exists? gtp-dir)
