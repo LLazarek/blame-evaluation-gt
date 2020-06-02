@@ -341,9 +341,7 @@
 
  (cond [(not (directory-exists? TR-dir))
         (download-TR raco-path TR-dir)]
-       [(not (check-TR-install racket-dir TR-dir))
-        (setup-existing-TR-dir! raco-path TR-dir)]
-       [else (void)])
+       [else (setup-existing-TR-dir! raco-path TR-dir)])
  (modify-TR TR-dir)
 
  (unless (directory-exists? gtp-dir)
