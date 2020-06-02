@@ -145,3 +145,5 @@
                          #:column-spacing 10
                          #:row-spacing 0))))
  (pict->png! together (hash-ref flags 'outfile)))
+
+(module+ test racket)

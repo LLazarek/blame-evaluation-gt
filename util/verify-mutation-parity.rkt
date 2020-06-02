@@ -264,7 +264,7 @@
                                              the-mod-checker
                                              complete-msg)]))
 
-(module+ test
+#;(module+ test
   (define a-quick-process-info
     (process-info (parity-checker-process #f
                                           0
@@ -525,3 +525,5 @@
  (define end-ms (current-inexact-milliseconds))
  (define total-minutes (/ (- end-ms start-ms) 1000 60))
  (log-parity-info @~a{Analysis complete in @total-minutes min}))
+
+(module test racket/base)
