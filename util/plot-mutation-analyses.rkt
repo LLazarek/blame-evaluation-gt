@@ -9,24 +9,30 @@
          pict-util/file)
 
 (define all-mutation-types
-  '(negate-conditional
-    class-initializer-swap
-    argument-swap
-    statement-deletion
-    arithmetic-op-swap
+  '(arithmetic-op-swap
     boolean-op-swap
     class:publicity
     class:super-new
-    data-structure-mutability
     data-accessor-swap
-    constant-swap))
+    constant-swap
+    begin-result-deletion
+    negate-conditional
+    class:parent-swap
+    class:initializer-swap
+    position-swap
+    class:add-extra-method
+    top-level-id-swap))
+
+(define PLOT-WIDTH 500)
 
 (define (read-data-files log-files
                          #:data-type data-type)
   (for/hash ([log (in-list log-files)])
-    (values (path->benchmark-name log)
-            (read-data-from-log log
-                                #:data-type data-type))))
+    (define-values {data total-mutant-count}
+      (read-data-from-log log
+                          #:data-type data-type))
+    (define title (~a (path->benchmark-name log) ": " total-mutant-count))
+    (values title data)))
 
 (define (path->benchmark-name path)
   (match (basename path)
@@ -61,7 +67,18 @@
                 [0 0]
                 [total (/ (+ hits misses) total)])]))
          (values type ratio)))
-     ratios]
+     (when (equal? data-type 'total-counts)
+       (define sum (apply + (hash-values ratios)))
+       (unless (< (abs (- sum 1)) 0.001)
+         (raise-user-error
+          'plot-mutation-analyses
+          @~a{
+              The sum of mutation operator occurrence ratios is not 1!
+              This probably means that there are missing mutation types,
+              or otherwise there is a bug.
+              })))
+     (values ratios
+             (hash-ref hit+miss-data 'total))]
     [else
      (raise-user-error 'plot-mutation-analyses
                        @~a{Given file that doesn't look like a log: @path})]))
@@ -121,7 +138,7 @@
       (define draw-labels? (zero? (modulo i columns)))
       (define plot-bars-pict (make-plotter draw-labels?))
       (define pict
-        (parameterize ([plot-width (- 400 (if draw-labels? 0 labels-width))]
+        (parameterize ([plot-width (- PLOT-WIDTH (if draw-labels? 0 labels-width))]
                        [plot-height (+ 400 (if draw-labels? 15 0))])
           (vc-append
            (plot-bars-pict data
@@ -146,4 +163,4 @@
                          #:row-spacing 0))))
  (pict->png! together (hash-ref flags 'outfile)))
 
-(module+ test racket)
+(module test racket)
