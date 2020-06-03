@@ -160,7 +160,7 @@
      #:timeout-result (const (test-fail "Allocator times out but should oom")))
     (run-with-limits
      (make-incremental-memory-allocator (* 3 gb))
-     #:timeout/s 30
+     #:timeout/s 60
      #:memory/gb 4
      #:oom-result (const (test-fail "Allocator runs oom despite sufficient memory"))
      #:timeout-result (const (test-fail "Allocator times out despite sufficient timeout")))))
