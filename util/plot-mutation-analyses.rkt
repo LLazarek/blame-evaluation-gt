@@ -28,10 +28,17 @@
 (define (read-data-files log-files
                          #:data-type data-type)
   (for/hash ([log (in-list log-files)])
-    (define-values {data total-mutant-count}
+    (define-values {data total-mutant-count total-success-count}
       (read-data-from-log log
                           #:data-type data-type))
-    (define title (~a (path->benchmark-name log) ": " total-mutant-count))
+    (define title (~a (path->benchmark-name log) " "
+                      "("
+                      total-success-count " / " total-mutant-count " type error"
+                      ")"
+                      ;; " ("
+                      ;; (round (* 100 (/ total-success-count total-mutant-count)))
+                      ;; "%)"
+                      ))
     (values title data)))
 
 (define (path->benchmark-name path)
@@ -78,7 +85,8 @@
               or otherwise there is a bug.
               })))
      (values ratios
-             (hash-ref hit+miss-data 'total))]
+             (hash-ref hit+miss-data 'total)
+             (apply + (hash-values all-hits)))]
     [else
      (raise-user-error 'plot-mutation-analyses
                        @~a{Given file that doesn't look like a log: @path})]))
@@ -153,8 +161,8 @@
     (vc-append
      10
      (text (match plot-type
-             ['total-counts "Mutation operator diversity"]
-             ['success-ratios "Mutation operator success rates"])
+             ['total-counts "Proportion of all mutants created by operator"]
+             ['success-ratios "Ratio of mutants causing type errors, per operator"])
            '(bold)
            30)
      (table/fill-missing picts
