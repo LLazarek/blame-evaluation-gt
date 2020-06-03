@@ -136,29 +136,31 @@
      (make-incremental-memory-allocator (* 0.1 gb))
      #:timeout/s 30
      #:memory/gb 1
-     #:oom-result (const #f)
-     #:timeout-result (const #f))
+     #:oom-result (const (test-fail "Allocator runs oom despite sufficient memory"))
+     #:timeout-result (const (test-fail "Allocator times out despite sufficient timeout")))
     (run-with-limits
      (make-incremental-memory-allocator (* 0.9 gb))
      #:timeout/s 30
      #:memory/gb 1
-     #:oom-result (const #f)
-     #:timeout-result (const #f))
-    (not (run-with-limits
-          (make-incremental-memory-allocator (* 1.5 gb))
-          #:timeout/s 30
-          #:memory/gb 1
-          #:oom-result (const #f)
-          #:timeout-result (const #f)))
-    (not (run-with-limits
-          (make-incremental-memory-allocator (* 3 gb))
-          #:timeout/s 30
-          #:memory/gb 1
-          #:oom-result (const #f)
-          #:timeout-result (const #f)))
+     #:oom-result (const (test-fail "Allocator runs oom despite sufficient memory"))
+     #:timeout-result (const (test-fail "Allocator times out despite sufficient timeout")))
+    (run-with-limits
+     (make-incremental-memory-allocator (* 1.5 gb)
+                                        (test-fail "Allocator finishes despite memory limit"))
+     #:timeout/s 30
+     #:memory/gb 1
+     #:oom-result (const #t)
+     #:timeout-result (const (test-fail "Allocator times out but should oom")))
+    (run-with-limits
+     (make-incremental-memory-allocator (* 3 gb)
+                                        (test-fail "Allocator finishes despite memory limit"))
+     #:timeout/s 30
+     #:memory/gb 1
+     #:oom-result (const #t)
+     #:timeout-result (const (test-fail "Allocator times out but should oom")))
     (run-with-limits
      (make-incremental-memory-allocator (* 3 gb))
      #:timeout/s 30
      #:memory/gb 4
-     #:oom-result (const #f)
-     #:timeout-result (const #f))))
+     #:oom-result (const (test-fail "Allocator runs oom despite sufficient memory"))
+     #:timeout-result (const (test-fail "Allocator times out despite sufficient timeout")))))
