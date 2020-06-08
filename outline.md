@@ -9,6 +9,8 @@
    - We present a **method** for systematically evaluating these
      choices and how affect their error message pragmatics.
 
+   - The method directly builds on the blame trails idea of Lukas et al [POPL '2]0
+
    - We apply the method to implementations of the Natural and Transient semantics. 
 
 2. Why and How Blame Assigment Algorithms Differ
@@ -31,6 +33,8 @@
 
    3. Blame trails
    
+      - We build on the blame trails idea of Lukas et al [POPL '20]
+
       - Blame trails provide a quantitative measure of a a system's
         error message utility, and they can be applied to every point
         in the above space.
@@ -54,8 +58,11 @@
 
    3. Selection of programs
 
-      - We are using a diverse set of programs from prior work on GT,
-        and we insert bugs using mutation techniques.
+      - We are using a set of representative programs, and we insert
+        bugs using mutation techniques.
+
+      - Do we need descriptions? Argue that they are representative?
+      	Short scripts, GUI programs, ...
 
    4. Sampling of mutants
 
