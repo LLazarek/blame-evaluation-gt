@@ -25,10 +25,14 @@
 
 (define PLOT-WIDTH 500)
 
+(struct annotated (data points))
 (define (read-data-files log-files
                          #:data-type data-type)
   (for/hash ([log (in-list log-files)])
-    (define-values {data total-mutant-count total-success-count}
+    (define-values {data
+                    total-mutant-count
+                    total-success-count
+                    plot-annotations}
       (read-data-from-log log
                           #:data-type data-type))
     (define title (~a (path->benchmark-name log) " "
@@ -39,7 +43,7 @@
                       ;; (round (* 100 (/ total-success-count total-mutant-count)))
                       ;; "%)"
                       ))
-    (values title data)))
+    (values title (annotated data plot-annotations))))
 
 (define (path->benchmark-name path)
   (match (basename path)
@@ -61,7 +65,7 @@
      (define all-misses
        (hash-ref hit+miss-data 'fail))
      (define ratios
-       (for/hash ([type (in-list all-mutation-types)])
+       (for/list ([type (in-list all-mutation-types)])
          (define ratio
            (match* {(hash-ref all-hits type 0)
                     (hash-ref all-misses type 0)
@@ -73,9 +77,11 @@
               (match (hash-ref hit+miss-data 'total)
                 [0 0]
                 [total (/ (+ hits misses) total)])]))
-         (values type ratio)))
+         (cons type ratio)))
+     (define annotations
+       (data-annotations all-hits all-misses))
      (when (equal? data-type 'total-counts)
-       (define sum (apply + (hash-values ratios)))
+       (define sum (apply + (dict-values ratios)))
        (unless (< (abs (- sum 1)) 0.001)
          (raise-user-error
           'plot-mutation-analyses
@@ -86,14 +92,29 @@
               })))
      (values ratios
              (hash-ref hit+miss-data 'total)
-             (apply + (hash-values all-hits)))]
+             (apply + (hash-values all-hits))
+             annotations)]
     [else
      (raise-user-error 'plot-mutation-analyses
                        @~a{Given file that doesn't look like a log: @path})]))
 
+(define (data-annotations all-hits all-misses)
+  (define bar-offset 1)
+  (define label-y 0)
+  (for/list ([type (in-list all-mutation-types)]
+             [i (in-naturals)]
+             #:when (match* {(hash-ref all-hits type 0)
+                             (hash-ref all-misses type 0)}
+                      [{0 0} #t]
+                      [{_ _} #f]))
+    (point-label (list label-y (+ (* i bar-offset) 0.5))
+                 "N/A"
+                 #:point-size 0
+                 #:color "gray")))
+
 
 ;; plot-y-far-tick-label-anchor
-(define (make-plotter add-ticks?)
+(define (make-plotter add-ticks? #:extra [extra-renderer-trees empty])
   (define colored-discrete-histogram
     (discrete-histogram/colors
      (map ->brush-color (build-list (length all-mutation-types) values))))
@@ -101,7 +122,7 @@
                                   #:invert? #t
                                   #:add-ticks? add-ticks?)
                            #:plot plot-pict
-                           ;; #:extra (list (y-tick-lines))
+                           #:extra extra-renderer-trees
                            ))
 
 (define labels-width 190)
@@ -139,22 +160,24 @@
  (define columns (string->number (hash-ref flags 'cols)))
  (define picts
    (flatten
-    (for/list ([{benchmark data} (in-hash (read-data-files
-                                           log-files
-                                           #:data-type plot-type))]
+    (for/list ([{benchmark data+annotations} (in-hash (read-data-files
+                                                       log-files
+                                                       #:data-type plot-type))]
                [i (in-naturals)])
       (define draw-labels? (zero? (modulo i columns)))
-      (define plot-bars-pict (make-plotter draw-labels?))
+      (match-define (annotated data points) data+annotations)
+      (define plot-bars-pict (make-plotter draw-labels?
+                                           #:extra points))
       (define pict
         (parameterize ([plot-width (- PLOT-WIDTH (if draw-labels? 0 labels-width))]
-                       [plot-height (+ 400 (if draw-labels? 15 0))])
+                       [plot-height (+ 400 (if draw-labels? 30 0))])
           (vc-append
            (plot-bars-pict data
                           #:title benchmark
                           #:y-label #f
                           #:x-label #f
                           #:x-max 1)
-           (if draw-labels? (blank 0) (blank 0 10)))))
+           (if draw-labels? (blank 0) (blank 0 30)))))
       pict)))
  (define together
    (fill-background
