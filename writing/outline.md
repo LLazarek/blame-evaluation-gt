@@ -15,31 +15,43 @@
 
 2. Why and How Blame Assigment Algorithms Differ
 
-   - Why Blame Assignments Differ
+   By example; adjusted version of the one in OOPSLA sec 2
 
-   - How Blame Assignments Differ 
+   1. Why Blame Assignments Differ
 
-3. Analyzing these differences
+   2. How Blame Assignments Differ
 
-   1. A space of GT system design
+   3. A space of GT system design
 
       - In terms of error reporting, we identify two axes of GT system
         design: where checking occurs and whether blame is tracked.
 
-   2. How to analyze this space?
+3. A general method for analyzing the utility of blame
+
+   1. How to analyze this space?
    
       - We want a quantative measure of error msg utility that allows
         us to evaluate each point in the above space.
 
-   3. Blame trails
+   2. Blame trails
    
-      - We build on the blame trails idea of Lukas et al [POPL '20]
+      - We want an empirical study to understand how the behavior of blame
+        in real systems.
 
       - Blame trails provide a quantitative measure of a a system's
         error message utility, and they can be applied to every point
         in the above space.
 
-   4. Null hypothesis
+      - We generalize the blame trails idea of Lukas et al [POPL '20] to make it
+        more systematic, scalable, and general, by:
+        1. Adding a null hypothesis baseline for comparison between multiple systems
+        2. Analyzing multiple blame following strategies
+        3. Mutating interfaces as well as programs
+        4. Incorporating domain knowledge in the selection of blame following
+           strategies and mutation
+        5. Evaluating systems on the same platform for apples-to-apples comparisons
+
+   3. Null hypothesis
 
       - We should have a baseline to tell how all of the points in the
         design space compare to having nothing at all.
@@ -58,11 +70,10 @@
 
    3. Selection of programs
 
-      - We are using a set of representative programs, and we insert
-        bugs using mutation techniques.
+      - We are using a set of representative programs
 
-      - Do we need descriptions? Argue that they are representative?
-      	Short scripts, GUI programs, ...
+      - Argue the programs are representative of the range of programs
+        written by TR developers; point to the JFP paper.
 
    4. Sampling of mutants
 
@@ -86,13 +97,12 @@
       - Racket stack traces
       - Mutant sampling
       - Blame trails do not necessarily capture all aspects of error reporting
+      - Transient blame adaptations
       - More?
 
 7. Related work
 
-   - Inspired by POPL'20
-   - GT
-   - Contracts
+   - GT: systems we don't represent
    - Mutation testing
    - Fault localization
 
