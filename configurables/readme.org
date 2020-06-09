@@ -1,0 +1,12 @@
+#+TITLE: Configurables
+
+This directory contains modules providing the configurable parts of the experiment.
+
+* mutation
+This directory contains modules implementing the different forms of mutation available.
+
+* mutant-sampling
+This directory contains modules implementing different ways of sampling mutants.
+
+* blame-following
+This directory contains modules implementing different ways of following blame.

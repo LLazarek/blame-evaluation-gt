@@ -1,0 +1,13 @@
+#+TITLE: Mutation analysis
+
+This directory contains programs for verifying and analyzing our mutation system.
+
+* verify-mutation-parity.rkt
+This program verifies that applying the mutation at index =X= to the typed and untyped variants of a benchmark produces the same mutation in both cases.
+In other words, it verifies that switching a module from untyped to typed (or vice versa) doesn't change the mutation identified by index =X=.
+
+* analyze-mutation.rkt
+This program collects information about how many mutants can be produced for a benchmark, breaks them down by mutator, and whether the mutants produce type errors or not.
+
+* plot-mutation-analyses.rkt
+Plots the information collected by [[*analyze-mutation.rkt][analyze-mutation.rkt]].

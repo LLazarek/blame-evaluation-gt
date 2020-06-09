@@ -28,7 +28,7 @@
          "../util/read-module.rkt"
          "../util/binary-search.rkt")
 
-(define-runtime-path mutant-runner-path "mutant-runner.rkt")
+(define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
 
 (define mutant-error-log (make-parameter "./mutant-errors.txt"))
@@ -126,7 +126,7 @@
 
 (module+ test
   (require ruinit
-           "mutant-factory-test-helper.rkt")
+           "../experiment/mutant-factory-test-helper.rkt")
 
   (define main-mutation-count 17)
   (define second-mutation-count 2)

@@ -12,7 +12,7 @@
          syntax/parse
          syntax/strip-context
          syntax/location
-         "../mutate-benchmark/mutate-benchmark.rkt"
+         "../configurables/mutation/mutate-benchmark.rkt"
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
          "../mutate/top-level-selectors.rkt"

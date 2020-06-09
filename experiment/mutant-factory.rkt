@@ -6,12 +6,12 @@
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "../util/optional-contracts.rkt"
+         "../util/mutant-util.rkt"
+         "../util/progress-log.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
          "../process-q/interface.rkt"
          "../process-q/priority.rkt"
-         "mutant-util.rkt"
-         "progress-log.rkt"
          "blame-trail-data.rkt"
          racket/file
          racket/format

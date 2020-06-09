@@ -4,10 +4,10 @@
 
 (require racket/function
          syntax/parse
-         "../mutate/mutate-expr.rkt"
-         "../mutate/mutate-program.rkt"
-         "../mutate/mutator-lib.rkt"
-         "../mutate/mutators.rkt")
+         "../../mutate/mutate-expr.rkt"
+         "../../mutate/mutate-program.rkt"
+         "../../mutate/mutator-lib.rkt"
+         "../../mutate/mutators.rkt")
 
 (define mutate-atom (compose-mutators arithmetic-op-swap
                                       boolean-op-swap
@@ -43,13 +43,13 @@
            ruinit
            syntax/parse
            syntax/parse/define
-           "../mutate/mutate-expr.rkt"
-           "../mutate/mutate-program.rkt"
-           "../mutate/mutate-test-common.rkt"
-           "../mutate/mutator-lib.rkt"
-           "../mutate/mutators.rkt"
-           "../mutate/top-level-selectors.rkt"
-           "../mutate/expression-selectors.rkt")
+           "../../mutate/mutate-expr.rkt"
+           "../../mutate/mutate-program.rkt"
+           "../../mutate/mutate-test-common.rkt"
+           "../../mutate/mutator-lib.rkt"
+           "../../mutate/mutators.rkt"
+           "../../mutate/top-level-selectors.rkt"
+           "../../mutate/expression-selectors.rkt")
 
   (define (mutate-program stx mutation-index
                           #:top-level-select [top-level-selector select-define/contract]

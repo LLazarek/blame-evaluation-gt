@@ -6,8 +6,8 @@
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
-         "progress-log.rkt"
-         "mutant-util.rkt"
+         "../util/progress-log.rkt"
+         "../util/mutant-util.rkt"
          racket/runtime-path)
 
 (define process-limit (make-parameter 3))
@@ -206,3 +206,5 @@
                                 #:log-progress log-progress!
                                 #:resume-cache cached-results-for)
  (finalize-log!))
+
+(module test racket/base)

@@ -9,12 +9,12 @@
          "../mutate/mutate-program.rkt"
          "../process-q/priority.rkt"
          "../process-q/interface.rkt"
-         "for-first-star.rkt"
-         "binary-search.rkt"
+         "../util/for-first-star.rkt"
+         "../util/binary-search.rkt"
          racket/runtime-path)
 
 (module common rscript
-  (require "binary-search.rkt")
+  (require "../util/binary-search.rkt")
   (provide index-ranges)
 
   (define (time-cost-f index)
@@ -53,8 +53,8 @@
            "../runner/mutation-runner.rkt"
            "../runner/program.rkt"
            "../util/path-utils.rkt"
-           "for-first-star.rkt"
-           "binary-search.rkt"
+           "../util/for-first-star.rkt"
+           "../util/binary-search.rkt"
            (submod ".." common)
            racket/logging
            syntax/parse)
