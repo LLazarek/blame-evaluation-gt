@@ -14,6 +14,8 @@
             procedure?)]
           [in-mutation-indices
            (module-name? benchmark/c . -> . (stream/c natural?))]
+          [max-mutation-index
+           (module-name? benchmark/c . -> . natural?)]
           [max-mutation-index-exceeded?
            (path-to-existant-file? natural? . -> . boolean?)]
 
@@ -97,6 +99,10 @@
                 (benchmark-configuration-others a-benchmark-configuration))))
 
 (define (in-mutation-indices module-to-mutate-name bench)
+  (define max-index (max-mutation-index module-to-mutate-name bench))
+  (in-range (add1 max-index)))
+
+(define (max-mutation-index module-to-mutate-name bench)
   (define max-config (make-max-bench-config bench))
   (define the-benchmark-configuration
     (configure-benchmark bench
@@ -107,14 +113,12 @@
      (list*
       (benchmark-configuration-main the-benchmark-configuration)
       (benchmark-configuration-others the-benchmark-configuration))))
-  (define max-index
-    (result-index ((lowest-upper-bound-binary-search
-                    (λ (index)
-                      (if (max-mutation-index-exceeded? module-to-mutate index)
-                          (go-lower)
-                          (go-higher))))
-                   #:increase-max? #t)))
-  (in-range (add1 max-index)))
+  (result-index ((lowest-upper-bound-binary-search
+                  (λ (index)
+                    (if (max-mutation-index-exceeded? module-to-mutate index)
+                        (go-lower)
+                        (go-higher))))
+                 #:increase-max? #t)))
 
 (define (max-mutation-index-exceeded? module-to-mutate mutation-index)
   ;; `mutate-module` throws if index is too large, so just try

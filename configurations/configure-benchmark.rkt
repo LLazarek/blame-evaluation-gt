@@ -5,6 +5,8 @@
            (path-to-existant-directory? . -> . (or/c #f benchmark/c))]
           [benchmark->mutatable-modules
            (benchmark/c . -> . (listof string?))]
+          [benchmark->name
+           (benchmark/c . -> . string?)]
           [make-max-bench-config
            (->i ([bench benchmark/c])
                 [result {bench}
@@ -135,6 +137,12 @@
   (define mods (benchmark->mutatable-modules a-benchmark))
   (for/hash ([mod (in-list mods)])
     (values mod 'types)))
+
+(define (benchmark->name a-benchmark)
+  (match (benchmark-typed a-benchmark)
+    [(list* (app explode-path/string
+                 (list _ ... name "typed" _)) _)
+     name]))
 
 (module+ test
   (require ruinit)

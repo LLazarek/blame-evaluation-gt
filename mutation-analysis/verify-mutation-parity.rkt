@@ -463,12 +463,6 @@
     (enq-mutant-parity-checker-for current-process-q
                                    mod-to-mutate)))
 
-(define (benchmark->name a-benchmark)
-  (match (benchmark-typed a-benchmark)
-    [(list* (app explode-path/string
-                 (list _ ... name "typed" _)) _)
-     name]))
-
 (define (verify-benchmarks-mutation-parity list-of-benchmarks
                                            process-q
                                            mode)
