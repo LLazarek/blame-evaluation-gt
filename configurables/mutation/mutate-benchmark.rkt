@@ -1,6 +1,7 @@
 #lang at-exp racket/base
 
-(provide mutate-benchmark)
+(provide mutate-benchmark
+         active-mutator-names)
 
 (require racket/function
          syntax/parse
@@ -9,6 +10,26 @@
          "../../mutate/mutator-lib.rkt"
          "../../mutate/mutators.rkt")
 
+;; lltodo: this should really be the list of mutators themselves, and there
+;; should be a way to get a mutator's name from the mutator.
+;; Probably I want a struct with prop:procedure, and a field for the name.
+;; I can have a `define-mutator` macro that takes the name and the mutator
+;; function, and introduces a binding for the name.
+;; For now, keep them manually in-sync.
+(define active-mutator-names
+  (list "arithmetic-op-swap"
+        "boolean-op-swap"
+        "class:publicity"
+        "class:super-new"
+        "data-accessor-swap"
+        "constant-swap"
+        "begin-result-deletion"
+        "negate-conditional"
+        "class:parent-swap"
+        "class:initializer-swap"
+        "position-swap"
+        "class:add-extra-method"
+        "top-level-id-swap"))
 (define mutate-atom (compose-mutators arithmetic-op-swap
                                       boolean-op-swap
                                       class-method-publicity-swap
