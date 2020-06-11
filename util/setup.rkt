@@ -16,7 +16,8 @@
 
 ;; ==================================================
 
-(require syntax/location)
+(require syntax/location
+         "../configurables/mutant-sampling/sample-within-mutators.rkt")
 
 (define-runtime-paths
   [repo-parent-path "../../"]
@@ -260,6 +261,41 @@
     (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
   (define gtp-branch-ok?
     (regexp-match? @regexp{\* hash-top} gtp-branches-str))
+
+  (cond [(not (directory-exists? (mutation-analysis-summaries-dir)))
+         (displayln
+          @~a{
+
+              WARNING: The default mutant summary directory @;
+              @(mutation-analysis-summaries-dir)
+              is empty. Sampling within mutation operators will not work @;
+              without those summaries.
+
+              Generate them with `mutation-analysis/analyze-mutation.rkt` @;
+              and then summarizing the analysis results by running @;
+              `mutation-analysis/summarize-mutation.rkt`.
+
+              })]
+        [(not (equal? (map benchmark-name->summary-file-name
+                           (directory-list (build-path gtp-dir "benchmarks")))
+                      (map ~a (directory-list (mutation-analysis-summaries-dir)))))
+         (define missing
+           (set-subtract (map benchmark-name->summary-file-name
+                              (directory-list (build-path gtp-dir "benchmarks")))
+                         (map ~a (directory-list (mutation-analysis-summaries-dir)))))
+         (displayln
+          @~a{
+
+              WARNING: Default mutant summaries are missing in @;
+              @(mutation-analysis-summaries-dir)
+              Specifically: @missing
+
+              Generate them with `mutation-analysis/analyze-mutation.rkt` @;
+              and then summarizing the analysis results by running @;
+              `mutation-analysis/summarize-mutation.rkt`.
+
+              })]
+        [else (void)])
 
   (unless racket-version-ok?
     (displayln
