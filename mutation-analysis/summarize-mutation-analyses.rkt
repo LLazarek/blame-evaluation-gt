@@ -50,8 +50,10 @@
               [("-o" "--outdir")
                'outdir
                ("Directory in which to place the summaries."
-                @~a{Default: @summaries-dir})
-               #:collect ["path" take-latest (path->string summaries-dir)]]
+                @~a{Default: @(mutation-analysis-summaries-dir)})
+               #:collect ["path"
+                          take-latest
+                          (path->string (mutation-analysis-summaries-dir))]]
               #:args progress-log-paths}
 
  (unless (directory-exists? outdir)

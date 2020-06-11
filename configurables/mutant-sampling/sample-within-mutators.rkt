@@ -5,7 +5,7 @@
 (provide (contract-out [select-mutants mutant-selector/c])
          (struct-out summary)
          benchmark-name->summary-file-name
-         summaries-dir)
+         mutation-analysis-summaries-dir)
 
 (require "../../util/mutant-util.rkt"
          "../mutation/mutate-benchmark.rkt"
@@ -13,7 +13,8 @@
          racket/runtime-path
          racket/random)
 
-(define-runtime-path summaries-dir "../../mutation-analysis/summaries")
+(define-runtime-path default-summaries-dir "../../mutation-analysis/summaries")
+(define mutation-analysis-summaries-dir (make-parameter default-summaries-dir))
 
 (struct summary (valid-indices ; (hash/c string? (listof natural?))
                  max-index ; natural?
@@ -24,7 +25,7 @@
 (define (summary-of bench module-to-mutate-name)
   (define bench-name (benchmark->name bench))
   (define summary-path
-    (build-path summaries-dir
+    (build-path (mutation-analysis-summaries-dir)
                 (benchmark-name->summary-file-name bench-name)))
   (unless (file-exists? summary-path)
     (raise-user-error
