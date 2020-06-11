@@ -2,7 +2,8 @@
 
 (require "../../util/optional-contracts.rkt"
          "mutant-selector.rkt")
-(provide (contract-out [select-mutants mutant-selector/c]))
+(provide (contract-out [select-mutants mutant-selector/c])
+         (struct-out summary))
 
 (require "../../util/mutant-util.rkt"
          "../mutation/mutate-benchmark.rkt"
@@ -18,35 +19,16 @@
                  )
   #:prefab)
 ;; benchmark/c -> summary?
-(define (summary-of bench)
-  (file->value (build-path summaries-dir (benchmark->name bench))))
-;; string? summary? -> (listof natural?)
-(define (summarized-indices-for-mutator mutator summary)
-  (hash-ref (summary-valid-indices summary) mutator))
-
-(define (select-mutants module-to-mutate-name
-                        bench
-                        sample-size)
-  (define summary (summary-of bench))
+(define (summary-of bench module-to-mutate-name)
+  (define summary
+    (file->value (build-path summaries-dir (benchmark->name bench))))
   (sanity-check-summary! summary
                          module-to-mutate-name
                          bench)
-  (define valid-indices-by-mutator
-    (for/hash ([mutator (in-list active-mutator-names)])
-      (values mutator
-              (summarized-indices-for-mutator mutator summary))))
-  (define max-sample-size-by-mutator
-    (for/hash ([{mutator indices} (in-hash valid-indices-by-mutator)])
-      (values mutator (length indices))))
-  (define samples-by-mutator
-    (distribute-sample-size-to-mutators sample-size
-                                        max-sample-size-by-mutator))
-  (define sampled-indices*
-    (for/list ([{mutator samples} (in-hash samples-by-mutator)])
-      (define indices-for-mutator
-        (hash-ref valid-indices-by-mutator mutator))
-      (random-sample indices-for-mutator samples)))
-  (in-list (flatten sampled-indices*)))
+  summary)
+;; string? summary? -> (listof natural?)
+(define (summarized-indices-for-mutator mutator summary)
+  (hash-ref (summary-valid-indices summary) mutator empty))
 
 (define (sanity-check-summary! summary
                                module-to-mutate-name
@@ -72,6 +54,34 @@
          From summary: @(summary-triggered-mutators summary)
          Active:       @active-mutator-names
          })))
+
+(define (select-mutants module-to-mutate-name
+                        bench
+                        sample-size
+                        [get-summary-of summary-of])
+  (define summary (get-summary-of bench module-to-mutate-name))
+  (define sampled-indices-by-mutator (sample-indices-by-mutator summary sample-size))
+  (in-list (flatten (hash-values sampled-indices-by-mutator))))
+
+(define (sample-indices-by-mutator summary sample-size)
+  (define valid-indices-by-mutator
+    (for/hash ([mutator (in-list active-mutator-names)])
+      (values mutator
+              (summarized-indices-for-mutator mutator summary))))
+  (define max-sample-size-by-mutator
+    (for/hash ([{mutator indices} (in-hash valid-indices-by-mutator)])
+      (values mutator (length indices))))
+  (define samples-by-mutator
+    (distribute-sample-size-to-mutators sample-size
+                                        max-sample-size-by-mutator))
+  (define sampled-indices-by-mutator
+    (for/hash ([{mutator samples} (in-hash samples-by-mutator)])
+      (define indices-for-mutator
+        (hash-ref valid-indices-by-mutator mutator))
+      (define sampled-indices (random-sample indices-for-mutator samples
+                                             #:replacement? #f))
+      (values mutator sampled-indices)))
+  sampled-indices-by-mutator)
 
 (define (distribute-sample-size-to-mutators sample-size
                                             max-sample-size-by-mutator)
@@ -124,6 +134,7 @@
 
 (module+ test
   (require ruinit)
+
   (test-begin
     #:name distribute-sample-size-to-mutators
     (test-match (distribute-sample-size-to-mutators 100
@@ -153,5 +164,94 @@
                  (hash 0 1
                        1 1
                        2 0
-                       3 0))))
+                       3 0)))
+
+  (define m1-text
+    @~a{
+        #lang racket
+
+        (define (foo x)
+          (baz x 42)) ; 1-2, 3, 4-8
+        (define (baz x y)
+          (if (even? x) ; 9
+              y
+              (* (sub1 y) (add1 x) 42))) ; 10-18
+        (define (booz x y)
+          (if (even? x) ; 19
+              y
+              (* (sub1 y) (add1 x) 42))) ; 20-28
+
+        (foo (baz 0 1))
+        })
+  ; negate-cond 2
+  ; top-level-id-swap 2
+  ; position-swap 3
+  ; constant-swap 15
+  ; arith-op-swap 6
+  (define-test-env {setup-env! cleanup-env!}
+    #:directories ([test-bench "./test-bench"]
+                   [ut "./test-bench/untyped"]
+                   [t  "./test-bench/typed"])
+    #:files ([test-module-1/ut (build-path ut "test-mod-1.rkt")
+                               m1-text]
+             [test-module-1/t (build-path t "test-mod-1.rkt")
+                              m1-text]))
+  (define call-with-deterministic-random
+    (let ([rando (make-pseudo-random-generator)])
+      (λ (thunk)
+        (parameterize ([current-pseudo-random-generator rando])
+          (random-seed 42)
+          (thunk)))))
+  (test-begin
+    #:name sample-indices-by-mutator
+    #:before (setup-env!)
+    #:after (cleanup-env!)
+    (ignore (define the-test-bench (read-benchmark test-bench))
+            (define operator-indices
+              (hash "constant-swap" (append (range 3 8)
+                                            (range 13 18)
+                                            (range 23 28))
+                    "negate-conditional" '(8 18)
+                    "arithmetic-op-swap" (append (range 9 12)
+                                                 (range 19 22))
+                    "top-level-id-swap" '(0 1)
+                    "position-swap" '(2 10 20)))
+            (define the-summary
+              (summary
+               operator-indices
+               28
+               (hash-keys operator-indices)))
+            (define test:summary-of (const the-summary))
+            (define sample-size 26)
+
+            (define sampled-indices-by-operator
+              (call-with-deterministic-random
+               (thunk (sample-indices-by-mutator the-summary sample-size)))))
+    (test-match sampled-indices-by-operator
+                (hash-table ["arithmetic-op-swap" (app length 6)]
+                            ["constant-swap" (app length 13)]
+                            ["negate-conditional" (app length 2)]
+                            ["position-swap" (app length 3)]
+                            ["top-level-id-swap" (app length 2)]))
+    (extend-test-message
+     (for/and/test ([operator (in-list (hash-keys operator-indices))])
+                   (define samples (hash-ref sampled-indices-by-operator operator))
+                   (equal? (remove-duplicates samples)
+                           samples))
+     "Sampled indices contain duplicates")
+
+    (ignore (define sampled-indices/list
+              (stream->list
+               (call-with-deterministic-random
+                (thunk (select-mutants
+                        "test-mod-1.rkt"
+                        the-test-bench
+                        sample-size
+                        test:summary-of))))))
+    (test-= (length sampled-indices/list)
+            sample-size)
+
+    (test-equal?
+     (sort sampled-indices/list <)
+     (sort (flatten (hash-values sampled-indices-by-operator)) <))))
 
