@@ -3,7 +3,9 @@
 (require "../../util/optional-contracts.rkt"
          "mutant-selector.rkt")
 (provide (contract-out [select-mutants mutant-selector/c])
-         (struct-out summary))
+         (struct-out summary)
+         benchmark-name->summary-file-name
+         summaries-dir)
 
 (require "../../util/mutant-util.rkt"
          "../mutation/mutate-benchmark.rkt"
@@ -20,12 +22,27 @@
   #:prefab)
 ;; benchmark/c -> summary?
 (define (summary-of bench module-to-mutate-name)
-  (define summary
-    (file->value (build-path summaries-dir (benchmark->name bench))))
+  (define bench-name (benchmark->name bench))
+  (define summary-path
+    (build-path summaries-dir
+                (benchmark-name->summary-file-name bench-name)))
+  (unless (file-exists? summary-path)
+    (raise-user-error
+     'sample-within-mutators
+     @~a{
+         Cannot find summary file for benchmark @bench-name @;
+         at @summary-path
+         A summary file is necessary to use this sampling method.
+         Generate one with the script `summarize-mutation-analyses.rkt`.
+         }))
+  (define bench-summary (file->value summary-path))
+  (define summary (hash-ref bench-summary module-to-mutate-name))
   (sanity-check-summary! summary
                          module-to-mutate-name
                          bench)
   summary)
+(define (benchmark-name->summary-file-name name)
+  (~a name "-summary.rktd"))
 ;; string? summary? -> (listof natural?)
 (define (summarized-indices-for-mutator mutator summary)
   (hash-ref (summary-valid-indices summary) mutator empty))
