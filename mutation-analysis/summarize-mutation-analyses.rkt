@@ -1,6 +1,7 @@
 #lang at-exp rscript
 
-(require "../configurables/mutant-sampling/sample-within-mutators.rkt")
+(require "mutation-analysis-summaries.rkt"
+         (prefix-in db: "../db/db.rkt"))
 
 (define (summarize-mutations-in progress-log-path)
   (define ((add-to-list x) l)
@@ -44,27 +45,27 @@
       @~a{Unable to extract benchmark name from @progress-log-path})]))
 
 (main
- #:arguments {[(hash-table ['outdir outdir])
+ #:arguments {[(hash-table ['outdb outdb])
                progress-logs]
               #:once-each
-              [("-o" "--outdir")
-               'outdir
-               ("Directory in which to place the summaries."
-                @~a{Default: @(mutation-analysis-summaries-dir)})
+              [("-o" "--outdb")
+               'outdb
+               ("Database in which to place the summaries."
+                @~a{Default: @(mutation-analysis-summaries-db)})
                #:collect ["path"
                           take-latest
-                          (path->string (mutation-analysis-summaries-dir))]]
+                          (path->string (mutation-analysis-summaries-db))]]
               #:args progress-log-paths}
 
- (unless (directory-exists? outdir)
-   (displayln @~a{Creating output directory @outdir})
-   (make-directory* outdir))
+ (unless (db:path-to-db? outdb)
+   (displayln @~a{Creating db at @outdb})
+   (db:new! outdb))
 
- (for ([progress-log (in-list progress-logs)])
-   (define the-summary (summarize-mutations-in progress-log))
-   (define bench-name (progress-log-path->bench-name progress-log))
-   (define outfile (build-path outdir
-                               (benchmark-name->summary-file-name bench-name)))
-   (with-output-to-file outfile
-     #:exists 'replace
-     (thunk (pretty-write the-summary)))))
+ (define db (db:get outdb))
+ (define data
+   (for/hash ([progress-log (in-list progress-logs)])
+     (define the-summary (summarize-mutations-in progress-log))
+     (define bench-name (progress-log-path->bench-name progress-log))
+     (values bench-name
+             the-summary)))
+ (void (db:write! db data)))
