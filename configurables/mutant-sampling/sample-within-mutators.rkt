@@ -13,9 +13,7 @@
 (define-runtime-path default-samples-db "samples/default.rktdb")
 (define mutation-analysis-samples-db (make-parameter default-samples-db))
 
-(define (select-mutants module-to-mutate-name
-                        the-bench
-                        sample-size)
+(define (select-mutants module-to-mutate-name the-bench)
   (define bench-name (benchmark->name the-bench))
   (define samples (samples-for bench-name module-to-mutate-name))
   (in-list samples))
