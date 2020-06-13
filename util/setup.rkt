@@ -17,7 +17,8 @@
 ;; ==================================================
 
 (require syntax/location
-         "../configurables/mutant-sampling/sample-within-mutators.rkt")
+         "../configurables/mutant-sampling/sample-within-mutators.rkt"
+         (prefix-in db: "../db/db.rkt"))
 
 (define-runtime-paths
   [repo-parent-path "../../"]
@@ -262,37 +263,40 @@
   (define gtp-branch-ok?
     (regexp-match? @regexp{\* hash-top} gtp-branches-str))
 
-  (cond [(not (directory-exists? (mutation-analysis-summaries-dir)))
+  (define how-to-generate-samples
+    @~a{
+        Generate them with `mutation-analysis/analyze-mutation.rkt`,
+        followed by summarizing the analysis results by running @;
+        `mutation-analysis/summarize-mutation.rkt`
+        followed by generating samples with @;
+        `configurables/mutant-sampling/generate-samples-within-mutators.rkt`
+        })
+  (cond [(not (db:path-to-db? (mutation-analysis-samples-db)))
          (displayln
           @~a{
 
-              WARNING: The default mutant summary directory @;
-              @(mutation-analysis-summaries-dir)
-              is empty. Sampling within mutation operators will not work @;
-              without those summaries.
+              WARNING: The default sample database @;
+              @(mutation-analysis-samples-db)
+              does not exist. Sampling within mutation operators must be done @;
+              before the experiment can be run with mutant sampling.
 
-              Generate them with `mutation-analysis/analyze-mutation.rkt` @;
-              and then summarizing the analysis results by running @;
-              `mutation-analysis/summarize-mutation.rkt`.
+              @how-to-generate-samples
 
               })]
-        [(not (equal? (map benchmark-name->summary-file-name
-                           (directory-list (build-path gtp-dir "benchmarks")))
-                      (map ~a (directory-list (mutation-analysis-summaries-dir)))))
+        [(not (set=?
+               (map ~a (directory-list (build-path gtp-dir "benchmarks")))
+               (db:keys (db:get (mutation-analysis-samples-db)))))
          (define missing
-           (set-subtract (map benchmark-name->summary-file-name
-                              (directory-list (build-path gtp-dir "benchmarks")))
-                         (map ~a (directory-list (mutation-analysis-summaries-dir)))))
+           (set-subtract (map ~a (directory-list (build-path gtp-dir "benchmarks")))
+                         (db:keys (db:get (mutation-analysis-samples-db)))))
          (displayln
           @~a{
 
-              WARNING: Default mutant summaries are missing in @;
-              @(mutation-analysis-summaries-dir)
+              WARNING: Samples are missing in the default sample database @;
+              @(mutation-analysis-samples-db)
               Specifically: @missing
 
-              Generate them with `mutation-analysis/analyze-mutation.rkt` @;
-              and then summarizing the analysis results by running @;
-              `mutation-analysis/summarize-mutation.rkt`.
+              @how-to-generate-samples
 
               })]
         [else (void)])
