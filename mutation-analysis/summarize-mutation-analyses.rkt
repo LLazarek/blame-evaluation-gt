@@ -80,3 +80,5 @@
      (values bench-name
              the-summary)))
  (void (db:write! db data)))
+
+(module test racket/base)

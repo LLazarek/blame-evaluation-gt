@@ -11,7 +11,8 @@
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
          "../util/path-utils.rkt"
-         "../process-q/interface.rkt")
+         "../process-q/interface.rkt"
+         "../configurables/configurables.rkt")
 
 
 (module mock racket
@@ -88,6 +89,7 @@
     (test-= (process-Q-get-data (process-Q-set-data mock-q 2))
             2)))
 
+(current-configuration-path (simple-form-path "../configurables/test.config"))
 
 (define e.rkt (file-name-string-from-path e-path))
 (define main.rkt (file-name-string-from-path main-path))

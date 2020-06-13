@@ -224,7 +224,12 @@
 
             (define sampled-indices-by-operator
               (call-with-deterministic-random
-               (thunk (sample-indices-by-mutator the-summary sample-size)))))
+               (thunk
+                (parameterize ([current-active-mutator-names
+                                (load-configured "../TR.config"
+                                                 "mutation"
+                                                 'active-mutator-names)])
+                  (sample-indices-by-mutator the-summary sample-size))))))
     (test-match sampled-indices-by-operator
                 (hash-table ["arithmetic-op-swap" (app length 6)]
                             ["constant-swap" (app length 13)]
