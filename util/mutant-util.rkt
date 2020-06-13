@@ -15,7 +15,7 @@
           [in-mutation-indices
            (module-name? benchmark/c . -> . (stream/c natural?))]
           [max-mutation-index
-           (module-name? benchmark/c . -> . natural?)]
+           (module-name? benchmark/c . -> . (or/c -1 natural?))]
           [max-mutation-index-exceeded?
            (path-to-existant-file? natural? . -> . boolean?)]
 
