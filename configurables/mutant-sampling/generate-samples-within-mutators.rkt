@@ -1,7 +1,5 @@
 #lang at-exp rscript
 
-(provide mutation-analysis-summaries-db)
-
 (require "../../util/mutant-util.rkt"
          "../../configurations/configure-benchmark.rkt"
          (prefix-in db: "../../db/db.rkt")
@@ -46,12 +44,19 @@
 (define (sample-mutants module-to-mutate-name
                         sample-size
                         summary
-                        [excluded-indices empty])
+                        #:exclude [excluded-indices empty]
+                        #:replacement? [replacement? #f])
   (define sampled-indices-by-mutator
-    (sample-indices-by-mutator summary sample-size excluded-indices))
+    (sample-indices-by-mutator summary
+                               sample-size
+                               #:exclude excluded-indices
+                               #:replacement? replacement?))
   (flatten (hash-values sampled-indices-by-mutator)))
 
-(define (sample-indices-by-mutator summary sample-size [excluded-indices empty])
+(define (sample-indices-by-mutator summary
+                                   sample-size
+                                   #:exclude [excluded-indices empty]
+                                   #:replacement? [replacement? #f])
   (define valid-indices-by-mutator
     (for/hash ([mutator (in-list active-mutator-names)])
       (define all-indices-for-mutator
@@ -70,7 +75,7 @@
       (define indices-for-mutator
         (hash-ref valid-indices-by-mutator mutator))
       (define sampled-indices (random-sample indices-for-mutator samples
-                                             #:replacement? #f))
+                                             #:replacement? replacement?))
       (values mutator sampled-indices)))
   sampled-indices-by-mutator)
 
@@ -238,7 +243,8 @@
                            ['samples-db samples-db-path]
                            ['benchmarks-dir benchmarks-dir]
                            ['sample-size (app string->number sample-size)]
-                           ['exclude samples-to-exclude])
+                           ['exclude samples-to-exclude]
+                           ['sample-with-replacement? sample-with-replacement?])
                args]
               #:once-each
               [("-s" "--sumaries-db")
@@ -262,6 +268,11 @@
                 "This is the total number of mutants to sample."
                 @~a{Default: @default-sample-size})
                #:collect ["N" take-latest (~a default-sample-size)]]
+              [("-r" "--with-replacement")
+               'sample-with-replacement?
+               ("Sample mutants with replacement instead of without."
+                "Default: sample without replacement.")
+               #:record]
 
               [("-b" "--benchmarks-dir")
                'benchmarks-dir
@@ -276,7 +287,7 @@
                'exclude
                ("Exclude the samples in the given database from sampling."
                 "This is intended to allow incremental sample additions,"
-                "while still sampling without replacement.")
+                "when sampling without replacement (see -r).")
                #:collect ["path" cons empty]]}
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
@@ -285,6 +296,9 @@
    (displayln @~a{Creating new db at @samples-db-path})
    (db:new! samples-db-path))
 
+ (displayln
+  @~a{Sampling @(if sample-with-replacement? "with" "without") replacement.})
+
  (define excluded-sample-dbs (map db:get samples-to-exclude))
 
  (define samples-db (db:get samples-db-path))
@@ -292,6 +306,8 @@
 
  (define data
    (for/hash ([bench-name (in-list (db:keys summaries-db))])
+     (displayln @~a{Sampling for @bench-name ...})
+
      (define summaries (db:read summaries-db bench-name))
 
      (when benchmarks-dir
@@ -318,7 +334,8 @@
                  (sample-mutants module-name
                                  sample-size
                                  summary
-                                 excluded-indices-for-this-module))))
+                                 #:exclude excluded-indices-for-this-module
+                                 #:replacement? sample-with-replacement?))))
      (values bench-name
              samples-by-module)))
  (void (db:write! samples-db data)))
