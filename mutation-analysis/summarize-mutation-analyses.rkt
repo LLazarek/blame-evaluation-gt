@@ -8,16 +8,27 @@
     (cons x l))
 
   (define contents (file->list progress-log-path))
-  (define mutation-info-by-module
-    (for/fold ([info (hash)])
+  ;; Tracking max-indices just for sanity checking
+  (define-values {mutation-info-by-module
+                  max-indices-by-module}
+    (for/fold ([info (hash)]
+               [max-indices (hash)])
               ([mutation (in-list contents)])
+      (define new-max-indices
+        (match mutation
+          [(list (list mod-name index) _ _)
+           (hash-update max-indices
+                        mod-name
+                        (λ (x) (max x index))
+                        -1)]))
       (match mutation
         [(list (list mod-name index) #t mutator)
-         (hash-update info
-                      mod-name
-                      (add-to-list (list index mutator))
-                      empty)]
-        [else info])))
+         (values (hash-update info
+                              mod-name
+                              (add-to-list (list index mutator))
+                              empty)
+                 new-max-indices)]
+        [else (values info new-max-indices)])))
   (for/hash ([{mod-name mutations} (in-hash mutation-info-by-module)])
     (define mutator-indices
       (for/fold ([mutator-indices (hash)])
@@ -27,7 +38,7 @@
                      mutator
                      (add-to-list index)
                      empty)))
-    (define max-index (apply max (map first mutations)))
+    (define max-index (hash-ref max-indices-by-module mod-name))
     (define triggered-mutators (hash-keys mutator-indices))
     (values mod-name
             (summary mutator-indices
