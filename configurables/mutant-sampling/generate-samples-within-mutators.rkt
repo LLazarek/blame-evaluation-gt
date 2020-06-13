@@ -4,10 +4,12 @@
          "../../configurations/configure-benchmark.rkt"
          (prefix-in db: "../../db/db.rkt")
          "../../mutation-analysis/mutation-analysis-summaries.rkt"
-         "../mutation/mutate-benchmark.rkt"
+         "../configurables.rkt"
          "mutant-selector.rkt"
          "sample-within-mutators.rkt"
          racket/random)
+
+(define current-active-mutator-names (make-parameter #f))
 
 ;; string? summary? -> (listof natural?)
 (define (summarized-indices-for-mutator mutator summary)
@@ -30,7 +32,7 @@
          Summary: @(summary-max-index summary)
          }))
   (unless (subset? (summary-triggered-mutators summary)
-                   active-mutator-names)
+                   (current-active-mutator-names))
     (raise-user-error
      'sample-within-mutators:sanity-check
      @~a{
@@ -38,7 +40,7 @@
          In particular, @;
          mutators recorded in summary are not a subset of active mutator names.
          From summary: @(summary-triggered-mutators summary)
-         Active:       @active-mutator-names
+         Active:       @(current-active-mutator-names)
          })))
 
 (define (sample-mutants module-to-mutate-name
@@ -58,7 +60,7 @@
                                    #:exclude [excluded-indices empty]
                                    #:replacement? [replacement? #f])
   (define valid-indices-by-mutator
-    (for/hash ([mutator (in-list active-mutator-names)])
+    (for/hash ([mutator (in-list (current-active-mutator-names))])
       (define all-indices-for-mutator
         (summarized-indices-for-mutator mutator summary))
       (values mutator
@@ -237,16 +239,24 @@
      "Sampled indices contain duplicates")))
 
 
-(define default-sample-size (* 20 (length active-mutator-names)))
+(define default-sample-size-multiplier 20)
 (main
- #:arguments {[(hash-table ['summaries-db summaries-db-path]
+ #:arguments {[(hash-table ['config-path config-path]
+                           ['summaries-db summaries-db-path]
                            ['samples-db samples-db-path]
                            ['benchmarks-dir benchmarks-dir]
-                           ['sample-size (app string->number sample-size)]
+                           ['sample-size maybe-sample-size]
                            ['exclude samples-to-exclude]
                            ['sample-with-replacement? sample-with-replacement?])
                args]
               #:once-each
+              [("-c" "--config")
+               'config-path
+               ("Configuration to use for generating samples."
+                "This argument is mandatory.")
+               #:mandatory
+               #:collect ["path" take-latest #f]]
+
               [("-s" "--sumaries-db")
                'summaries-db
                ("Database in which to find benchmark mutant summaries."
@@ -266,8 +276,8 @@
                'sample-size
                ("Size of mutant samples to generate."
                 "This is the total number of mutants to sample."
-                @~a{Default: @default-sample-size})
-               #:collect ["N" take-latest (~a default-sample-size)]]
+                @~a{Default: @default-sample-size-multiplier * <number of mutators>})
+               #:collect ["N" take-latest #f]]
               [("-r" "--with-replacement")
                'sample-with-replacement?
                ("Sample mutants with replacement instead of without."
@@ -291,6 +301,18 @@
                #:collect ["path" cons empty]]}
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
+
+ (current-active-mutator-names (load-configured config-path
+                                                "mutation"
+                                                'active-mutator-names))
+
+ (define sample-size
+   (match maybe-sample-size
+     [#f (* default-sample-size-multiplier
+            (length (current-active-mutator-names)))]
+     [(? string? (app string->number (and n (not #f)))) n]
+     [else (raise-user-error 'generate-samples-within-mutators
+                             "Error: sample size must be a number")]))
 
  (unless (db:path-to-db? samples-db-path)
    (displayln @~a{Creating new db at @samples-db-path})
