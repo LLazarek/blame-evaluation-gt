@@ -12,6 +12,7 @@
          "../configurations/configure-benchmark.rkt"
          "../process-q/interface.rkt"
          "../process-q/priority.rkt"
+         "../configurables/configurables.rkt"
          "blame-trail-data.rkt"
          racket/file
          racket/format
@@ -243,6 +244,10 @@
       (log-factory debug "Creating output directory ~a." (data-output-dir))
       (make-directory (data-output-dir)))
 
+    (define select-mutants
+      (load-configured (current-configuration-path)
+                       "mutant-sampling"
+                       'select-mutants))
     (define process-q
       (for/fold ([process-q (make-process-Q (process-limit)
                                             (factory (bench-info bench max-config)
@@ -251,8 +256,8 @@
                                                      0))])
                 ([module-to-mutate-name mutatable-module-names]
                  #:when #t
-                 [mutation-index (in-mutation-indices module-to-mutate-name
-                                                      bench)])
+                 [mutation-index (select-mutants module-to-mutate-name
+                                                 bench)])
         (sample-blame-trails-if-type-error process-q
                                            (mutant module-to-mutate-name
                                                    mutation-index
@@ -1066,6 +1071,10 @@ Mutant: [~a] ~a @ ~a with config:
     path
     "Path to benchmark to run."
     (bench-to-run path)]
+   [("-c" "--config")
+    path
+    "Path to the configuration to use."
+    (current-configuration-path path)]
    [("-o" "--output-dir")
     dir
     "Data output directory."
@@ -1090,8 +1099,12 @@ Mutant: [~a] ~a @ ~a with config:
     ("Record progress in the given log file."
      "If it exists and is not empty, resume from the point reached in the log.")
     (progress-log path)])
+
   (unless (bench-to-run)
-    (error 'mutant-factory "Must provide benchmark to run."))
+    (raise-user-error 'mutant-factory "Error: must provide benchmark to run."))
+  (unless (current-configuration-path)
+    (raise-user-error 'mutant-factory "Error: must provide a configuration."))
+
   (when (and (directory-exists? (data-output-dir))
              (not (progress-log)))
     (eprintf "Output directory ~a already exists; remove? (y/n): "
@@ -1099,6 +1112,7 @@ Mutant: [~a] ~a @ ~a with config:
     (match (read)
       [(or 'y 'yes) (delete-directory/files (data-output-dir))]
       [_ (eprintf "Not deleted.~n")]))
+
   (define progress-info
     (match (progress-log)
       [(? file-exists? path) (make-hash (file->list path))]
