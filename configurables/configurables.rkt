@@ -3,7 +3,8 @@
 (require "../util/optional-contracts.rkt")
 (provide (contract-out
           [load-specific (string? string? symbol? . -> . any/c)]
-          [load-configured (path-string? string? symbol? . -> . any/c)]))
+          [load-configured (path-string? string? symbol? . -> . any/c)]
+          [current-configuration-path (parameter/c (or/c #f path-string?))]))
 
 (require racket/runtime-path)
 
@@ -52,3 +53,5 @@
   (define config (file->value config-path))
   (define name (hash-ref config category))
   (load-specific category name id))
+
+(define current-configuration-path (make-parameter #f))
