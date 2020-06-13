@@ -7,7 +7,7 @@
          "../configurations/configure-benchmark.rkt"
          "../runner/unify-program.rkt"
          "../experiment/blame-trail-data.rkt"
-         "../experiment/mutant-util.rkt"
+         "../util/mutant-util.rkt"
          "../util/path-utils.rkt"
          racket/runtime-path)
 
