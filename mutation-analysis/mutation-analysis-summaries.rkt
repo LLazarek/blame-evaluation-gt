@@ -8,9 +8,9 @@
 (define-runtime-path default-summaries-db "summaries/default.rktdb")
 (define mutation-analysis-summaries-db (make-parameter default-summaries-db))
 
-(struct summary (valid-indices      ; (hash/c string? (listof natural?))
+(struct summary (valid-indices      ; (hash/c mutator-name? (listof natural?))
                  max-index          ; natural?
-                 triggered-mutators ; (listof string?)
+                 triggered-mutators ; (listof mutator-name?)
                  )
   #:prefab)
 

@@ -7,13 +7,60 @@
          "../configurables.rkt"
          "mutant-selector.rkt"
          "sample-within-mutators.rkt"
-         racket/random)
+         racket/random
+         racket/hash)
 
 (define current-active-mutator-names (make-parameter #f))
 
-;; string? summary? -> (listof natural?)
-(define (summarized-indices-for-mutator mutator summary)
-  (hash-ref (summary-valid-indices summary) mutator empty))
+(struct mutant-id (module index)
+  #:transparent)
+(define ((mutant-id-for module) index)
+  (mutant-id module index))
+;; This contains the same information as the hash table
+;; containing summaries produced by `summarize-mutation-analysis.rkt`
+;; but in a form that makes sampling much easier
+;; since we sample mutants from a benchmark *across modules*.
+(struct benchmark-summary
+  (mutants-by-mutator ; (hash/c mutator-name? (listof mutant-id?))
+   )
+  #:transparent)
+
+(define (module-summaries->benchmark-summary module-summaries)
+  (define (module-summary->benchmark-summary mod-name mod-summary)
+    (for/hash ([{mutator indices} (in-hash
+                                   (summary-valid-indices mod-summary))])
+      (values mutator
+              (map (mutant-id-for mod-name) indices))))
+
+  (define all-mutants-by-mutator
+    (for/fold ([all-mutants-by-mutator (hash)])
+              ([{mod-name mod-summary} (in-hash module-summaries)])
+      (define summary-for-this-mod
+        (module-summary->benchmark-summary mod-name mod-summary))
+      (hash-union all-mutants-by-mutator
+                  summary-for-this-mod
+                  #:combine append)))
+  (benchmark-summary all-mutants-by-mutator))
+
+(define (module-samples->benchmark-samples module-samples)
+  (hash-map mutant-id module-samples))
+(define (benchmark-samples->module-samples benchmark-samples)
+  (define ((add-to-list x) l)
+    (cons x l))
+  (for/fold ([samples-by-module (hash)])
+            ([sample (in-list benchmark-samples)])
+    (match-define (mutant-id module-name index) sample)
+    (hash-update samples-by-module
+                 module-name
+                 (add-to-list index)
+                 empty)))
+
+
+;; string? benchmark-summary? -> (listof mutant-id?)
+(define (summarized-indices-for-mutator mutator benchmark-summary)
+  (hash-ref (benchmark-summary-mutants-by-mutator benchmark-summary)
+            mutator
+            empty))
 
 (define (sanity-check-summary! summary
                                module-to-mutate-name
@@ -43,26 +90,25 @@
          Active:       @(current-active-mutator-names)
          })))
 
-(define (sample-mutants module-to-mutate-name
-                        sample-size
-                        summary
+(define (sample-mutants sample-size
+                        benchmark-summary
                         #:exclude [excluded-indices empty]
                         #:replacement? [replacement? #f])
   (define sampled-indices-by-mutator
-    (sample-indices-by-mutator summary
+    (sample-indices-by-mutator benchmark-summary
                                sample-size
                                #:exclude excluded-indices
                                #:replacement? replacement?))
   (flatten (hash-values sampled-indices-by-mutator)))
 
-(define (sample-indices-by-mutator summary
+(define (sample-indices-by-mutator benchmark-summary
                                    sample-size
                                    #:exclude [excluded-indices empty]
                                    #:replacement? [replacement? #f])
   (define valid-indices-by-mutator
     (for/hash ([mutator (in-list (current-active-mutator-names))])
       (define all-indices-for-mutator
-        (summarized-indices-for-mutator mutator summary))
+        (summarized-indices-for-mutator mutator benchmark-summary))
       (values mutator
               (set-subtract all-indices-for-mutator
                             excluded-indices))))
@@ -131,7 +177,8 @@
                          new-remaining-to-distribute)])))
 
 (module+ test
-  (require ruinit)
+  (require ruinit
+           "../../util/path-utils.rkt")
 
   (test-begin
     #:name distribute-sample-size-to-mutators
@@ -194,6 +241,30 @@
                                m1-text]
              [test-module-1/t (build-path t "test-mod-1.rkt")
                               m1-text]))
+  (define operator-indices
+    (hash "constant-swap" (append (range 3 8)
+                                  (range 13 18)
+                                  (range 23 28))
+          "negate-conditional" '(8 18)
+          "arithmetic-op-swap" (append (range 9 12)
+                                       (range 19 22))
+          "top-level-id-swap" '(0 1)
+          "position-swap" '(2 10 20)))
+
+  (define test-mod-name (file-name-string-from-path test-module-1/ut))
+  (define test-mod-summary (summary
+                            operator-indices
+                            28
+                            (hash-keys operator-indices)))
+  (test-begin
+    #:name module-summaries->benchmark-summary
+    (test-equal?
+     (module-summaries->benchmark-summary (hash test-mod-name test-mod-summary))
+     (benchmark-summary
+      (for/hash ([{mutator indices} (in-hash operator-indices)])
+        (values mutator
+                (map (mutant-id-for test-mod-name) indices))))))
+
   (define call-with-deterministic-random
     (let ([rando (make-pseudo-random-generator)])
       (λ (thunk)
@@ -205,22 +276,11 @@
     #:before (setup-env!)
     #:after (cleanup-env!)
     (ignore (define the-test-bench (read-benchmark test-bench))
-            (define operator-indices
-              (hash "constant-swap" (append (range 3 8)
-                                            (range 13 18)
-                                            (range 23 28))
-                    "negate-conditional" '(8 18)
-                    "arithmetic-op-swap" (append (range 9 12)
-                                                 (range 19 22))
-                    "top-level-id-swap" '(0 1)
-                    "position-swap" '(2 10 20)))
-            (define the-summary
-              (summary
-               operator-indices
-               28
-               (hash-keys operator-indices)))
-            (define test:summary-of (const the-summary))
             (define sample-size 26)
+
+            (define the-summary
+              (module-summaries->benchmark-summary
+               (hash test-mod-name test-mod-summary)))
 
             (define sampled-indices-by-operator
               (call-with-deterministic-random
@@ -236,12 +296,58 @@
                             ["negate-conditional" (app length 2)]
                             ["position-swap" (app length 3)]
                             ["top-level-id-swap" (app length 2)]))
-    (extend-test-message
-     (for/and/test ([operator (in-list (hash-keys operator-indices))])
-                   (define samples (hash-ref sampled-indices-by-operator operator))
-                   (equal? (remove-duplicates samples)
-                           samples))
-     "Sampled indices contain duplicates")))
+
+    (ignore (define the-summary-2
+              (module-summaries->benchmark-summary
+               (hash test-mod-name test-mod-summary
+                     "another-mod.rkt" test-mod-summary)))
+            (define sampled-indices-by-operator-2
+              (call-with-deterministic-random
+               (thunk
+                (parameterize ([current-active-mutator-names
+                                (load-configured "../TR.config"
+                                                 "mutation"
+                                                 'active-mutator-names)])
+                  (sample-indices-by-mutator the-summary-2 sample-size))))))
+    ;; Now there's double the number of mutants, so things can be more evenly
+    ;; distributed: 26/5 = 5 to start with:
+    ;; 5 -> 6
+    ;; 5    6
+    ;; 4    4
+    ;; 5    6
+    ;; 4    4
+    (test-match sampled-indices-by-operator-2
+                (hash-table ["arithmetic-op-swap" (app length 6)]
+                            ["constant-swap" (app length 6)]
+                            ["negate-conditional" (app length 4)]
+                            ["position-swap" (app length 6)]
+                            ["top-level-id-swap" (app length 4)]))
+    (for/and/test
+     ([samples (in-list (list sampled-indices-by-operator
+                                           sampled-indices-by-operator-2))])
+     (extend-test-message
+      (for/and/test ([operator (in-list (hash-keys operator-indices))])
+                    (define samples (hash-ref sampled-indices-by-operator operator))
+                    (equal? (remove-duplicates samples)
+                            samples))
+      "Sampled indices contain duplicates"))
+
+
+    ;; exclusion
+    (ignore
+     (define already-sampled (flatten (hash-values sampled-indices-by-operator)))
+     (define sampled-indices-by-operator/exclusion
+              (call-with-deterministic-random
+               (thunk
+                (parameterize ([current-active-mutator-names
+                                (load-configured "../TR.config"
+                                                 "mutation"
+                                                 'active-mutator-names)])
+                  (sample-indices-by-mutator the-summary
+                                             sample-size
+                                             #:exclude already-sampled))))))
+    (test-match sampled-indices-by-operator/exclusion
+                (hash-table ["constant-swap" (app length 2)]))))
 
 
 (define default-sample-size-multiplier 20)
@@ -335,34 +441,30 @@
    (for/hash ([bench-name (in-list (db:keys summaries-db))])
      (displayln @~a{Sampling for @bench-name ...})
 
-     (define summaries (db:read summaries-db bench-name))
-
+     (define module-summaries (db:read summaries-db bench-name))
      (when benchmarks-dir
        (define bench (read-benchmark (build-path benchmarks-dir
                                                  bench-name)))
-       (for ([{module-name summary} (in-hash summaries)])
+       (for ([{module-name summary} (in-hash module-summaries)])
          (sanity-check-summary! summary
                                 module-name
                                 bench)))
+     (define benchmark-summary
+       (module-summaries->benchmark-summary module-summaries))
 
-     (define excluded-sample-maps-for-this-bench
-       (for/list ([excluded-db (in-list excluded-sample-dbs)])
-         (db:read excluded-db bench-name)))
+     (define excluded-samples-for-this-bench
+       (flatten
+        (for/list ([excluded-db (in-list excluded-sample-dbs)])
+          (module-samples->benchmark-samples (db:read excluded-db bench-name)))))
+
+     (define benchmark-samples
+       (sample-mutants sample-size
+                       benchmark-summary
+                       #:exclude excluded-samples-for-this-bench
+                       #:replacement? sample-with-replacement?))
 
      (define samples-by-module
-       (for/hash ([{module-name summary} (in-hash summaries)])
-         (define excluded-indices-for-this-module
-           (flatten
-            (for/list ([excluded-sample-map
-                        (in-list excluded-sample-maps-for-this-bench)])
-              (hash-ref excluded-sample-map
-                        module-name))))
-         (values module-name
-                 (sample-mutants module-name
-                                 sample-size
-                                 summary
-                                 #:exclude excluded-indices-for-this-module
-                                 #:replacement? sample-with-replacement?))))
+       (benchmark-samples->module-samples benchmark-samples))
      (values bench-name
              samples-by-module)))
  (void (db:write! samples-db data)))
