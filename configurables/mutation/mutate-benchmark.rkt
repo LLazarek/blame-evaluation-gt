@@ -486,11 +486,11 @@
     (test-mutation/sequence
      #'{(define/contract c
           any/c
-          (class o (field [v (foo bar)]
-                          w
+          (class o (field w
+                          y
+                          [v (foo bar)]
                           [x 5]
                           [a (g 0)]
-                          y
                           [b f]
                           [z #f])))}
      ;; Swap first pair of initializers
@@ -499,102 +499,102 @@
                 any/c
                 (class o
                   (define/public (a-nonexistant-method x) x)
-                  (field [v (foo bar)]
-                         w
+                  (field w
+                         y
+                         [v (foo bar)]
                          [x 5]
                          [a (g 0)]
-                         y
                          [b f]
                          [z #f])))}]
        ;; Swap first pair of initializers
        [2 ,#'{(define/contract c any/c (class o
-                                         (field [v 5]
+                                         (field w
+                                                y
+                                                [v 5]
                                                 [x (foo bar)]
                                                 [a (g 0)]
                                                 [b f]
-                                                [z #f]
-                                                w
-                                                y)))}]
+                                                [z #f])))}]
        ;; Swap second pair of initializers
        [3 ,#'{(define/contract c any/c (class o
-                                         (field [v (foo bar)]
+                                         (field w
+                                                y
+                                                [v (foo bar)]
                                                 [x 5]
                                                 [a f]
                                                 [b (g 0)]
-                                                [z #f]
-                                                w
-                                                y)))}]
+                                                [z #f])))}]
        ;; swap ordering
        [4 ,#'{(define/contract c any/c (class o
-                                         (field [x 5]
+                                         (field y
+                                                w
+                                                [v (foo bar)]
+                                                [x 5]
+                                                [a (g 0)]
+                                                [b f]
+                                                [z #f])))}]
+       [5 ,#'{(define/contract c any/c (class o
+                                         (field w
+                                                y
+                                                [x 5]
                                                 [v (foo bar)]
                                                 [a (g 0)]
                                                 [b f]
-                                                [z #f]
-                                                w
-                                                y)))}]
-       [5 ,#'{(define/contract c any/c (class o
-                                         (field [v (foo bar)]
-                                                [x 5]
-                                                [b f]
-                                                [a (g 0)]
-                                                [z #f]
-                                                w
-                                                y)))}]
+                                                [z #f])))}]
        [6 ,#'{(define/contract c any/c (class o
-                                         (field [v (foo bar)]
+                                         (field w
+                                                y
+                                                [v (foo bar)]
                                                 [x 5]
-                                                [a (g 0)]
                                                 [b f]
-                                                w
-                                                [z #f]
-                                                y)))}]
+                                                [a (g 0)]
+                                                [z #f])))}]
        ;; Descend into mutating initializer values
        ;; Note that final odd initializer is NOT swapped
        [7 ,#'{(define/contract c any/c (class o
-                                         (field [v (foo bar)]
+                                         (field w
+                                                y
+                                                [v (foo bar)]
                                                 [x -5]
                                                 [a (g 0)]
                                                 [b f]
-                                                [z #f]
-                                                w
-                                                y)))}]
+                                                [z #f])))}]
        [12 ,#'{(define/contract c any/c (class o
-                                          (field [v (foo bar)]
+                                          (field w
+                                                 y
+                                                 [v (foo bar)]
                                                  [x 5]
                                                  [a (g 0.0)]
                                                  [b f]
-                                                 [z #f]
-                                                 w
-                                                 y)))}]
+                                                 [z #f])))}]
        [15 ,#'{(define/contract c any/c (class o
-                                          (field [v (foo bar)]
+                                          (field w
+                                                 y
+                                                 [v (foo bar)]
                                                  [x 5]
                                                  [a (g 0)]
                                                  [b f]
-                                                 [z #t]
-                                                 w
-                                                 y)))}]))
+                                                 [z #t])))}]))
     ;; same test with init-field
     (test-mutation/sequence
      #'{(define/contract c
           any/c
-          (class o (init-field [v (foo bar)]
-                               w
+          (class o (init-field w
+                               y
+                               [v (foo bar)]
                                [x 5]
                                [a (g 0)]
-                               y
                                [b f]
                                [z #f])))}
      ;; Swap first pair of initializers
      `([2 ,#'{(define/contract c any/c (class o
-                                         (init-field [v 5]
+                                         (init-field w
+                                                     y
+                                                     [v 5]
                                                      [x (foo bar)]
                                                      [a (g 0)]
                                                      [b f]
-                                                     [z #f]
-                                                     w
-                                                     y)))}]))
+                                                     [z #f])))}]))
 
     ;; mutation of method bodies
     (test-mutation/sequence

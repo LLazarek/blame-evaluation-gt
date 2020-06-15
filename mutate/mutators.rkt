@@ -360,8 +360,10 @@
     [({~and {~or {~datum init-field}
                  {~datum field}}
             field-type}
-      {~or [field-id:id other-field-stuff ... initial-value:expr]
-           no-init-field:id}
+      {~and no-init-field
+            {~or _:id [_:id {~datum :} _]}}
+      ...
+      [field-id:id other-field-stuff ... initial-value:expr]
       ...)
      (define init-value-stxs (attribute initial-value))
      (mdo* (def rearranged-init-value-stxs
@@ -372,8 +374,8 @@
             (syntax-parse rearranged-init-value-stxs
               [[new-init-value ...]
                (quasisyntax/loc stx
-                 (field-type [field-id other-field-stuff ... new-init-value] ...
-                             no-init-field ...))])])]
+                 (field-type no-init-field ...
+                             [field-id other-field-stuff ... new-init-value] ...))])])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -384,22 +386,34 @@
      ([field-name (in-list (list #'field #'init-field))])
      (extend-test-message
       (test-mutator* swap-class-initializers
-                     #`(#,field-name [a 1]
+                     #`(#,field-name
+                        mandatory-1
+                        [mandatory-2 : T2]
+                        [a 1]
                         [b 2]
                         [c 3]
                         [d : T1 4]
                         [e 5])
-                     (list #`(#,field-name [a 2]
+                     (list #`(#,field-name
+                              mandatory-1
+                              [mandatory-2 : T2]
+                              [a 2]
                               [b 1]
                               [c 3]
                               [d : T1 4]
                               [e 5])
-                           #`(#,field-name [a 1]
+                           #`(#,field-name
+                              mandatory-1
+                              [mandatory-2 : T2]
+                              [a 1]
                               [b 2]
                               [c 4]
                               [d : T1 3]
                               [e 5])
-                           #`(#,field-name [a 1]
+                           #`(#,field-name
+                              mandatory-1
+                              [mandatory-2 : T2]
+                              [a 1]
                               [b 2]
                               [c 3]
                               [d : T1 4]
