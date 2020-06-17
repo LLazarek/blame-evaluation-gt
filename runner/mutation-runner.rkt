@@ -268,38 +268,15 @@
       (make-status status-sym
                    blamed
                    mutated-id))
-    (define (extract-blamed e)
-      (define blame-obj (exn:fail:contract:blame-object e))
-      (define blamed
-        (match (blame-positive blame-obj)
-          [`(function ,id) id]
-          [`(definition ,id) id]
-          [(or 'cast 'typed-world)
-           (srcloc-source (blame-source blame-obj))]
-          [other other]))
-      (define blamed-mod-name
-        (match blamed
-          ;; NOTE: This depends on a modification to Typed Racket;
-          ;; Specifically `require/contract` must be modified to change
-          ;; the positive party, by extending the list with
-          ;; ```from #,(syntax->datum #'lib)```
-          [`(interface for ,_ from ,mod-name)
-           mod-name]
-          [(? path-string?)
-           (file-name-string-from-path blamed)]
-          [else
-           (error 'extract-blamed
-                  @~a{
-                      Unexpected blamed party shape: @~v[blamed]
-                      Mutant info:
-                      @(format-mutant-info a-program
-                                           module-to-mutate
-                                           mutation-index)
-
-                      The blame error message is:
-                      @(exn-message e)
-                      })]))
-      ((make-status* 'blamed) blamed-mod-name))
+    (define make-extract-blamed
+      (load-configured (current-configuration-path)
+                       "blame-following"
+                       'make-extract-blamed))
+    (define extract-blamed
+      (make-extract-blamed (make-status* 'blamed)
+                           (thunk (format-mutant-info a-program
+                                                      module-to-mutate
+                                                      mutation-index))))
     (define (extract-type-error-source e)
       (define failing-stxs (exn:fail:syntax-exprs e))
       (define module-name
