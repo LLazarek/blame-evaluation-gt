@@ -12,7 +12,7 @@
          syntax/parse
          syntax/strip-context
          syntax/location
-         "../configurables/mutation/mutate-benchmark.rkt"
+         "../configurables/configurables.rkt"
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
          "../mutate/top-level-selectors.rkt"
@@ -42,6 +42,9 @@
 
 ;; Produce the mutated syntax for the module at the given path
 (define (mutate-module module-stx mutation-index)
+  (define mutate-benchmark (load-configured (current-configuration-path)
+                                            "mutation"
+                                            'mutate-benchmark))
   (syntax-parse module-stx
     #:datum-literals [module]
     [(module name lang {~and mod-body (mod-begin body ...)})
@@ -409,7 +412,12 @@
 
 
 (module+ test
-  (require ruinit)
+  (require ruinit
+           racket/runtime-path)
+
+  (define-runtime-path test-config "../configurables/test.config")
+  (current-configuration-path test-config)
+
   (define-test (test-stx=? a b)
     (test-equal? (syntax->datum a) (syntax->datum b)))
   (define-test (test-mutate-top-level-selector stx
