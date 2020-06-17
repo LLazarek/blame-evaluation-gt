@@ -1,5 +1,7 @@
 #lang at-exp racket
 
+(provide debug-mutant)
+
 (require "../runner/mutation-runner.rkt"
          (submod "../runner/mutation-runner.rkt" debug)
          "../runner/program.rkt"
