@@ -130,8 +130,12 @@
 
 (module+ test
   (require ruinit
-           "../experiment/mutant-factory-test-helper.rkt")
+           "../experiment/mutant-factory-test-helper.rkt"
+           "../configurables/configurables.rkt"
+           racket/runtime-path)
 
+  (define-runtime-path test-config "../configurables/test.config")
+  (current-configuration-path test-config)
   (define main-mutation-count 17)
   (define second-mutation-count 2)
   (test-begin/with-env

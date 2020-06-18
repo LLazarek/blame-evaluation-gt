@@ -4,11 +4,14 @@
 ;; Get blame from normal Racket contracts, which only ever blame a single
 ;; component. Follow blame to that component.
 
-(provide make-extract-blamed)
+(require "../../util/optional-contracts.rkt")
+(provide (contract-out
+          [make-extract-blamed blamed-location-extractor/c]))
 
-(require "../../util/path-utils.rkt")
+(require "../../util/path-utils.rkt"
+         "../../runner/error-extractors/blamed-location-extractor.rkt")
 
-(define (make-extract-blamed make-result
+(define (make-extract-blamed the-program
                              format-mutant-info-for-error)
   (λ (e)
     (define blame-obj (exn:fail:contract:blame-object e))
@@ -39,4 +42,4 @@
                     The blame error message is:
                     @(exn-message e)
                     })]))
-    (make-result blamed-mod-name)))
+    (list blamed-mod-name)))

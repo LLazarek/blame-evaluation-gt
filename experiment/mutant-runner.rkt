@@ -143,7 +143,12 @@
 
 (module+ test
   (require ruinit
-           racket)
+           racket
+           "../configurables/configurables.rkt"
+           racket/runtime-path)
+
+  (define-runtime-path test-config "../configurables/test.config")
+  (current-configuration-path test-config)
 
   (define-test-env {setup! cleanup!}
     #:directories ([test-bench "./test-bench"]

@@ -11,17 +11,18 @@
 (require racket/runtime-path
          syntax/parse
          syntax/strip-context
-         syntax/location
          "../configurables/configurables.rkt"
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
          "../mutate/top-level-selectors.rkt"
          "../mutate/expression-selectors.rkt"
+         "../util/path-utils.rkt"
+         "../util/ctc-utils.rkt"
          "sandbox-runner.rkt"
          "program.rkt"
          "instrumented-runner.rkt"
-         "../util/path-utils.rkt"
-         "../util/ctc-utils.rkt")
+         "error-extractors/extract-type-error-source.rkt"
+         "error-extractors/extract-runtime-error-location.rkt")
 
 (define-logger mutant-runner)
 
@@ -201,12 +202,13 @@
              [outcome         (apply or/c outcomes)]
              [blamed          {outcome}
                               (if (member outcome '(blamed type-error))
-                                  (or/c module-name?
-                                        ;; This case allows the benchmarks to
-                                        ;; blame library code, which happens for
-                                        ;; instance in the quadU mutant
-                                        ;; "quad-main.rkt" @ 79
-                                        library-path?)
+                                  (listof
+                                   (or/c module-name?
+                                         ;; This case allows the benchmarks to
+                                         ;; blame library code, which happens for
+                                         ;; instance in the quadU mutant
+                                         ;; "quad-main.rkt" @ 79
+                                         library-path?))
                                   any/c)]
              [result-value    any/c]))
 
@@ -268,102 +270,32 @@
       (make-status status-sym
                    blamed
                    mutated-id))
+    (define format-mutant-info-for-error
+      (thunk (format-mutant-info a-program
+                                 module-to-mutate
+                                 mutation-index)))
     (define make-extract-blamed
       (load-configured (current-configuration-path)
                        "blame-following"
                        'make-extract-blamed))
     (define extract-blamed
-      (make-extract-blamed (make-status* 'blamed)
-                           (thunk (format-mutant-info a-program
-                                                      module-to-mutate
-                                                      mutation-index))))
-    (define (extract-type-error-source e)
-      (define failing-stxs (exn:fail:syntax-exprs e))
-      (define module-name
-        (match failing-stxs
-          [(list* (app syntax-source-file-name #f)
-                  ...
-                  (app syntax-source-file-name (? path? file-name-path))
-                  _)
-           (path->string file-name-path)]
-          [else
-           (error 'extract-type-error-source
-                  @~a{
-                      Couldn't find mod name in type error stxs.
-                      Program:
-                      @(format-mutant-info a-program
-                                           module-to-mutate
-                                           mutation-index)
-
-                      Stxs:
-                      @~v[failing-stxs]
-
-                      The type error message is:
-                      @(exn-message e)
-                      })]))
-      ((make-status* 'type-error) module-name (exn-message e)))
-    (define (extract-runtime-error-location e)
-      (define ctx (continuation-mark-set->context
-                   (exn-continuation-marks e)))
-      (define mod-with-error
-        (for*/first ([ctx-item (in-list ctx)]
-                     [ctx-mod-path
-                      (in-value
-                       (match ctx-item
-                         [(cons _ (srcloc (? path? path) _ _ _ _))
-                          (path->string path)]
-                         [(cons _ (srcloc (? string? path-str) _ _ _ _))
-                          (string-trim path-str "\"")]
-                         [(cons (? symbol?
-                                   (app symbol->string
-                                        (regexp @regexp{^body of "(.+)"$}
-                                                (list _ path-str))))
-                                _)
-                          path-str]
-                         [(cons (? symbol?
-                                   (app symbol->string
-                                        (regexp @regexp{^body of '(.+)$}
-                                                (list _ mod-name-sym))))
-                                _)
-                          (~a mod-name-sym ".rkt")]
-                         [else #f]))]
-                     #:when ctx-mod-path
-                     [mod (in-list (list* (program-main a-program)
-                                          (program-others a-program)))]
-                     #:when (equal? (file-name-string-from-path (mod-path mod))
-                                    (file-name-string-from-path ctx-mod-path)))
-          (file-name-string-from-path ctx-mod-path)))
-      (define mod-with-error-name
-        (match mod-with-error
-          [(? string? name) name]
-          [#f
-           (eprintf @~a{
-                        Couldn't find a mod name in ctx from runtime error, @;
-                        possibly because the error happened while @;
-                        instantiating a module.
-                        Program:
-                        @(format-mutant-info a-program
-                                             module-to-mutate
-                                             mutation-index)
-
-                        Ctx:
-                        @pretty-format[ctx]
-
-                        The runtime error message is:
-                        @(exn-message e)
-
-                        Assuming that errortrace failed us and moving on.
-                        })
-           #f]))
-      ((make-status* 'runtime-error) mod-with-error-name))
+      (make-extract-blamed a-program format-mutant-info-for-error))
+    (define extract-type-error-source
+      (make-extract-type-error-source a-program format-mutant-info-for-error))
+    (define extract-runtime-error-location
+      (make-extract-runtime-error-location a-program
+                                           format-mutant-info-for-error))
     (define run/handled
       (λ _
         (with-handlers
-          ([exn:fail:contract:blame? extract-blamed]
-           [type-checker-failure? extract-type-error-source]
+          ([exn:fail:contract:blame? (compose1 (make-status* 'blamed)
+                                               extract-blamed)]
+           [type-checker-failure? (compose (make-status* 'type-error)
+                                           extract-type-error-source)]
            [exn:fail:out-of-memory? (λ _ ((make-status* 'oom)))]
            [exn:fail:syntax? (λ _ ((make-status* 'syntax-error)))]
-           [exn? extract-runtime-error-location])
+           [exn? (compose1 (make-status* 'runtime-error)
+                           extract-runtime-error-location)])
           (run)
           ((make-status* 'completed)))))
     (run-with-limits run/handled
@@ -558,7 +490,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
-                                               [blamed "main.rkt"]))))))
+                                               [blamed '("main.rkt")]))))))
 
   (define (replace-stx-location stx new-file-name)
     (define-values {read-port write-port} (make-pipe))
@@ -620,7 +552,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
-                                               [blamed "b.rkt"])))))
+                                               [blamed '("b.rkt")])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    c
@@ -628,7 +560,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
-                                               [blamed "c.rkt"])))))
+                                               [blamed '("c.rkt")])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -636,7 +568,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "a.rkt"]))))))
+                                               [blamed '("a.rkt")]))))))
 
 
   (define-test-env {setup-test-env! cleanup-test-env!}
@@ -728,7 +660,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "a.rkt"]))))))
+                                               [blamed '("a.rkt")]))))))
   (test-begin
     #:name run-with-mutated-module/runtime-error-locations
     ;; #:before (setup-test-env!)
@@ -769,7 +701,7 @@
                                    #:memory/gb 1
                                    #:suppress-output? #f))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "c.rkt"])))))
+                                               [blamed '("c.rkt")])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -777,7 +709,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "b.rkt"])))))
+                                               [blamed '("b.rkt")])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -785,7 +717,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "a.rkt"])))))
+                                               [blamed '("a.rkt")])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -793,7 +725,7 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed "a.rkt"])))))))
+                                               [blamed '("a.rkt")])))))))
 
 
 ;; for debugging
