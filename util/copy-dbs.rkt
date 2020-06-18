@@ -7,7 +7,8 @@
 (main
  #:arguments {[(hash-table ['dbs dbs-path]
                            ['save save?]
-                           ['load load?])
+                           ['load load?]
+                           ['temp-dir temp-dir])
                args]
               #:once-each
               [("-d" "--dbs")
@@ -26,11 +27,15 @@
                "Action: Load the dbs."
                #:conflicts '(save)
                #:mandatory-unless (λ (flags) (member 'save flags))
-               #:record]}
+               #:record]
+              [("-t" "--temp-dir")
+               'temp-dir
+               ("Specify a directory for temporary files."
+                "Useful if the default temp dir is a different filesystem.")
+               #:collect ["path" take-latest (~a (find-system-path 'temp-dir))]]}
  #:check [(or save? (file-exists? dbs-path))
           @~a{Error: unable to find @dbs-path}]
 
- (define temp-dir (find-system-path 'temp-dir))
  (define data-dir (build-path temp-dir "copy-dbs.rkt-data"))
  (when (directory-exists? data-dir)
    (delete-directory/files data-dir))
