@@ -8,6 +8,7 @@
          racket/match
          racket/path
          racket/pretty
+         (except-in racket/contract/base contract-out)
          "../util/optional-contracts.rkt")
 
 (provide (contract-out
@@ -16,7 +17,7 @@
           [new! ({path-string?} {path-string?} . ->* . any)]
           [read ({db? any/c} {failure-result/c} . ->* . any/c)]
           [write! (db? hash? . -> . db?)]
-          [keys (db? . -> . (listof? any/c))]))
+          [keys (db? . -> . (listof any/c))]))
 
 ;; A DB is a pair of:
 ;; - a file of metadata

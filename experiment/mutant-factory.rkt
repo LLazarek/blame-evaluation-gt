@@ -61,7 +61,7 @@
            spawn-mutant
            read-mutant-result
            process-outcome
-           try-get-blamed-module
+           try-get-blamed-modules
            try-get-type-error-module
            mutant->process-will
            make-blame-following-will/fallback))
@@ -112,7 +112,7 @@
 (struct blame-trail (id parts) #:transparent)
 
 ;; will?           := (factory? dead-mutant-process? -> factory?)
-;; result?         := run-status? (see `mutation-runner.rkt`)
+;; result/c        := run-status/c (see `mutation-runner.rkt`)
 ;; ctc-level?      := symbol?
 ;; config?         := (hash path-string?
 ;;                         (hash (or symbol? path-string?) ctc-level?))
@@ -135,7 +135,7 @@
                         increased-limits?)
   #:transparent)
 
-;; result: result?
+;; result: result/c
 (struct dead-mutant-process (mutant
                              config
                              result
@@ -174,7 +174,7 @@
 
 (define test-mutant-flag 'test)
 
-(define blame-label? module-name?)
+(define blame-labels? (listof module-name?))
 (define mutant/c
   (struct/dc mutant
              [module (abstract?) (if abstract?
@@ -182,7 +182,7 @@
                                      path-to-existant-file?)]
              [index natural?]
              [abstract? boolean?]))
-(define result? run-status?)
+(define result/c run-status/c)
 (define blame-trail-id? (or/c natural?
                               test-mutant-flag))
 (define blame-trail/c
@@ -202,7 +202,7 @@
   (struct/dc dead-mutant-process
              [mutant             mutant/c]
              [config             config/c]
-             [result             result?]
+             [result             result/c]
              [id                 natural?]
              [blame-trail        blame-trail/c]
              [increased-limits?  boolean?]))
@@ -460,10 +460,10 @@
 ;; - the output of `dead-proc` has a blame label
 (define/contract (follow-blame-from-dead-process the-process-q
                                                  dead-proc
-                                                 blamed/type-error-location)
-  (->i ([the-process-q               (process-Q/c factory/c)]
-        [dead-proc                   dead-mutant-process/c]
-        [blamed/type-error-location  blame-label?])
+                                                 blamed/type-error-locations)
+  (->i ([the-process-q                (process-Q/c factory/c)]
+        [dead-proc                    dead-mutant-process/c]
+        [blamed/type-error-locations  blame-labels?])
        #:pre/desc {dead-proc}
        (match dead-proc
          [(struct* dead-mutant-process
@@ -483,25 +483,52 @@
   (define the-blame-trail+dead-proc
     (extend-blame-trail the-blame-trail
                         dead-proc))
-  (cond [(config-at-max-precision-for? blamed/type-error-location config)
+  (define all-blamed-at-max-precision?
+    (andmap (λ (blamed) (config-at-max-precision-for? blamed config))
+            blamed/type-error-locations))
+  (define buggy-mod-type-error?
+    (type-error-on-buggy-mod? blamed/type-error-locations result))
+  (cond [(or buggy-mod-type-error?
+             all-blamed-at-max-precision?)
          (log-factory debug
                       "Blame trail ~a @ ~a {~a} ended."
                       mod
                       index
                       (blame-trail-id the-blame-trail+dead-proc))
-         (unless (blame/type-error-on-buggy-mod? blamed/type-error-location result)
-           (log-factory
-            error
-            @~a{
-                BT VIOLATION: @;
-                Found mutant with blamed/type-error at types that is not bug.
-                Blamed: @~v[blamed/type-error-location]
 
-                Mutant: @;
-                @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
-                With config:
-                @~v[config]
-                }))
+         (cond [(and buggy-mod-type-error?
+                     (not all-blamed-at-max-precision?))
+                ;; This should never happen: something has gone wrong, because
+                ;; type errors only blame one location and that location must be
+                ;; typed
+                (log-factory
+                 error
+                 @~a{
+                     Found a mutant with type error in the buggy module, @;
+                     but the module is not typed?
+                     Type error location: @blamed/type-error-locations
+
+                     Mutant: @;
+                     @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
+                     With config:
+                     @~v[config]
+                     })]
+               [(and (not buggy-mod-type-error?)
+                     all-blamed-at-max-precision?)
+                (log-factory
+                 error
+                 @~a{
+                     BT VIOLATION: @;
+                     Found mutant with blamed/type-error location at types @;
+                     that is not the buggy module.
+                     Blamed: @~v[blamed/type-error-locations]
+
+                     Mutant: @;
+                     @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
+                     With config:
+                     @~v[config]
+                     })]
+               [else (void)])
          ;; Blamed region is typed, so the path ends here.
          ;; Log the trail and stop following.
          (define new-factory
@@ -511,7 +538,7 @@
                              new-factory)]
         [else
          (define config/blamed-region-ctc-strength-incremented
-           (increment-config-precision-for blamed/type-error-location config))
+           (increment-config-precision-for-all blamed/type-error-locations config))
          (define (spawn-the-blame-following-mutant a-process-q
                                                    #:timeout/s [timeout/s #f]
                                                    #:memory/gb [memory/gb #f])
@@ -526,7 +553,7 @@
          (define will:keep-following-blame
            (make-blame-following-will/fallback
             (make-blame-disappearing-fallback dead-proc
-                                              blamed/type-error-location
+                                              blamed/type-error-locations
                                               spawn-the-blame-following-mutant)))
          (spawn-the-blame-following-mutant the-process-q)]))
 
@@ -546,7 +573,7 @@
                                                    blamed
                                                    respawn-mutant)
   (dead-mutant-process/c
-   blame-label?
+   blame-labels?
    ((process-Q/c factory/c)
     #:timeout/s (or/c #f number?)
     #:memory/gb (or/c #f number?)
@@ -621,7 +648,8 @@ Predecessor (id [~a]) blamed ~a and had config:
         config)
        (maybe-abort "Blame disappeared" current-process-q)]
       [{(or 'blamed 'type-error) _}
-       #:when (library-path? (run-status-blamed dead-succ-result))
+       #:when (and (list? (run-status-blamed dead-succ-result))
+                   (andmap library-path? (run-status-blamed dead-succ-result)))
        (log-factory
         error
         @~a{
@@ -641,17 +669,17 @@ Predecessor (id [~a]) blamed ~a and had config:
 
   (λ (the-process-q dead-proc)
     (cond
-      [(or (try-get-blamed-module dead-proc)
+      [(or (try-get-blamed-modules dead-proc)
            (try-get-type-error-module dead-proc))
-       => (λ (blamed/type-error-location)
+       => (λ (blamed/type-error-locations)
             (log-factory debug
                          "Following blame trail {~a} from [~a] via ~a..."
                          (dead-mutant-process-id dead-proc)
                          (dead-mutant-process-id dead-proc)
-                         blamed/type-error-location)
+                         blamed/type-error-locations)
             (follow-blame-from-dead-process the-process-q
                                             dead-proc
-                                            blamed/type-error-location))]
+                                            blamed/type-error-locations))]
       [else
        (no-blame-fallback the-process-q dead-proc)])))
 
@@ -709,6 +737,7 @@ Predecessor (id [~a]) blamed ~a and had config:
                            module-to-mutate-name
                            mutation-index
                            outfile
+                           (current-configuration-path)
                            #:timeout/s timeout/s
                            #:memory/gb memory/gb
                            #:save-output (and debug:save-individual-mutant-outputs?
@@ -799,8 +828,8 @@ Predecessor (id [~a]) blamed ~a and had config:
                                                     (or 'blamed
                                                         'type-error
                                                         'runtime-error))]
-                                      [blamed (? string? mod-name)]))
-                            (~a outcome " blaming " mod-name)]
+                                      [blamed (list (? string? mod-names) ...)]))
+                            (~a outcome " blaming " mod-names)]
                            [(struct* run-status
                                      ([outcome (and outcome
                                                     'runtime-error)]
@@ -991,11 +1020,12 @@ Mutant: [~a] ~a @ ~a with config:
 (define (process-outcome dead-proc)
   (run-status-outcome (dead-mutant-process-result dead-proc)))
 
-;; result? -> module-name?
-(define/match (try-get-blamed-module/from-result result)
+;; result/c -> module-name?
+(define/match (try-get-blamed-modules/from-result result)
   [{(struct* run-status ([outcome 'blamed]
-                         [blamed (? module-name? blamed)]))}
-   blamed]
+                         [blamed (and (list-no-order (? module-name?) _ ...)
+                                      blamed-list)]))}
+   (filter module-name? blamed-list)]
   [{(struct* run-status ([outcome 'runtime-error]
                          [blamed (and blamed
                                       (not #f))]))}
@@ -1004,16 +1034,16 @@ Mutant: [~a] ~a @ ~a with config:
    #f])
 
 ;; dead-mutant-process? -> module-name?
-(define/match (try-get-blamed-module dead-proc)
+(define/match (try-get-blamed-modules dead-proc)
   [{(dead-mutant-process _ _ result _ _ _)}
-   (try-get-blamed-module/from-result result)])
+   (try-get-blamed-modules/from-result result)])
 
-(define/contract (blame/type-error-on-buggy-mod? blamed-mod-name result)
-  (module-name? run-status/c . -> . boolean?)
+(define/contract (type-error-on-buggy-mod? blamed-mod-names result)
+  ((listof module-name?) run-status/c . -> . boolean?)
 
   (match result
-    [(struct* run-status ([outcome (or 'blamed 'type-error 'runtime-error)]
-                          [blamed (== blamed-mod-name)]))
+    [(struct* run-status ([outcome 'type-error]
+                          [blamed (== blamed-mod-names)]))
      #t]
     [_ #f]))
 

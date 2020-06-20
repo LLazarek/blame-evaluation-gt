@@ -103,7 +103,7 @@
                                    0
                                    'baz
                                    'blamed
-                                   e.rkt
+                                   (list e.rkt)
                                    #f)
                        42
                        (blame-trail 95 '())
@@ -124,7 +124,7 @@
                                    0
                                    'baz
                                    'blamed
-                                   e.rkt
+                                   (list e.rkt)
                                    #f)]))
 (define dead-e-proc/type-error-in-d
   (struct-copy dead-mutant-process
@@ -133,7 +133,7 @@
                                    0
                                    'baz
                                    'type-error
-                                   main.rkt
+                                   (list main.rkt)
                                    #f)]))
 (define dead-e-proc/oom/no-increased-limits
   (struct-copy dead-mutant-process
@@ -204,18 +204,18 @@
 
 (test-begin
  #:name dead-process-blame/type-errors
- (test-equal? (try-get-blamed-module dead-e-proc/crashed)
-              e.rkt)
- (not/test (try-get-blamed-module dead-e-proc/completed))
- (test-equal? (try-get-blamed-module dead-e-proc/blame-e)
-              e.rkt)
- (not/test (try-get-blamed-module dead-e-proc/type-error-in-d))
+ (test-equal? (try-get-blamed-modules dead-e-proc/crashed)
+              (list e.rkt))
+ (not/test (try-get-blamed-modules dead-e-proc/completed))
+ (test-equal? (try-get-blamed-modules dead-e-proc/blame-e)
+              (list e.rkt))
+ (not/test (try-get-blamed-modules dead-e-proc/type-error-in-d))
 
  (not/test (try-get-type-error-module dead-e-proc/crashed))
  (not/test (try-get-type-error-module dead-e-proc/completed))
  (not/test (try-get-type-error-module dead-e-proc/blame-e))
  (test-equal? (try-get-type-error-module dead-e-proc/type-error-in-d)
-              main.rkt)
+              (list main.rkt))
 
  (test-equal? (process-outcome dead-e-proc/crashed)
               'blamed)
@@ -282,13 +282,26 @@
                            q)))
     (follow-blame-from-dead-process mock-q
                                     dead-e-proc/blame-e
-                                    e.rkt))
+                                    (list e.rkt)))
    (extend-test-message
     (mutant-process? (unbox enqueued))
     "Didn't enqueue a mutant following blame on e.rkt when it should have")
    (equal? (mutant-process-config (unbox enqueued))
            (hash-set (dead-mutant-process-config dead-e-proc/blame-e)
                      e.rkt 'types))
+
+   (ignore (set-box! enqueued #f)
+           (follow-blame-from-dead-process mock-q
+                                           dead-e-proc/blame-e
+                                           (list main.rkt e.rkt)))
+   (extend-test-message
+    (mutant-process? (unbox enqueued))
+    "Didn't enqueue a mutant following blame on e.rkt and main.rkt when it should have")
+   (equal? (mutant-process-config (unbox enqueued))
+           (hash-set
+            (hash-set (dead-mutant-process-config dead-e-proc/blame-e)
+                      e.rkt 'types)
+            main.rkt 'types))
 
    (ignore
     (set-box! enqueued #f)
@@ -300,7 +313,7 @@
                                      'types)]))
     (follow-blame-from-dead-process mock-q
                                     dead-e-proc/blame-e/e-already-types
-                                    e.rkt))
+                                    (list e.rkt)))
    (extend-test-message
     (not (unbox enqueued))
     "Enqueued a mutant following blame on e.rkt when it's already at max")
@@ -312,7 +325,7 @@
                    [result
                     (struct-copy run-status
                                  (dead-mutant-process-result dead-e-proc/blame-e)
-                                 [blamed "../base/csp.rkt"])]))
+                                 [blamed '("../base/csp.rkt")])]))
     ((make-blame-following-will/fallback (λ (q _)
                                            (set-box! enqueued 'fallback)
                                            q))
@@ -320,7 +333,7 @@
      dead-e-proc/blame-lib))
    (extend-test-message
     (test-equal? (unbox enqueued) 'fallback)
-    "Enqueued a mutant following blame into a library?")))
+    "\nEnqueued a mutant following blame into a library?")))
 
 (parameterize ([abort-on-failure? #f])
   (test-begin/with-env
@@ -330,7 +343,7 @@
     (define fallback/oom
       (make-blame-disappearing-fallback
        dead-e-proc/oom/no-increased-limits
-       main.rkt
+       (list main.rkt)
        (λ (q #:timeout/s t #:memory/gb m)
          (set-box! increased-limits?-box (or t m))
          q)))
@@ -373,7 +386,7 @@
                    [result
                     (struct-copy run-status
                                  (dead-mutant-process-result dead-e-proc/blame-e)
-                                 [blamed "../base/csp.rkt"])]))
+                                 [blamed '("../base/csp.rkt")])]))
     (fallback/oom (make-mock-Q (make:m0-factory))
                   dead-e-proc/blamed-lib))
    (extend-test-message
@@ -718,7 +731,7 @@
                             (mutant-summary _
                                             (struct* run-status
                                                      ([outcome 'blamed]
-                                                      [blamed "main.rkt"]))
+                                                      [blamed '("main.rkt")]))
                                             (== (hash "main.rkt" 'none
                                                       "second.rkt" 'types)))
                             _ ___)]))

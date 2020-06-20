@@ -5,6 +5,7 @@
            ({benchmark-configuration/c
              module-name?
              natural?
+             path-string?
              path-string?}
             {#:timeout/s (or/c #f number?)
              #:memory/gb (or/c #f number?)
@@ -28,7 +29,8 @@
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
-         "../util/binary-search.rkt")
+         "../util/binary-search.rkt"
+         "../configurables/configurables.rkt")
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
@@ -42,6 +44,7 @@
                              module-to-mutate-name
                              mutation-index
                              outfile
+                             config-path
                              #:timeout/s [timeout/s #f]
                              #:memory/gb [memory/gb #f]
                              #:log-mutation-info? [log-mutation-info? #f]
@@ -85,7 +88,8 @@
                           "-t" (~a (or timeout/s
                                        (default-timeout/s)))
                           "-g" (~a (or memory/gb
-                                       (default-memory-limit/gb))))
+                                       (default-memory-limit/gb)))
+                          "-c" config-path)
                     (if output-path
                         (list "-O" output-path)
                         empty))))

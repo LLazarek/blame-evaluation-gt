@@ -2,7 +2,8 @@
 
 (require "../../util/optional-contracts.rkt")
 (provide (contract-out
-          [make-extract-type-error-source blamed-location-extractor/c]))
+          [make-extract-type-error-source
+           (blamed-location-extractor/c-for exn:fail:syntax?)]))
 
 (require "../../util/path-utils.rkt"
          "../program.rkt"
@@ -33,4 +34,4 @@
                     The type error message is:
                     @(exn-message e)
                     })]))
-    (values (list module-name) (exn-message e))))
+    (list module-name)))

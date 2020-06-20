@@ -1,6 +1,6 @@
 #lang at-exp racket/base
 
-(provide blamed-location-extractor/c
+(provide blamed-location-extractor/c-for
          blamed-modules/c)
 
 (require racket/contract/base
@@ -10,8 +10,9 @@
 
 (define blamed-modules/c (listof (or/c module-name?
                                        library-path?)))
-(define blamed-location-extractor/c
+(define (blamed-location-extractor/c-for exn-predicate)
   (program/c
    (-> string?)
    . -> .
-   (exn:fail:contract:blame? . -> . blamed-modules/c)))
+   (exn-predicate . -> . blamed-modules/c)))
+

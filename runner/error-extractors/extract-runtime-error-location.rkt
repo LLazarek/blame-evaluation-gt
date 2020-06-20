@@ -2,7 +2,8 @@
 
 (require "../../util/optional-contracts.rkt")
 (provide (contract-out
-          [make-extract-runtime-error-location blamed-location-extractor/c]))
+          [make-extract-runtime-error-location
+           (blamed-location-extractor/c-for exn:fail?)]))
 
 (require "../../util/path-utils.rkt"
          "../program.rkt"

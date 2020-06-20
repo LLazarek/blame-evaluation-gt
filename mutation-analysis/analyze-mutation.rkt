@@ -8,6 +8,7 @@
          "../util/read-module.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
+         "../configurables/configurables.rkt"
          racket/runtime-path)
 
 (define process-limit (make-parameter 3))
@@ -89,6 +90,7 @@
                                    module-to-mutate-name
                                    index
                                    outfile
+                                   (current-configuration-path)
                                    #:log-mutation-info? #t))
   (log-mutation-analysis-info
    @~a{Spawned mutant @module-to-mutate-name @"@" @index})
@@ -160,6 +162,11 @@
                "Path to benchmark to run."
                #:mandatory
                #:collect ["path" take-latest #f]]
+              [("-c" "--config")
+               'config-path
+               "The config to use for generating mutants."
+               #:mandatory
+               #:collect ["path" take-latest #f]]
               [("-o" "--output-dir")
                'data-output-dir
                "Data output directory."
@@ -177,6 +184,7 @@
                ("Record progress in the given log file."
                 "If it exists and is not empty, resume from the point reached in the log.")
                #:collect ["path" take-latest #f]]}
+ (current-configuration-path (hash-ref flags 'config-path))
  (define progress-log (hash-ref flags 'progress-log))
  (define progress
    (match progress-log

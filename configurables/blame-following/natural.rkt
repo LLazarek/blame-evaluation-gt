@@ -6,7 +6,8 @@
 
 (require "../../util/optional-contracts.rkt")
 (provide (contract-out
-          [make-extract-blamed blamed-location-extractor/c]))
+          [make-extract-blamed
+           (blamed-location-extractor/c-for exn:fail:contract:blame?)]))
 
 (require "../../util/path-utils.rkt"
          "../../runner/error-extractors/blamed-location-extractor.rkt")

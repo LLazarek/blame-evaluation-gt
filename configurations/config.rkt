@@ -18,6 +18,10 @@
     [else
      (error 'increment-config-precision-for
             @~a{Given config with value @name already at types: @config})]))
+(define (increment-config-precision-for-all names config)
+  (for/fold ([config config])
+            ([name (in-list names)])
+    (increment-config-precision-for name config)))
 
 ;; Produce a list of `n` random samples (with replacement!) of the config whose
 ;; top element is `max-config`

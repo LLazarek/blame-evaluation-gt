@@ -9,7 +9,8 @@
          racket/format
          "../runner/mutation-runner.rkt"
          "../runner/program.rkt"
-         "../runner/unify-program.rkt")
+         "../runner/unify-program.rkt"
+         "../configurables/configurables.rkt")
 
 (define (fail fmt-str . fmt-args)
   (apply eprintf
@@ -77,7 +78,12 @@
    [("-O" "--output")
     path
     "Send mutant output to `path` instead of suppressing it."
-    (mutant-output-path path)])
+    (mutant-output-path path)]
+
+   [("-c" "--config")
+    path
+    "The configuration with which to run the mutant."
+    (current-configuration-path path)])
 
   (define mutant-output-path-port
     (match (mutant-output-path)

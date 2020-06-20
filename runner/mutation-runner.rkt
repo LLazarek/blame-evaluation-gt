@@ -191,6 +191,13 @@
                     result-value)
   #:prefab)
 
+(define module-name-or-library-path?
+  (or/c module-name?
+        ;; This case allows the benchmarks to
+        ;; blame library code, which happens for
+        ;; instance in the quadU mutant
+        ;; "quad-main.rkt" @ 79
+        library-path?))
 (define run-status/c
   (struct/dc run-status
              [mutated-module  module-name?]
@@ -201,15 +208,13 @@
                                   symbol?)]
              [outcome         (apply or/c outcomes)]
              [blamed          {outcome}
-                              (if (member outcome '(blamed type-error))
-                                  (listof
-                                   (or/c module-name?
-                                         ;; This case allows the benchmarks to
-                                         ;; blame library code, which happens for
-                                         ;; instance in the quadU mutant
-                                         ;; "quad-main.rkt" @ 79
-                                         library-path?))
-                                  any/c)]
+                              (match outcome
+                                ['blamed
+                                 (non-empty-listof module-name-or-library-path?)]
+                                ['type-error
+                                 (list/c module-name-or-library-path?)]
+                                [else
+                                 any/c])]
              [result-value    any/c]))
 
 ;; run-status -> bool
@@ -290,8 +295,8 @@
         (with-handlers
           ([exn:fail:contract:blame? (compose1 (make-status* 'blamed)
                                                extract-blamed)]
-           [type-checker-failure? (compose (make-status* 'type-error)
-                                           extract-type-error-source)]
+           [type-checker-failure? (compose1 (make-status* 'type-error)
+                                            extract-type-error-source)]
            [exn:fail:out-of-memory? (λ _ ((make-status* 'oom)))]
            [exn:fail:syntax? (λ _ ((make-status* 'syntax-error)))]
            [exn? (compose1 (make-status* 'runtime-error)
