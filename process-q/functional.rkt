@@ -216,7 +216,7 @@
                                 [2 4]))
                    (enq-process
                     the-q*
-                    (λ _ (simple-process @~a{echo @i+}
+                    (λ _ (simple-process @~a{sleep 0.5 && echo @i+}
                                          (will-for i+))))]
                   [else the-q*])))
             (define the-q
@@ -225,7 +225,7 @@
                 (enq-process
                  the-q
                  (λ _
-                   (simple-process @~a{echo @i}
+                   (simple-process @~a{sleep 0.5 && echo @i}
                                    (will-for i)))))))
     (test-= (fun-process-Q-active-count the-q) 2)
     (test-= (Q-size (fun-process-Q-waiting the-q)) 1)
