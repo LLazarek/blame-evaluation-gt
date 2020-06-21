@@ -10,6 +10,7 @@
          "blamed-location-extractor.rkt")
 
 (define (make-extract-runtime-error-location the-program
+                                             program-config
                                              format-mutant-info-for-error)
   (λ (e)
     (define ctx (continuation-mark-set->context

@@ -13,6 +13,7 @@
          "../../runner/error-extractors/blamed-location-extractor.rkt")
 
 (define (make-extract-blamed the-program
+                             program-config
                              format-mutant-info-for-error)
   (λ (e)
     (define blame-obj (exn:fail:contract:blame-object e))

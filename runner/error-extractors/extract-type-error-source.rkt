@@ -11,6 +11,7 @@
          syntax/location)
 
 (define (make-extract-type-error-source the-program
+                                        program-config
                                         format-mutant-info-for-error)
   (λ (e)
     (define failing-stxs (exn:fail:syntax-exprs e))

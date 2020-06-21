@@ -1,5 +1,6 @@
 #lang at-exp racket
 
+(require "../util/optional-contracts.rkt")
 (provide (contract-out
           [read-benchmark
            (path-to-existant-directory? . -> . (or/c #f benchmark/c))]
@@ -31,13 +32,14 @@
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt")
 
-(struct benchmark-configuration (main others base-dir)
+(struct benchmark-configuration (main others base-dir config)
   #:transparent)
 (define benchmark-configuration/c
   (struct/c benchmark-configuration
             path-string?
             (listof path-string?)
-            (or/c #f path-string?)))
+            (or/c #f path-string?)
+            config/c))
 
 (define (configure-benchmark bench config)
   (match-define (benchmark typed untyped base both)
@@ -57,7 +59,8 @@
   (benchmark-configuration main
                            (append others
                                    adapters)
-                           base))
+                           base
+                           config))
 
 
 (define (sort-file-names names)
@@ -221,34 +224,40 @@
     #:before (setup!)
     #:after (cleanup!)
 
-    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir))
+            (define config-1 (hash (file-name-string-from-path main) 'none
+                                   (file-name-string-from-path a) 'none
+                                   (file-name-string-from-path b) 'none)))
     (test-match (configure-benchmark a-benchmark
-                                     (hash (file-name-string-from-path main) 'none
-                                           (file-name-string-from-path a) 'none
-                                           (file-name-string-from-path b) 'none))
+                                     config-1)
                 (benchmark-configuration (== main paths=?)
                                          (list-no-order (== a paths=?)
                                                         (== b paths=?)
                                                         (== adapter paths=?))
-                                         (== base paths=?)))
+                                         (== base paths=?)
+                                         (== config-1)))
+    (ignore (define a-types-config (hash-set config-1
+                                             (file-name-string-from-path a)
+                                             'types)))
     (test-match (configure-benchmark a-benchmark
-                                     (hash (file-name-string-from-path main) 'none
-                                           (file-name-string-from-path a) 'types
-                                           (file-name-string-from-path b) 'none))
+                                     a-types-config)
                 (benchmark-configuration (== main paths=?)
                                          (list-no-order (== a/t paths=?)
                                                         (== b paths=?)
                                                         (== adapter paths=?))
-                                         (== base paths=?)))
+                                         (== base paths=?)
+                                         (== a-types-config)))
+    (ignore (define a-main-types-config (hash-set a-types-config
+                                                  (file-name-string-from-path main)
+                                                  'types)))
     (test-match (configure-benchmark a-benchmark
-                                     (hash (file-name-string-from-path main) 'types
-                                           (file-name-string-from-path a) 'types
-                                           (file-name-string-from-path b) 'none))
+                                     a-main-types-config)
                 (benchmark-configuration (== main/t paths=?)
                                          (list-no-order (== a/t paths=?)
                                                         (== b paths=?)
                                                         (== adapter paths=?))
-                                         (== base paths=?))))
+                                         (== base paths=?)
+                                         (== a-main-types-config))))
 
   (test-begin
     #:name make-max-bench-config

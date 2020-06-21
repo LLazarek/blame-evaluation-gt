@@ -49,7 +49,7 @@
                              #:memory/gb [memory/gb #f]
                              #:log-mutation-info? [log-mutation-info? #f]
                              #:save-output [output-path #f])
-  (match-define (benchmark-configuration main others* base-dir)
+  (match-define (benchmark-configuration main others* base-dir bench-config)
     a-benchmark-configuration)
   (define module-to-mutate
     (resolve-configured-benchmark-module a-benchmark-configuration
@@ -89,7 +89,8 @@
                                        (default-timeout/s)))
                           "-g" (~a (or memory/gb
                                        (default-memory-limit/gb)))
-                          "-c" config-path)
+                          "-c" config-path
+                          "-C" (~s bench-config))
                     (if output-path
                         (list "-O" output-path)
                         empty))))

@@ -18,6 +18,7 @@
          "../mutate/expression-selectors.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt"
+         "../configurations/config.rkt"
          "sandbox-runner.rkt"
          "program.rkt"
          "instrumented-runner.rkt"
@@ -229,6 +230,7 @@
 (define/contract (run-with-mutated-module a-program
                                           module-to-mutate
                                           mutation-index
+                                          program-config
                                           #:suppress-output? [suppress-output? #t]
                                           #:timeout/s [timeout/s (* 3 60)]
                                           #:memory/gb [memory/gb 3]
@@ -238,7 +240,8 @@
                                           #:mutator [mutate mutate-module])
   (->i ([a-program program/c]
         [module-to-mutate mod/c]
-        [mutation-index natural?])
+        [mutation-index natural?]
+        [program-config config/c])
        (#:suppress-output? [suppress-output? boolean?]
         #:timeout/s [timeout/s number?]
         #:memory/gb [memory/gb number?]
@@ -284,11 +287,16 @@
                        "blame-following"
                        'make-extract-blamed))
     (define extract-blamed
-      (make-extract-blamed a-program format-mutant-info-for-error))
+      (make-extract-blamed a-program
+                           program-config
+                           format-mutant-info-for-error))
     (define extract-type-error-source
-      (make-extract-type-error-source a-program format-mutant-info-for-error))
+      (make-extract-type-error-source a-program
+                                      program-config
+                                      format-mutant-info-for-error))
     (define extract-runtime-error-location
       (make-extract-runtime-error-location a-program
+                                           program-config
                                            format-mutant-info-for-error))
     (define run/handled
       (λ _
@@ -360,6 +368,10 @@
   (define-test (test/no-error run-thunk test-thunk)
     (with-handlers ([exn:fail? (λ (e) (fail (exn-message e)))])
       (test-thunk (run-thunk))))
+  (define p-config
+    ;; this doesn't matter for the natural blame strategy used by the test
+    ;; config
+    (hash))
   (test-begin
     #:name run-with-mutated-module/mutations
     (ignore
@@ -415,6 +427,7 @@
             (λ _ (run-with-mutated-module p
                                           a
                                           0
+                                          p-config
                                           #:suppress-output? #f))))
      (λ (output) (test-equal? output
                               "B
@@ -430,6 +443,7 @@
             (λ _ (run-with-mutated-module p
                                           b
                                           0
+                                          p-config
                                           #:suppress-output? #f))))
      (λ (output) (test-equal? output
                               "B
@@ -444,6 +458,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    10
+                                   p-config
                                    #:timeout/s 5
                                    #:memory/gb 3))
      (λ (r) (test-match r (struct* run-status ([outcome 'timeout])))))
@@ -451,6 +466,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    10
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'oom]))))))
@@ -492,6 +508,7 @@
      (λ _ (run-with-mutated-module p
                                    main
                                    3
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
@@ -554,6 +571,7 @@
      (λ _ (run-with-mutated-module p
                                    b
                                    0
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
@@ -562,6 +580,7 @@
      (λ _ (run-with-mutated-module p
                                    c
                                    0
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
@@ -570,6 +589,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    11 ;; runtime error -> blame on a.rkt
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
@@ -649,6 +669,7 @@
      (λ _ (run-with-mutated-module p/ml
                                    a/ml
                                    3
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-equal?
@@ -656,12 +677,14 @@
              (run-with-mutated-module p/f
                                       a/f
                                       3
+                                      p-config
                                       #:timeout/s 60
                                       #:memory/gb 1))))
     (test/no-error
      (λ _ (run-with-mutated-module p/ml
                                    a/ml
                                    3
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
@@ -702,6 +725,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    0 ; swap x y args of foo -> crash in bar
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1
                                    #:suppress-output? #f))
@@ -711,6 +735,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    1 ; (+ 1) to (- 1) -> crash in foo
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
@@ -719,6 +744,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    4 ; (+ 1) to (+ 0) -> crash in top level of a.rkt
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
@@ -727,6 +753,7 @@
      (λ _ (run-with-mutated-module p
                                    a
                                    8 ; 0 to 1 -> crash in main
+                                   p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]

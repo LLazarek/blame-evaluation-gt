@@ -28,6 +28,7 @@
   (define timeout/s (make-parameter #f))
   (define memory/gb (make-parameter #f))
   (define mutant-output-path (make-parameter #f))
+  (define bench-config (make-parameter #f))
 
   (command-line
    #:once-each
@@ -82,8 +83,15 @@
 
    [("-c" "--config")
     path
-    "The configuration with which to run the mutant."
-    (current-configuration-path path)])
+    ("The configuration with which to run the mutant."
+     "This is a mandatory argument.")
+    (current-configuration-path path)]
+
+   [("-C" "--bench-config")
+    config-str
+    ("The `write`n form of the benchmark configuration."
+     "This is a mandatory argument.")
+    (bench-config (call-with-input-string config-str read))])
 
   (define mutant-output-path-port
     (match (mutant-output-path)
@@ -100,8 +108,10 @@
     (for/first ([arg (in-list (list (main-module)
                                     (other-modules)
                                     (module-to-mutate)
-                                    (mutation-index)))]
-                [flag (in-list '(-m -o -M -i))]
+                                    (mutation-index)
+                                    (current-configuration-path)
+                                    (bench-config)))]
+                [flag (in-list '(-m -o -M -i -c -C))]
                 #:unless arg)
       flag))
 
@@ -135,6 +145,7 @@
          the-program
          the-module-to-mutate
          (mutation-index)
+         (bench-config)
          #:timeout/s (timeout/s)
          #:memory/gb (memory/gb)
          #:modules-base-path (find-program-base-path the-program)
@@ -200,5 +211,6 @@
     (or (run-with-mutated-module
          test-program
          to-mutate
-         0)
+         0
+         (hash))
         #t)))

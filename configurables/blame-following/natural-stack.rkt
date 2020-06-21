@@ -13,6 +13,7 @@
          "../../runner/error-extractors/extract-runtime-error-location.rkt")
 
 (define (make-extract-blamed the-program
+                             program-config
                              format-mutant-info-for-error)
   (make-extract-runtime-error-location the-program
                                        format-mutant-info-for-error))
