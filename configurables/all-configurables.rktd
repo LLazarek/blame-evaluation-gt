@@ -3,4 +3,5 @@
       ("mutant-sampling" . #hash(("none" . "mutant-sampling/no-sampling.rkt")
                                  ("within-mutators" . "mutant-sampling/sample-within-mutators.rkt")))
       ("blame-following" . #hash(("natural-blame" . "blame-following/natural-blame.rkt")
-                                 ("natural-stack" . "blame-following/natural-stack.rkt"))))
+                                 ("natural-stack" . "blame-following/natural-stack.rkt")
+                                 ("null"          . "blame-following/null.rkt"))))
