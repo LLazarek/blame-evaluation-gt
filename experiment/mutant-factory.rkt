@@ -235,6 +235,12 @@
 
   (parameterize ([current-progress-logger log-progress!]
                  [current-result-cache cached-results-for])
+    (log-factory info
+                 @~a{
+                     Running experiment with config @;
+                     @(current-configuration-path)
+                     })
+
     (define mutatable-module-names (benchmark->mutatable-modules bench))
     (define max-config (make-max-bench-config bench))
     (log-factory info "Benchmark has modules:~n~a"
