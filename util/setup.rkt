@@ -131,7 +131,8 @@
   (displayln "Downloading typed-racket...")
   (define-values {parent _}
     (basename TR-dir #:with-directory? #t))
-  (parameterize ([current-directory parent])
+  ;; For setting up normal TR
+  #;(parameterize ([current-directory parent])
     (shell* raco-path
             "pkg"
             "update"
@@ -146,10 +147,18 @@
             "-j" "2"
             "--clone"
             "typed-racket"))
+  (parameterize ([current-directory parent])
+    (shell* "git"
+            "clone"
+            "https://github.com/bennn/typed-racket.git"))
+  (parameterize ([current-directory TR-dir])
+    (shell* "git"
+            "checkout"
+            "transient-blame"))
   (directory-exists? TR-dir))
 
 (define (setup-existing-TR-dir! raco-path TR-dir)
-  (displayln @~a{Installing existing TR at @TR-dir})
+  (displayln @~a{Installing TR at @TR-dir})
   (define TR-subpaths
     (for/list ([dir (in-list '("source-syntax"
                                "typed-racket-compatibility"
@@ -173,15 +182,6 @@
               "require-contract.rkt"))
 (define (modify-TR TR-dir)
   (displayln "Modifying typed-racket...")
-  (unless (parameterize ([current-directory TR-dir])
-            (shell* "git"
-                    "checkout"
-                    "v7.6"))
-    (user-prompt! @~a{
-
-                      Help! Unable to checkout branch v7.6 in @TR-dir
-                      Please resolve the problem and checkout the branch before continuing.
-                      }))
   (unless (dry-run?)
     (replace-in-file! (build-path TR-dir TR-modified-module-rel-path)
                       (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm))})
@@ -227,6 +227,17 @@
       (dynamic-require `(submod (file ,(quote-source-file)) check-modified-TR) #f)
       #f))
 
+  (define transient-kw-accepted?
+    (with-handlers ([exn:fail:syntax? (const #f)])
+      (eval #'(module test typed/racket (#%module-begin #:transient (+ 2 2))))
+      #t))
+
+  (define transient-blame-present?
+    (and (dynamic-require 'typed-racket/utils/transient-contract-struct
+                          'exn:fail:contract:blame:transient
+                          (const #f))
+         #t))
+
   (when (and (not TR-modified-line-present?)
              display-failures?)
     (displayln
@@ -244,8 +255,30 @@
          ERROR: The modified version of typed-racket is not installed or active.
          Run this setup script to install it.
          }))
+  (when (and (not transient-kw-accepted?)
+             display-failures?)
+    (displayln
+     @~a{
+
+         ERROR: Transient support is not available in the current typed-racket
+         install. Are you trying to use a different version of typed racket?
+         This setup script installs a custom version with support for Transient.
+         Run me to install it.
+         }))
+  (when (and (not transient-blame-present?)
+             display-failures?)
+    (displayln
+     @~a{
+
+         ERROR: Transient support is available but without blame.
+         Probably the install has become misconfigured somehow.
+         Run me to fix it.
+         }))
   (and TR-modified-line-present?
-       modified-TR-active?))
+       modified-TR-active?
+       transient-kw-accepted?
+       transient-blame-present?))
+
 (module check-modified-TR typed/racket
   (require/typed (only-in racket first)
     [first ((Listof Any) . -> . Boolean)])
@@ -394,12 +427,11 @@
  (when (hash-ref flags 'deps-only)
    (exit 0))
 
- (cond [(not (directory-exists? TR-dir))
-        (download-TR raco-path TR-dir)]
-       [(not (check-TR-install racket-dir TR-dir))
-        (setup-existing-TR-dir! raco-path TR-dir)]
-       [else (void)])
+ (unless (directory-exists? TR-dir)
+   (download-TR raco-path TR-dir))
  (modify-TR TR-dir)
+ (unless (check-TR-install racket-dir TR-dir)
+   (setup-existing-TR-dir! raco-path TR-dir))
 
  (unless (directory-exists? gtp-dir)
    (install-gtp-repo gtp-dir))
