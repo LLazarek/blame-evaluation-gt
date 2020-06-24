@@ -261,8 +261,7 @@
          Probably the install has become misconfigured somehow.
          Run me to fix it.
          }))
-  (and TR-modified-line-present?
-       modified-TR-active?
+  (and modified-TR-active?
        transient-kw-accepted?
        transient-blame-present?))
 
