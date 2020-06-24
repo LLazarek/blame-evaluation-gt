@@ -233,10 +233,11 @@
       #t))
 
   (define transient-blame-present?
-    (and (dynamic-require 'typed-racket/utils/transient-contract-struct
-                          'exn:fail:contract:blame:transient
-                          (const #f))
-         #t))
+    (with-handlers ([exn:fail:filesystem:missing-module? (const #f)])
+      (and (dynamic-require 'typed-racket/utils/transient-contract-struct
+                            'exn:fail:contract:blame:transient
+                            (const #f))
+           #t)))
 
   (when (and (not TR-modified-line-present?)
              display-failures?)
