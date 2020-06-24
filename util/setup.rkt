@@ -214,11 +214,6 @@
   ;;     [(list path) (string-contains? path (path->string racket-dir))]
   ;;     [else #f]))
 
-  (define TR-modified-line-present?
-    (shell* "grep"
-            "interface for.*from"
-            (build-path TR-dir TR-modified-module-rel-path)))
-
   (define (error-has-interface-from? e)
     (equal? (blame-positive (exn:fail:contract:blame-object e))
             '(interface for first from (only-in racket first))))
@@ -239,15 +234,6 @@
                             (const #f))
            #t)))
 
-  (when (and (not TR-modified-line-present?)
-             display-failures?)
-    (displayln
-     @~a{
-
-         ERROR: The installed version of typed-racket doesn't appear @;
-         to have the required modifications.
-         Run this setup script to make them.
-         }))
   (when (and (not modified-TR-active?)
              display-failures?)
     (displayln
