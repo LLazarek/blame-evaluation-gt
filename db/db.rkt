@@ -1,6 +1,7 @@
 #lang at-exp racket/base
 
 ;; Very simple file-system-based database
+;; todo: tests
 
 (require racket/file
          racket/format
@@ -104,10 +105,13 @@
                         (λ _
                           (error 'read
                                  @~a{key not found in db: @~e[key]}))])
-  (define file-name (hash-ref (db-map a-db) key fail-result))
-  (define data-dir-path (db-data-dir a-db))
-  (define file-path (build-path data-dir-path file-name))
-  (file->value file-path))
+  (define file-name (hash-ref (db-map a-db) key #f))
+  (cond [file-name
+         (define data-dir-path (db-data-dir a-db))
+         (define file-path (build-path data-dir-path file-name))
+         (file->value file-path)]
+        [(procedure? fail-result) (fail-result)]
+        [else fail-result]))
 
 (define (write! a-db contents)
   (define data-dir (db-data-dir a-db))
