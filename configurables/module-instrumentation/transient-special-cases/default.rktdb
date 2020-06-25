@@ -1,0 +1,2 @@
+#hash((data-directory . "default.rktdb-data")
+      (map . #hash(("lnm/typed/lnm-plot.rkt" . "0"))))

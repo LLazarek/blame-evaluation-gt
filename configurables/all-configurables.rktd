@@ -4,4 +4,6 @@
                                  ("within-mutators" . "mutant-sampling/sample-within-mutators.rkt")))
       ("blame-following" . #hash(("natural-blame" . "blame-following/natural-blame.rkt")
                                  ("natural-stack" . "blame-following/natural-stack.rkt")
-                                 ("null"          . "blame-following/null.rkt"))))
+                                 ("null"          . "blame-following/null.rkt")))
+      ("module-instrumentation" . #hash(("none" . "module-instrumentation/none.rkt")
+                                        ("transient" . "module-instrumentation/type-with-transient.rkt"))))

@@ -130,7 +130,7 @@
 
   ;; ll: Ugly hack to get the mutated id out of the instrumentor
   (define mutated-id-box (box #f))
-  (define (instrument-module a-mod)
+  (define (record-mutated-id/maybe-write-modules a-mod)
     (match a-mod
       [(and (== module-to-mutate)
             (mod path stx))
@@ -161,9 +161,15 @@
     (parameterize ([current-namespace ns])
       (namespace-require 'errortrace)))
 
+  (define configured-instrumenter
+    (load-configured (current-configuration-path)
+                     "module-instrumentation"
+                     'instrument-module))
+
   (define runner
     (make-instrumented-runner a-program
-                              instrument-module
+                              (compose1 record-mutated-id/maybe-write-modules
+                                        configured-instrumenter)
                               #:setup-namespace setup-namespace!))
   (define mutated-id (unbox mutated-id-box))
 
