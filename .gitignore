@@ -1,3 +1,4 @@
 compiled/
 mutation-analysis/summaries/
 configurables/mutant-sampling/samples/
+configurables/module-instrumentation/transient-special-cases/
