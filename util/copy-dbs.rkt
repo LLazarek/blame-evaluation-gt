@@ -2,7 +2,12 @@
 
 (define-runtime-paths
   [summaries-dir "../mutation-analysis/summaries"]
-  [mutations-dir "../configurables/mutant-sampling/samples"])
+  [mutations-dir "../configurables/mutant-sampling/samples"]
+  [special-cases-dir "../configurables/module-instrumentation/transient-special-cases"])
+
+(define db-dirs (list summaries-dir
+                      mutations-dir
+                      special-cases-dir))
 
 (main
  #:arguments {[(hash-table ['dbs dbs-path]
@@ -40,8 +45,10 @@
  (when (directory-exists? data-dir)
    (delete-directory/files data-dir))
  (make-directory data-dir)
- (define temp-summaries-dir (build-path data-dir (basename summaries-dir)))
- (define temp-mutations-dir (build-path data-dir (basename mutations-dir)))
+ (define temp-dirs
+   (for/hash ([db-dir (in-list db-dirs)])
+     (values db-dir
+             (build-path data-dir (basename db-dir)))))
  (define temp-db-name "dbs.tar.gz")
  (cond
    [save?
@@ -53,36 +60,26 @@
              (delete-file dbs-path)]
             [else (eprintf "Canceling~n")
                   (exit 1)]))
-    (copy-directory/files summaries-dir
-                          temp-summaries-dir)
-    (copy-directory/files mutations-dir
-                          temp-mutations-dir)
+    (for ([db-dir (in-list db-dirs)])
+      (copy-directory/files db-dir
+                            (hash-ref temp-dirs db-dir)))
     (parameterize ([current-directory data-dir])
-      (system @~a{
-                  tar -czf @temp-db-name @;
-                  @(find-relative-path data-dir
-                                       temp-summaries-dir) @;
-                  @(find-relative-path data-dir
-                                       temp-mutations-dir)
-                  }))
+      (define temp-dirs-str
+        (string-join
+         (for/list ([db-dir (in-list db-dirs)])
+           (~a (find-relative-path data-dir
+                                   (hash-ref temp-dirs db-dir))))))
+      (system @~a{tar -czf @temp-db-name @temp-dirs-str}))
     (rename-file-or-directory (build-path data-dir temp-db-name)
                               dbs-path)]
    [load?
-    (when (directory-exists? summaries-dir)
+    (for ([db-dir (in-list db-dirs)]
+          #:when (directory-exists? db-dir))
       (cond [(user-prompt! @~a{
-                                      @summaries-dir already exists, @;
-                                      overwrite it?
-                                      })
-             (delete-directory/files summaries-dir)]
-            [else
-             (eprintf "Canceling~n")
-             (exit 1)]))
-    (when (directory-exists? mutations-dir)
-      (cond [(user-prompt! @~a{
-                                      @mutations-dir already exists, @;
-                                      overwrite it?
-                                      })
-             (delete-directory/files mutations-dir)]
+                               @db-dir already exists, @;
+                               overwrite it?
+                               })
+             (delete-directory/files db-dir)]
             [else
              (eprintf "Canceling~n")
              (exit 1)]))
@@ -90,11 +87,9 @@
     (copy-file dbs-path
                (build-path data-dir temp-db-name))
     (parameterize ([current-directory data-dir])
-      (system @~a{tar -xzf @temp-db-name}))
-    (rename-file-or-directory temp-summaries-dir
-                              summaries-dir
-                              #t)
-    (rename-file-or-directory temp-mutations-dir
-                              mutations-dir
-                              #t)])
+      (system @~a{tar -xzmf @temp-db-name}))
+    (for ([db-dir (in-list db-dirs)])
+      (rename-file-or-directory (hash-ref temp-dirs db-dir)
+                                db-dir
+                                #t))])
  (delete-directory/files data-dir))
