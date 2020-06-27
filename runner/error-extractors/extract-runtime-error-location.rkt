@@ -43,24 +43,25 @@
                    #:when (equal? (file-name-string-from-path (mod-path mod))
                                   (file-name-string-from-path ctx-mod-path)))
         (file-name-string-from-path ctx-mod-path)))
-    (define mod-with-error-name
-      (match mod-with-error
-        [(? string? name) name]
-        [#f
-         (eprintf @~a{
-                      Couldn't find a mod name in ctx from runtime error, @;
-                      possibly because the error happened while @;
-                      instantiating a module.
-                      Program:
-                      @(format-mutant-info-for-error)
+    (match mod-with-error
+      [(? string? name) (list name)]
+      [#f
+       (eprintf @~a{
+                    Couldn't find a mod name in ctx from runtime error, @;
+                    possibly because the error happened while @;
+                    instantiating a module.
+                    Program:
+                    @(format-mutant-info-for-error)
 
-                      Ctx:
-                      @pretty-format[ctx]
+                    Ctx:
+                    @pretty-format[ctx]
 
-                      The runtime error message is:
-                      @(exn-message e)
+                    The runtime error message is:
+                    @(exn-message e)
 
-                      Assuming that errortrace failed us and moving on.
-                      })
-         #f]))
-    (list mod-with-error-name)))
+                    Assuming that errortrace failed us and moving on.
+                    })
+       ;; Since error extractors return lists, we can return an empty list here.
+       ;; This ends up being consistent in a way with how non-`module-name?`
+       ;; elements in a list (from blaming library code) get filtered out.
+       empty])))
