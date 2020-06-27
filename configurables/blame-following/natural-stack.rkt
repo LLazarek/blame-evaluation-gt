@@ -16,4 +16,5 @@
                              program-config
                              format-mutant-info-for-error)
   (make-extract-runtime-error-location the-program
+                                       program-config
                                        format-mutant-info-for-error))
