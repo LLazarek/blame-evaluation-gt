@@ -33,6 +33,23 @@
 (define (explode-path/string p)
   (map path->string (explode-path p)))
 
+(define (build-path-string . parts)
+  (path->string (apply build-path parts)))
+
+(define (benchmark-mod-relative-path-parts full-path)
+  (match (explode-path/string full-path)
+    [(list _ ... bench u/t name)
+     (list bench u/t name)]
+    [else
+     (error 'benchmark-mod-relative-path-parts
+            @~a{
+                Unexpected benchmark path shape: @full-path
+                })]))
+
+(define (benchmark-mod-relative-path full-path)
+  (apply build-path-string
+         (benchmark-mod-relative-path-parts full-path)))
+
 (module+ test
   (require ruinit)
   (test-begin
@@ -66,4 +83,9 @@
                  #f)
     (test-equal? (pick-file-by-name '()
                                     "def.rkt")
-                 #f)))
+                 #f))
+
+  (test-begin
+    #:name benchmark-mod-relative-path
+    (test-equal? (benchmark-mod-relative-path "/foo/bar/gregor/untyped/a.rkt")
+                 "gregor/untyped/a.rkt")))
