@@ -8,6 +8,7 @@
          racket/list
          typed-racket/utils/transient-contract-struct
          "../../util/optional-contracts.rkt"
+         "../../runner/error-extractors/blamed-location-extractor.rkt"
          "extract-blamed-mod-name.rkt")
 
 (provide (contract-out

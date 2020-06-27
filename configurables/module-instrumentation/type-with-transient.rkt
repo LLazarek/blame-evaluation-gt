@@ -9,7 +9,9 @@
          (prefix-in db: "../../db/db.rkt")
          "../../runner/program.rkt"
          "../../util/optional-contracts.rkt"
-         "../../util/read-module.rkt")
+         "../../util/read-module.rkt"
+         "../../util/path-utils.rkt"
+         "instrument-module.rkt")
 
 (provide (contract-out
           [instrument-module module-instrumenter/c])
@@ -36,9 +38,7 @@
 
 (define (mod-stx/replace-special-cases a-mod)
   (define mod-relative-path
-    (match (explode-path (mod-path a-mod))
-      [(list _ ... bench u/t name)
-       (path->string (build-path bench u/t name))]))
+    (benchmark-mod-relative-path (mod-path a-mod)))
   (define db (db:get (transient-special-cases-db)))
   (match (db:read db
                   mod-relative-path
