@@ -1,18 +1,23 @@
 #lang at-exp racket
 
-(provide make-instrumented-runner)
+(provide make-instrumented-runner
+         run-with:require)
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
          "modgraph.rkt"
          "program.rkt"
-         "../util/path-utils.rkt")
+         "../util/path-utils.rkt"
+         "../util/optional-contracts.rkt")
 
 (define (module-path-resolve mod-path [load? #f])
   ((current-module-name-resolver) mod-path #f #f load?))
 
 (struct instrumented-module
   (path-string module-path file-path containing-directory stx))
+
+(define (run-with:require main-mod-path)
+  (eval `(require ,main-mod-path)))
 
 (define/contract (make-instrumented-runner a-program
                                            instrument-module
@@ -21,12 +26,15 @@
                                            #:before-main
                                            [do-before-main! (λ _ (void))]
                                            #:make-result
-                                           [make-result (λ (ns r) r)])
+                                           [make-result (λ (ns r) r)]
+                                           #:run-with
+                                           [run-main run-with:require])
   (->i ([a-program program/c]
         [instrument-module (mod/c . -> . syntax?)])
        (#:setup-namespace [setup-namespace! (namespace? . -> . void?)]
         #:before-main [do-before-main! (namespace? . -> . any)]
-        #:make-result [make-result (namespace? any/c . -> . any/c)])
+        #:make-result [make-result (namespace? any/c . -> . any/c)]
+        #:run-with [run-main ((list/c 'file path-string?) . -> . any/c)])
 
        [result (-> any)])
 
@@ -95,9 +103,7 @@
            [current-directory
             (instrumented-module-containing-directory main/instrumented)])
         (do-before-main! ns)
-        (define result
-          (eval
-           `(require ,(instrumented-module-module-path main/instrumented))))
+        (define result (run-main (instrumented-module-module-path main/instrumented)))
 
         (make-result ns result))))
 

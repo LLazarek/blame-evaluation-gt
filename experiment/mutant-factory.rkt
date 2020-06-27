@@ -1034,7 +1034,7 @@ Mutant: [~a] ~a @ ~a with config:
    (filter module-name? blamed-list)]
   [{(struct* run-status ([outcome 'runtime-error]
                          [blamed (and blamed
-                                      (not #f))]))}
+                                      (not '()))]))}
    blamed]
   [{(struct* run-status ([outcome _]))}
    #f])

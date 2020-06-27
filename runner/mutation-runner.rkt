@@ -166,11 +166,20 @@
                      "module-instrumentation"
                      'instrument-module))
 
+  (define make-configured-runner
+    (load-configured (current-configuration-path)
+                     "benchmark-runner"
+                     'make-benchmark-runner))
+
   (define runner
-    (make-instrumented-runner a-program
-                              (compose1 record-mutated-id/maybe-write-modules
-                                        configured-instrumenter)
-                              #:setup-namespace setup-namespace!))
+    (make-instrumented-runner
+     a-program
+     (compose1 record-mutated-id/maybe-write-modules
+               configured-instrumenter)
+     #:setup-namespace setup-namespace!
+     #:run-with (make-configured-runner a-program
+                                        (mod->name module-to-mutate)
+                                        mutation-index)))
   (define mutated-id (unbox mutated-id-box))
 
   (values runner mutated-id))
@@ -220,6 +229,8 @@
                                  (non-empty-listof module-name-or-library-path?)]
                                 ['type-error
                                  (list/c module-name-or-library-path?)]
+                                ['runtime-error
+                                 (listof module-name-or-library-path?)]
                                 [else
                                  any/c])]
              [result-value    any/c]))
@@ -307,7 +318,10 @@
     (define run/handled
       (λ _
         (with-handlers
-          ([exn:fail:contract:blame? (compose1 (make-status* 'blamed)
+          (;; see configurables/benchmark-runner/load-pre-computed-result.rkt
+           [run-status? values]
+
+           [exn:fail:contract:blame? (compose1 (make-status* 'blamed)
                                                extract-blamed)]
            [type-checker-failure? (compose1 (make-status* 'type-error)
                                             extract-type-error-source)]

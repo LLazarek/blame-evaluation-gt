@@ -8,4 +8,6 @@
                                  ("transient-oldest" . "blame-following/transient-oldest.rkt")
                                  ("transient-all" . "blame-following/transient-all.rkt")))
       ("module-instrumentation" . #hash(("none" . "module-instrumentation/none.rkt")
-                                        ("transient" . "module-instrumentation/type-with-transient.rkt"))))
+                                        ("transient" . "module-instrumentation/type-with-transient.rkt")))
+      ("benchmark-runner" . #hash(("run-it" . "benchmark-runner/run-it.rkt")
+                                  ("load-pre-computed-result" . "benchmark-runner/load-pre-computed-result.rkt"))))
