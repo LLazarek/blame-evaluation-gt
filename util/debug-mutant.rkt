@@ -129,6 +129,7 @@
                   the-program
                   the-module-to-mutate
                   index
+                  config
                   #:timeout/s (* 10 60)
                   #:memory/gb 5
                   #:modules-base-path (find-program-base-path the-program)
