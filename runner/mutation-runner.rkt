@@ -24,7 +24,9 @@
          "program.rkt"
          "instrumented-runner.rkt"
          "error-extractors/extract-type-error-source.rkt"
-         "error-extractors/extract-runtime-error-location.rkt")
+         "error-extractors/extract-runtime-error-location.rkt"
+         (prefix-in racket-contracts:
+                    "../configurables/blame-following/natural-blame.rkt"))
 
 (define-logger mutant-runner)
 
@@ -321,11 +323,27 @@
       (make-extract-runtime-error-location a-program
                                            program-config
                                            format-mutant-info-for-error))
+    (define (runtime-error-with-blame? e)
+      (define (contract-from-runtime? blame-obj)
+        (define src (srcloc-source (blame-source blame-obj)))
+        (and (string? src)
+             (regexp-match? #rx"^<collects>/"
+                            src)))
+      (and (exn:fail:contract:blame? e)
+           (contract-from-runtime? (exn:fail:contract:blame-object e))))
+    (define extract-runtime-contract-error-blamed-location
+      (racket-contracts:make-extract-blamed a-program
+                                            program-config
+                                            format-mutant-info-for-error))
     (define run/handled
       (λ _
         (with-handlers
           (;; see configurables/benchmark-runner/load-pre-computed-result.rkt
            [run-status? values]
+
+           [runtime-error-with-blame?
+            (compose1 (make-status* 'runtime-error)
+                      extract-runtime-contract-error-blamed-location)]
 
            [exn:fail:contract:blame? (compose1 (make-status* 'blamed)
                                                extract-blamed)]
@@ -782,6 +800,28 @@
                                    p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
+                                               [blamed '("a.rkt")]))))))
+
+  (test-begin
+    #:name run-with-mutated-module/runtime-error-locations-with-blame
+    (ignore
+     (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
+                        #'(module a racket
+                            (#%module-begin
+                             (define (f x)
+                               (~r x #:min-width 2))
+                             (f -42)))))
+     (define p (program a (list))))
+
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   a
+                                   0 ; swap x and #:min-width -> ~r raises ctc violation
+                                   p-config
+                                   #:timeout/s 60
+                                   #:memory/gb 1
+                                   #:suppress-output? #t))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
                                                [blamed '("a.rkt")])))))))
 
