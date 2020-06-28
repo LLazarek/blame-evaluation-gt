@@ -11,6 +11,7 @@
 (require racket/runtime-path
          syntax/parse
          syntax/strip-context
+         typed-racket/utils/transient-contract-struct
          "../configurables/configurables.rkt"
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
@@ -159,7 +160,12 @@
     #;((namespace-require 'errortrace ns))
     ;; but this works:
     (parameterize ([current-namespace ns])
-      (namespace-require 'errortrace)))
+      (namespace-require 'errortrace))
+    ;; Also attach transient blame exn definition module so we can inspect
+    ;; those
+    (namespace-attach-module (current-namespace)
+                             'typed-racket/utils/transient-contract-struct
+                             ns))
 
   (define configured-instrumenter
     (load-configured (current-configuration-path)
