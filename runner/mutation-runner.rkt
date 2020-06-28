@@ -329,7 +329,11 @@
         (and (string? src)
              (regexp-match? #rx"^<collects>/"
                             src)))
-      (and (exn:fail:contract:blame? e)
+      ;; Can't get the source of the blame from a transient error, it blows up
+      ;; because the blame object is not actually a blame object.
+      ;; So just short circuit if we have one of those.
+      (and (not (exn:fail:contract:blame:transient? e))
+           (exn:fail:contract:blame? e)
            (contract-from-runtime? (exn:fail:contract:blame-object e))))
     (define extract-runtime-contract-error-blamed-location
       (racket-contracts:make-extract-blamed a-program
@@ -382,6 +386,7 @@
            racket/runtime-path)
 
   (define-runtime-path test-config "../configurables/test.config")
+  (define-runtime-path transient-config "../configurables/transient-oldest.config")
   (current-configuration-path test-config)
 
   (define-test (test-stx=? a b)
@@ -823,7 +828,37 @@
                                    #:memory/gb 1
                                    #:suppress-output? #t))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")])))))))
+                                               [blamed '("a.rkt")])))))
+
+    ;; The handling for above needs to not trigger on -- and not blow up on --
+    ;; actual contract violations from transient. This is an example that caught
+    ;; me:
+    (ignore
+     (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
+                        #'(module a racket
+                            (#%module-begin
+                             (require "b.rkt")
+                             (define x #f)
+                             (f x)))))
+     (define b (mod/loc (simple-form-path "./test-mods/b.rkt")
+                        #'(module b typed/racket
+                            (#%module-begin
+                             (provide f)
+                             (: f (-> Number Number))
+                             (define (f x)
+                               (+ x x))))))
+     (define p (program a (list b))))
+    (parameterize ([current-configuration-path transient-config])
+      (test/no-error
+       (λ _ (run-with-mutated-module p
+                                     a
+                                     0 ; #f -> #t
+                                     p-config
+                                     #:timeout/s 60
+                                     #:memory/gb 1
+                                     #:suppress-output? #f))
+       (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                                 [blamed '("a.rkt")]))))))))
 
 
 ;; for debugging
