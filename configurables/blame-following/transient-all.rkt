@@ -20,13 +20,10 @@
                              format-mutant-info-for-error)
   (λ (e)
     (define blamed-list (transient-get-blame e))
-    (when (empty? blamed-list)
-      (raise-user-error 'blame-following:transient-oldest
-                        @~a{
-                            Transient blame error has empty blamed list:
-                            @~e[e]
-                            }))
-    (define blamed-mod-list (map boundary-pos blamed-list))
+    (define blamed-mod-list
+      (flatten (for/list ([bound (in-list blamed-list)])
+                 (list (boundary-pos bound)
+                       (boundary-neg bound)))))
     (define (error-info)
       @~a{
           Mutant info:
@@ -47,9 +44,26 @@
               (exn:fail:contract:blame:transient
                "hello"
                (current-continuation-marks)
-               (list (boundary "/tmp/foo/untyped/a.rkt" "/" 'Any)
-                     (boundary "/tmp/foo/untyped/b.rkt" "/" 'Any)
-                     (boundary "/tmp/foo/untyped/c.rkt" "/" 'Any)))))
+               (list (boundary "/tmp/foo/untyped/a-pos.rkt"
+                               "/tmp/foo/untyped/a-neg.rkt"
+                               'Any)
+                     (boundary "/tmp/foo/untyped/b-pos.rkt"
+                               "/tmp/foo/untyped/b-neg.rkt"
+                               'Any)
+                     (boundary "/tmp/foo/untyped/c-pos.rkt"
+                               "/tmp/foo/untyped/c-neg.rkt"
+                               'Any)))))
     (test-equal? ((make-extract-blamed #f #f (const ""))
                   blame-exn)
-                 '("a.rkt" "b.rkt" "c.rkt"))))
+                 '("a-pos.rkt" "a-neg.rkt"
+                   "b-pos.rkt" "b-neg.rkt"
+                   "c-pos.rkt" "c-neg.rkt"))
+
+    (ignore (define empty-blame-exn
+              (exn:fail:contract:blame:transient
+               "hello"
+               (current-continuation-marks)
+               empty)))
+    (test-equal? ((make-extract-blamed #f #f (const ""))
+                  empty-blame-exn)
+                 empty)))

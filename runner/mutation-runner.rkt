@@ -858,7 +858,8 @@
                                      #:memory/gb 1
                                      #:suppress-output? #f))
        (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
-                                                 [blamed '("a.rkt")]))))))))
+                                                 [blamed '("b.rkt"
+                                                           "a.rkt")]))))))))
 
 
 ;; for debugging

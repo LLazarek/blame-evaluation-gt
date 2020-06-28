@@ -20,13 +20,12 @@
                              format-mutant-info-for-error)
   (λ (e)
     (define blamed-list (transient-get-blame e))
-    (when (empty? blamed-list)
-      (raise-user-error 'blame-following:transient-oldest
-                        @~a{
-                            Transient blame error has empty blamed list:
-                            @~e[e]
-                            }))
-    (define blamed (boundary-pos (last blamed-list)))
+    (define blamed
+      (cond [(empty? blamed-list) empty]
+            [else
+             (define last-boundary (last blamed-list))
+             (list (boundary-pos last-boundary)
+                   (boundary-neg last-boundary))]))
     (define (error-info)
       @~a{
           Mutant info:
@@ -35,9 +34,8 @@
           The blame error message is:
           @(exn-message e)
           })
-    (define blamed-mod-name
-      ((extract-blamed-mod-name error-info) blamed))
-    (list blamed-mod-name)))
+    (map (extract-blamed-mod-name error-info)
+         blamed)))
 
 (module+ test
   (require ruinit
@@ -48,9 +46,24 @@
               (exn:fail:contract:blame:transient
                "hello"
                (current-continuation-marks)
-               (list (boundary "/tmp/foo/untyped/a.rkt" "/" 'Any)
-                     (boundary "/tmp/foo/untyped/b.rkt" "/" 'Any)
-                     (boundary "/tmp/foo/untyped/c.rkt" "/" 'Any)))))
+               (list (boundary "/tmp/foo/untyped/a-pos.rkt"
+                               "/tmp/foo/untyped/a-neg.rkt"
+                               'Any)
+                     (boundary "/tmp/foo/untyped/b-pos.rkt"
+                               "/tmp/foo/untyped/b-neg.rkt"
+                               'Any)
+                     (boundary "/tmp/foo/untyped/c-pos.rkt"
+                               "/tmp/foo/untyped/c-neg.rkt"
+                               'Any)))))
     (test-equal? ((make-extract-blamed #f #f (const ""))
                   blame-exn)
-                 '("c.rkt"))))
+                 '("c-pos.rkt" "c-neg.rkt"))
+
+    (ignore (define empty-blame-exn
+              (exn:fail:contract:blame:transient
+               "hello"
+               (current-continuation-marks)
+               empty)))
+    (test-equal? ((make-extract-blamed #f #f (const ""))
+                  empty-blame-exn)
+                 empty)))
