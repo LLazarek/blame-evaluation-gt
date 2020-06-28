@@ -3,11 +3,15 @@
 (define-runtime-paths
   [summaries-dir "../mutation-analysis/summaries"]
   [mutations-dir "../configurables/mutant-sampling/samples"]
-  [special-cases-dir "../configurables/module-instrumentation/transient-special-cases"])
+  [special-cases-dir
+   "../configurables/module-instrumentation/transient-special-cases"]
+  [pre-computed-results-dir
+   "../configurables/benchmark-runner/pre-computed-results"])
 
 (define db-dirs (list summaries-dir
                       mutations-dir
-                      special-cases-dir))
+                      special-cases-dir
+                      pre-computed-results-dir))
 
 (main
  #:arguments {[(hash-table ['dbs dbs-path]
