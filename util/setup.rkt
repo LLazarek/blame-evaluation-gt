@@ -18,7 +18,9 @@
 
 (require syntax/location
          "../configurables/mutant-sampling/sample-within-mutators.rkt"
-         (prefix-in db: "../db/db.rkt"))
+         (prefix-in db: "../db/db.rkt")
+         "../configurables/module-instrumentation/type-with-transient.rkt"
+         "../configurables/benchmark-runner/load-pre-computed-result.rkt")
 
 (define-runtime-paths
   [repo-parent-path "../../"]
@@ -270,6 +272,32 @@
     [first ((Listof Any) . -> . Boolean)])
   (first '(5)))
 
+(define (check-db/keys path-to-db
+                       [expected-keys #f]
+                       #:display-failures? [display-failures? #t])
+  (cond [(not (db:path-to-db? path-to-db))
+         (when display-failures?
+           (displayln
+            @~a{
+
+                WARNING: Missing default database at @path-to-db
+                }))
+         #f]
+        [(and expected-keys
+              (not (set=? (db:keys (db:get path-to-db)) expected-keys)))
+         (define missing (set-subtract (db:keys (db:get path-to-db))
+                                       expected-keys))
+         (when display-failures?
+           (displayln
+            @~a{
+
+                WARNING: Default database at @path-to-db @;
+                has missing keys.
+                Specifically: @missing
+                }))
+         #f]
+        [else #t]))
+
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
@@ -282,43 +310,40 @@
   (define gtp-branch-ok?
     (regexp-match? @regexp{\* hash-top} gtp-branches-str))
 
-  (define how-to-generate-samples
-    @~a{
-        Generate them with `mutation-analysis/analyze-mutation.rkt`,
-        followed by summarizing the analysis results by running @;
-        `mutation-analysis/summarize-mutation.rkt`
-        followed by generating samples with @;
-        `configurables/mutant-sampling/generate-samples-within-mutators.rkt`
-        })
-  (cond [(not (db:path-to-db? (mutation-analysis-samples-db)))
-         (displayln
-          @~a{
+  (define gtp-benchmark-names
+    (map ~a (directory-list (build-path gtp-dir "benchmarks"))))
+  (unless (check-db/keys (mutation-analysis-samples-db)
+                         gtp-benchmark-names)
+    (displayln
+     @~a{
+         This database stores mutant samples which must be collected @;
+         for every benchmark before the experiment can run with mutant sampling.
 
-              WARNING: The default sample database @;
-              @(mutation-analysis-samples-db)
-              does not exist. Sampling within mutation operators must be done @;
-              before the experiment can be run with mutant sampling.
+         Generate them with `mutation-analysis/analyze-mutation.rkt`, @;
+         followed by summarizing the analysis results by running @;
+         `mutation-analysis/summarize-mutation.rkt`
+         followed by generating samples with @;
+         `configurables/mutant-sampling/generate-samples-within-mutators.rkt`
+         }))
+  (unless (check-db/keys (transient-special-cases-db))
+    (displayln
+     @~a{
+         This database stores specialized versions of the benchmark necessary @;
+         to run the experiment with Transient type enforcement.
 
-              @how-to-generate-samples
+         This database is manually populated.
+         }))
+  (unless (check-db/keys (pre-computed-results-db)
+                         gtp-benchmark-names)
+    (displayln
+     @~a{
+         This database stores pre-computed results for the untyped version of @;
+         each mutant necessary to run the experiment with Erasure type @;
+         enforcement.
 
-              })]
-        [(not (set=?
-               (map ~a (directory-list (build-path gtp-dir "benchmarks")))
-               (db:keys (db:get (mutation-analysis-samples-db)))))
-         (define missing
-           (set-subtract (map ~a (directory-list (build-path gtp-dir "benchmarks")))
-                         (db:keys (db:get (mutation-analysis-samples-db)))))
-         (displayln
-          @~a{
-
-              WARNING: Samples are missing in the default sample database @;
-              @(mutation-analysis-samples-db)
-              Specifically: @missing
-
-              @how-to-generate-samples
-
-              })]
-        [else (void)])
+         Generate it with @;
+         `configurables/benchmark-runner/pre-compute-benchmark-results.rkt`.
+         }))
 
   (unless racket-version-ok?
     (displayln
