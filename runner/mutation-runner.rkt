@@ -69,6 +69,16 @@
               #'(module name lang mutated-mod-stx))
              mutated-id)]))
 
+;; Returns the predicate recognizing transient blame exns if the module is
+;; available, otherwise #f
+(define (try-dynamic-require-transient-blame-exn-predicate!)
+  (with-handlers ([exn:fail:filesystem:missing-module?
+                   ;; if we can't load the transient exn module, it's not
+                   ;; installed and we definitely can't get transient blames
+                   (const #f)])
+    (dynamic-require 'typed-racket/utils/transient-contract-struct
+                     'exn:fail:contract:blame:transient?)))
+
 (define (simple-form-path? path)
   (and (path? path)
        (complete-path? path)
@@ -164,9 +174,10 @@
       (namespace-require 'errortrace))
     ;; Also attach transient blame exn definition module so we can inspect
     ;; those
-    (namespace-attach-module (current-namespace)
-                             'typed-racket/utils/transient-contract-struct
-                             ns))
+    (when (try-dynamic-require-transient-blame-exn-predicate!)
+      (namespace-attach-module (current-namespace)
+                               'typed-racket/utils/transient-contract-struct
+                               ns)))
 
   (define configured-instrumenter
     (load-configured (current-configuration-path)
@@ -323,12 +334,7 @@
                                            program-config
                                            format-mutant-info-for-error))
     (define exn:fail:contract:blame:transient?
-      (with-handlers ([exn:fail:filesystem:missing-module?
-                       ;; if we can't load the transient exn module, it's not
-                       ;; installed and we definitely can't get transient blames
-                       (const (const #f))])
-        (dynamic-require 'typed-racket/utils/transient-contract-struct
-                         'exn:fail:contract:blame:transient?)))
+      (try-dynamic-require-transient-blame-exn-predicate!))
     (define (runtime-error-with-blame? e)
       (define (contract-from-runtime? blame-obj)
         (define src (srcloc-source (blame-source blame-obj)))
@@ -338,7 +344,8 @@
       ;; Can't get the source of the blame from a transient error, it blows up
       ;; because the blame object is not actually a blame object.
       ;; So just short circuit if we have one of those.
-      (and (not (exn:fail:contract:blame:transient? e))
+      (and exn:fail:contract:blame:transient?
+           (not (exn:fail:contract:blame:transient? e))
            (exn:fail:contract:blame? e)
            (contract-from-runtime? (exn:fail:contract:blame-object e))))
     (define extract-runtime-contract-error-blamed-location
