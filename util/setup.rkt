@@ -296,17 +296,21 @@
         [else #t]))
 
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
-  (define (load/report-failure mod-path id)
+  (define (load/report-failure mod-path/rel-to-repo-root id)
+    (define mod-path/abs (build-path-string repo-path
+                                            mod-path/rel-to-repo-root))
     (with-handlers ([exn:fail:filesystem?
-                     (λ _
+                     (λ (e)
                        (displayln
                         @~a{
 
-                            ERROR: Unable to load dependencies.
+                            @~v[e]
+
+                            WARNING: Unable to load dependencies.
                             Have you run this script to install them?
                             })
-                       #f)])
-      (dynamic-require mod-path id)))
+                       (const #f))])
+      (dynamic-require `(file ,mod-path/abs) id)))
 
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
@@ -324,7 +328,7 @@
 
   (define mutation-analysis-samples-db
     (load/report-failure
-     "../configurables/mutant-sampling/sample-within-mutators.rkt"
+     "configurables/mutant-sampling/sample-within-mutators.rkt"
      'mutation-analysis-samples-db))
   (unless (check-db/keys (mutation-analysis-samples-db)
                          gtp-benchmark-names)
@@ -341,7 +345,7 @@
          }))
   (define transient-special-cases-db
     (load/report-failure
-     "../configurables/module-instrumentation/type-with-transient.rkt"
+     "configurables/module-instrumentation/type-with-transient.rkt"
      'transient-special-cases-db))
   (unless (check-db/keys (transient-special-cases-db))
     (displayln
@@ -353,7 +357,7 @@
          }))
   (define pre-computed-results-db
     (load/report-failure
-     "../configurables/benchmark-runner/load-pre-computed-result.rkt"
+     "configurables/benchmark-runner/load-pre-computed-result.rkt"
      'pre-computed-results-db))
   (unless (check-db/keys (pre-computed-results-db)
                          gtp-benchmark-names)
