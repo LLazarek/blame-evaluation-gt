@@ -88,7 +88,8 @@
                                    data-dir-path))]))
 
 (define (path-to-db? path)
-  (and (file-exists? path)
+  (and (path-string? path)
+       (file-exists? path)
        (match (file->value path)
          [(hash-table ['data-directory rel-data-path]
                       ['map (? hash?)])

@@ -17,10 +17,7 @@
 ;; ==================================================
 
 (require syntax/location
-         "../configurables/mutant-sampling/sample-within-mutators.rkt"
-         (prefix-in db: "../db/db.rkt")
-         "../configurables/module-instrumentation/type-with-transient.rkt"
-         "../configurables/benchmark-runner/load-pre-computed-result.rkt")
+         (prefix-in db: "../db/db.rkt"))
 
 (define-runtime-paths
   [repo-parent-path "../../"]
@@ -299,6 +296,18 @@
         [else #t]))
 
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
+  (define (load/report-failure mod-path id)
+    (with-handlers ([exn:fail:filesystem?
+                     (λ _
+                       (displayln
+                        @~a{
+
+                            ERROR: Unable to load dependencies.
+                            Have you run this script to install them?
+                            })
+                       #f)])
+      (dynamic-require mod-path id)))
+
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
   (define gtp-branches-str
@@ -312,6 +321,11 @@
 
   (define gtp-benchmark-names
     (map ~a (directory-list (build-path gtp-dir "benchmarks"))))
+
+  (define mutation-analysis-samples-db
+    (load/report-failure
+     "../configurables/mutant-sampling/sample-within-mutators.rkt"
+     'mutation-analysis-samples-db))
   (unless (check-db/keys (mutation-analysis-samples-db)
                          gtp-benchmark-names)
     (displayln
@@ -325,6 +339,10 @@
          followed by generating samples with @;
          `configurables/mutant-sampling/generate-samples-within-mutators.rkt`
          }))
+  (define transient-special-cases-db
+    (load/report-failure
+     "../configurables/module-instrumentation/type-with-transient.rkt"
+     'transient-special-cases-db))
   (unless (check-db/keys (transient-special-cases-db))
     (displayln
      @~a{
@@ -333,6 +351,10 @@
 
          This database is manually populated.
          }))
+  (define pre-computed-results-db
+    (load/report-failure
+     "../configurables/benchmark-runner/load-pre-computed-result.rkt"
+     'pre-computed-results-db))
   (unless (check-db/keys (pre-computed-results-db)
                          gtp-benchmark-names)
     (displayln
@@ -447,12 +469,13 @@
  (unless (directory-exists? gtp-dir)
    (install-gtp-repo gtp-dir))
 
- (verify-install!)
-
  (when (user-prompt!
         @~a{
 
-            Setup complete.
+            Setup complete, though there may be warnings.
+
+            See them by running this script again with `--verify-install` @;
+            to verify the integrity of the install.
 
             Do you want to verify that everything is in working order
             by running the system tests?
