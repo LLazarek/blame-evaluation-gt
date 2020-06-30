@@ -11,7 +11,6 @@
 (require racket/runtime-path
          syntax/parse
          syntax/strip-context
-         typed-racket/utils/transient-contract-struct
          "../configurables/configurables.rkt"
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
@@ -323,6 +322,13 @@
       (make-extract-runtime-error-location a-program
                                            program-config
                                            format-mutant-info-for-error))
+    (define exn:fail:contract:blame:transient?
+      (with-handlers ([exn:fail:filesystem:missing-module?
+                       ;; if we can't load the transient exn module, it's not
+                       ;; installed and we definitely can't get transient blames
+                       (const (const #f))])
+        (dynamic-require 'typed-racket/utils/transient-contract-struct
+                         'exn:fail:contract:blame:transient?)))
     (define (runtime-error-with-blame? e)
       (define (contract-from-runtime? blame-obj)
         (define src (srcloc-source (blame-source blame-obj)))
