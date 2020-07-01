@@ -64,3 +64,14 @@
 \newcommand{\todo}[1]{{\textcolor{red}{TODO}\{\textcolor{gray}{#1}\}}}
 
 \newenvironment{code}{\codesize \color{\codecolor} \begin{alltt}}{\end{alltt}}
+
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% for leaving margin notes in the paper write
+%% \yourinitials{...} 
+
+\def\notes#1{\expandafter\def\csname#1\endcsname##1{\marginpar{\raggedright\tiny $\bullet$ #1 says: ##1}}}
+\notes{mf}
+\notes{cd}
+\notes{ll}
+\notes{bg}
