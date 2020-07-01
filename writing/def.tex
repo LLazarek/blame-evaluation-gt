@@ -1,0 +1,66 @@
+%\usepackage{draftwatermark}
+%\SetWatermarkText{DRAFT}
+%\SetWatermarkScale{1}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           PREAMBLE       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% acmart formatting
+\settopmatter{printfolios=true}
+\overfullrule=1mm
+
+% techreport title
+\newcommand{\techreport}{supplementary material}
+
+% short url formatting
+\newcommand{\shorturl}[2]{\href{#1#2}{\texttt{#2}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% lattice
+
+\newcommand{\system}{\ensuremath{C}}
+
+\newcommand{\component}{\ensuremath{c}}
+
+\newcommand{\contract}{\ensuremath{k}}
+
+\newcommand{\contracts}{\ensuremath{K}}
+
+\newcommand{\kmap}{\ensuremath{KMAP}}
+
+\newcommand{\latticeL}{\mathcal{L}}
+
+\newcommand{\lattice}[2]{\ensuremath{\latticeL\llbracket#1,#2\rrbracket}}
+
+\newcommand{\standardlattice}{\lattice{\system}{\kmap}}
+
+\newcommand{\conf}{\ensuremath{CONF}}
+
+\newcommand{\metric}{\ensuremath{\leq_{\latticeL}^{X}}}
+
+
+%% misc
+
+\newcommand{\setsize}[1]{\left|#1\right|}
+
+\newcommand{\codesize}{\small}
+
+\newcommand{\codecolor}{black}
+
+\let\OldTexttt\texttt
+\renewcommand{\texttt}[1]{\OldTexttt{\color{\codecolor}{#1}}}
+
+\let\Oldtt\tt
+\renewcommand{\tt}{\Oldtt \color{\codecolor} }
+
+\newcommand{\todo}[1]{{\textcolor{red}{TODO}\{\textcolor{gray}{#1}\}}}
+
+\newenvironment{code}{\codesize \color{\codecolor} \begin{alltt}}{\end{alltt}}

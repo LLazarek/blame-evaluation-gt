@@ -1,0 +1,35 @@
+\section{How to Evaluate Blame}
+
+\begin{itemize}
+
+    \item How to analyze this space?
+          \begin{itemize}
+            \item We want a quantative measure of error msg utility that allows
+                  us to evaluate each point in the above space.
+          \end{itemize}       
+
+     \item Blame trails
+       \begin{itemize}
+       
+        \item We want an empirical study to understand how the behavior of blame
+        in real systems.
+
+       
+        \item Blame trails provide a quantitative measure of a a system's
+        error message utility, and they can be applied to every point
+        in the above space.
+
+       \item We generalize the blame trails idea of Lukas et al [POPL '20] to make it
+        more systematic, scalable, and general, by:
+           \begin{itemize}
+             \item Adding a null hypothesis baseline for comparison between multiple systems
+             \item Analyzing multiple blame following strategies
+             \item Mutating interfaces as well as programs
+             \item Incorporating domain knowledge in the selection of blame following
+           strategies and mutation
+             \item Evaluating systems on the same platform for apples-to-apples comparisons
+           \end{itemize}   
+
+         \item Null hypothesis. We should have a baseline to tell how all of the points in the
+        design space compare to having nothing at all.
+\end{itemize}

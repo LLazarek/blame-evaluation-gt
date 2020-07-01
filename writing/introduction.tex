@@ -1,0 +1,118 @@
+\section{Does Blame Matter?}
+
+A spectre is haunting gradual typing --- the spectre of blame.  All works
+on gradual typing incantate spells either to incarnate blame as they see
+fit or to avoid facing it.  But unfortunately, despite all the effort that
+has gone to trap blame with models and theorems, its soul remains elusive. 
+
+Take for instance the so-called blame theorem~\cite{mf-toplas-2009,
+tf-dls-2006, wf-esop-2009}. It reveals blame as an essential indicator of
+gradual type soundness; sound gradual type systems never blame typed code.
+On one hand, this helps language designers benefit from blame to
+(partially) validate their gradual type systems~\cite{gf-icfp-2018}. On
+the other hand though, it reduces blame to a proof apparatus.  Worse,
+projecting the theorem to a lesson for the programmer leads to misleading
+conclusions about where the bug is. The problem  may not be with the
+blamed untyped code but with one of the annotations of the typed code.
+Similarly, the recent complete monitoring framework~\cite{gfd-oopsla-2019}
+sheds limited light to the pragmatic nature of blame for gradual types. It
+shows that blame captures some aspects of the provenance of the value that
+fails a runtime type check, but again this explanation falls short of
+tangible information for the programmer. In effect programmers are left
+without any guidance about how to turn information from blame to the
+location of bugs.  And this current lack of a principled connection
+between blame and bugs ---  the raison d'\^etre of blame --- puts in
+question the value of blame for gradual types.
+
+This paper aims to answer a single question: \emph{Does blame add value to
+gradual typing?} We posit that blame does add value to gradual typing only
+if it conveys to programmers extra information that is useful for
+debugging. Specifically, for blame to be valuable there needs to be a
+systematic relation between blame and the location of bugs. 
+
+To examine the truth of this condition, we follow recent work on the
+pragmatics of blame for contracts~\cite{lksfd-popl-2020}. First, we stray
+from the usual theoretical treatment of blame in the gradual typing
+literature and we investigate the value of blame with an empirical
+methodology. Its empirical nature gives us the opportunity to investigate how blame copes
+against actual bugs in real implementations of gradual type systems.
+
+Second, the central piece of the methodology is a connection between blame
+and bugs inspired straight from the experience of programming with gradual
+types.  When facing a run time type error in a mix-typed program, programmers often try to add
+type annotations to their programs hoping to turn the  run time type error
+into a static one that reveals where the code and its types clash.  In
+this setting, blame can suggest what part of the program to migrate from
+untyped to typed next.  Therefore, if heeding blame culminates to a static type
+error, blame and the location of the bug are directly connected.  Based on
+this observation, our methodology explores the migration of mix-typed programs with
+run time type errors to validate whether blame guides their migration to an
+ill-typed  version that pinpoints the location of the
+bug.
+
+Realizing these ideas into a robust experiment requires surpassing three challenges.  First,
+gradual typing is a heterogeneous landscape. Herein, we focus on three
+points of the landscape: the natural approach of Typed
+Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010},
+the transient one of Reticulated
+Python~\cite{vsc-dls-2019,vss-popl-2017,vksb-dls-2014} and  the optional
+gradual typing of the likes of Typescript. Each of these points comes with
+a distinct blaming strategy and together they represent all proposed
+strategies so far. In addition, instead of experimenting with the three
+approaches in isolation, we have implemented transient and optional
+gradual typing as variants of  Typed Racket to seize the opportunity to
+compare them.  However, implementations on top of the same platform are
+not enough for an apples-to-apples comparison. The three approaches differ
+not only on their blaming strategies but also on the type checks they
+perform. To untangle the two, we supplement our experiment with two extra
+modes. The \emph{vanilla} mode  ignores blame and instead uses information
+from dynamic type error messages to select how to proceed with migration. Hence it
+separates the effect of blame on the experiment from that of the type
+checks. The \emph{control} mode randomly selects which part of the program to migrate
+and serves as the null hypothesis control for the overall methodology.  
+
+
+The second challenge stems from the lack of a sufficiently large available
+corpus of type errors for a meaningful experiment. Similar to
+~\citet{lksfd-popl-2020}, we cover this gap by injecting bugs in
+typed programs  with mutation analysis~\cite{lipton1971fault,
+demillo1978hints, jia2011analysis}. This results into a large 
+number of buggy programs whose mix-typed versions are suitable subjects
+for our experiment. However, mutation analysis
+traditionally  aims to inject bugs that are sophisticated enough to
+challenge extensive test suites. As a consequence, the ill-typed mutants we care about here are
+usually deemed \emph{incompetent} and mutation analysis frameworks are
+fine-tuned to avoid them. To overcome this problem, we design a
+set of mutators specific for type errors inspired by common errors when
+programming with in Typed Racket.  These type errors cover
+a wide range of Typed Racket's type system and moreover cause reliably runtime
+type errors  in mix-typed versions of mutants.
+
+The final challenge deals with the fact that bugs in mix-typed programs
+occur not only in the code but also in type
+annotations~\cite{sta-nt-base-types, incorrect-ts, wmwz-ecoop-2017}. Thus
+our experiment needs to also explore the relation between blame and the
+location of bugs in case of wrong type annotations. Similarly to the previous challenge, we
+deal with this one by designing a set of mutators that ``break'' type
+annotations but leave programs otherwise intact. 
+
+To sum up, the maim {\bf contribution} of this paper is an empirical  methodology for
+evaluating blame for gradual type systems. The methodology applies across the
+landscape of gradual typing and allows to compare its different points. 
+  As a result, this paper also contributes the first comparative
+empirical study of natural, transient and optional gradual typing
+with respect to blame. [A couple of sentences that summarize the results
+her.]
+
+The remainder of the paper is organized as follows.
+Section~\ref{sec:landscape} revisits the landscape of gradual typing from
+the perspective of the different checking and blame strategies.
+Section~\ref{sec:ideas} presents in detail the main ideas behind our
+methodology and section~\ref{sec:experiment} explains the specifics of our
+experiment. Section~\ref{sec:results} gathers our results and
+section~\ref{sec:discussion} discusses their implications. The paper
+concludes with a survey of related work in section~\ref{sec:related} and 
+a few final remarks in section~\ref{sec:conclusion}.
+
+
+
