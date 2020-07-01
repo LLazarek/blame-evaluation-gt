@@ -1,5 +1,5 @@
 %% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
-\documentclass[acmsmall,screen]{acmart}\settopmatter{printfolios=true,printccs=true,printacmref=true}
+\documentclass[acmsmall,screen,anonymous,nonacm]{acmart}\settopmatter{printfolios=true,printccs=true,printacmref=true}
 %% For double-blind review submission, w/ CCS and ACM Reference
 %%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
 %% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
@@ -29,13 +29,10 @@
 %% Many elements are not rendered, but should be provided for metadata
 %% extraction tools.
 
-\author{Christos Dimoulas}
-\affiliation{
-\institution{PLT}
-\city{Evanston}
-\country{Illinois}
-}
-\email{chrdim@northwestern.edu}          %% \email is recommended
+\author{Nobody In Particular}
+% \affiliation{\institution{PLT} \city{Evanston} \country{Illinois} }
+\affiliation{\relax} % \institution{PLT} \city{Evanston} \country{Illinois} }
+% \email{chrdim@northwestern.edu}          %% \email is recommended
 
 
 
@@ -160,6 +157,5 @@ Gradual types and blame go hand in hand. But what is the value of blame?
 
 %% Bibliography
 \bibliography{cs}
-
 
 \end{document}
