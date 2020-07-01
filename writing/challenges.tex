@@ -1,0 +1,69 @@
+
+\section{Challenges}
+
+Creating a method for comparing blame assignment strategies poses
+several severe challenges. 
+
+Realizing these ideas into a robust experiment requires surpassing three challenges.  First,
+gradual typing is a heterogeneous landscape. Herein, we focus on three
+points of the landscape: the natural approach of Typed
+Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010},
+the transient one of Reticulated
+Python~\cite{vsc-dls-2019,vss-popl-2017,vksb-dls-2014} and  the optional
+gradual typing of the likes of Typescript. Each of these points comes with
+a distinct blaming strategy and together they represent all proposed
+strategies so far. In addition, instead of experimenting with the three
+approaches in isolation, we have implemented transient and optional
+gradual typing as variants of  Typed Racket to seize the opportunity to
+compare them.  However, implementations on top of the same platform are
+not enough for an apples-to-apples comparison. The three approaches differ
+not only on their blaming strategies but also on the type checks they
+perform. To untangle the two, we supplement our experiment with two extra
+modes. The \emph{vanilla} mode  ignores blame and instead uses information
+from dynamic type error messages to select how to proceed with migration. Hence it
+separates the effect of blame on the experiment from that of the type
+checks. The \emph{control} mode randomly selects which part of the program to migrate
+and serves as the null hypothesis control for the overall methodology.  
+
+
+The second challenge stems from the lack of a sufficiently large available
+corpus of type errors for a meaningful experiment. Similar to
+~\citet{lksfd-popl-2020}, we cover this gap by injecting bugs in
+typed programs  with mutation analysis~\cite{lipton1971fault,
+demillo1978hints, jia2011analysis}. This results into a large 
+number of buggy programs whose mix-typed versions are suitable subjects
+for our experiment. However, mutation analysis
+traditionally  aims to inject bugs that are sophisticated enough to
+challenge extensive test suites. As a consequence, the ill-typed mutants we care about here are
+usually deemed \emph{incompetent} and mutation analysis frameworks are
+fine-tuned to avoid them. To overcome this problem, we design a
+set of mutators specific for type errors inspired by common errors when
+programming with in Typed Racket.  These type errors cover
+a wide range of Typed Racket's type system and moreover cause reliably runtime
+type errors  in mix-typed versions of mutants.
+
+The final challenge deals with the fact that bugs in mix-typed programs
+occur not only in the code but also in type
+annotations~\cite{sta-nt-base-types, incorrect-ts, wmwz-ecoop-2017}. Thus
+our experiment needs to also explore the relation between blame and the
+location of bugs in case of wrong type annotations. Similarly to the previous challenge, we
+deal with this one by designing a set of mutators that ``break'' type
+annotations but leave programs otherwise intact. 
+
+To sum up, the maim {\bf contribution} of this paper is an empirical  methodology for
+evaluating blame for gradual type systems. The methodology applies across the
+landscape of gradual typing and allows to compare its different points. 
+  As a result, this paper also contributes the first comparative
+empirical study of natural, transient and optional gradual typing
+with respect to blame. [A couple of sentences that summarize the results
+her.]
+
+The remainder of the paper is organized as follows.
+Section~\ref{sec:landscape} revisits the landscape of gradual typing from
+the perspective of the different checking and blame strategies.
+Section~\ref{sec:ideas} presents in detail the main ideas behind our
+methodology and section~\ref{sec:experiment} explains the specifics of our
+experiment. Section~\ref{sec:results} gathers our results and
+section~\ref{sec:discussion} discusses their implications. The paper
+concludes with a survey of related work in section~\ref{sec:related} and 
+a few final remarks in section~\ref{sec:conclusion}.
