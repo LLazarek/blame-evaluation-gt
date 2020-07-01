@@ -314,14 +314,18 @@
 
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
-  (define gtp-branches-str
+  (match-define (list gtp-branches-str
+                      gtp-origin-str)
     (parameterize ([current-directory gtp-dir])
-      (system/string "git branch")))
+      (list (system/string "git branch")
+            (system/string "git remote show origin"))))
 
   (define racket-version-ok?
     (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
   (define gtp-branch-ok?
     (regexp-match? @regexp{\* hash-top} gtp-branches-str))
+  (define gtp-up-to-date?
+    (regexp-match? @regexp{hash-top.*up to date} gtp-origin-str))
 
   (define gtp-benchmark-names
     (map ~a (directory-list (build-path gtp-dir "benchmarks"))))
@@ -383,13 +387,25 @@
     (displayln
      @~a{
 
-         ERROR: The wrong branch of gtp-benchmarks is present.
+         ERROR: The wrong branch of gtp-benchmarks is active.
          current branch:  @gtp-branches-str
          required branch: hash-top
          }))
+  (define gtp-up-to-date?*
+    (if gtp-up-to-date?
+        #t
+        (and (user-prompt!
+              @~a{
+
+                  ERROR: gtp-benchmarks is out of date. @;
+                  Do you want to update it?
+                  })
+             (parameterize ([current-directory gtp-dir])
+               (system "git pull")))))
 
   (and racket-version-ok?
        gtp-branch-ok?
+       gtp-up-to-date?*
        (check-TR-install racket-dir TR-dir #:display-failures? #t)))
 
 (main
