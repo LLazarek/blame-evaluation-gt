@@ -1,69 +1,67 @@
 
 \section{Challenges}
 
-Creating a method for comparing blame assignment strategies poses
-several severe challenges. 
+Creating a method for comparing blame assignment strategies poses several severe
+challenges.
 
-Realizing these ideas into a robust experiment requires surpassing three challenges.  First,
-gradual typing is a heterogeneous landscape. Herein, we focus on three
-points of the landscape: the natural approach of Typed
-Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010},
-the transient one of Reticulated
-Python~\cite{vsc-dls-2019,vss-popl-2017,vksb-dls-2014} and  the optional
-gradual typing of the likes of Typescript. Each of these points comes with
-a distinct blaming strategy and together they represent all proposed
-strategies so far. In addition, instead of experimenting with the three
-approaches in isolation, we have implemented transient and optional
-gradual typing as variants of  Typed Racket to seize the opportunity to
-compare them.  However, implementations on top of the same platform are
-not enough for an apples-to-apples comparison. The three approaches differ
-not only on their blaming strategies but also on the type checks they
-perform. To untangle the two, we supplement our experiment with two extra
-modes. The \emph{vanilla} mode  ignores blame and instead uses information
-from dynamic type error messages to select how to proceed with migration. Hence it
-separates the effect of blame on the experiment from that of the type
-checks. The \emph{control} mode randomly selects which part of the program to migrate
-and serves as the null hypothesis control for the overall methodology.  
+The most serious challenge concerns the nature of this research. Unlike ordinary
+work on programming languages, the question seems to call for research similar
+to the one in the human-computer interaction area. At the same time, a
+significant evaluation result demands a good number of cases yielding a serious
+amount of data. But, as~\citet{lksfd-popl-2020} already demonstrated, the way
+around this dilemma is to postulate the equivalent of a {\it home economicus\/}
+for programming languages---the {\em rational programmer\/}---and to implement
+this rational programmer as an algorithm. As indicated in the introduction, in
+the context of gradual typing a rationally acting programmer translates the
+Wadler-Findler slogan into a debugging method, searching for the source of the
+impedance mismatch in an incremental fashion.
 
-
-The second challenge stems from the lack of a sufficiently large available
-corpus of type errors for a meaningful experiment. Similar to
-~\citet{lksfd-popl-2020}, we cover this gap by injecting bugs in
-typed programs  with mutation analysis~\cite{lipton1971fault,
-demillo1978hints, jia2011analysis}. This results into a large 
-number of buggy programs whose mix-typed versions are suitable subjects
-for our experiment. However, mutation analysis
-traditionally  aims to inject bugs that are sophisticated enough to
-challenge extensive test suites. As a consequence, the ill-typed mutants we care about here are
-usually deemed \emph{incompetent} and mutation analysis frameworks are
-fine-tuned to avoid them. To overcome this problem, we design a
+One derivative challenge to the first is the problem of simulating the
+programmer's mistakes. Before a programmer can try to find mistakes, mistakes
+have to be made. Technically the problem is the lack of a sufficiently large
+available corpus of type errors for a meaningful experiment. Similar to
+~\citet{lksfd-popl-2020}, we cover this gap by injecting bugs in typed programs
+with mutation analysis~\cite{lipton1971fault, demillo1978hints,
+jia2011analysis}. This results into a large number of buggy programs whose
+mix-typed versions are suitable subjects for our experiment. However, mutation
+analysis traditionally aims to inject bugs that are sophisticated enough to
+challenge extensive test suites. As a consequence, the ill-typed mutants we care
+about here are usually deemed \emph{incompetent} and mutation analysis
+frameworks are fine-tuned to avoid them. To overcome this problem, we design a
 set of mutators specific for type errors inspired by common errors when
-programming with in Typed Racket.  These type errors cover
-a wide range of Typed Racket's type system and moreover cause reliably runtime
-type errors  in mix-typed versions of mutants.
+programming with in Typed Racket.  These type errors cover a wide range of Typed
+Racket's type system and moreover cause reliably runtime type errors in
+mix-typed versions of mutants.
 
-The final challenge deals with the fact that bugs in mix-typed programs
-occur not only in the code but also in type
-annotations~\cite{sta-nt-base-types, incorrect-ts, wmwz-ecoop-2017}. Thus
-our experiment needs to also explore the relation between blame and the
-location of bugs in case of wrong type annotations. Similarly to the previous challenge, we
-deal with this one by designing a set of mutators that ``break'' type
-annotations but leave programs otherwise intact. 
+Another derivative challenge is the problem of mistakes in type specifications.
+Gradual typing enables programmers to move an untyped code base into the typed
+realm on an incremental basis. The retroactive addition of a specific type to a
+component, even a library, may result from a misunderstanding of the code and
+may thus be a mistake itself. Empirical evidence suggests that this scenario is
+reasonably common~\cite{sta-nt-base-types, incorrect-ts, wmwz-ecoop-2017}, and
+hence must be addressed by any evaluation method.  \ldots needs to also explore
+the relation between blame and the location of bugs in case of wrong type
+annotations. Similarly to the previous challenge, we deal with this one by
+designing a set of mutators that ``break'' type annotations but leave programs
+otherwise intact.
 
-To sum up, the maim {\bf contribution} of this paper is an empirical  methodology for
-evaluating blame for gradual type systems. The methodology applies across the
-landscape of gradual typing and allows to compare its different points. 
-  As a result, this paper also contributes the first comparative
-empirical study of natural, transient and optional gradual typing
-with respect to blame. [A couple of sentences that summarize the results
-her.]
+The second big challenge is the set of seemingly incomparable blame-assignment
+strategies. This results in this paper focus on three points of the landscape:
+the {\em natural\/} approach of Typed Racket~\cite{tf-dls-2006, tf-popl-2008,
+tfffgksst-snapl-2017, tf-icfp-2010}, the {\em transient\/} one of Reticulated
+Python~\cite{vsc-dls-2019,vss-popl-2017,vksb-dls-2014}, and the {\em optional\/}
+typing approach of industrial systems. Each of these points comes with a
+distinct blaming strategy and together they represent all proposed strategies so
+far. In addition, instead of experimenting with the three approaches in
+isolation, we have implemented transient and optional gradual typing as variants
+of Typed Racket to seize the opportunity to compare them.  However,
+implementations on top of the same platform are not enough for an
+apples-to-apples comparison. The three approaches differ not only on their
+blaming strategies but also on the type checks they perform. To untangle the
+two, we supplement our experiment with two extra modes. The \emph{vanilla} mode
+ignores blame and instead uses information from dynamic type error messages to
+select how to proceed with migration. Hence it separates the effect of blame on
+the experiment from that of the type checks. The \emph{control} mode randomly
+selects which part of the program to migrate and serves as the null hypothesis
+control for the overall methodology.
 
-The remainder of the paper is organized as follows.
-Section~\ref{sec:landscape} revisits the landscape of gradual typing from
-the perspective of the different checking and blame strategies.
-Section~\ref{sec:ideas} presents in detail the main ideas behind our
-methodology and section~\ref{sec:experiment} explains the specifics of our
-experiment. Section~\ref{sec:results} gathers our results and
-section~\ref{sec:discussion} discusses their implications. The paper
-concludes with a survey of related work in section~\ref{sec:related} and 
-a few final remarks in section~\ref{sec:conclusion}.
