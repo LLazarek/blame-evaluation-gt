@@ -4,12 +4,29 @@
 Creating a method for comparing blame assignment strategies poses several severe
 challenges.
 
+\cd{One point we haven's justified is why empirical. The justification
+seems easy in the sense that we are looking at a real language, programs,
+bugs rather than models.}
+
+\cd{I like this idea of the competent programmer. I couldn't have thought
+about homo economicus. Instead this was partly inspired by Gonen's work.}
+\cd{There they make a hypothesis, try to test it in vivo using designed model organisms
+with a well-specified first-order characteristic (e.g, a deleted gene).
+Then they collect data by placing the organism in a number of scenarios 
+and measuring aspects of its behavior and then they 
+construct an operational model from their data. Due to the synthetic
+nature of CS, for us the process goes in the opposite direction. In that
+sense the competent programmer is a model organism that, as its
+first-order characteristic, implements a direct consequence of the
+semantics. So in a sense for me this has always been about semantics and
+exploring their consequences.}
+
 The most serious challenge concerns the nature of this research. Unlike ordinary
 work on programming languages, the question seems to call for research similar
 to the one in the human-computer interaction area. At the same time, a
 significant evaluation result demands a good number of cases yielding a serious
 amount of data. But, as~\citet{lksfd-popl-2020} already demonstrated, the way
-around this dilemma is to postulate the equivalent of a {\it home economicus\/}
+around this dilemma is to postulate the equivalent of a {\it homo economicus\/}
 for programming languages---the {\em rational programmer\/}---and to implement
 this rational programmer as an algorithm. As indicated in the introduction, in
 the context of gradual typing a rationally acting programmer translates the
@@ -23,15 +40,15 @@ available corpus of type errors for a meaningful experiment. Similar to
 ~\citet{lksfd-popl-2020}, we cover this gap by injecting bugs in typed programs
 with mutation analysis~\cite{lipton1971fault, demillo1978hints,
 jia2011analysis}. This results into a large number of buggy programs whose
-mix-typed versions are suitable subjects for our experiment. However, mutation
+mixed-typed versions are suitable subjects for our experiment. However, mutation
 analysis traditionally aims to inject bugs that are sophisticated enough to
 challenge extensive test suites. As a consequence, the ill-typed mutants we care
 about here are usually deemed \emph{incompetent} and mutation analysis
 frameworks are fine-tuned to avoid them. To overcome this problem, we design a
 set of mutators specific for type errors inspired by common errors when
-programming with in Typed Racket.  These type errors cover a wide range of Typed
+programming in Typed Racket.  These type errors cover a wide range of Typed
 Racket's type system and moreover cause reliably runtime type errors in
-mix-typed versions of mutants.
+mixed-typed versions of mutants.
 
 Another derivative challenge is the problem of mistakes in type specifications.
 Gradual typing enables programmers to move an untyped code base into the typed
@@ -39,29 +56,40 @@ realm on an incremental basis. The retroactive addition of a specific type to a
 component, even a library, may result from a misunderstanding of the code and
 may thus be a mistake itself. Empirical evidence suggests that this scenario is
 reasonably common~\cite{sta-nt-base-types, incorrect-ts, wmwz-ecoop-2017}, and
-hence must be addressed by any evaluation method.  \ldots needs to also explore
-the relation between blame and the location of bugs in case of wrong type
-annotations. Similarly to the previous challenge, we deal with this one by
-designing a set of mutators that ``break'' type annotations but leave programs
-otherwise intact.
+hence must be addressed by any evaluation method. Similarly to the
+previous challenge, we deal with this one by designing a set of mutators
+that ``break'' type annotations but leave programs otherwise intact.
 
-The second big challenge is the set of seemingly incomparable blame-assignment
-strategies. This results in this paper focus on three points of the landscape:
-the {\em natural\/} approach of Typed Racket~\cite{tf-dls-2006, tf-popl-2008,
-tfffgksst-snapl-2017, tf-icfp-2010}, the {\em transient\/} one of Reticulated
-Python~\cite{vsc-dls-2019,vss-popl-2017,vksb-dls-2014}, and the {\em optional\/}
-typing approach of industrial systems. Each of these points comes with a
-distinct blaming strategy and together they represent all proposed strategies so
-far. In addition, instead of experimenting with the three approaches in
-isolation, we have implemented transient and optional gradual typing as variants
-of Typed Racket to seize the opportunity to compare them.  However,
-implementations on top of the same platform are not enough for an
-apples-to-apples comparison. The three approaches differ not only on their
-blaming strategies but also on the type checks they perform. To untangle the
-two, we supplement our experiment with two extra modes. The \emph{vanilla} mode
+The second big challenge is the set of seemingly incomparable gradual
+typing systems. Despite the fact that the natural, transient and optional
+approaches are all well-understood as variants of the same minimal operational model
+~\cite{gf-icfp-2018, gfd-oopsla-2019}, their actual implementations live on
+different linguistic settings. Hence it is not possible to compare them directly 
+on the same programs; code needs to be adjusted in often subtle ways to
+transfer from one implementation to another. As a first step to overcome the problem, 
+we have implemented a transient and optional variant of Typed Racket.  
+However,
+implementations on top of the same platform are not sufficient for an
+apples-to-apples comparison. As we discuss in detail in
+section~\ref{sec:landscape}, the three strategies differ in the kind of
+blame information they produce. Natural blames one component while
+transient blames a set of components and optional none. To account for these
+differences, our competent programmer comes with \emp{modes} that represent 
+the alternative ways programmers can interpret blame information. For instance, in
+transient, one mode  has the competent programmer pick the oldest element of a blame set 
+as the next component to add types. After all, this corresponds to the
+earliest point in the program's evaluation that can discover the bug. 
+Another mode though, does not distinguish between the elements of the
+blame set and instead it requires that the competent programmer types 
+all blamed components at once. In order to compare different strategies
+across their different modes, we normalize the steps the competent
+programmer takes to find the bug by the effort of each step, that is the
+number of component it has to type. Finally, besides differences in how
+and what they blame, the three gradual typing approaches differ in the type checks they perform. 
+To untangle the two, we supplement our experiment with two extra modes. The \emph{vanilla} mode
 ignores blame and instead uses information from dynamic type error messages to
-select how to proceed with migration. Hence it separates the effect of blame on
-the experiment from that of the type checks. The \emph{control} mode randomly
+select the next component to type. Hence it separates the effect of blame 
+from that of the type checks. The \emph{control} mode randomly
 selects which part of the program to migrate and serves as the null hypothesis
-control for the overall methodology.
+control for the overall method.
 
