@@ -84,12 +84,15 @@ blame set and instead it requires that the competent programmer types
 all blamed components at once. In order to compare different strategies
 across their different modes, we normalize the steps the competent
 programmer takes to find the bug by the effort of each step, that is the
-number of component it has to type. Finally, besides differences in how
+number of component it has to type. Moreover, besides differences in how
 and what they blame, the three gradual typing approaches differ in the type checks they perform. 
-To untangle the two, we supplement our experiment with two extra modes. The \emph{vanilla} mode
+To untangle the two, we supplement our experiment with an extra mode. The \emph{vanilla} mode
 ignores blame and instead uses information from dynamic type error messages to
 select the next component to type. Hence it separates the effect of blame 
-from that of the type checks. The \emph{control} mode randomly
+from that of the type checks. Finally, to exclude that the experiment
+results are not products of pure chance, the \emph{control} mode randomly
 selects which part of the program to migrate and serves as the null hypothesis
 control for the overall method.
 
+In sum, the peculiarities of the gradual typing landscape demand careful
+design to turn the idea of the competent programmer to a robust method. 
