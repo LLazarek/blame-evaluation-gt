@@ -11,7 +11,8 @@
       ("module-instrumentation" . #hash(("none" . "module-instrumentation/none.rkt")
                                         ("transient" . "module-instrumentation/type-with-transient.rkt")))
       ("benchmark-runner" . #hash(("run-it" . "benchmark-runner/run-it.rkt")
-                                  ("load-pre-computed-result" . "benchmark-runner/load-pre-computed-result.rkt")))
+                                  ("load-pre-computed-result" . "benchmark-runner/load-pre-computed-result.rkt")
+                                  ("none" . "benchmark-runner/nothing.rkt")))
       ("configuration-sampling" . #hash(("uniform-with-replacement" . "configuration-sampling/uniform-with-replacement.rkt")
                                         ("uniform-with-replacement/typing-mod-to-mutate"
                                          .
