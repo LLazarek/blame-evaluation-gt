@@ -8,7 +8,9 @@
          "../../mutate/mutate-expr.rkt"
          "../../mutate/mutate-program.rkt"
          "../../mutate/mutator-lib.rkt"
-         "../../mutate/mutators.rkt")
+         "../../mutate/mutators.rkt"
+         "../../mutate/top-level-selectors.rkt"
+         "../../mutate/expression-selectors.rkt")
 
 ;; lltodo: this should really be the list of mutators themselves, and there
 ;; should be a way to get a mutator's name from the mutator.
@@ -38,8 +40,10 @@
                                       replace-constants))
 
 (define (mutate-benchmark program-stx mutation-index
-                        #:top-level-select top-level-selector
-                        #:expression-select expression-selector)
+                          #:top-level-select
+                          [top-level-selector select-define-body]
+                          #:expression-select
+                          [expression-selector select-exprs-as-if-untyped])
   (define replace-ids-with-top-level-defs
     (make-top-level-id-swap-mutator program-stx))
   (define mutate-expr

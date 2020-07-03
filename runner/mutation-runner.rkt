@@ -14,8 +14,6 @@
          "../configurables/configurables.rkt"
          "../mutate/mutated.rkt"
          "../mutate/mutate-program.rkt"
-         "../mutate/top-level-selectors.rkt"
-         "../mutate/expression-selectors.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt"
          "../configurations/config.rkt"
@@ -29,21 +27,6 @@
 
 (define-logger mutant-runner)
 
-(define (mutate-top-level-selector stx)
-  (syntax-parse stx
-    #:datum-literals [define :]
-    [({~and define def} id/sig
-                        {~optional {~seq : type}}
-                        body ...)
-     (define body-stxs (syntax-e (syntax/loc stx (body ...))))
-     (define (reconstruct-definition body-stxs/mutated)
-       (quasisyntax/loc stx
-         (def id/sig {~? {~@ : type}} #,@body-stxs/mutated)))
-     (values body-stxs
-             (leftmost-identifier-in #'id/sig)
-             reconstruct-definition)]
-    [_ (values #f #f #f)]))
-
 ;; Produce the mutated syntax for the module at the given path
 (define (mutate-module module-stx mutation-index)
   (define mutate-benchmark (load-configured (current-configuration-path)
@@ -56,9 +39,7 @@
            (match-define (mutated (mutated-program program-stx/mutated
                                                    mutated-id)
                                   _)
-             (mutate-benchmark program-stx mutation-index
-                               #:top-level-select mutate-top-level-selector
-                               #:expression-select select-exprs-as-if-untyped))]
+             (mutate-benchmark program-stx mutation-index))]
      #:with program/mutated program-stx/mutated
      #:with mutated-mod-stx
      (datum->syntax #'mod-body
@@ -402,31 +383,6 @@
   (define-runtime-path transient-config "../configurables/transient-oldest.config")
   (current-configuration-path test-config)
 
-  (define-test (test-stx=? a b)
-    (test-equal? (syntax->datum a) (syntax->datum b)))
-  (define-test (test-mutate-top-level-selector stx
-                                               body-stxs/expected
-                                               id/expected
-                                               test-reconstruct)
-    (define-values {body-stxs id reconstruct}
-      (mutate-top-level-selector stx))
-    (and/test/message
-     [(for/and/test ([part (in-list body-stxs)]
-                     [part/expected (in-list body-stxs/expected)])
-                    (test-stx=? part part/expected))
-      @~a{Body stxs are different:}]
-     [(test-equal? id id/expected)
-      @~a{Mutated ids are different:}]
-     [(test-reconstruct reconstruct)
-      @~a{Reconstruction test failed:}]))
-  (test-begin
-    #:name mutate-top-level-selector
-    (test-mutate-top-level-selector #'(define x 5)
-                                    (list #'5)
-                                    'x
-                                    (λ (reconstruct)
-                                      (test-stx=? (reconstruct (list #'42))
-                                                  #'(define x 42)))))
   (define-test (test/no-error run-thunk test-thunk)
     (with-handlers ([exn:fail? (λ (e) (fail (exn-message e)))])
       (test-thunk (run-thunk))))
