@@ -6,7 +6,8 @@
          plot-util/histogram
          pict
          (except-in pict-util line)
-         pict-util/file)
+         pict-util/file
+         "../configurables/configurables.rkt")
 
 (define current-mutation-types (make-parameter #f))
 
@@ -73,9 +74,12 @@
          (raise-user-error
           'plot-mutation-analyses
           @~a{
-              The sum of mutation operator occurrence ratios is not 1!
-              This probably means that there are missing mutation types,
+              The sum of mutation operator occurrence ratios is not 1 @;
+              in log @path !
+              This probably means that there are missing mutation types, @;
               or otherwise there is a bug.
+              The mutation types I looked for are:
+              @(pretty-format (dict-keys ratios))
               })))
      (values ratios
              (hash-ref hit+miss-data 'total)
@@ -149,9 +153,10 @@
           @~a{Must provide at least one log file to plot.}]
 
  (current-mutation-types
-  (load-configured (current-configuration-path)
-                   "mutation"
-                   'active-mutator-names))
+  (map string->symbol
+       (load-configured (current-configuration-path)
+                        "mutation"
+                        'active-mutator-names)))
 
  (define plot-type (if (hash-ref flags 'total-counts)
                        'total-counts
