@@ -396,6 +396,12 @@
                     replace-with-Any
                     drop-case->-cases))
 
+(define (mutate-type-if-inside-annotation stx mutation-index counter)
+  (define mutate (if (currently-inside-type-annotation?)
+                     mutate-type
+                     no-mutation))
+  (mutate stx mutation-index counter))
+
 (define active-mutator-names
   '("known-type-generalization"
     "known-type-restriction"
@@ -415,18 +421,30 @@
      (select-type-annotation-exprs
       (syntax/loc stx
         (: name (arrow arg-T ... res-T ...))))]
-    [({~and : {~datum :}} name:id T)
+    [({~and colon/ann/cast
+            {~or* {~datum :}
+                  {~datum ann}
+                  {~datum cast}}}
+      e T)
      (list (attribute T)
            (λ (mutated-T)
              (quasisyntax/loc stx
-               (: name #,mutated-T)))
+               (colon/ann/cast e #,mutated-T)))
+           (list (cons currently-inside-type-annotation? #t)))]
+    [({~and inst {~datum inst}} e T ...)
+     (list #'{T ...}
+           (syntax-parser
+             [{mutated-T ...}
+              (syntax/loc stx
+                (inst e mutated-T ...))]
+             [Any
+              (syntax/loc stx
+                (inst e Any))])
            (list (cons currently-inside-type-annotation? #t)))]
     [other
-     #:when (currently-inside-type-annotation?)
      (list stx
            identity
-           empty)]
-    [else #f]))
+           empty)]))
 
 (define (mutate-benchmark program-stx mutation-index
                           #:top-level-select
@@ -434,7 +452,7 @@
                           #:expression-select
                           [expression-selector select-type-annotation-exprs])
   (define mutate-expr
-    (make-expr-mutator mutate-type
+    (make-expr-mutator mutate-type-if-inside-annotation
                        #:select expression-selector))
   (define mutate-program
     (make-program-mutator mutate-expr
@@ -531,117 +549,145 @@
        [6 ,#'{(: f (case-> (Any . Any . Any)
                            (Any Any . -> . Any)))}]
        ;; ...
-       )))
+       ))
+    ; different types of annotations
+    (test-mutation/sequence
+     #'{(define x (list (ann f Integer)))}
+     `([0 ,#'{(define x (list (ann f Real)))}]
+       [1 ,#'{(define x (list (ann f Index)))}]
+       [2 ,#'{(define x (list (ann f Any)))}]))
+    (test-mutation/sequence
+     #'{(define x (list (cast f Integer)))}
+     `([0 ,#'{(define x (list (cast f Real)))}]
+       [1 ,#'{(define x (list (cast f Index)))}]
+       [2 ,#'{(define x (list (cast f Any)))}]))
+    (test-mutation/sequence
+     #'{(define x (list (inst f Integer Boolean)))}
+     `([0 ,#'{(define x (list (inst f Any)))}]
+       [1 ,#'{(define x (list (inst f Real Boolean)))}]
+       [2 ,#'{(define x (list (inst f Index Boolean)))}]
+       [3 ,#'{(define x (list (inst f Any Boolean)))}]
+       [4 ,#'{(define x (list (inst f Integer Any)))}])))
 
 
   (test-begin
     #:name mutate-benchmark/traversal
-    (ignore (define p
-              #'{(: f : Number -> Integer)
-                 (define (f x)
-                   (: y String)
-                   (define y (number->string x))
-                   (: y-l Integer)
-                   (define y-l (string-length y))
-                   (+ x y-l))
-                 (f 78)}))
-    (test-mutation/sequence p
-                            `([0 ,#'{(: f (-> Integer Number))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [1 ,#'{(: f Any)
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [2 ,#'{(: f (Any Number Integer))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [3 ,#'{(: f (-> Real Integer))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [4 ,#'{(: f (-> Any Integer))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [5 ,#'{(: f (-> Number Real))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [6 ,#'{(: f (-> Number Index))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [7 ,#'{(: f (-> Number Any))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [8 ,#'{(: f (-> Number Integer))
-                                     (define (f x)
-                                       (: y Any)
-                                       (define y (number->string x))
-                                       (: y-l Integer)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [9 ,#'{(: f (-> Number Integer))
-                                     (define (f x)
-                                       (: y String)
-                                       (define y (number->string x))
-                                       (: y-l Real)
-                                       (define y-l (string-length y))
-                                       (+ x y-l))
-                                     (f 78)}]
-                              [10 ,#'{(: f (-> Number Integer))
-                                      (define (f x)
-                                        (: y String)
-                                        (define y (number->string x))
-                                        (: y-l Index)
-                                        (define y-l (string-length y))
-                                        (+ x y-l))
-                                      (f 78)}]
-                              [11 ,#'{(: f (-> Number Integer))
-                                      (define (f x)
-                                        (: y String)
-                                        (define y (number->string x))
-                                        (: y-l Any)
-                                        (define y-l (string-length y))
-                                        (+ x y-l))
-                                      (f 78)}]))
-    (with-handlers ([mutation-index-exception? (const #t)])
-      (mutate-syntax p 12)
-      #f)))
+    (ignore (define (define/function-syntax body)
+              #`(define (f x) . #,body))
+            (define (define/value-syntax body)
+              #`(define f (λ (x) . #,body))))
+    (for/and/test
+     ([define-f-with-body (in-list (list define/function-syntax
+                                         define/value-syntax))])
+     (define p
+       #`{(: f : Number -> Integer)
+          #,(define-f-with-body
+              #'[(: y String)
+                 (define y (number->string x))
+                 (: y-l Integer)
+                 (define y-l (string-length y))
+                 (+ x y-l)])
+          (f 78)})
+     (extend-test-message
+      (and/test
+       (test-mutation/sequence p
+                               `([0 ,#`{(: f (-> Integer Number))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [1 ,#`{(: f Any)
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [2 ,#`{(: f (Any Number Integer))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [3 ,#`{(: f (-> Real Integer))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [4 ,#`{(: f (-> Any Integer))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [5 ,#`{(: f (-> Number Real))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [6 ,#`{(: f (-> Number Index))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [7 ,#`{(: f (-> Number Any))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [8 ,#`{(: f (-> Number Integer))
+                                        #,(define-f-with-body
+                                            #'[(: y Any)
+                                               (define y (number->string x))
+                                               (: y-l Integer)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [9 ,#`{(: f (-> Number Integer))
+                                        #,(define-f-with-body
+                                            #'[(: y String)
+                                               (define y (number->string x))
+                                               (: y-l Real)
+                                               (define y-l (string-length y))
+                                               (+ x y-l)])
+                                        (f 78)}]
+                                 [10 ,#`{(: f (-> Number Integer))
+                                         #,(define-f-with-body
+                                             #'[(: y String)
+                                                (define y (number->string x))
+                                                (: y-l Index)
+                                                (define y-l (string-length y))
+                                                (+ x y-l)])
+                                         (f 78)}]
+                                 [11 ,#`{(: f (-> Number Integer))
+                                         #,(define-f-with-body
+                                             #'[(: y String)
+                                                (define y (number->string x))
+                                                (: y-l Any)
+                                                (define y-l (string-length y))
+                                                (+ x y-l)])
+                                         (f 78)}]))
+       (with-handlers ([mutation-index-exception? (const #t)])
+         (mutate-syntax p 12)
+         #f))
+      @~a{ (define-f-with-body: @(object-name define-f-with-body))}))))

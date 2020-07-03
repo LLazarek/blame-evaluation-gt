@@ -245,4 +245,21 @@
                                      (define y 32)
                                      (: z B)
                                      (define z 40)
-                                     (+ y z)))))))
+                                     (+ y z)))))
+    (test-selector select-type-annotations+define-body
+                   #'(define f
+                       (λ (x)
+                         (: y A)
+                         x))
+                   (list #'(λ (x)
+                             (: y A)
+                             x))
+                   'f:body
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'(λ (x)
+                                                        (: y Foobar)
+                                                        x)))
+                                 #'(define f
+                                     (λ (x)
+                                       (: y Foobar)
+                                       x)))))))
