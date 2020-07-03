@@ -355,14 +355,29 @@
                    will:sample-if-type-error
                    #:test-mutant? #t)]))
 
+(define (mutant-module-name a-mutant)
+  (define mod (mutant-module a-mutant))
+  (if (mutant-abstract? a-mutant)
+      mod
+      (file-name-string-from-path mod)))
+
 (define/contract (sample-blame-trail-roots process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
+  (define config-samples
+    (load-configured (current-configuration-path)
+                     "configuration-sampling"
+                     'config-samples))
+
   (define the-factory (process-Q-get-data process-q))
   (define max-config (bench-info-max-config (factory-bench the-factory)))
-  (define samples (sample-config max-config (sample-size)))
+  (define samples (config-samples max-config
+                                  (sample-size)
+                                  (mutant-module-name mutant-program)))
   (define (resample a-factory)
-    (define sample (first (sample-config max-config 1)))
+    (define sample (first (config-samples max-config
+                                          1
+                                          (mutant-module-name mutant-program))))
     (cond
       ;; ll: by default, sample *with* replacement
       [(and (sample-without-replacement?)
