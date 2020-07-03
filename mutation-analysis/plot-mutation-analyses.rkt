@@ -8,20 +8,7 @@
          (except-in pict-util line)
          pict-util/file)
 
-(define all-mutation-types
-  '(arithmetic-op-swap
-    boolean-op-swap
-    class:publicity
-    class:super-new
-    data-accessor-swap
-    constant-swap
-    begin-result-deletion
-    negate-conditional
-    class:parent-swap
-    class:initializer-swap
-    position-swap
-    class:add-extra-method
-    top-level-id-swap))
+(define current-mutation-types (make-parameter #f))
 
 (define PLOT-WIDTH 500)
 
@@ -65,7 +52,7 @@
      (define all-misses
        (hash-ref hit+miss-data 'fail))
      (define ratios
-       (for/list ([type (in-list all-mutation-types)])
+       (for/list ([type (in-list (current-mutation-types))])
          (define ratio
            (match* {(hash-ref all-hits type 0)
                     (hash-ref all-misses type 0)
@@ -101,7 +88,7 @@
 (define (data-annotations all-hits all-misses)
   (define bar-offset 1)
   (define label-y 0)
-  (for/list ([type (in-list all-mutation-types)]
+  (for/list ([type (in-list (current-mutation-types))]
              [i (in-naturals)]
              #:when (match* {(hash-ref all-hits type 0)
                              (hash-ref all-misses type 0)}
@@ -117,7 +104,7 @@
 (define (make-plotter add-ticks? #:extra [extra-renderer-trees empty])
   (define colored-discrete-histogram
     (discrete-histogram/colors
-     (map ->brush-color (build-list (length all-mutation-types) values))))
+     (map ->brush-color (build-list (length (current-mutation-types)) values))))
   (simple-inferred-plotter (curry colored-discrete-histogram
                                   #:invert? #t
                                   #:add-ticks? add-ticks?)
@@ -134,12 +121,19 @@
 (main
  #:arguments {[flags log-files]
               #:once-each
+              [("-c" "--config")
+               'config
+               "Config from which to obtain active mutator names."
+               #:collect ["path"
+                          (set-parameter current-configuration-path)
+                          #f]
+               #:mandatory]
               [("-o" "--outfile")
                'outfile
                ("Filename to output plot table."
                 "Default: mutation-analyses.png")
                #:collect ["path" take-latest "mutation-analyses.png"]]
-              [("-c" "--columns")
+              [("-C" "--columns")
                'cols
                ("Number of columns in which to arrange plots."
                 "Default: 4")
@@ -153,6 +147,11 @@
 
  #:check [(not (empty? log-files))
           @~a{Must provide at least one log file to plot.}]
+
+ (current-mutation-types
+  (load-configured (current-configuration-path)
+                   "mutation"
+                   'active-mutator-names))
 
  (define plot-type (if (hash-ref flags 'total-counts)
                        'total-counts
