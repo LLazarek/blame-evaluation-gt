@@ -6,9 +6,12 @@
                     contract-out))
 (provide (contract-out
           [top-level-selector/c    contract?]
-          [select-all              top-level-selector/c]
-          [select-define/contract  top-level-selector/c]
-          [select-any-define       top-level-selector/c]
+          [select-all                          top-level-selector/c]
+          [select-define/contract              top-level-selector/c]
+          [select-any-define                   top-level-selector/c]
+
+          [select-define-body                  top-level-selector/c]
+          [select-type-annotations+define-body top-level-selector/c]
 
           [leftmost-identifier-in  (syntax? . -> . symbol?)]))
 
@@ -17,6 +20,7 @@
          racket/function
          racket/list
          racket/match
+         racket/syntax
          syntax/parse)
 
 (define-syntax-class contracted-definition
@@ -100,3 +104,145 @@
               (leftmost-identifier-in #'def.id/sig)
               reconstruct-definition)]
     [_ (values #f #f #f)]))
+
+(define (select-define-body stx)
+  (syntax-parse stx
+    #:datum-literals [define :]
+    [({~and define def} id/sig
+                        {~optional {~seq : type}}
+                        body ...)
+     (define body-stxs (syntax-e (syntax/loc stx (body ...))))
+     (define (reconstruct-definition body-stxs/mutated)
+       (quasisyntax/loc stx
+         (def id/sig {~? {~@ : type}} #,@body-stxs/mutated)))
+     (values body-stxs
+             (leftmost-identifier-in #'id/sig)
+             reconstruct-definition)]
+    [_ (values #f #f #f)]))
+
+(module+ test
+  (require ruinit
+           racket)
+  (define-test (test-stx=? a b)
+    (test-equal? (syntax->datum a) (syntax->datum b)))
+  (define-test (test-selector selector
+                              stx
+                              body-stxs/expected
+                              id/expected
+                              test-reconstruct)
+    (define-values {body-stxs id reconstruct}
+      (selector stx))
+    (and/test/message
+     [(for/and/test ([part (in-list body-stxs)]
+                     [part/expected (in-list body-stxs/expected)])
+                    (test-stx=? part part/expected))
+      @~a{Body stxs are different:}]
+     [(test-equal? id id/expected)
+      @~a{Mutated ids are different:}]
+     [(test-reconstruct reconstruct)
+      @~a{Reconstruction test failed:}]))
+  (test-begin
+    #:name select-define-body
+    (test-selector select-define-body
+                   #'(define x 5)
+                   (list #'5)
+                   'x
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'42))
+                                 #'(define x 42))))))
+
+(define (select-type-annotations+define-body stx)
+  (syntax-parse stx
+    #:datum-literals [define :]
+    [({~and : colon} name:id . _)
+     (values (list stx)
+             (format-symbol "~a:annotation"
+                            (leftmost-identifier-in #'name))
+             first)]
+    [({~and {~datum define} def} id/sig {~optional {~seq {~and : colon} T}}
+                                 body ...)
+     (define body-stxs (syntax-e (syntax/loc stx
+                                   ({~? (colon gensym T)} body ...))))
+     (define (reconstruct-definition body-stxs/mutated)
+       (if (attribute T)
+           (syntax-parse body-stxs/mutated
+             [(({~datum :} _ mutated-T) mutated-body-stx ...)
+              (syntax/loc stx
+                (def id/sig colon mutated-T mutated-body-stx ...))])
+           (quasisyntax/loc stx
+             (def id/sig #,@body-stxs/mutated))))
+     (values body-stxs
+             (format-symbol "~a:body"
+                            (leftmost-identifier-in #'id/sig))
+             reconstruct-definition)]
+    [else (values #f #f #f)]))
+
+(module+ test
+  (test-begin
+    #:name select-type-annotations+define-body
+    (test-selector select-type-annotations+define-body
+                   #'(: foo Any)
+                   (list #'(: foo Any))
+                   'foo:annotation
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'(: foo Something-Else)))
+                                 #'(: foo Something-Else))))
+    (test-selector select-type-annotations+define-body
+                   #'(: foo : Any)
+                   (list #'(: foo : Any))
+                   'foo:annotation
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'(: foo : Something-Else)))
+                                 #'(: foo : Something-Else))))
+    (test-selector select-type-annotations+define-body
+                   #'(define (f x)
+                       (: y A)
+                       (define y 32)
+                       (: z B)
+                       (define z 40)
+                       (+ y z))
+                   (list #'(: y A)
+                         #'(define y 32)
+                         #'(: z B)
+                         #'(define z 40)
+                         #'(+ y z))
+                   'f:body
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'(: y A)
+                                                    #'(define y 32)
+                                                    #'(: z Any)
+                                                    #'(define z 40)
+                                                    #'(+ y z)))
+                                 #'(define (f x)
+                                     (: y A)
+                                     (define y 32)
+                                     (: z Any)
+                                     (define z 40)
+                                     (+ y z)))))
+    (test-selector select-type-annotations+define-body
+                   #'(define (f x) : Number
+                       (: y A)
+                       (define y 32)
+                       (: z B)
+                       (define z 40)
+                       (+ y z))
+                   (list #'(: gensym Number)
+                         #'(: y A)
+                         #'(define y 32)
+                         #'(: z B)
+                         #'(define z 40)
+                         #'(+ y z))
+                   'f:body
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'(: gensym Any)
+                                                    #'(: y A)
+                                                    #'(define y 32)
+                                                    #'(: z B)
+                                                    #'(define z 40)
+                                                    #'(+ y z)))
+                                 #'(define (f x) : Any
+                                     (: y A)
+                                     (define y 32)
+                                     (: z B)
+                                     (define z 40)
+                                     (+ y z)))))))

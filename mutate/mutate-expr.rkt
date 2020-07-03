@@ -34,32 +34,43 @@
   (define (mutate-expr stx mutation-index counter)
     (match (and (<= counter mutation-index)
                 (select? stx))
-      [(list selected-stx reconstruct-original-stx)
-       (mdo (count-with [__ counter])
-            (def outer-level-mutated-stx
-              (mutator selected-stx mutation-index __))
-            (def result
-              (cond
-                [(and (compound-expr? outer-level-mutated-stx)
-                      (not (mutation-guarded? outer-level-mutated-stx)))
-                 (mdo* (def inner-parts-mutated-stx-split
-                         (mutate-in-seq (syntax->list outer-level-mutated-stx)
-                                        mutation-index
-                                        __
-                                        mutate-expr))
-                       [return
-                        (datum->syntax stx
-                                       inner-parts-mutated-stx-split
-                                       stx
-                                       stx)])]
-                [else (no-mutation outer-level-mutated-stx
-                                   mutation-index
-                                   __)]))
-            [return (reconstruct-original-stx result)])]
-      [else
+      [(list selected-stx reconstruct-original-stx parameters-to-set)
+       (define (mutate-it)
+         (mdo (count-with [__ counter])
+              (def outer-level-mutated-stx
+                (mutator selected-stx mutation-index __))
+              (def result
+                (cond
+                  [(and (compound-expr? outer-level-mutated-stx)
+                        (not (mutation-guarded? outer-level-mutated-stx)))
+                   (mdo* (def inner-parts-mutated-stx-split
+                           (mutate-in-seq (syntax->list outer-level-mutated-stx)
+                                          mutation-index
+                                          __
+                                          mutate-expr))
+                         [return
+                          (datum->syntax stx
+                                         inner-parts-mutated-stx-split
+                                         stx
+                                         stx)])]
+                  [else (no-mutation outer-level-mutated-stx
+                                     mutation-index
+                                     __)]))
+              [return (reconstruct-original-stx result)]))
+       (call-with-parameterization* parameters-to-set
+                                    mutate-it)]
+      [#f
        (no-mutation stx mutation-index counter)]))
 
   mutate-expr)
+
+(define (call-with-parameterization* parameter-alist thunk)
+  (let set-next-param ([remaining-params parameter-alist])
+    (match remaining-params
+      [(cons (cons param v) remaining)
+       (parameterize ([param v])
+         (set-next-param remaining))]
+      ['() (thunk)])))
 
 (module+ test
   (require ruinit
@@ -114,13 +125,13 @@
                    x
                    x)))
 
+  (define-value-mutator replace-any-datum-with-0
+    #:type "test"
+    #:bind-value value
+    [(not (? list?)) #:-> 0])
   (test-begin
     #:name make-expr-mutator
     (ignore
-     (define-value-mutator replace-any-datum-with-0
-       #:type "test"
-       #:bind-value value
-       [(not (? list?)) #:-> 0])
      (define just-replace-any-datum-with-0
        (make-expr-mutator replace-any-datum-with-0)))
     (test-mutator* just-replace-any-datum-with-0
@@ -164,7 +175,7 @@
        (make-expr-mutator replace-any-datum-with-0
                           #:select (syntax-parser
                                      [({~datum define} . _) #f]
-                                     [else (list this-syntax values)]))))
+                                     [else (list this-syntax values empty)]))))
     (test-mutator* replace-datums-not-under-define-with-0
                    #'(#%module-begin
                       (define x 5)
@@ -199,7 +210,8 @@
                                                    counter))
                    [return
                     (mutation-guard #`(#,mutated-head . rest))])]
-            [other #'other])))))
+            [other
+             (no-mutation stx mutation-index counter)])))))
     (test-mutator* replace-head-of-exprs-with-0-and-prevent-recur
                    #'(#%module-begin
                       (define x 5)
@@ -209,4 +221,61 @@
                             (+ x 42))
                          #'(#%module-begin
                             (define x 5)
-                            (+ x 42))))))
+                            (+ x 42)))))
+
+  (test-begin
+    #:name make-mutate-expr/params
+    (ignore
+     (define inside-annotation? (make-parameter #f))
+     (define (select-type-annotations stx)
+       (syntax-parse stx
+         [({~datum :} . Ts)
+          (list (attribute Ts)
+                (λ (mutated-Ts) #`(: . #,mutated-Ts))
+                (list (cons inside-annotation? #t)))]
+         [other
+          #:when (inside-annotation?)
+          (list stx
+                identity
+                empty)]
+         [else #f]))
+
+     (define replace-any-datum-with-0-only-under-:
+       (make-expr-mutator
+        replace-any-datum-with-0
+        #:select select-type-annotations)))
+    (test-mutator* replace-any-datum-with-0-only-under-:
+                   #'(#%module-begin
+                      (define x 5)
+                      (+ x 42))
+                   (list #'(#%module-begin
+                            (define x 5)
+                            (+ x 42))))
+    (test-mutator* replace-any-datum-with-0-only-under-:
+                   #'(: y
+                        (define x 5)
+                        (+ x 42))
+                   (list #'(: 0
+                              (define x 5)
+                              (+ x 42))
+                         #'(: y
+                              (0 x 5)
+                              (+ x 42))
+                         #'(: y
+                              (define 0 5)
+                              (+ x 42))
+                         #'(: y
+                              (define x 0)
+                              (+ x 42))
+                         #'(: y
+                              (define x 5)
+                              (0 x 42))
+                         #'(: y
+                              (define x 5)
+                              (+ 0 42))
+                         #'(: y
+                              (define x 5)
+                              (+ x 0))
+                         #'(: y
+                              (define x 5)
+                              (+ x 42))))))

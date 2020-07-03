@@ -20,11 +20,13 @@
    . -> .
    (or/c #f
          (list/c syntax?
-                 (syntax? . -> . syntax?)))))
+                 (syntax? . -> . syntax?)
+                 (listof (cons/c parameter? any/c))))))
 
 (define (select-any-expr expr)
   (list expr
-        identity))
+        identity
+        empty))
 
 (define-splicing-syntax-class type-annotation
   #:datum-literals [:]
@@ -65,7 +67,8 @@
      (list #'e
            (λ (new-e)
              (quasisyntax/loc expr
-               (the-annotation-thing #,new-e T ...))))]
+               (the-annotation-thing #,new-e T ...)))
+           empty)]
     [({~and e-1 {~not {~or* : (: . _)}}}
       ...+
       {~seq annot:type-annotation
@@ -101,7 +104,8 @@
             (mutated-e-1
              ...
              {~@ annot.annotation-parts ... mutated-e-i ...}
-             ...)))))]
+             ...))))
+      empty)]
     ;; ll: this is a bit naive, see tests below for #''(: a b c)
     [{~or* ({~or* quote quasiquote} atom)
            atom
@@ -109,7 +113,8 @@
      #:when (or (not (attribute atom))
                 (false? (syntax->list #'atom)))
      (list this-syntax
-           identity)]
+           identity
+           empty)]
     [other
      (error 'select-exprs-as-if-untyped
             @~a{Syntax @#'other doesn't match any patterns.})]))
@@ -120,12 +125,14 @@
            "mutate-test-common.rkt")
   (define-test (test-selector selector
                               stx
-                              expected)
+                              expected
+                              [params-test (const #t)])
     (define result (selector stx))
     (match* {result expected}
-      [{(list new-stx reconstructor) (not #f)}
+      [{(list new-stx reconstructor params) (not #f)}
        (and/test (test-programs-equal? new-stx expected)
-                 (test-programs-equal? (reconstructor new-stx) stx))]
+                 (test-programs-equal? (reconstructor new-stx) stx)
+                 (params-test params))]
       [{(not #f) #f}
        (fail @~a{Selector matches with result: @result})]
       [{#f (not #f)}
@@ -198,7 +205,7 @@
 
   (test-begin
     #:name select-exprs-as-if-untyped/reconstructor
-    (ignore (match-define (list selected reconstruct)
+    (ignore (match-define (list selected reconstruct params)
               (select-exprs-as-if-untyped #'(+ 2 2))))
     (test-programs-equal? (reconstruct #'(- 2 2))
                           #'(- 2 2)))
@@ -206,14 +213,14 @@
   (test-begin
     #:name select-exprs-as-if-untyped/reconstruct/add-remove-swap-exprs
     ;; swap
-    (ignore (match-define (list selected reconstruct)
+    (ignore (match-define (list selected reconstruct params)
               (select-exprs-as-if-untyped #'(begin x : T y (: x T2) z))))
     (test-programs-equal? (reconstruct #'(begin x y))
                           #'(begin x : T y (: x T2)))
     (test-programs-equal? (reconstruct #'(begin x z y))
                           #'(begin x : T z (: x T2) y))
     ;; add
-    (ignore (match-define (list selected reconstruct)
+    (ignore (match-define (list selected reconstruct params)
               (select-exprs-as-if-untyped #'(class parent
                                               (field a b c)
                                               (: f : Number -> Number)
@@ -229,7 +236,7 @@
                               (field a b c)
                               (define/public (f x) x)))
     ;; remove
-    (ignore (match-define (list selected reconstruct)
+    (ignore (match-define (list selected reconstruct params)
               (select-exprs-as-if-untyped #'(class parent
                                               (field a b c)
                                               (super-new)
