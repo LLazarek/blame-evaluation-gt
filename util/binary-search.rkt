@@ -33,9 +33,10 @@
 ;; Then this function will find `a`.
 ;;
 ;; Edge cases:
-;; If no such index can be found between `min` and `max` and `increase-max?`
-;; is #f, returns `(result i (exhausted))`, where `i` is the highest index
-;; for which `index-result` returns `go-higher?`.
+;; If no such index can be found between `min` and `max` and either
+;; `increase-max?` is #f or `index-result` returns `go-lower?` for all indices
+;; greater than `a`, returns `(result i (exhausted))`, where `i` is the highest
+;; index for which `index-result` returns `go-higher?`.
 ;; Diagramatically, it finds `a` for:
 ;;  >>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<
 ;; min           a                      max
@@ -62,41 +63,38 @@
   (let search ([min base-min]
                [max base-max]
                [lowest-end-value-found (result +inf.0 default-end-value)])
-    (cond [(and (> min max)
-                increase-max?
-                (zero? (modulo max base-max)))
+    (define i (+ min (quotient (- max min) 2)))
+    (match (index-result i)
+      [(go-lower)
+       (if (= i min)
+           (result (sub1 i) default-end-value)
            (search min
-                   (+ max base-max)
-                   lowest-end-value-found)]
-          [(> min max)
-           (match lowest-end-value-found
-             [(result +inf.0 v)
-              (result max v)]
-             [else lowest-end-value-found])]
-          [else
-           (define index-to-try (+ min (quotient (- max min) 2)))
-           (define lowest-index (result-index lowest-end-value-found))
-           (match (index-result index-to-try)
-             [(go-lower)
-              (search min
-                      (sub1 index-to-try)
+                   (sub1 i)
+                   lowest-end-value-found))]
+      [(try-go-lower value)
+       (if (= i min)
+           (result i value)
+           (search min
+                   (sub1 i)
+                   (result i value)))]
+      [(go-higher)
+       (cond [(and (= i max)
+                   (= (result-index lowest-end-value-found)  +inf.0)
+                   increase-max?
+                   (>= max base-max)
+                   (zero? (modulo max base-max)))
+              (search (add1 i)
+                      (+ max base-max)
                       lowest-end-value-found)]
-             [(go-higher)
-              (search (add1 index-to-try)
+             [(and (= i max)
+                   (= (result-index lowest-end-value-found) +inf.0))
+              (result i default-end-value)]
+             [(= i max)
+              lowest-end-value-found]
+             [else
+              (search (add1 i)
                       max
-                      lowest-end-value-found)]
-             [(try-go-lower value)
-              (search min
-                      (sub1 index-to-try)
-                      (if (< index-to-try lowest-index)
-                          (result index-to-try value)
-                          lowest-end-value-found))]
-             #;[(try-go-higher value)
-                (search (add1 index-to-try)
-                        max
-                        (if (< index-to-try lowest-index)
-                            (result index-to-try value)
-                            lowest-end-value-found))])])))
+                      lowest-end-value-found)])])))
 
 (module+ test
   (require ruinit)
@@ -133,6 +131,13 @@
                             (match-lambda [else (go-higher)]))))
     (test-match (search #:max 100)
                 (result 100 (exhausted)))
+
+    ;; A program that has just one mutant
+    (ignore (define search (lowest-upper-bound-binary-search
+                            (match-lambda [0 (go-higher)]
+                                          [else (go-lower)]))))
+    (test-match (search #:increase-max? #t)
+                (result 0 (exhausted)))
 
 
     ;; Simulate a program that passes on all mutants, and has 50 mutants. Then
