@@ -683,6 +683,20 @@ Predecessor (id [~a]) blamed ~a and had config:
 
             Blamed: @(run-status-blamed result)
             })
+       current-process-q]
+      [{'runtime-error _}
+       (log-factory
+        error
+        @~a{
+            BT VIOLATION: @;
+            Unable to infer program location from runtime error on trail @;
+            @mod @"@" @index {@blame-trail-id}. @;
+            Giving up on following the trail.
+            Mutant: [@dead-succ-id] and config:
+            @~v[dead-succ-config]
+
+            Blamed: @(run-status-blamed result)
+            })
        current-process-q])))
 
 (define/contract (make-blame-following-will/fallback no-blame-fallback)

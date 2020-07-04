@@ -391,7 +391,26 @@
                   dead-e-proc/blamed-lib))
    (extend-test-message
     (not (unbox increased-limits?-box))
-    "blame disappearing into library not recognized")))
+    "blame disappearing into library not recognized")
+
+   (ignore
+    (set-box! increased-limits?-box #f)
+    (define dead-e-proc/runtime-error-no-blamed
+      (struct-copy dead-mutant-process dead-e-proc/blame-e
+                   [result
+                    (struct-copy run-status
+                                 (dead-mutant-process-result dead-e-proc/blame-e)
+                                 [outcome 'runtime-error]
+                                 [blamed '()])])))
+   (extend-test-message
+    (with-handlers ([exn:fail? (const #f)])
+      (fallback/oom (make-mock-Q (make:m0-factory))
+                    dead-e-proc/runtime-error-no-blamed)
+      #t)
+    "runtime-error without inferred blame crashes factory")
+   (extend-test-message
+    (not (unbox increased-limits?-box))
+    "runtime-error without inferred blame not recognized")))
 
 (parameterize ([data-output-dir test-mutant-dir])
   (test-begin/with-env
