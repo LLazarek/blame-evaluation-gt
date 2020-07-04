@@ -48,16 +48,16 @@
                       #:stop-diff-early? [stop-diff-early? #f]
                       #:run? [run? #f]
                       #:run-process? [run-via-process? #f]
-                      #:write-modules-to [dump-dir-name #f]
+                      #:write-modules-to [dump-dir-path-or-name #f]
                       #:suppress-output? [suppress-output? #f]
                       #:config [config-name "TR"])
-  (define config (build-path config-dir (~a config-name ".config")))
-  (unless (file-exists? config)
+  (define experiment-config (build-path config-dir (~a config-name ".config")))
+  (unless (file-exists? experiment-config)
     (raise-user-error
      'debug-mutant
      @~a{Unable to find config named @|config-name|.config in @config-dir}))
 
-  (parameterize ([current-configuration-path config])
+  (parameterize ([current-configuration-path experiment-config])
     (define bench-path (find-benchmark bench-name-or-path))
     (define the-benchmark (read-benchmark bench-path))
     (define config (read-config identifier the-benchmark))
@@ -133,7 +133,7 @@
                   #:timeout/s (* 10 60)
                   #:memory/gb 5
                   #:modules-base-path (find-program-base-path the-program)
-                  #:write-modules-to dump-dir-name
+                  #:write-modules-to dump-dir-path-or-name
                   #:on-module-exists 'replace
                   #:suppress-output? suppress-output?)]
                 [run-via-process?
@@ -148,7 +148,9 @@
                       mutated-module-name
                       index
                       outfile
-                      config)))
+                      experiment-config
+                      #:write-modules-to dump-dir-path-or-name
+                      #:force-module-write? #t)))
                  (displayln "Waiting up to 6min for mutant to finish...")
                  (define wait-thd
                    (thread (thunk (ctl 'wait))))

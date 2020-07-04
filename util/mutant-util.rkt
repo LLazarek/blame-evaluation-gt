@@ -10,7 +10,9 @@
             {#:timeout/s (or/c #f number?)
              #:memory/gb (or/c #f number?)
              #:log-mutation-info? boolean?
-             #:save-output (or/c #f path-string?)}
+             #:save-output (or/c #f path-string?)
+             #:write-modules-to (or/c #f path-string?)
+             #:force-module-write? boolean?}
             . ->* .
             procedure?)]
           [in-mutation-indices
@@ -48,7 +50,10 @@
                              #:timeout/s [timeout/s #f]
                              #:memory/gb [memory/gb #f]
                              #:log-mutation-info? [log-mutation-info? #f]
-                             #:save-output [output-path #f])
+                             #:save-output [output-path #f]
+
+                             #:write-modules-to [dump-dir-path #f]
+                             #:force-module-write? [force-module-write? #f])
   (match-define (benchmark-configuration main others* base-dir bench-config)
     a-benchmark-configuration)
   (define module-to-mutate
@@ -93,6 +98,12 @@
                           "-C" (~s bench-config))
                     (if output-path
                         (list "-O" output-path)
+                        empty)
+                    (if dump-dir-path
+                        (list "-w" dump-dir-path)
+                        empty)
+                    (if force-module-write?
+                        '("-f")
                         empty))))
           (close-output-port runner-in)
           runner-ctl)))))
