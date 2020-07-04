@@ -46,21 +46,22 @@
     (match mod-with-error
       [(? string? name) (list name)]
       [#f
-       (eprintf @~a{
-                    Couldn't find a mod name in ctx from runtime error, @;
-                    possibly because the error happened while @;
-                    instantiating a module.
-                    Program:
-                    @(format-mutant-info-for-error)
+       (displayln @~a{
+                      Couldn't find a mod name in ctx from runtime error, @;
+                      possibly because the error happened while @;
+                      instantiating a module.
+                      Program:
+                      @(format-mutant-info-for-error)
 
-                    Ctx:
-                    @pretty-format[ctx]
+                      Ctx:
+                      @pretty-format[ctx]
 
-                    The runtime error message is:
-                    @(exn-message e)
+                      The runtime error message is:
+                      @(exn-message e)
 
-                    Assuming that errortrace failed us and moving on.
-                    })
+                      Assuming that errortrace failed us and moving on.
+                      }
+                  (current-error-port))
        ;; Since error extractors return lists, we can return an empty list here.
        ;; This ends up being consistent in a way with how non-`module-name?`
        ;; elements in a list (from blaming library code) get filtered out.
