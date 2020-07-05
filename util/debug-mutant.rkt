@@ -164,6 +164,7 @@
                             (system @~a{cat @errfile})
                             (file->string outfile)]
                            [else
+                            (system @~a{cat @errfile})
                             (file->value outfile)])
                    (delete-file outfile)
                    (delete-file errfile))]))

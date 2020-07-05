@@ -1,7 +1,6 @@
-#lang racket
+#lang at-exp racket/base
 
-;; lltodo: consider using sandbox evaluators?
-
+(require "../util/optional-contracts.rkt")
 (provide (contract-out
           [run-with-limits
            ({(-> any)}
@@ -9,84 +8,85 @@
              #:memory/gb (or/c #f (and/c real? (>=/c 0)))
              #:suppress-output? boolean?
              #:oom-result (-> any)
-             #:timeout-result (-> any)
-             #:exn-handler (any/c . -> . any)}
+             #:timeout-result (-> any)}
             . ->* .
             any)]))
 
-(require racket/async-channel)
-
-
-(struct result (type value) #:transparent)
-
-(define ((make-async-outcome-reporter thunk outcome-channel))
-  (define res
-    (with-handlers ([(const #t) (λ (e) (result 'exn e))])
-      (result 'normal (thunk))))
-  (async-channel-put outcome-channel res))
+(require racket/match
+         racket/port
+         racket/sandbox)
 
 (define (run-with-limits thunk
                          #:timeout/s [timeout-secs #f]
                          #:memory/gb [memory-limit-gb #f]
                          #:suppress-output? [suppress-output? #f]
                          #:oom-result [make-oom-result (λ () 'oom)]
-                         #:timeout-result [make-timeout-result (λ () 'timeout)]
-                         #:exn-handler [exn-handler (λ (e) (raise e))])
-  (define run-custodian (make-custodian))
-  (define shutdown-box
-    (make-custodian-box run-custodian 'available))
-  (when memory-limit-gb
-    (custodian-limit-memory run-custodian
-                            (exact-floor (* memory-limit-gb (expt 10 9)))))
+                         #:timeout-result [make-timeout-result (λ () 'timeout)])
   (define run
     (λ _
       (define /dev/null (open-output-nowhere))
-      (parameterize ([current-output-port (if suppress-output?
-                                              /dev/null
-                                              (current-output-port))]
-                     [current-error-port (if suppress-output?
-                                             /dev/null
-                                             (current-error-port))])
-        (begin0 (thunk)
-          (close-output-port /dev/null)))))
-  ;; Channel for communicating result of the thunk
-  (define outcome-channel (make-async-channel 1))
-  (define thread-id
-    ;; Threads inheret the current-custodian upon creation
-    (parameterize ([current-custodian run-custodian])
-        (thread (make-async-outcome-reporter run outcome-channel))))
-  (define ended-event
-    (sync/timeout/enable-break timeout-secs
-                               thread-id
-                               shutdown-box))
-  (unless ended-event
-    (kill-thread thread-id))
-  ;; Sync to clean up the killed thread
-  (sync/enable-break thread-id shutdown-box)
+      (define result
+        (parameterize ([current-output-port (if suppress-output?
+                                                /dev/null
+                                                (current-output-port))]
+                       [current-error-port (if suppress-output?
+                                               /dev/null
+                                               (current-error-port))])
+          (thunk)))
+      (close-output-port /dev/null)
+      result))
+
+  (define (resource-limit-result e)
+    (match (exn:fail:resource-resource e)
+      ['memory (make-oom-result)]
+      [else (make-timeout-result)]))
+  #;(define (terminated-result e)
+    (displayln (exn:fail:sandbox-terminated-reason e))
+    (match (exn:fail:sandbox-terminated-reason e)
+      ['out-of-memory (make-oom-result)]
+      [else (make-timeout-result)]))
+
+  (define time-limit (and timeout-secs
+                          (round timeout-secs)))
+  (define memory-limit (and memory-limit-gb
+                            (round (* memory-limit-gb 1024))))
+  (define result
+    ;; this seems to be pretty much equivalent to the much simpler
+    ;; `call-with-limits` below
+    #;(parameterize ([sandbox-path-permissions '((read #rx#".*"))]
+                   [sandbox-memory-limit memory-limit]
+                   [sandbox-eval-limits (list time-limit memory-limit)]
+
+                   [sandbox-output (current-output-port)]
+                   [sandbox-error-output (current-error-port)]
+                   [sandbox-input (current-input-port)]
+
+                   [sandbox-make-code-inspector current-code-inspector])
+      (let ([sandbox-eval
+             (make-evaluator 'racket/base)])
+        (with-handlers ([exn:fail:resource? resource-limit-result]
+                        [exn:fail:sandbox-terminated? terminated-result])
+          (sandbox-eval (list run)))))
+    (with-handlers ([exn:fail:resource? resource-limit-result])
+      (call-with-limits time-limit
+                        memory-limit
+                        run)))
 
   ;; Force garbage collection so repeated oom runs don't cause memory exhaustion
   (collect-garbage)
   (collect-garbage)
   (collect-garbage)
 
-  (cond
-    ;; Check if oom or timed out
-    [(not (custodian-box-value shutdown-box))
-     (make-oom-result)]
-    [(not ended-event)
-     (make-timeout-result)]
-    ;; if not, and it completed normally, get the result of the thunk
-    [(async-channel-try-get outcome-channel)
-     =>
-     (match-lambda [(result 'normal v) v]
-                   [(result 'exn e) (exn-handler e)])]
-    [else
-     (raise-user-error
-      'run-with-limits
-      "Unable to extract result from thunk. Probably it does things I didn't expect.")]))
+  result)
 
 (module+ test
-  (require ruinit)
+  (require ruinit
+           racket)
+
+  (test-begin
+    #:name timeout
+    (run-with-limits (λ _ (sleep 10) 42)
+                     #:timeout/s 2))
 
   (test-begin
     #:name exn-in-thunk
@@ -107,16 +107,6 @@
                                       "bad stx")))
                #:timeout/s 60
                #:memory/gb 3)))
-
-  (test-begin
-    #:name exn-handler
-    (test-equal? (run-with-limits
-                  (thunk
-                   (error 'thunk "bad thunk"))
-                  #:timeout/s 60
-                  #:memory/gb 3
-                  #:exn-handler (λ (e) 'foobar))
-                 'foobar))
 
   (test-begin
     #:name oom-limits
