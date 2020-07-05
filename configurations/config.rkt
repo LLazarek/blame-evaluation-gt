@@ -14,16 +14,23 @@
 (define (config-at-max-precision-for? name config)
   (equal? (hash-ref config name) 'types))
 
-(define (increment-config-precision-for name config)
+(define (increment-config-precision-for name config
+                                        #:increment-types-error?
+                                        [error-if-already-types? #t])
   (match (hash-ref config name)
     ['none (hash-set config name 'types)]
     [else
+     #:when error-if-already-types?
      (error 'increment-config-precision-for
-            @~a{Given config with value @name already at types: @config})]))
-(define (increment-config-precision-for-all names config)
+            @~a{Given config with value @name already at types: @config})]
+    [else config]))
+(define (increment-config-precision-for-all names config
+                                            #:increment-types-error?
+                                            [error-if-already-types? #t])
   (for/fold ([config config])
             ([name (in-list names)])
-    (increment-config-precision-for name config)))
+    (increment-config-precision-for name config
+                                    #:increment-types-error? error-if-already-types?)))
 
 (module+ test
   (require ruinit

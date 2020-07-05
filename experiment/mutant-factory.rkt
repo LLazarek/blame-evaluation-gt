@@ -559,7 +559,8 @@
                              new-factory)]
         [else
          (define config/blamed-region-ctc-strength-incremented
-           (increment-config-precision-for-all blamed/type-error-locations config))
+           (increment-config-precision-for-all blamed/type-error-locations config
+                                               #:increment-types-error? #f))
          (define (spawn-the-blame-following-mutant a-process-q
                                                    #:timeout/s [timeout/s #f]
                                                    #:memory/gb [memory/gb #f])
