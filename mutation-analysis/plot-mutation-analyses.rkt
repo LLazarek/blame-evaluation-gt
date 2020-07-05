@@ -158,6 +158,11 @@
                         "mutation"
                         'active-mutator-names)))
 
+ (define label-offset
+   (match (length (current-mutation-types))
+     [13 30]
+     [10 55]))
+
  (define plot-type (if (hash-ref flags 'total-counts)
                        'total-counts
                        'success-ratios))
@@ -174,14 +179,14 @@
                                            #:extra points))
       (define pict
         (parameterize ([plot-width (- PLOT-WIDTH (if draw-labels? 0 labels-width))]
-                       [plot-height (+ 400 (if draw-labels? 30 0))])
+                       [plot-height (+ 400 (if draw-labels? label-offset 0))])
           (vc-append
            (plot-bars-pict data
                           #:title benchmark
                           #:y-label #f
                           #:x-label #f
                           #:x-max 1)
-           (if draw-labels? (blank 0) (blank 0 30)))))
+           (if draw-labels? (blank 0) (blank 0 label-offset)))))
       pict)))
  (define together
    (fill-background
