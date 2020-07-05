@@ -303,6 +303,25 @@
                       e.rkt 'types)
             main.rkt 'types))
 
+   ;; Check that getting multiple blames with some already at types is OK, and
+   ;; it just strengthens the ones not already at types
+   (ignore (set-box! enqueued #f)
+           (define dead-e-proc/main-types
+             (struct-copy dead-mutant-process dead-e-proc/blame-e
+                          [config (hash-set (dead-mutant-process-config
+                                             dead-e-proc/blame-e)
+                                            main.rkt
+                                            'types)]))
+           (follow-blame-from-dead-process mock-q
+                                           dead-e-proc/main-types
+                                           (list main.rkt e.rkt)))
+   (extend-test-message
+    (mutant-process? (unbox enqueued))
+    "Didn't enqueue a mutant following blame on e.rkt and main.rkt when it should have")
+   (equal? (mutant-process-config (unbox enqueued))
+           (hash-set (dead-mutant-process-config dead-e-proc/main-types)
+                     e.rkt 'types))
+
    (ignore
     (set-box! enqueued #f)
     (define dead-e-proc/blame-e/e-already-types
@@ -325,7 +344,7 @@
                    [result
                     (struct-copy run-status
                                  (dead-mutant-process-result dead-e-proc/blame-e)
-                                 [blamed '("../base/csp.rkt")])]))
+                                 [blamed '("module-not-in-benchmark.rkt")])]))
     ((make-blame-following-will/fallback (λ (q _)
                                            (set-box! enqueued 'fallback)
                                            q))

@@ -174,7 +174,7 @@
 
 (define test-mutant-flag 'test)
 
-(define blame-labels? (listof module-name?))
+(define blame-labels? (non-empty-listof module-name?))
 (define mutant/c
   (struct/dc mutant
              [module (abstract?) (if abstract?
@@ -592,7 +592,7 @@
           (* 2 (default-memory-limit/gb))))
 
 (define/contract (make-blame-disappearing-fallback dead-proc
-                                                   blamed
+                                                   predecessor-blamed
                                                    respawn-mutant)
   (dead-mutant-process/c
    blame-labels?
@@ -666,17 +666,15 @@ Predecessor (id [~a]) blamed ~a and had config:
             "Likely due to a buggy contract
    on the region blamed by the predecessor (see below) that crashed"
             "Something has gone very wrong")
-        id blamed
+        id predecessor-blamed
         config)
        (maybe-abort "Blame disappeared" current-process-q)]
       [{(or 'blamed 'type-error) _}
-       #:when (and (list? (run-status-blamed dead-succ-result))
-                   (andmap library-path? (run-status-blamed dead-succ-result)))
        (log-factory
         error
         @~a{
             BT VIOLATION: @;
-            Blame entered library code while following blame trail @;
+            All blame entered library code while following blame trail @;
             @mod @"@" @index {@blame-trail-id}. @;
             Giving up on following the trail.
             Mutant: [@dead-succ-id] and config:
@@ -1056,23 +1054,27 @@ Mutant: [~a] ~a @ ~a with config:
 (define (process-outcome dead-proc)
   (run-status-outcome (dead-mutant-process-result dead-proc)))
 
-;; result/c -> module-name?
-(define/match (try-get-blamed-modules/from-result result)
-  [{(struct* run-status ([outcome 'blamed]
-                         [blamed (and (list-no-order (? module-name?) _ ...)
-                                      blamed-list)]))}
-   (filter module-name? blamed-list)]
-  [{(struct* run-status ([outcome 'runtime-error]
-                         [blamed (and blamed
-                                      (not '()))]))}
-   blamed]
-  [{(struct* run-status ([outcome _]))}
-   #f])
+;; result/c -> (or/c #f (non-empty-listof string?))
+(define/match (try-get-blamed/from-result result)
+  [{(struct* run-status ([outcome (or 'blamed 'runtime-error)]
+                         [blamed blamed-list]))}
+   blamed-list]
+  [{_} #f])
 
-;; dead-mutant-process? -> module-name?
+;; dead-mutant-process? -> (or/c #f (non-empty-listof module-name?))
 (define/match (try-get-blamed-modules dead-proc)
-  [{(dead-mutant-process _ _ result _ _ _)}
-   (try-get-blamed-modules/from-result result)])
+  [{(dead-mutant-process _
+                         config
+                         (app try-get-blamed/from-result (? list? blamed))
+                         _
+                         _
+                         _)}
+   (define blamed-mods-in-benchmark
+     (filter (λ (blamed-module) (hash-has-key? config blamed-module))
+             blamed))
+   (and (not (empty? blamed-mods-in-benchmark))
+        blamed-mods-in-benchmark)]
+  [{_} #f])
 
 (define/contract (type-error-on-buggy-mod? blamed-mod-names result)
   ((listof module-name?) run-status/c . -> . boolean?)
