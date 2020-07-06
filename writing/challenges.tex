@@ -92,10 +92,10 @@ Besides the blame information they produce, the three gradual typing
 systems also differ in the runtime type checks they perform. Therefore an
 application of the evaluation method to a gradual typing system has to
 factor in the effect of type checks to determine whether blame helps the
-rational programmer find an impedance mismatch. A solution to this issue
+rational programmer find the cause of an impedance mismatch. A solution to this issue
 is yet another mode for the rational programmer that uses information only
-from teh underlying languages exceptions to select the next component(s) to type.
-This \emph{vanilla} mode simulates a rational programmer that ignores
+from the underlying languages exceptions to select the next component(s) to type.
+This \emph{exception} mode simulates a rational programmer that ignores
 blame and serves as the baseline for blame's value.
 
 
@@ -103,7 +103,7 @@ The final big challenge is that the different gradual type
 systems, the number of necessary modes for the rational programmer
 and the large number of mutants lead to an explosion of scenarios the
 method needs to examine. Thus a practical application of the
-method has no option but to carefully sample this space while 
+method has no option but to carefully sample the space of scenarios while 
 making sure that it still produces reproducible conclusions.
 
 
@@ -114,17 +114,17 @@ also suggest a recipe for doing so correctly:
 
 \begin{itemize}
 
-\item Implement all the gradual type systems to be compared on a common
-  basis (section~\ref{sec:landscape}).
+\item Implement all three gradual type systems on a common
+  basis (section~\ref{sec:landscape});
 
 \item Construct a large number of suitable benchmarks for all gradual type
   systems with representative
-  type errors  (section~\ref{sec:mutate}). 
+  type errors  (section~\ref{sec:mutate}); 
     
 \item Simulate the rational programmer with sufficient 
   modes to (i) match the peculiarities of each gradual type system and 
     (ii) isolate blame from other confounding factors
-    (section~\ref{sec:rational}).
+    (section~\ref{sec:rational});
 
 
 
