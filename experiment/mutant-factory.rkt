@@ -1091,16 +1091,16 @@ Mutant: [~a] ~a @ ~a with config:
 (define/match (try-get-type-error-module/from-result result)
   [{(struct* run-status ([outcome 'type-error]
                          [blamed blamed]))}
+   blamed]
+  [{_} #f])
+(define/match (try-get-type-error-module dead-proc)
+  [{(struct* dead-mutant-process
+             ([result (app try-get-type-error-module/from-result (? list? blamed))]
+              [config config]))}
    (define blamed-mods-in-benchmark
      (filter-blames-to-mods-in-config config blamed))
    (and (not (empty? blamed-mods-in-benchmark))
         blamed-mods-in-benchmark)]
-  [{(struct* run-status ([outcome (not 'type-error)]))}
-   #f])
-(define/match (try-get-type-error-module dead-proc)
-  [{(struct* dead-mutant-process
-             ([result (? run-status? result)]))}
-   (try-get-type-error-module/from-result result)]
   [{_} #f])
 
 (define (maybe-abort reason continue-val #:force [force? #f])
