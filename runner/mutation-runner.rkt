@@ -225,7 +225,11 @@
              [blamed          {outcome}
                               (match outcome
                                 ['blamed
-                                 (non-empty-listof module-name-or-library-path?)]
+                                 ;; This should really be `non-empty-listof`,
+                                 ;; but one limitation of transient is that
+                                 ;; sometimes it raises a blame error blaming
+                                 ;; nothing
+                                 (listof module-name-or-library-path?)]
                                 ['type-error
                                  (list/c module-name-or-library-path?)]
                                 ['runtime-error
