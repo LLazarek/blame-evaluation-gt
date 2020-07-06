@@ -352,7 +352,7 @@
 
 (define default-sample-size-multiplier 20)
 (main
- #:arguments {[(hash-table ['config-path config-path]
+ #:arguments {[(hash-table ['config-path _]
                            ['summaries-db summaries-db-path]
                            ['samples-db samples-db-path]
                            ['benchmarks-dir benchmarks-dir]
@@ -366,7 +366,7 @@
                ("Configuration to use for generating samples."
                 "This argument is mandatory.")
                #:mandatory
-               #:collect ["path" take-latest #f]]
+               #:collect ["path" (set-parameter current-configuration-path) #f]]
 
               [("-s" "--sumaries-db")
                'summaries-db
@@ -413,7 +413,7 @@
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
 
- (current-active-mutator-names (load-configured config-path
+ (current-active-mutator-names (load-configured (current-configuration-path)
                                                 "mutation"
                                                 'active-mutator-names))
 
