@@ -680,7 +680,7 @@ Predecessor (id [~a]) blamed ~a and had config:
             Mutant: [@dead-succ-id] and config:
             @~v[dead-succ-config]
 
-            Blamed: @(run-status-blamed result)
+            Result: @(run-status-outcome result) on @(run-status-blamed result)
             })
        current-process-q]
       [{'runtime-error _}
@@ -1061,6 +1061,10 @@ Mutant: [~a] ~a @ ~a with config:
    blamed-list]
   [{_} #f])
 
+(define (filter-blames-to-mods-in-config config blamed-list)
+  (filter (λ (blamed-module) (hash-has-key? config blamed-module))
+          blamed-list))
+
 ;; dead-mutant-process? -> (or/c #f (non-empty-listof module-name?))
 (define/match (try-get-blamed-modules dead-proc)
   [{(dead-mutant-process _
@@ -1070,8 +1074,7 @@ Mutant: [~a] ~a @ ~a with config:
                          _
                          _)}
    (define blamed-mods-in-benchmark
-     (filter (λ (blamed-module) (hash-has-key? config blamed-module))
-             blamed))
+     (filter-blames-to-mods-in-config config blamed))
    (and (not (empty? blamed-mods-in-benchmark))
         blamed-mods-in-benchmark)]
   [{_} #f])
@@ -1088,7 +1091,10 @@ Mutant: [~a] ~a @ ~a with config:
 (define/match (try-get-type-error-module/from-result result)
   [{(struct* run-status ([outcome 'type-error]
                          [blamed blamed]))}
-   blamed]
+   (define blamed-mods-in-benchmark
+     (filter-blames-to-mods-in-config config blamed))
+   (and (not (empty? blamed-mods-in-benchmark))
+        blamed-mods-in-benchmark)]
   [{(struct* run-status ([outcome (not 'type-error)]))}
    #f])
 (define/match (try-get-type-error-module dead-proc)
