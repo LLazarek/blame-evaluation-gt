@@ -1,36 +1,255 @@
-\section{How to Evaluate Blame}
+\section{How to Simulate the Rational Programmer} \label{sec:ideas}
 
-\begin{itemize}
+Given the comparable implementations of the three gradual typing systems,
+the next step for applying our method is to obtain a set of fully
+typed benchmarks that each comes with a single impedance mismatch between
+its type specifications and its code. As we briefly discuss in
+section~\ref{sec:challenges}, we derive such ill-typed benchmarks with
+mutation analysis from well-typed programs.  We return to mutation
+analysis and the benchmarks in section~\ref{sec:experiment}.  Herein,
+we assume that we have them in hand and instead we focus on the
+main element of our method, the rational programmer.  
 
-    \item How to analyze this space?
-          \begin{itemize}
-            \item We want a quantative measure of error msg utility that allows
-                  us to evaluate each point in the above space.
-          \end{itemize}       
 
-     \item Blame trails
-       \begin{itemize}
-       
-        \item We want an empirical study to understand how the behavior of blame
-        in real systems.
+The rational programmer exploits blame information to figure out wih. Therefore the way to understand its behavior 
+is to analyze the migratory path it follows through the 
+\emph{configuration space} of the program. The space
+consists of variants of the program, dubbed \emph{configurations}, that 
+differ in their type annotations. 
+Herein we build on top of Typed Racket's migratory typing
+approach,\footnote{The method can be adapted to so-called true gradual typing
+systems~\cite{svcb-snapl-2015} in a straightforward manner.}, hence, each configuration differs from another
+in which of its components are typed and which are not. Formally, we can
+represent a program $\system$ as a set of of components
+$\set{\component}$ and each configuration $\conf$ of $\system$ is a subset of 
+$\set{\component}$
+that contains exactly the components of  $\system$ that are typed in
+$\conf$. Naturally the configurations of  $\system$ are ordered by the subset relation and
+thus form a lattice $\lattice{\system}$ with size $2^{\size{\system}}$.
+The bottom configuration of $\lattice{\system}$ is always $\emptyset$ and
+the top element is $\system$ itself. In between there are all the
+mixed-type configurations. If we assume that  component $\component$ of $\system$
+contains the type error, any configuration $\conf$ that
+includes $\component$ is ill-typed. Any other configuration $\conf$ may blame 
+a $\component_b$, which we denote with $\blame{\conf}$. Let a blametrail
+be a sequence of configurations $\conf_0,...\conf_n$ where 
+for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+$\conf_{i+1} \setminus \conf_i = \blame{\conf_i}$. That is a blametrail
+corresponds to a succession of a configurations that start with a
+configuration $\conf_0$, dubbed the \emph{root of the blametrail}, and 
+each configuration is derived from its previous one by typing the
+component that the latter blames. A rational programmer is one that
+migrates the variant of a program $\system$ that corresponds to
+configuration $\conf_0$ along the blametrail that starts at $\conf_0$.
+We say a blametrail is final iff its last configuration, $\conf_n$
+doesn't blame a component, $\blame{\conf_i} = \emptyset$. We call a
+blametrail \emph{successful} iff it is final and its last configuration
+$\conf_n$ contains the faulty component of $\system$, $\faulty{\system}
+\in \conf_n$. 
 
-       
-        \item Blame trails provide a quantitative measure of a a system's
-        error message utility, and they can be applied to every point
-        in the above space.
-       \end{itemize}       
+Using the notion of successful blametrails we can define precisely what it
+means for blame to add value to a gradual typing system: 
 
-       \item We generalize the blame trails idea of Lukas et al [POPL '20] to make it
-        more systematic, scalable, and general, by:
-           \begin{itemize}
-             \item Adding a null hypothesis baseline for comparison between multiple systems
-             \item Analyzing multiple blame following strategies
-             \item Mutating interfaces as well as programs
-             \item Incorporating domain knowledge in the selection of blame following
-           strategies and mutation
-             \item Evaluating systems on the same platform for apples-to-apples comparisons
-           \end{itemize}   
+All blametrails are successfull: Given a program P and its configuration
+lattice $\lattice{\system}$, all blametrails in the lattice are successful. 
 
-         \item Null hypothesis. We should have a baseline to tell how all of the points in the
-        design space compare to having nothing at all.
-\end{itemize}
+With these definitions we can describe with precision the experimental
+process of our method. For each benchmark we create its configuration
+lattice. Then we separate the configurations of the lattice that 
+when run result in blame or result in a static type error from  those that do not
+do either. The former are 
+suitable to be roots of a blametrail. Thus we simulate the rational 
+programmer and if the configuration blames we type their blamed component to obtain the next
+configuration in the blametrail and repeat the process until the
+blametrail becomes final. At this point we check whether the last
+configuration fails to type check. If it does for all blametrails in the
+lattice, then the property holds. Otherwise it fails. 
+
+In addition to the property the framework allows us to assign a metric of
+effort to a successful blametrail; $\effort{\conf_0, ...., \conf_n} = n$ 
+
+\subsection{How to Generalize the Rational Programmer} 
+
+As we discuss in section~\ref{sec:challenges}, an important factor that the method need to
+take into account is that different gradual typing systems blame
+differently and perform different checks. For that reason in
+section~\ref{sec:challenges} we introduce the notion of modes for the
+rational programmer. Defining these modes requires a generalization of the 
+discussion above. 
+
+In particular it requires revisiting the notion of blametrail and that of
+successful blametrail. 
+
+We define a blametrail in a mode  $\modem$ as  
+a sequence of configurations $\conf_0,...\conf_n$ where 
+for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+$\conf_{i+1} \setminus \conf_i = \mode{\conf_i}$.
+
+   For example we can obtain the simple blame mode
+for the natural system if we use, as above, the selector $\blame{\cdot}$. 
+However, the same mode has a different meaning in transient as this
+semantics results in multiple blamed components. 
+
+This requires generalizing the notion of successful blametrail
+to that of successful blametrees: a blametree is the set of all
+blametrails with root a configuration $\conf_0$. A blametree is succesful if at least one
+of its blametrails is succesful. 
+
+Of course for systems such as transient we can add modes where the rational
+programmer picks one blametrail as part of the migration process. For
+example the \first{\blame{\cdot}} mode continues with the oldest blame
+entry in the blameset of a configuration, as we discuss in
+section~\ref{sec:challenges}. 
+
+Moreover, the \emph{vanilla} mode corresponds to ignoring blame and instead
+using only information from the dynamic type error that a configuration
+produces using the $\error{\cdot}$ selector. 
+
+Finally, the \emph{null} mode uses selector $\random{\cdot}$ and it is
+used by our method as the null hypothesis control experiment.
+
+The following table collects all the modes and their selectors for the
+three gradual typing systems we compare in this paper:
+
+
+\begin{tabular}{c|c|c|c}
+                    & {\bf Natural}  & {\bf Transient}        & {\bf Erasure} \\
+   \hline 
+  {\bf Simple Blame}   & \blame{\conf}  & \blame{\conf}          &               \\
+ {\bf First Blame}  &                 & \first{\blame{\conf}}  &               \\
+  {\bf Vanilla}       &  \error{\conf} & \error{\conf}          & \error{\conf} \\
+  {\bf Null}        & \random{\conf} & \random{\conf}         & \random{\conf} 
+\end{tabular}  
+  
+ 
+As a last step we also need to lift the notion of effort to blametrees.
+The effort of a blametree $\effort{\{\conf_0, ...., \conf_n\},...}$ is the
+aggregate effort of all its blametrails.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -26,25 +26,47 @@
 
 %% lattice
 
-\newcommand{\system}{\ensuremath{C}}
+\newcommand{\system}{\ensuremath{P}}
+
+
 
 \newcommand{\component}{\ensuremath{c}}
 
-\newcommand{\contract}{\ensuremath{k}}
-
-\newcommand{\contracts}{\ensuremath{K}}
-
-\newcommand{\kmap}{\ensuremath{KMAP}}
-
 \newcommand{\latticeL}{\mathcal{L}}
 
-\newcommand{\lattice}[2]{\ensuremath{\latticeL\llbracket#1,#2\rrbracket}}
+\newcommand{\lattice}[1]{\ensuremath{\latticeL\llbracket#1\rrbracket}}
 
 \newcommand{\standardlattice}{\lattice{\system}{\kmap}}
 
 \newcommand{\conf}{\ensuremath{CONF}}
 
 \newcommand{\metric}{\ensuremath{\leq_{\latticeL}^{X}}}
+
+\newcommand{\set}[1]{\ensuremath{\bar{#1}}}
+
+\newcommand{\size}[1]{\ensuremath{\mid #1 \mid}}
+
+\newcommand{\blame}[1]{\ensuremath{BLAME\llbracket#1\rrbracket}}
+
+\newcommand{\mblame}[1]{\ensuremath{MULTIBLAME\llbracket#1\rrbracket}}
+
+
+
+\newcommand{\faulty}[1]{\ensuremath{FAULTY\llbracket#1\rrbracket}}
+
+\newcommand{\random}[1]{\ensuremath{RANDOM\llbracket#1\rrbracket}}
+
+\newcommand{\error}[1]{\ensuremath{ERROR\llbracket#1\rrbracket}}
+
+\newcommand{\effort}[1]{\ensuremath{EFFORT\llbracket#1\rrbracket}}
+
+\newcommand{\oldest}[1]{\ensuremath{OLDEST\llbracket#1\rrbracket}}
+
+\newcommand{\modem}{\ensuremath{S}}
+\newcommand{\mode}[1]{\ensuremath{\modem\llbracket#1\rrbracket}}
+
+
+
 
 
 %% misc

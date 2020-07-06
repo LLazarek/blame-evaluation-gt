@@ -1,0 +1,324 @@
+\section{How to Simulate the Rational Programmer} \label{sec:rational}
+
+Consider a rational programmer  that tries to debug a faulty program in
+Typed Racket with the default natural semantics. If the Typed Racekt
+typechecker detects the issue with the program, the programmer knows where
+to look for the bug; in the component that doesn't type check. However, if
+the type checker blesses the program, the programmer relies on  runtime
+type checks  to  signal an impedance mismatch between the
+program's behavior and its types. In these checks raise an error, the programmer ``follows'' blame to
+locate where to add a type specification next.  Hopefully, the extra
+types are sufficient to turn the run time error into a static one. Otherwise,
+the rational programmer starts over with the latest version of the program. 
+In essence, at each iteration the
+faulty program migrates to a version with more type specifications until
+the faulty component becomes typed.
+
+Therefore, a concise way to model rational programmers is with the
+migratory paths they follow through the \emph{configuration space} of the
+program. This space consists of variants of the program, dubbed
+\emph{configurations}, that differ in their type specifications. In the 
+setting of Typed Racket's migratory typing,\footnote{The
+method can be adapted to so-called true gradual typing
+systems~\cite{svcb-snapl-2015} in a straightforward manner.}, each
+configuration differs from another in the components that have type
+specifications. Hence, formally, we can represent a program
+$\system$ as a set of components $\set{\component}$ and each
+configuration $\conf$  as a subset of $\set{\component}$ that contains
+exactly the components of  $\system$ that are typed in $\conf$. Naturally
+the configurations of  $\system$ are ordered by the subset relation and
+thus form a lattice $\lattice{\system}$ with $2^{\size{\system}}$ elements.
+The bottom configuration of $\lattice{\system}$ is always $\emptyset$ and
+the top element is $\system$ itself. In between there are all the
+mixed-type configurations. If we assume that  component
+$\faulty{\system}$ contains the fault, the type checker detects any
+configuration $\conf$ that includes $\faulty{\system}$. Any other
+configuration $\conf$ of $\system$ may blame a $\component_b$, which we denote with
+$\blame{\system,\conf}$.\footnote{Blame can result either directly from a Typed
+Racket type check or from a check in a Racket library function that raises
+a blame error or, in the absence of blame, from an
+exception that we track back to the component that causes it with the help
+of Racket's stack trace.}
+
+
+With these definitions, the actions of the rational programmer map to an ascending chain in
+$\lattice{\system}$, dubbed a \emph{blametrail}. 
+The starting configuration $\conf_0$ of a blametrail,  dubbed the \emph{root of the
+blametrail}, is the configuration of
+$\program$ that the programmer attempts to debug. Any other
+configuration $\conf_{i+1}$ in the blametrail differs from its predecessor
+$\conf_{i}$ in that 
+the untyped component $\blame{\program, \conf_i}$ of $\conf_{i}$
+ becomes typed in $\conf_{i+1}$. Putting these pieces together:
+
+\begin{quote}
+\it 
+A natural blametrail
+is a sequence of configurations $\conf_0,...\conf_n$ of a program
+$\system$ where for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+$\conf_{i+1} \setminus \conf_i = \{\blame{\system, \conf_i}\}$.
+\end{quote}
+
+So far the definition of blametrail does not capture whether blame helps the rational
+programmer locate the bug in the root of a blametrail. For that we need 
+two properties of blametrails. A blametrail is \emph{final} if
+the rational programmer cannot extend it further. Or formally, if 
+$\blame{\program, \conf_n}$ is not defined where  $\conf_n$ is the last
+configuration of the blametrail. A blametrail is \emph{successful} 
+if it is final and  its last configuration
+$\conf_n$ contains the faulty component, that is $\faulty{\system}
+\in \conf_n$.  We can now give a precise definition of what it
+means for blame to help the rational programmer in natural Typed Racket:
+\begin{quote}
+\it
+  Natural blame is useful for a program $\system$ iff 
+  all natural blametrails in  $\lattice{\system}$ are successful.
+\end{quote}
+
+
+However, the definition does not give a full picture of how much blame helps the
+natural rational programmer. In particular, all blametrails in $\lattice{\system}$
+may  be successful but this may well be because of some other aspect of
+natural, such as the type checks it performs, or it may even be a result
+of pure chance. To exclude these possibilities we define two different
+modes for the rational programmer. In the first, the natural programmer
+ignores blame and instead decides what component to type next based on
+information from the stack trace of the failed runtime type check.  This 
+vanilla rational programmer corresponds to \emph{vanilla natural
+blametrails}:
+\begin{quote}
+\it 
+A vanlla natural blametrail
+is a sequence of configurations $\conf_0,...\conf_n$ of a program
+$\system$ where for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+$\conf_{i+1} \setminus \conf_i = \{\error{\system, \conf_i}\}$.
+\end{quote}
+where $\error{\system, \conf}$ denotes the component that triggers a
+failed runtime check according to Racket's stack trace. 
+In the second mode, the natural programmer
+ignores any kind of information related to the type error and randomly
+picks which component to type next.  This 
+random rational programmer corresponds to \emph{random natural
+blametrails}:
+\begin{quote}
+\it 
+A vanlla natural blametrail
+is a sequence of configurations $\conf_0,...\conf_n$ of a program
+$\system$ where for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+$\conf_{i+1} \setminus \conf_i = \{\random{\system, \conf_i}\}$.
+\end{quote}
+where $\random{\system, \conf}$ denotes a randomly selected of $\system$
+that is not in $\conf_i$.
+
+With vanilla and random blametrails, we can define the value that blame
+adds to natural Typed Rachet: 
+\begin{quote}
+\it
+  Natural blame  adds value to natural for a program $\system$ iff 
+ iff 
+  all natural blametrails in  $\lattice{\system}$ are successful while 
+not all vanilla and random natural blametrails are successful.
+\end{quote}
+
+
+\noindent
+{\bf Experimental Process.}~Given a set of faulty benchmarks such as the ones
+from~section \ref{sec:mutate}, it is straightforward to turn the above definition
+into the falsfiable hypothesis of an experiment that tests whether blame
+add value to natural Typed Racket. Specifically, for each benchmark
+we first construct its configuration lattice. Then, we determine the
+configurations of the lattice that detect the fault in the
+program. This can happen either because a
+ runtime type check fails or Typed Racket's typechecker
+rejects the configuration. In either case,  each of these configurations is the
+root of a natural blametrail in the configuration lattice of the benchmark. \emph{We
+hypothesize that all such natural blametrails are successful while the
+vanilla and random ones are not}. 
+To confirm or falsify the hypothesis for a benchmark, we simply extend each blametrail
+ according to the mode of the corresponding rational programmer  until the blametrail
+becomes final\footnote{All blametrails are final since the lattices are
+finite.} and we check if its last configuration contains the faulty
+component of the benchmark. 
+
+\subsection{How to Generalize the Rational Programmer Beyond Natural Typed
+Racket} 
+
+Adapting the simulated rational programmer to handle transient
+and erasure Typed Racket requires taking into account the distinguishing
+features of each semantics. As we discuss in section~\ref{sec:landscape}, 
+transient blames a set of components in contrast to natural's
+single-component blame. At the other end of the blame spectrum, erasure
+blames no component and relies on Racket's exceptions.
+
+Hence, for an erasure rational programmer only the vanilla and random 
+rational programmers are meaningful. In contrast, for transient, we 
+need two extra transient-specific modes for the rational
+programmer. Specifically, in the first mode, the rational programmer types
+all blamed components.  In the second mode, the rational programmer types
+the component that is added to the blame set first --- and thus can 
+detect an impendance mismatch earlier in the evaluation of a program. 
+As before, the two modes give
+rise to two different notions of blametrail:
+\begin{quote}
+\it 
+A  transient blametrail
+is a sequence of configurations $\conf_0,...\conf_n$ of a program
+$\system$ where for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+~$\conf_{i+1} \setminus \conf_i \in \{\mblame{\system, \conf_i}\}$;
+\end{quote}
+\noindent
+and
+\begin{quote}
+\it 
+A firstborn transient blametrail
+is a sequence of configurations $\conf_0,...\conf_n$ of a program
+$\system$ where for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
+  $\conf_{i+1} \setminus \conf_i = \oldest{\mblame{\system, \conf_i}}$
+\end{quote}
+\noindent
+where $\mblame{\system, \conf}$ denotes the set of components that $\conf$
+blames. 
+
+\noindent
+{\bf Experimental Process.} The following table summarizes the modes for the rational programmer in
+different gradual typing systems:
+
+\center
+\begin{tabular}[c]{c|c|c|c}
+                       & {\bf Natural}  & {\bf Transient} & {\bf Erasure}  \\
+\hline 
+{\bf Blame}            &       X        &                 &                \\
+  {\bf Multi blame}    &                &        X        &                \\
+ {\bf Firstborn blame} &                &        X        &                \\
+{\bf Vanilla}          &       X        &        X        &       X        \\
+{\bf Random}           &       X        &        X        &       X        \\
+\end{tabular}  
+  
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
