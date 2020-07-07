@@ -13,6 +13,7 @@
          "../process-q/interface.rkt"
          "../process-q/priority.rkt"
          "../configurables/configurables.rkt"
+         "mutant-factory-data.rkt"
          "blame-trail-data.rkt"
          racket/file
          racket/format
@@ -86,141 +87,23 @@
 
 
 (define-logger factory)
-(define-syntax-rule (log-factory level msg v ...)
-  (when (log-level? factory-logger 'level)
+(define (log-factory-message level msg . vs)
+  (when (log-level? factory-logger level)
     (log-message factory-logger
-                 'level
-                 (format
+                 level
+                 (apply
+                  format
                   (string-append "[~a] "
-                                 (if (member 'level '(fatal error warning))
-                                     (failure-msg 'level msg)
+                                 (if (member level '(fatal error warning))
+                                     (failure-msg level msg)
                                      msg))
                   (date->string (current-date) #t)
-                  v ...)
+                  vs)
                  #f)))
+(define-syntax-rule (log-factory level msg v ...)
+  (log-factory-message 'level msg v ...))
 (define (failure-msg failure-type m)
   (string-append "***** " (~a failure-type) " *****\n" m "\n**********"))
-
-;; see last result of `process`
-(define process-ctl? procedure?)
-
-;; module:    path-string?
-;; index:     natural?
-;; abstract?: boolean? ; is module a `module-name?` rather than a resolved path?
-(struct mutant (module index abstract?) #:transparent)
-
-(struct blame-trail (id parts) #:transparent)
-
-;; will?           := (factory? dead-mutant-process? -> factory?)
-;; result/c        := run-status/c (see `mutation-runner.rkt`)
-;; ctc-level?      := symbol?
-;; config?         := (hash path-string?
-;;                         (hash (or symbol? path-string?) ctc-level?))
-;; blame-trail-id? := (or natural? 'no-blame)
-
-;; mutant:         mutant?
-;; config:         config?
-;; file:           path-string?
-;; id:             natural?
-;; blame-trail-id: blame-trail-id?
-;; blame-trail:    (listof dead-mutant-process/c)
-;; revival-count:  natural?
-;; increased-limits?: boolean?
-(struct mutant-process (mutant
-                        config
-                        file
-                        id
-                        blame-trail
-                        revival-count
-                        increased-limits?)
-  #:transparent)
-
-;; result: result/c
-(struct dead-mutant-process (mutant
-                             config
-                             result
-                             id
-                             ;; INVARIANT: `blame-trail` does NOT contain this
-                             ;; dead process.
-                             blame-trail
-                             increased-limits?)
-  #:transparent)
-
-(define mutant-results? (hash/c mutant?
-                                path-to-existant-file?))
-
-;; benchmark:  benchmark/c
-;; max-config: config?
-(struct bench-info (benchmark max-config) #:transparent)
-
-;; bench: bench-info?
-;; results: mutant-results?
-;;     The map from mutant to blame trail data file
-;; mutant-samples: mutant? |-> (set config?)
-;;     The set of precision config samples checked for each mutant.
-;; total-mutants-spawned: natural?
-;;     Count of the total number of mutants spawned by this factory.
-;;     This is primarily useful to making every new mutant file unique.
-(struct factory (bench
-                 results
-                 mutant-samples
-                 total-mutants-spawned)
-  #:transparent)
-
-
-(define-simple-macro (copy-factory
-                      a-factory:expr field-val-pair:expr ...)
-  (struct-copy factory a-factory field-val-pair ...))
-
-(define test-mutant-flag 'test)
-
-(define blame-labels? (non-empty-listof module-name?))
-(define mutant/c
-  (struct/dc mutant
-             [module (abstract?) (if abstract?
-                                     module-name?
-                                     path-to-existant-file?)]
-             [index natural?]
-             [abstract? boolean?]))
-(define result/c run-status/c)
-(define blame-trail-id? (or/c natural?
-                              test-mutant-flag))
-(define blame-trail/c
-  (struct/dc blame-trail
-             [id     blame-trail-id?]
-             [parts  (listof (recursive-contract dead-mutant-process/c #:chaperone))]))
-(define mutant-process/c
-  (struct/dc mutant-process
-             [mutant             mutant/c]
-             [config             config/c]
-             [file               path-string?]
-             [id                 natural?]
-             [blame-trail        blame-trail/c]
-             [revival-count      natural?]
-             [increased-limits?  boolean?]))
-(define dead-mutant-process/c
-  (struct/dc dead-mutant-process
-             [mutant             mutant/c]
-             [config             config/c]
-             [result             result/c]
-             [id                 natural?]
-             [blame-trail        blame-trail/c]
-             [increased-limits?  boolean?]))
-(define bench-info/c
-  (struct/dc bench-info
-             [benchmark   benchmark/c]
-             [max-config  config/c]))
-(define factory/c
-  (struct/dc factory
-             [bench                   bench-info/c]
-             [results                 mutant-results?]
-             [mutant-samples          (hash/c mutant/c (set/c config/c))]
-             [total-mutants-spawned   natural?]))
-
-(define mutant-will/c
-  ((process-Q/c factory/c) dead-mutant-process/c . -> . (process-Q/c factory/c)))
-
-
 
 
 ;; Main entry point of the factory
@@ -504,52 +387,21 @@
   (define the-blame-trail+dead-proc
     (extend-blame-trail the-blame-trail
                         dead-proc))
-  (define all-blamed-at-max-precision?
-    (andmap (λ (blamed) (config-at-max-precision-for? blamed config))
-            blamed/type-error-locations))
-  (define buggy-mod-type-error?
-    (type-error-on-buggy-mod? blamed/type-error-locations result))
-  (cond [(or buggy-mod-type-error?
-             all-blamed-at-max-precision?)
+
+  (define blame-trail-ended?
+    (load-configured (current-configuration-path)
+                     "trail-completion"
+                     'blame-trail-ended?))
+
+  (cond [(blame-trail-ended? dead-proc
+                             blamed/type-error-locations
+                             log-factory-message)
          (log-factory debug
                       "Blame trail ~a @ ~a {~a} ended."
                       mod
                       index
                       (blame-trail-id the-blame-trail+dead-proc))
 
-         (cond [(and buggy-mod-type-error?
-                     (not all-blamed-at-max-precision?))
-                ;; This should never happen: something has gone wrong, because
-                ;; type errors only blame one location and that location must be
-                ;; typed
-                (log-factory
-                 error
-                 @~a{
-                     Found a mutant with type error in the buggy module, @;
-                     but the module is not typed?
-                     Type error location: @blamed/type-error-locations
-
-                     Mutant: @;
-                     @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
-                     With config:
-                     @~v[config]
-                     })]
-               [(and (not buggy-mod-type-error?)
-                     all-blamed-at-max-precision?)
-                (log-factory
-                 error
-                 @~a{
-                     BT VIOLATION: @;
-                     Found mutant with blamed/type-error location at types @;
-                     that is not the buggy module.
-                     Blamed: @~v[blamed/type-error-locations]
-
-                     Mutant: @;
-                     @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
-                     With config:
-                     @~v[config]
-                     })]
-               [else (void)])
          ;; Blamed region is typed, so the path ends here.
          ;; Log the trail and stop following.
          (define new-factory
@@ -1078,15 +930,6 @@ Mutant: [~a] ~a @ ~a with config:
    (and (not (empty? blamed-mods-in-benchmark))
         blamed-mods-in-benchmark)]
   [{_} #f])
-
-(define/contract (type-error-on-buggy-mod? blamed-mod-names result)
-  ((listof module-name?) run-status/c . -> . boolean?)
-
-  (match result
-    [(struct* run-status ([outcome 'type-error]
-                          [blamed (== blamed-mod-names)]))
-     #t]
-    [_ #f]))
 
 (define/match (try-get-type-error-module/from-result result)
   [{(struct* run-status ([outcome 'type-error]

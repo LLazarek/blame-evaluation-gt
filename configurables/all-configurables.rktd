@@ -16,4 +16,8 @@
       ("configuration-sampling" . #hash(("uniform-with-replacement" . "configuration-sampling/uniform-with-replacement.rkt")
                                         ("uniform-with-replacement/typing-mod-to-mutate"
                                          .
-                                         "configuration-sampling/uniform-with-replacement-typing-mod-to-mutate.rkt"))))
+                                         "configuration-sampling/uniform-with-replacement-typing-mod-to-mutate.rkt")))
+      ("trail-completion" . #hash(("mutated-type-error/blamed-at-max"
+                                   .
+                                   "trail-completion/mutated-type-error-or-blamed-at-max.rkt")
+                                  ("any-type-error" . "trail-completion/any-type-error.rkt"))))
