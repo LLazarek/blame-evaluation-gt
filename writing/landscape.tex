@@ -17,3 +17,62 @@
 
 
 
+\subsection{Natural Typed Racket}
+
+Typed Racket extends the untyped Racket language with \emph{natural}\/ gradual
+ types~\cite{}.
+Natural types guarantee a strict separation between typed and untyped code;
+ informally, an untyped value can interact with a typed context only if the
+ value behaves in a well-typed way.
+Typed Racket implements this separation by compiling types to higher-order
+ contracts that guard all boundaries to untyped code.
+Any higher-order typed value that exits a boundary receives a protective
+ wrapper, and any untyped value that enters must pass a deep run-time type
+ check.
+These contract checks help predict the behavior of typed code, but
+ may greatly slow down a program.
+
+
+\subsection{Transient Typed Racket}
+
+Transient gradual types ensure that typed code cannot get stuck on a primitive
+ operation.
+This assurance can be implemented without higher-order
+ contracts~\cite{vss-popl-2017}, and therefore offers a modicum of type
+ soundness for a seemingly-low implementation and performance cost.
+
+For this experiment, we modified Typed Racket to bring transient and natural
+ under the same roof.
+Our version of the library is parameterized by a \emph{type-enforcement strategy}
+ to allow reuse of common components.
+Under the \emph{natural} strategy, our Typed Racket is identical to the latest release.
+By contrast, the \emph{transient} strategy re-uses the static type checker and
+ much of the compiler, but weakens the run-time meaning of types in two ways.
+
+The first major ingredient in transient Typed Racket is a new interpretation
+ of types as first-order shape checks.
+Each shape-check enforces a type constructor.
+For certain types, such as {\tt String} or {\tt (Vectorof Byte)}, transient can
+ re-use a predicate from the underlying Racket language.
+Other types require custom predicates; for example the type {\tt Index} of
+ valid array indices allows a range of positive exact integers.
+Many custom predicates run in constant time, but some are more involved.
+One linear-time check is for {\tt (Listof T)} for any element type {\tt T},
+ because it must distinguish a null-terminated list of pairs from improper
+ list-like structures.
+The key point, however, is that no transient check relies on
+ higher-order contract wrappers.
+
+Second, transient adds a new pass to the compiler that rewrites all typed code.
+Rewriting changes all elimination forms to shape-check the result.
+For example, if the variable {\tt f} has the static type {\tt (-> String String)}
+ then the application {\tt (f x}} must be rewritten to check for a string result
+ because {\tt f} could be an untyped function.
+Rewriting also inserts hooks to update a global blame heap.
+When a value crosses a boundary, the blame heap records a cast assumption.
+Elimination forms and other operations record smaller path assumptions.
+If a transient check ever fails, the language follows path assumptions and
+ reports a set of casts/boundaries to the programmer.
+
+
+
