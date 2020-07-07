@@ -20,7 +20,7 @@
 \subsection{Natural Typed Racket}
 
 Typed Racket extends the untyped Racket language with \emph{natural}\/ gradual
- types~\cite{}.
+ types~\cite{tf-popl-2008,tfffgksst-snapl-2017}.
 Natural types guarantee a strict separation between typed and untyped code;
  informally, an untyped value can interact with a typed context only if the
  value behaves in a well-typed way.
@@ -66,7 +66,7 @@ The key point, however, is that no transient check relies on
 Second, transient adds a new pass to the compiler that rewrites all typed code.
 Rewriting changes all elimination forms to shape-check the result.
 For example, if the variable {\tt f} has the static type {\tt (-> String String)}
- then the application {\tt (f x}} must be rewritten to check for a string result
+ then the application {\tt (f x)} must be rewritten to check for a string result
  because {\tt f} could be an untyped function.
 Rewriting also inserts hooks to update a global blame heap.
 When a value crosses a boundary, the blame heap records a cast assumption.
