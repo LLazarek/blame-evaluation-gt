@@ -104,7 +104,7 @@
           }
          })
     (define-values {type-error? mutation-type}
-      (extract-mutation-type-and-result outfile))
+      (extract-mutation-type-and-result outfile max-config))
     (log-progress! module-to-mutate-name
                    index
                    type-error?
@@ -127,7 +127,7 @@
                  (hash)))
   (process-Q-set-data q (update (process-Q-get-data q))))
 
-(define (extract-mutation-type-and-result f)
+(define (extract-mutation-type-and-result f max-config)
   (define trimmed-output
     (system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f}))
   (define output-regexp
@@ -144,6 +144,8 @@
   (match trimmed-output
     [(regexp output-regexp
              (list _ mutation-type outcome))
+     (raise-user-error 'analyze-mutation
+                       "lltodo: This needs to be modified to check if the type error blames a component in the original program. It can do that by checking if one of the blamed components is a key in the config. Without doing that, we can get infinite loops in mutant-factory because a mutant that type errors but only ever blames library code has no valid blame trail roots.")
      (define type-error? (string=? outcome "type-error"))
      (values type-error? mutation-type)]
     [other-contents

@@ -332,7 +332,7 @@
                     (λ (current-process-q dead-proc)
                       ;; Try sampling another config
                       (log-factory
-                       debug
+                       info
                        "    Sample ~a (id [~a]) for ~a @ ~a failed to find blame."
                        sample-number
                        (dead-mutant-process-id dead-proc)

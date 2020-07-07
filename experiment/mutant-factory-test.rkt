@@ -335,24 +335,52 @@
                                     (list e.rkt)))
    (extend-test-message
     (not (unbox enqueued))
-    "Enqueued a mutant following blame on e.rkt when it's already at max")
+    "Enqueued a mutant following blame on e.rkt when it's already at max")))
 
-   (ignore
-    (set-box! enqueued #f)
-    (define dead-e-proc/blame-lib
-      (struct-copy dead-mutant-process dead-e-proc/blame-e
-                   [result
-                    (struct-copy run-status
-                                 (dead-mutant-process-result dead-e-proc/blame-e)
-                                 [blamed '("module-not-in-benchmark.rkt")])]))
-    ((make-blame-following-will/fallback (λ (q _)
-                                           (set-box! enqueued 'fallback)
-                                           q))
-     mock-q
-     dead-e-proc/blame-lib))
-   (extend-test-message
-    (test-equal? (unbox enqueued) 'fallback)
-    "\nEnqueued a mutant following blame into a library?")))
+(test-begin/with-env
+ #:name make-blame-following-will/fallback
+ (ignore
+  (define enqueued (box #f))
+  (define mock-q
+    (make-mock-Q (make:m0-factory)
+                 #:enq (λ (q spawn-proc . _)
+                         (define the-process-info (spawn-proc))
+                         (set-box! enqueued (process-info-data the-process-info))
+                         ((process-info-ctl the-process-info) 'kill)
+                         q))))
+ (ignore
+  (define dead-e-proc/blame-lib
+    (struct-copy dead-mutant-process dead-e-proc/blame-e
+                 [result
+                  (struct-copy run-status
+                               (dead-mutant-process-result dead-e-proc/blame-e)
+                               [blamed '("module-not-in-benchmark.rkt")])]))
+  ((make-blame-following-will/fallback (λ (q _)
+                                         (set-box! enqueued 'fallback)
+                                         q))
+   mock-q
+   dead-e-proc/blame-lib))
+ (extend-test-message
+  (test-equal? (unbox enqueued) 'fallback)
+  "\nEnqueued a mutant following blame into a library?")
+
+ (ignore
+  (set-box! enqueued #f)
+  (define dead-e-proc/type-error-in-lib
+    (struct-copy dead-mutant-process dead-e-proc/blame-e
+                 [result
+                  (struct-copy run-status
+                               (dead-mutant-process-result dead-e-proc/blame-e)
+                               [outcome 'type-error]
+                               [blamed '("module-not-in-benchmark.rkt")])]))
+  ((make-blame-following-will/fallback (λ (q _)
+                                         (set-box! enqueued 'fallback)
+                                         q))
+   mock-q
+   dead-e-proc/type-error-in-lib))
+ (extend-test-message
+  (test-equal? (unbox enqueued) 'fallback)
+  "\nEnqueued a mutant following type-error into a library?"))
 
 (parameterize ([abort-on-failure? #f])
   (test-begin/with-env
