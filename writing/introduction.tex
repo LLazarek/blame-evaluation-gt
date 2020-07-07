@@ -18,10 +18,10 @@ TypeScript\footnote{\url{https://www.typescriptlang.org}} exploit types for IDE 
 code. Then these compilers remove types and rely on the built-in safety checks of
 the underlying programming language to catch any problems.
 
-The contrast between academic and industrial systems raises the question whether
+The contrast between academic and industrial systems raises the question 
 \begin{quote}
  \it
- blame assignment adds any value to a gradually typed language, \\
+ whether blame assignment adds any value to a gradually typed language, \\
  especially for the benefit of the working programmer.
 \end{quote}
 Given the prominence of blame in academia and its complete absence in
@@ -29,19 +29,20 @@ industrial systems, it comes as an even bigger surprise that the research
 literature and the industrial blog world do not present or discuss any
 possible answers.  Instead, when language designers decide to look into the
 question, they seem to answer it one way or another without any scientific
-justification. Most of the time though they ignore the question altogether. The
-root of the issue is that the research community simply does not have a
-method for evaluating such questions, and given the question's practical
+justification. As a matter of fact, the research community simply does not have a
+method for evaluating blame, and given the question's practical
 relevance, this a significant problem.
 
 This paper's first contribution is an automated method for evaluating the
-effectiveness of blame assignment strategies in the gradual typing world
-(sections ~\ref{sec:landscape},~\ref{sec:mutate},~\ref{sec:rational} and \ref{sec:sample}). 
+effectiveness of blame assignment strategies in the gradual typing world.
+%% (sections ~\ref{sec:landscape},~\ref{sec:mutate},~\ref{sec:rational} and \ref{sec:sample}). 
+%% MF: says you can't simulate a roadmap by listing all sections.
+%% MF: and for heaven's sake lookup the use of ~ in TeX
 Roughly speaking, the method, which is
 loosely based on the work of Lazarek et al.~\cite{lksfd-popl-2020},
 simulates a programmer who follows the Wadler-Findler slogan quoted above.
 Such a \emph{rational programmer} can find impedance-mismatch
-bugs by adding types to a partially typed program. That is, when the
+bugs by adding types to a partially typed program (section~\ref{sec:landscape}). That is, when the
 run-time system signals an impedance mismatch, a good blame message helps
 the programmer infer where to add an additional type specification. Since
 components that pass the type checker cannot cause impedance mismatches;
@@ -49,7 +50,7 @@ the type checker discovers these mismatches at compile time and points
 directly to the faulty component. Otherwise, if the
 additional type does {\em not\/} cause a static type error, the program
  is run again to signal another violation. Then the programmer can heed
-blame one more time to add yet another type specification. Counting the number of
+blame one more time to add yet another type specification. Weighing the number of
 steps it takes to discover the mistake in this manner is a measure of the effectiveness
 of the blame assignment strategy of the language.
 
@@ -64,8 +65,8 @@ underlying programming language.
 
 \mf{This is made up and must be fixed for the submission.}
 
-The results of the experiment (section~\ref{sec:discussion}) validate the
-conjecture behind the work of theoreticians. A good blame assignment
+A direct interpretation of the results (section~\ref{sec:discussion}) is that
+they validate the conjecture behind the work of theoreticians. A good blame assignment
 strategy
 greatly shortens the search for impedance mismatches between the specified types
 and the behavior of untyped components. Even better, the evaluation method clearly

@@ -14,8 +14,8 @@ this rational programmer as an algorithm.  As indicated in the introduction, in
 the context of gradual typing, the rational programmer translates the
 Wadler-Findler slogan into a debugging method, searching for the source of the
 impedance mismatch in an incremental fashion. Measuring this simulated
-programmer's behavior on a large number of inputs is the equivalent of
-collecting empirical data in a truly human-focused discipline. 
+programmer's behavior on a large number of inputs then yields relevant 
+data, similar to collecting empirical data in a human-focused discipline. 
 
 One derivative challenge of the first one is the problem of simulating the
 programmer's mistakes or, more precisely, the origin of impedance
@@ -27,8 +27,7 @@ analysis~\cite{lipton1971fault, demillo1978hints, jia2011analysis} to
 create mistakes in a synthetic manner. This process yields a large number
 of buggy programs whose mixed-typed versions are suitable subjects for our
 experiment.  The mutation analysis of Lazarek et al, is, however,
-completely useless for creating impedance mismatches in a gradually
-typed context.
+completely useless for creating impedance mismatches.
 
 While mutation analysis traditionally aims to inject bugs that challenge
 extensive test suites, the ones yielding ill-typed mutants are usually deemed
@@ -39,19 +38,19 @@ inspired by the authors extensive experience with programming in Typed Racket.
 They cause type errors that cover a wide range of Typed Racket's type system and moreover
 reliably cause runtime exceptions in mixed-typed versions of mutants.
 
-Another derivative challenge of the first one is the problem of mistakes in type
+Another derivative challenge is the problem of mistakes in type
 annotations themselves.  Gradual typing enables programmers to move an untyped
 code base into the typed realm on an incremental basis. The retroactive addition
 of a specific type to a component, even a library, may result from a
-misunderstanding of the code and may thus be a mistake itself. Empirical
+misunderstanding of the code and may thus be a mistake itself. Anecdotal 
 evidence suggests that this scenario is quite common~\cite{sta-nt-base-types,
 incorrect-ts, wmwz-ecoop-2017}, and hence must be addressed by any evaluation
 method. Conversely, the method not only demands mutators for code that cause
 good impedance mismatches, it also calls for a set of mutators that ``break''
 type annotations without breaking the code itself. 
 
-The second big challenge is due to the implementation disparity of gradual
-type systems. While the various approaches are well understood in theory,
+The second big challenge is the disparity of gradually
+typed languages. While the approaches are well understood in theory,
 they come with vastly different type systems, accommodate seemingly
 incompatible language features, and apply to radically different coding
 styles in the untyped world.  To eliminate these differences as variables
@@ -62,8 +61,8 @@ comparable.  For instance, the case study presented here builds on
 Greenman and Felleisen's transient variant for functional Typed
 Racket~\cite{gf-icfp-2018} to obtain a transient semantics that is
 comparable with Typed Racket's default natural one. The revised transient
-variant accommodates many more linguistic features and calls library code
-in a in a way that is faithful to the transient
+variant accommodates many more linguistic features and library calls
+in a way that is faithful to the transient
 semantics~\cite{vss-popl-2017}.
 
 Beyond the implementation issue, a comparison also faces the problem that
@@ -75,18 +74,17 @@ erasure semantics does not blame a component per se, but it comes with an
 exception location and the usual stack traces. 
 
 Making these strategies comparable is {\em not\/} an issue of language
-implementation but one about how the rational programmer behaves with regard to
-these messages. Specifically, the rational programmer must come with \emph{modes}
-that represent the alternative ways in which a programmer may interpret blame. 
-For instance, in transient, one mode has the competent programmer
-pick the oldest element of a blame set as the next component to add types. After
-all, this corresponds to the earliest point in the program's evaluation that can
+implementation but the behavior of the rational programmer.
+Specifically, the rational programmer must come with \emph{modes}
+that represent the alternative interpretations of blame. 
+For instance, a programmer using transient may
+pick the oldest element of a blame set as the next component to add types because
+it corresponds to the earliest point in the program's evaluation that can
 discover an impedance mismatch.  Another mode does not distinguish between the elements of the
-blame set and requires that the rational programmer types all blamed components
-at once. Of course, a step of the rational programmer in the latter mode
-is not as laborious as one in the former. Hence, an evaluation method should take 
-into account the effort of the rational programmer when comparing 
-different modes.
+blame set and has the rational programmer type all blamed components
+at once. Because this second kind of step 
+is more laborious than the first one, a comparison must take 
+into account the rational programmer's effort.
 
 Besides the blame information they produce, the three gradual typing
 systems also differ in the runtime type checks they perform. Therefore an
@@ -110,7 +108,10 @@ making sure that it still produces reproducible conclusions.
 \smallskip
 
 These challenges expose the subtlety of evaluating blame strategies but
-also suggest a recipe for doing so correctly:
+also suggest a recipe:
+
+%% for doing so correctly
+%% MF: what is correct about this recipe? 
 
 \begin{itemize}
 
