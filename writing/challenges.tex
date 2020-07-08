@@ -17,17 +17,18 @@ impedance mismatch in an incremental fashion. Measuring this simulated
 programmer's behavior on a large number of inputs then yields relevant 
 data, similar to collecting empirical data in a human-focused discipline. 
 
-One derivative challenge of the first one is the problem of simulating the
-programmer's mistakes or, more precisely, the origin of impedance
-mismatches. Before a programmer can try to find mistakes, mistakes have to
-be made. Technically the problem is the lack of a sufficiently large
-available corpus of type errors for a meaningful experiment.
-Following~\citet{lksfd-popl-2020} again, the solution is to use mutation
-analysis~\cite{lipton1971fault, demillo1978hints, jia2011analysis} to
-create mistakes in a synthetic manner. This process yields a large number
-of buggy programs whose mixed-typed versions are suitable subjects for our
-experiment.  The mutation analysis of Lazarek et al, is, however,
-completely useless for creating impedance mismatches.
+A derivative challenge is the problem of simulating the programmer's
+mistakes or, more precisely, the origin of impedance
+mismatches. Before a programmer can try to find mistakes, mistakes
+have to be made. Technically the problem is the lack of a sufficiently
+large available corpus of type errors for a meaningful experiment.
+Following~\citet{lksfd-popl-2020} again, the solution is to use
+mutation analysis~\cite{lipton1971fault, demillo1978hints,
+jia2011analysis} to create mistakes in a synthetic manner. This
+process yields a large number of buggy programs whose mixed-typed
+versions are suitable subjects for our experiment.  The mutation
+analysis of Lazarek et al, is, however, completely useless for
+creating impedance mismatches.
 
 While mutation analysis traditionally aims to inject bugs that challenge
 extensive test suites, the ones yielding ill-typed mutants are usually deemed
@@ -37,17 +38,6 @@ evaluating blame assignment strategies. The mutators used here are newly designe
 inspired by the authors extensive experience with programming in Typed Racket.
 They cause type errors that cover a wide range of Typed Racket's type system and moreover
 reliably cause runtime exceptions in mixed-typed versions of mutants.
-
-%Another derivative challenge is the problem of mistakes in type
-%annotations themselves.  Gradual typing enables programmers to move an untyped
-%code base into the typed realm on an incremental basis. The retroactive addition
-%of a specific type to a component, even a library, may result from a
-%misunderstanding of the code and may thus be a mistake itself. Anecdotal 
-%evidence suggests that this scenario is quite common~\cite{sta-nt-base-types,
-%incorrect-ts, wmwz-ecoop-2017}, and hence must be addressed by any evaluation
-%method. Conversely, the method not only demands mutators for code that cause
-%good impedance mismatches, it also calls for a set of mutators that ``break''
-%type annotations without breaking the code itself. 
 
 The second big challenge is the disparity of gradually
 typed languages. While the approaches are well understood in theory,

@@ -1,3 +1,41 @@
-\section{What to Do Next}
+%% -----------------------------------------------------------------------------
+\section{What to Do Next} \label{sec:conclusion}
+
+The paper provides the first insight into the measurable value of blame
+assignment in the gradually typed world. In an implicit manner researchers and
+language designers have answered this question one way or another, without any
+evidence. Now they may use the evaluation method presented in this paper to
+confirm or reject their answers. We already know from~\citet{tgpk-dls-2018}
+that, by intuition, programmers prefer the run-time checking of natural over
+other soundness methods. But, just because a random set of programmers expresses
+this view does not mean that blame assignment adds value. At this point we know
+that it does, in some circumstances, and that in others, the answer remains
+murky.
+
+The paper does {\em not\/} address a problem in the gradually typed world that
+was pointed out early on by practical researchers~\cite{incorrect-ts,
+sta-nt-base-types, wmwz-ecoop-2017} and that has recently received theoretical
+attention~\cite{gfd-oopsla-2019}: mistakes in type annotations themselves.
+Developers use gradual typing to move an untyped code base into the typed realm,
+and to this end, they need typed APIs for the vast repositories of
+already-existing libraries. Because they can, language implementors merely
+create typed facade modules that import untyped functions and exports them with
+type annotations---instead of converting the libraries themselves. With those
+facades, the compiler can easily type-check typed components. The problem is
+that these retroactive additions of a specific type to a component and the
+standard run-time functions may result from a misunderstanding of the
+code. \emph{They may thus be a mistake themselves.}
+
+The cited evidence suggests that this scenario is quite common, and that a type
+soundness check does {\em not\/} at all address the problem.  Hence, a future
+evaluation must develop type-level mutators that produce incorrect type
+annotations without breaking the code itself. Some preliminary work suggests
+that such type mutators are much more difficult to develop than the code
+mutators presented in this paper. We conjecture that the natural semantics will
+usually discover such mistakes, while the transient and erasure semantics cannot
+help with such mistakes at all; indeed, we expect that these latter two raise
+misleading exceptions or produce plainly-wrong answers.  Of course, only further
+evaluation work can confirm or reject these conjectures.
+
 
 
