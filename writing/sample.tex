@@ -1,1 +1,23 @@
 \section{How to Sample the Experimental Space} \label{sec:sample}
+
+As we mention above we treat each definitions as a component. A
+consequence of this decision is that examining the whole lattice
+for each of the mutants becomes unfeasible.
+As figure~\ref{table:benchmarks} shows,  most of the programs contain dozens of definitions  
+resulting in lattices with as many as $1.41 \times 10^{28}$ configurations.
+Since running a single configuration can take 10 minutes or more 
+(due to contract checking and instrumentation), running every possible configuration is impractical.
+Evidence from similar contexts suggests that randomly sampling the lattice instead of
+an exhaustive exploration is an effective alternative~\cite{greenman2019evaluate}.
+Hence we randomly sample enough significant configurations
+from the lattice to obtain a confidence of 0.95 (with margin of error
+0.05) about whether our hypotheses hold or not.
+See accompanying appendix for the details of the calculations for the
+sufficient size of samples for this estimate.
+Exploring more of the lattice would yield higher confidence in the generalizability
+of our results for each benchmark in cases where no violations of a property
+(e.g. Blame Trail) are found.
+In such cases, we could be more certain that we did not simply miss
+the configuration(s) that reveal the violation by exploring the lattice more fully.
+Our choice of random sample counts reflects the (informal) standard practice of estimating
+results to 95 percent or higher confidence.
