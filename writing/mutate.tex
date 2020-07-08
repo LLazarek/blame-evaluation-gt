@@ -92,7 +92,7 @@ class:public
     \begin{tabular}[t]{@{}l}
       \texttt{(class object\%}\\
         \texttt{\,\,(define/public (m x) x))}\\
-       \rightarrow\\ 
+       $\rightarrow$\\ 
       \texttt{(class object\%}\\
         \texttt{\,\,(define/private (m x) x))}\\
     \end{tabular}\\
@@ -102,7 +102,7 @@ class:super
     & Remove \texttt{super-new} calls from class definitions.
     &  \begin{tabular}[t]{@{}l}
       \texttt{(class object\% (super-new))}\\
-       \rightarrow\\ 
+       $\rightarrow$\\ 
       \texttt{(class object\% (void))}\\
     \end{tabular}\\
 \hline 
@@ -111,7 +111,7 @@ conditional
     & Negate conditional test expressions.
     &  \begin{tabular}[t]{@{}l}
       \texttt{(cond [(= x 0) 42] ...)}\\ 
-       \rightarrow\\ 
+       $\rightarrow$\\ 
       \texttt{(cond [(not (= x 0)) 42] ...)}
     \end{tabular}\\
 \hline 
@@ -120,7 +120,7 @@ class:parent
     & Replace the parent of classes with \texttt{object\%}.
     &  \begin{tabular}[t]{@{}l}
      \texttt{(class foo\% ...)}\\
-       \rightarrow\\ 
+       $\rightarrow$\\ 
       \texttt{(class object\% ...)}\\
     \end{tabular}\\
 \hline     
@@ -130,7 +130,7 @@ class:init
    &  \begin{tabular}[t]{@{}l}
      \texttt{(class object\%}\\
      \texttt{\,\,(field [a 5] [b "hello"]))}\\
-       \rightarrow\\ 
+       $\rightarrow$\\ 
       \texttt{(class object\%}\\
      \texttt{\,\,(field [a "hello"] [b 5]))}\\
     \end{tabular}\\
@@ -140,7 +140,7 @@ position
  & Swap the position of subexpressions.
   &  \begin{tabular}[t]{@{}l}
      \texttt{(f a 42 "b" 0)}\\
-       \rightarrow\\ 
+       $\rightarrow$\\ 
       \texttt{(f a 42 0 "b")}
     \end{tabular}\\
 \hline 
@@ -149,7 +149,7 @@ class:method
  & Add an extra trivial public method to a class.
  &  \begin{tabular}[t]{@{}l}
    \texttt{(class object\%  ...)}\\
-       \rightarrow\\ 
+       $\rightarrow$\\ 
      \texttt{(class object\%}\\
      \texttt{\,\,(define/public (extra x) x)}\\
      \texttt{\,\,...)}
@@ -159,7 +159,7 @@ class:method
 id
  & Swaps a use of a top-level identifier defined with with another defined
  in the same module.
- &\texttt{(f ...)} \rightarrow \texttt{(g ...)}
+ &\texttt{(f ...)} $\rightarrow$ \texttt{(g ...)}
   
    
 
