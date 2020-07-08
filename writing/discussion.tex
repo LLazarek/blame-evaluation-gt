@@ -1,3 +1,4 @@
+%% -----------------------------------------------------------------------------
 \section{What We Learned}
 
 \begin{itemize}
@@ -15,30 +16,34 @@
           \item Transient blame adaptations
           \item More?
 
-	  \item is the rational programmer rational? 
-
         \end{itemize}
 \end{itemize}        
 
-
 Like {\em homo economicus\/}, which decouples the actual behavior of a
-participant in an economy for the sake of mathematical modeling, the
-model of a rational programmer decouples the actual debugging behavior
-of a software developer for the sake of a systematic, large-scale
-analysis. This decoupling comes advantages and disadvantages. In the
-economic realm, mathematical models have provided some predictive
-insights into the market's behavior; but as behavioral economics has
-shown more recently, the mathematical abstraction of a rational actor
-makes predictions also quite unreliable in some situations.
-\footnote{It has also misled economists to focus on just the
-mathematics, though this problem is not relevant here.}  Just like an
-ordinary consumer or producer, an actual software developer is
-unlikely to stick to the exact strategy proposed here. When this
-happens, the predicted benefits of blame assignment may not
-materialize. Indeed, our own personal experience suggests such
-deviations, and it also suggests that deviating is a mistake. To make
-a true judgment of the usefulness of the rational-programmer idea, the
-community will need a lot more experience with this form of evaluation
-and relating the evaluation to the behavior of working programmers. 
+participant in an economy for the sake of mathematical modeling, the model of a
+rational programmer decouples the actual debugging behavior of a software
+developer for the sake of a systematic, large-scale analysis. This decoupling
+comes advantages and disadvantages. In the economic realm, mathematical models
+have provided some predictive insights into the market's behavior; but as
+behavioral economics has shown more recently, the mathematical abstraction of a
+rational actor makes predictions also quite unreliable in some situations.
+\footnote{It has also misled economists to focus on just the mathematics, though
+this problem is not relevant here.}  Just like an ordinary consumer or producer,
+an actual software developer is unlikely to stick to the exact strategy proposed
+here. When this happens, the predicted benefits of blame assignment may not
+materialize. Indeed, our own personal experience suggests such deviations, and
+it also suggests that deviating is a mistake. To make a true judgment of the
+usefulness of the rational-programmer idea, the community will need a lot more
+experience with this form of evaluation and relating the evaluation to the
+behavior of working programmers.
 
-
+Our setup hides the type choice a rational programmer must make. When the
+run-time checks signal an impedance mismatch in the real world, a programmer
+does not have a typed component ready to swap in. Instead, the programmer must
+come up with the next set of types---and this means the programmer must make
+choices. It is normally possible to assign consistent types to variables in a
+component in different ways. The creation and curation of the benchmarks over
+many years has driven home this lesson, but fortunately, it has also shown that
+the types are in most cases reasonably canonical.  We therefore conjecture that
+a rational programmer would in most cases come up with an equivalent type
+assignment for trail extension as our experimental setup describes.
