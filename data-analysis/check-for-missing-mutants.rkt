@@ -34,9 +34,8 @@
               @(if (zero? extra-mutant-count) "" (~a extra-mutant-count "extra and")) @;
               @(length missing-mutants) missing:
               })
-         (define missing-mutants+reasons
-           (missing-mutant-reasons missing-mutants
-                                   log-path))]))
+         (missing-mutant-reasons missing-mutants
+                                 log-path)]))
 
 (define (missing-mutant-reasons mutants log-path)
   (define ag/grep (or (find-executable-path "ag")
@@ -44,7 +43,7 @@
   (define discarded-mutant-lines
     (system/string @~a{@ag/grep 'Mutant.+has no type error. discarding' @log-path}))
 
-  (for/list ([missing-mutant (in-list mutants)])
+  (for ([missing-mutant (in-list mutants)])
     (match-define (mutant benchmark mod index) missing-mutant)
     (define reason
       (cond [(string-contains? discarded-mutant-lines
