@@ -337,24 +337,57 @@
       (racket-contracts:make-extract-blamed a-program
                                             program-config
                                             format-mutant-info-for-error))
+    (define (report-unexpected-error name message e)
+      (raise-user-error name
+                        @~a{
+                            @message
+                            Message:
+                            @exn-message[e]
+
+                            Context:
+                            @(pretty-format
+                              (continuation-mark-set->context
+                               (exn-continuation-marks e)))
+                            }))
+    (define (handle-module-evaluation-error runner-e)
+      (define e (exn:fail:runner:module-evaluation-error runner-e))
+      (match e
+        [(? type-checker-failure?)
+         ((make-status* 'type-error)
+          (extract-type-error-source e))]
+        [(? exn:fail:syntax?)
+         ((make-status* 'syntax-error))]
+        [else
+         (report-unexpected-error 'handle-module-evaluation-error
+                                  "Unexpected error while loading modules."
+                                  e)]))
+    (define (handle-runtime-error runner-e)
+      (define e (exn:fail:runner:runtime-error runner-e))
+      (match e
+        [(? runtime-error-with-blame?)
+         ((make-status* 'runtime-error)
+          (extract-runtime-contract-error-blamed-location e))]
+        [(? exn:fail:contract:blame?)
+         ((make-status* 'blamed)
+          (extract-blamed e))]
+        [(? exn:fail:syntax?) ; don't think should ever happen?
+         ((make-status* 'syntax-error))]
+        [else
+         ((make-status* 'runtime-error)
+          (extract-runtime-error-location e))]))
     (define run/handled
       (λ _
         (with-handlers
           (;; see configurables/benchmark-runner/load-pre-computed-result.rkt
            [run-status? values]
 
-           [runtime-error-with-blame?
-            (compose1 (make-status* 'runtime-error)
-                      extract-runtime-contract-error-blamed-location)]
+           [exn:fail:runner:module-evaluation? handle-module-evaluation-error]
+           [exn:fail:runner:runtime?           handle-runtime-error]
 
-           [exn:fail:contract:blame? (compose1 (make-status* 'blamed)
-                                               extract-blamed)]
-           [type-checker-failure? (compose1 (make-status* 'type-error)
-                                            extract-type-error-source)]
-           [exn:fail:out-of-memory? (λ _ ((make-status* 'oom)))]
-           [exn:fail:syntax? (λ _ ((make-status* 'syntax-error)))]
-           [exn? (compose1 (make-status* 'runtime-error)
-                           extract-runtime-error-location)])
+           [exn? (λ (e)
+                   (report-unexpected-error 'run-with-mutated-module
+                                            "Something has gone horribly wrong."
+                                            e))])
           (run)
           ((make-status* 'completed)))))
     (run-with-limits run/handled

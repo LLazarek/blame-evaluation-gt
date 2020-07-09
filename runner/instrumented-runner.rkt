@@ -1,6 +1,11 @@
 #lang at-exp racket
 
 (provide make-instrumented-runner
+         exn:fail:runner:module-evaluation?
+         exn:fail:runner:module-evaluation-error
+         exn:fail:runner:runtime?
+         exn:fail:runner:runtime-error
+
          run-with:require)
 
 (require custom-load
@@ -19,6 +24,14 @@
 (define (run-with:require main-mod-path)
   (eval `(require ,main-mod-path)))
 
+(struct exn:fail:runner:module-evaluation exn:fail (error))
+(struct exn:fail:runner:runtime exn:fail (error))
+
+;; The returned thunk will throw one of the above exceptions if `a-program`
+;; raises an exception in the process of begin evaluated.
+;; `exn:fail:runner:module-evaluation?` is raised if just evaluating the modules
+;; throws an exception.
+;; `exn:fail:runner:runtime?` is raised if calling `run-main` raises an exception.
 (define/contract (make-instrumented-runner a-program
                                            instrument-module
                                            #:setup-namespace
@@ -84,28 +97,38 @@
                    [current-namespace ns])
 
       ;; Eval the instrumented modules one at a time
-      (for ([m (in-list others+main/instrumented/ordered)])
+      (with-handlers ([exn? (λ (e)
+                              (raise
+                               (exn:fail:runner:module-evaluation "Module evaluation exception"
+                                                                  (current-continuation-marks)
+                                                                  e)))])
+        (for ([m (in-list others+main/instrumented/ordered)])
+          (parameterize
+              ;; Ensure relative load paths work
+              ([current-load-relative-directory
+                (instrumented-module-containing-directory m)]
+               [current-module-declare-name
+                (module-path-resolve (instrumented-module-module-path m))]
+               [current-directory
+                (instrumented-module-containing-directory m)])
+            (eval (instrumented-module-stx m)))))
+
+      ;; Run the main module
+      (with-handlers ([exn? (λ (e)
+                              (raise
+                               (exn:fail:runner:runtime "Runtime exception"
+                                                        (current-continuation-marks)
+                                                        e)))])
         (parameterize
             ;; Ensure relative load paths work
             ([current-load-relative-directory
-              (instrumented-module-containing-directory m)]
-             [current-module-declare-name
-              (module-path-resolve (instrumented-module-module-path m))]
+              (instrumented-module-containing-directory main/instrumented)]
              [current-directory
-              (instrumented-module-containing-directory m)])
-          (eval (instrumented-module-stx m))))
+              (instrumented-module-containing-directory main/instrumented)])
+          (do-before-main! ns)
+          (define result (run-main (instrumented-module-module-path main/instrumented)))
 
-      ;; Run the main module
-      (parameterize
-          ;; Ensure relative load paths work
-          ([current-load-relative-directory
-            (instrumented-module-containing-directory main/instrumented)]
-           [current-directory
-            (instrumented-module-containing-directory main/instrumented)])
-        (do-before-main! ns)
-        (define result (run-main (instrumented-module-module-path main/instrumented)))
-
-        (make-result ns result))))
+          (make-result ns result)))))
 
   run)
 
