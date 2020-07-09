@@ -1,11 +1,13 @@
 #lang at-exp racket
 
-(provide read-data
+(provide find-data-files
+         read-data
          mutator-names
          read-mutants-by-mutator
 
          (struct-out mutant)
          (struct-out blame-trail)
+         (struct-out benchmark-data-files)
 
          mutator-name?
 
@@ -27,41 +29,42 @@
 
 (define mutator-name? string?)
 
+(define (find-data-files dir)
+  (match (map path->string (directory-list dir))
+    [(and (list (regexp #rx"^[A-Za-z0-9]+$") ...)
+          benchmark-dirs)
+     ;; new format: directory per benchmark, directory has
+     ;; {$bench.log $bench-progress.log data/}
+     (for/list ([benchmark (in-list benchmark-dirs)])
+       (define (benchmark-path f)
+         (build-path dir benchmark f))
+       (define data-dir
+         (if (path-to-existant-directory? (benchmark-path "data"))
+             (benchmark-path "data")
+             (benchmark-path benchmark)))
+       (benchmark-data-files benchmark
+                             data-dir
+                             (benchmark-path (~a benchmark ".log"))
+                             (benchmark-path (~a benchmark "-progress.log"))))]
+    [old-format-files
+     ;; old format: each benchmark has
+     ;; {$bench.log $bench-progress.log $bench/}
+     (define benchmark-dirs
+       (filter (λ (f) (regexp-match? #rx"^[A-Za-z0-9]+$" f))
+               old-format-files))
+     (for/list ([benchmark (in-list benchmark-dirs)])
+       (benchmark-data-files benchmark
+                             (build-path dir benchmark)
+                             (build-path dir (~a benchmark ".log"))
+                             (build-path dir (~a benchmark "-progress.log"))))]))
+
 (define/contract (read-data dir mutant-mutators)
   (path-to-existant-directory?
    (hash/c mutant? mutator-name?)
    . -> .
    (hash/c mutator-name? (listof blame-trail?)))
 
-  (define dir-data-files
-    (match (map path->string (directory-list dir))
-      [(and (list (regexp #rx"^[A-Za-z0-9]+$") ...)
-            benchmark-dirs)
-       ;; new format: directory per benchmark, directory has
-       ;; {$bench.log $bench-progress.log data/}
-       (for/list ([benchmark (in-list benchmark-dirs)])
-         (define (benchmark-path f)
-           (build-path dir benchmark f))
-         (define data-dir
-           (if (path-to-existant-directory? (benchmark-path "data"))
-               (benchmark-path "data")
-               (benchmark-path benchmark)))
-         (benchmark-data-files benchmark
-                               data-dir
-                               (benchmark-path (~a benchmark ".log"))
-                               (benchmark-path (~a benchmark "-progress.log"))))]
-      [old-format-files
-       ;; old format: each benchmark has
-       ;; {$bench.log $bench-progress.log $bench/}
-       (define benchmark-dirs
-         (filter (λ (f) (regexp-match? #rx"^[A-Za-z0-9]+$" f))
-                 old-format-files))
-       (for/list ([benchmark (in-list benchmark-dirs)])
-         (benchmark-data-files benchmark
-                               (build-path dir benchmark)
-                               (build-path dir (~a benchmark ".log"))
-                               (build-path dir (~a benchmark "-progress.log"))))]))
-
+  (define dir-data-files (find-data-files dir))
   (for/fold ([data-by-mutator (hash)])
             ([a-benchmark-data-files (in-list dir-data-files)])
     (hash-union data-by-mutator
