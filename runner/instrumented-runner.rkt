@@ -174,5 +174,49 @@
                      m2
                      92
 
-                     })))
+                     }))
+
+  (test-begin
+    #:name exns
+    (ignore
+     (define m/type-error
+       (mod "m.rkt"
+            #'(module m typed/racket
+                (#%module-begin
+                 (: x Number)
+                 (define x "hello")))))
+     (define m/runtime-error
+       (mod "m.rkt"
+            #'(module m racket
+                (#%module-begin
+                 (+ 2 "3")))))
+     (define m/segfault
+       (mod "m.rkt"
+            #'(module m typed/racket
+                (#%module-begin
+                 (module A typed/racket
+                   (provide f)
+                   (: f : String -> Number)
+                   (define (f x)
+                     (string-length x)))
+                 (require/typed 'A
+                   [f (-> Number Number)])
+                 (f 5))))))
+
+    (test-exn (λ (e)
+                (and (exn:fail:runner:module-evaluation? e)
+                     (exn:fail:syntax? (exn:fail:runner:module-evaluation-error e))))
+              ((make-instrumented-runner (program m/type-error empty)
+                                         mod-stx)))
+    (test-exn (λ (e)
+                (and (exn:fail:runner:runtime? e)
+                     (exn:fail:contract? (exn:fail:runner:runtime-error e))))
+              ((make-instrumented-runner (program m/runtime-error empty)
+                                         mod-stx)))
+
+    (test-exn (λ (e)
+                (and (exn:fail:runner:runtime? e)
+                     (exn:fail? (exn:fail:runner:runtime-error e))))
+              ((make-instrumented-runner (program m/segfault empty)
+                                         mod-stx)))))
 
