@@ -106,15 +106,23 @@
               run-via-process?)
       (with-handlers ([exn:fail?
                        (λ (e)
-                         (displayln @~a{
-                                        Mutant crashed with exn:
-                                        @pretty-format[e]
+                         (cond [interactive?
+                                (displayln @~a{
+                                               Mutant crashed with exn:
+                                               @pretty-format[e]
 
-                                        exn has msg:
-                                        })
-                         ((error-display-handler)
-                          ""
-                          e))])
+                                               exn has msg:
+                                               })
+                                ((error-display-handler)
+                                 ""
+                                 e)]
+                               [else
+                                (run-status the-module-to-mutate
+                                            index
+                                            '?
+                                            '<crashed>
+                                            #f
+                                            e)]))])
         (when interactive?
           (displayln "Running mutant..."))
         (when (and interactive?

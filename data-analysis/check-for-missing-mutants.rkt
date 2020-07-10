@@ -30,12 +30,14 @@
            (length (set-subtract benchmark-mutants expected-mutants)))
          (displayln
           @~a{
-              Mutant sets differ: @;
+              @bench-name mutant sets differ: @;
               @(if (zero? extra-mutant-count) "" (~a extra-mutant-count "extra and")) @;
               @(length missing-mutants) missing:
               })
          (missing-mutant-reasons missing-mutants
-                                 log-path)]))
+                                 log-path)
+         (newline)
+         (newline)]))
 
 (define (missing-mutant-reasons mutants log-path)
   (define ag/grep (or (find-executable-path "ag")
