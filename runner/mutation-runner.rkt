@@ -372,9 +372,13 @@
           (extract-blamed e))]
         [(? exn:fail:syntax?) ; don't think should ever happen?
          ((make-status* 'syntax-error))]
-        [else
+        [(? exn:fail?)
          ((make-status* 'runtime-error)
-          (extract-runtime-error-location e))]))
+          (extract-runtime-error-location e))]
+        [else
+         (report-unexpected-error 'handle-module-evaluation-error
+                                  "Unexpected non-`exn:fail?` error while running program."
+                                  e)]))
     (define run/handled
       (λ _
         (with-handlers
