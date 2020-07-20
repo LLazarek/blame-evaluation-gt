@@ -9,9 +9,11 @@ state to a typed one.
 
 Based on this idea, a metric for migratory paths is a concise way to
 evaluate the effectiveness of a rational programmer. The components of
-each program create a \emph{debugging scenario space}, a lattice like
-the one introduced by~\citet{tfgnvf-popl-2016} for performance
-evaluations. This space consists of variants of the program, dubbed
+an ill-typed program, such as one of  our ill-typed mutants, 
+create a \emph{debugging scenario space}, a lattice like
+the one introduced by ~\citet{tfgnvf-popl-2016} for performance
+evaluations. As we discuss briefly at the end of ~\ref{sec:mutate}, 
+this space consists of variants of the program, dubbed
 \emph{scenarios}, that differ in their type specifications. In the
 setting of migratory typing,\footnote{The method can be adapted to
 so-called true gradual typing systems~\cite{svcb-snapl-2015} in a
@@ -252,7 +254,8 @@ uses the natural blame, exception and random trails to answer it.
 
 %% -----------------------------------------------------------------------------
 
-In detail we answer $Q_1$ for a mutant by creating trails for each natural blame,
+In detail we answer $Q_1$ for an ill-typed mutant from
+section~\ref{sec:mutate} by creating trails for each natural blame,
 natural exception and natural random trail in the scenario lattice of the mutant. A
 log reports on success and failure endings.  The first step is to construct the
 mutant's scenario lattice and determine the scenario that can detect the fault in
@@ -267,8 +270,18 @@ roots two more times; once following the natural-exception programmer and once t
 natural-random programmer. Finally, based on the collected data, we calculate the
 success/failure results for the trails to determine whether natural blame is more
 successful than natural exceptions and pure chance and we obtain the answer for
-$Q_1$.  The process is analogues for the other questions employing the respective
-modes of the rational programmer.
+$Q_1$.  The process is analogous for the other questions employing the respective
+modes of the rational programmer. Figure~\ref{fig:process} summarizes the
+experimental process for one mode of the rational programmer and connects
+it with the mutations from section~\ref{sec:mutation}.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth]{./Images/process}
+  \caption{The experimental process for one mode of the rational
+  programmer}
+  \label{fig:process}
+\end{figure}
 
 
 \subsection{Programmer Effort}

@@ -252,7 +252,7 @@ with Typed Racket translates to effective mutators, we analyze the
 
 So far we have established that our mutators and~\citet{gtnffvf-jfp-2019}'s 
 benchmarks are sufficient to create a large number of realistic ill-typed Type Racket
-programs. However, for ill-typed programs if their types are correct, like
+programs. However, in an ill-typed program with correct types, like
 in our case, it is trivial to figure out which component contains the bug.
 It is the component that doesn't type check. Thus the ill-typed mutants
 do not offer an interesting setting to try out the debugging abilities of
@@ -263,8 +263,8 @@ run may raise a type error. Section~\ref{sec:rational} explains how we can
 explore the space of debugging scenarios in a principled manner. As a
 final remark in this section, with the data from
 figure~\ref{fig:mutators-runtime-hit}, we verify  that in each of the three semantics
-we target, our mutators generate mutants that half the time give rise to at least one
-interesting debugging scenario.
+we target, between 25\% and
+90\% of the ill-typed mutants each mutator generates give rise to at least one interesting debugging scenario.
 
 
 \begin{figure}
