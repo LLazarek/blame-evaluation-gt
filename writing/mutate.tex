@@ -77,10 +77,10 @@ once, dubbed a mutant, can be distinguished from the original program with a tes
 The better the test suite of a program, the more mutants it can ``kill.''
 Thus a big part of research on mutation analysis goes into designing
 operations that perform mutations, dubbed mutators, that create mutants 
-that are hard to ``kill.'' Unlike the standard mutators, that also ~\cite{lksfd-popl-2020}
-use, the mutators we need to evaluate the rational programmer have to be
-fined-tune to generate shallow errors. Typed Racket's type system detects 
-typos not convoluted logical issues and mutators suitable for our purposes
+that are hard to ``kill.'' Unlike the standard mutators, which \citet{lksfd-popl-2020}
+use, too, the mutators we need to evaluate the rational programmer have to be
+fine-tuned to generate shallow errors. Typed Racket's type system detects 
+typos not logical mistakes, and mutators suitable for our purposes
 should target the former rather than the latter. 
 
 The table in figure~\ref{table:mutation-ops}  summarizes our mutators. 
