@@ -40,10 +40,15 @@
          (newline)]))
 
 (define (missing-mutant-reasons mutants log-path)
-  (define ag/grep (or (find-executable-path "ag")
-                      (find-executable-path "grep")))
+  (define pattern "Mutant.+has no type error. discarding")
   (define discarded-mutant-lines
-    (system/string @~a{@ag/grep 'Mutant.+has no type error. discarding' @log-path}))
+    (cond [(find-executable-path "ag")
+           => (λ (ag) (system/string @~a{@ag '@pattern' @log-path}))]
+          [(find-executable-path "grep")
+           => (λ (grep) (system/string @~a{@grep -E '@pattern' @log-path}))]
+          [else
+           (raise-user-error 'check-for-missing-mutants
+                             "Can't find ag or grep")]))
 
   (for ([missing-mutant (in-list mutants)])
     (match-define (mutant benchmark mod index) missing-mutant)
