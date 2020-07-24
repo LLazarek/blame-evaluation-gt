@@ -1,24 +1,31 @@
 \section{Does Blame Matter?} \label{sec:introduction}
 
-From the very beginning, the theory of gradual typing has come with a blame
-theorem~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed [components]\footnote{The
-original authors got this word wrong.} can't be blamed'' turned the theorem into a
-slogan~\cite{wf-esop-2009}. Indeed, academic implementations---for example,
-Reticulated Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
+From the very beginning, the theory of gradual typing has come with a
+blame theorem~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
+[components]\footnote{The original authors got this word wrong.} can't be
+blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Indeed,
+academic implementations---for example, Reticulated
+Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
 Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}---come
-with sophisticated blame assignment strategies. Theoreticians firmly embrace the
-idea that blame can help practicing programmers find impedance mismatches between
-the types they added to a software system and the behavior of the remaining untyped
-components.
+with sophisticated blame assignment strategies. The academics that
+created them firmly embrace the idea that blame can help practicing
+programmers find impedance mismatches between the types they added to a
+software system and the behavior of the remaining untyped components.
 
-Practical gradual type systems ignore blame assignment almost completely.
+However, many academics view blame as an interesting but laborious
+orthogonal add-on to 
+gradual typing. Thus blame is often omitted from theoretical models and
+academic implementations alike.
+Other academics go one step further and doubt its pragmatic significance altogether~\cite{cc-snapl-19}.
+
+In line with the latter, practical gradual type systems ignore blame assignment almost completely.
 Industrial systems such as Flow,\footnote{\url{https://flow.org}}
 Hack,\footnote{\url{https://hacklang.org}} or
 TypeScript\footnote{\url{https://www.typescriptlang.org}} exploit types for IDE actions and for finding typos in
 code. Then these compilers remove types and rely on the built-in safety checks of
 the underlying programming language to catch any problems.
 
-The contrast between academic and industrial systems raises the question 
+The divisions in the academic and industrial world of gradual typing raise the question 
 \begin{quote}
  \it
  whether blame assignment adds any value to a gradually typed language, \\
