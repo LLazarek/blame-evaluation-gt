@@ -18,17 +18,22 @@ programmer's behavior on a large number of inputs then yields relevant
 data, similar to collecting empirical data in a human-focused discipline. 
 
 A derivative challenge is the problem of simulating the programmer's
-mistakes or, more precisely, the origin of impedance
-mismatches. Before a programmer can try to find mistakes, mistakes
-have to be made. Technically the problem is the lack of a sufficiently
-large available corpus of type errors for a meaningful experiment.
-Following~\citet{lksfd-popl-2020} again, the solution is to use
-mutation analysis~\cite{lipton1971fault, demillo1978hints,
-jia2011analysis} to create mistakes in a synthetic manner. This
-process yields a large number of buggy programs whose mixed-typed
-versions are suitable subjects for our experiment.  The mutation
-analysis of Lazarek et al, is, however, completely useless for
-creating impedance mismatches.
+mistakes or, more precisely, the origin of impedance mismatches. Before a
+programmer can try to find mistakes, mistakes have to be made.
+Specifically, a necessary step to test the rational programmer is to find
+a collection of  type mistakes in  mix-typed programs that is highly
+representantive of both mistakes and programs ``in the wild.''
+Unfortunately no such collection exists.  There is a good reason for that;
+the kind of mistakes the rational programmer targets are easily detected
+by unit tests and, even if they are tough to weed out, they do not make it
+to code repositories.  In other words, the problem is how to generate a
+sufficiently large and representantive corpus of type mistakes for a meaningful
+experiment.  Following~\citet{lksfd-popl-2020} again, the solution is to
+use mutation analysis~\cite{lipton1971fault, demillo1978hints,
+jia2011analysis} to create mistakes in a synthetic manner. This process
+yields a large number of buggy programs whose mixed-typed versions are
+suitable subjects for our experiment.  The mutation analysis of Lazarek et
+al, is, however, completely useless for creating impedance mismatches.
 
 While mutation analysis traditionally aims to inject bugs that challenge
 extensive test suites, the ones yielding ill-typed mutants are usually deemed
@@ -110,12 +115,11 @@ also suggest a recipe:
 \item Implement all three gradual type systems on a common
   basis (section~\ref{sec:landscape});
 
-\item Construct a large number of suitable benchmarks for all gradual type
-  systems with representative
-  type errors  (section~\ref{sec:mutate}); 
+\item Generate a large set of programs with representative
+  type errors that all three systems can detect (section~\ref{sec:mutate}); 
     
-\item Simulate the rational programmer with sufficient 
-  modes to (i) match the peculiarities of each gradual type system and 
+\item Simulate the rational programmer on these programs with sufficient 
+  modes to (i) match the peculiarities of each  system and 
     (ii) isolate blame from other confounding factors
     (section~\ref{sec:rational});
 
