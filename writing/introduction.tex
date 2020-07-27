@@ -1,7 +1,7 @@
 \section{Does Blame Matter?} \label{sec:introduction}
 
-From the very beginning, the theory of gradual typing has come with a
-blame theorem~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
+Theoreticians of gradual typing have focused on
+blame theorems from the very beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
 [components]\footnote{The original authors got this word wrong.} can't be
 blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Indeed,
 academic implementations---for example, Reticulated
@@ -10,22 +10,18 @@ Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}---come
 with sophisticated blame assignment strategies. The academics that
 created them firmly embrace the idea that blame can help practicing
 programmers find impedance mismatches between the types they added to a
-software system and the behavior of the remaining untyped components.
+software system and the behavior of the remaining untyped components. 
 
-However, many academics view blame as an interesting but laborious
-orthogonal add-on to 
-gradual typing. Thus blame is often omitted from theoretical models and
-academic implementations alike.
-Other academics go one step further and doubt its pragmatic significance altogether~\cite{cc-snapl-19}.
-
-In line with the latter, practical gradual type systems ignore blame assignment almost completely.
-Industrial systems such as Flow,\footnote{\url{https://flow.org}}
+Industrial implementors of  gradual typing systems have almost completely ignored blame assignment.
+Systems such as Flow,\footnote{\url{https://flow.org}}
 Hack,\footnote{\url{https://hacklang.org}} or
 TypeScript\footnote{\url{https://www.typescriptlang.org}} exploit types for IDE actions and for finding typos in
-code. Then these compilers remove types and rely on the built-in safety checks of
-the underlying programming language to catch any problems.
+code. Then their compilers remove types and rely on the built-in safety checks of
+the underlying programming language to catch any problems. 
+Recently, \citet{cc-snapl-19} have turned this implicitly expressed
+skepticism into an explicit statement and challenge.
 
-The divisions in the academic and industrial world of gradual typing raise the question 
+This contrast between theoretical research and industrial applications of gradual typing raises the question 
 \begin{quote}
  \it
  whether blame assignment adds any value to a gradually typed language, \\
