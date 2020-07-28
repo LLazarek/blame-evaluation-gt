@@ -118,6 +118,7 @@
 
   (parameterize ([current-progress-logger log-progress!]
                  [current-result-cache cached-results-for])
+    (log-factory info @~a{Running on benchmark @bench})
     (log-factory info
                  @~a{
                      Running experiment with config @;
@@ -497,33 +498,9 @@ Giving up.
                     mod index blame-trail-id
                     dead-succ-id outcome)
        current-process-q]
-      [{(or 'completed 'syntax-error) _}
-       (log-factory
-        error
-        "BT VIOLATION: Blame disappeared while following blame trail ~a @ ~a {~a}.
-Mutant: [~a] and config:
-~v
-
-produced result: ~v
-=> ~a
-
-Predecessor (id [~a]) blamed ~a and had config:
-~v"
-        mod index blame-trail-id
-        dead-succ-id
-        dead-succ-config
-        dead-succ-result
-        (if (equal? (run-status-outcome dead-succ-result)
-                    'syntax-error)
-            "Likely due to a buggy contract
-   on the region blamed by the predecessor (see below) that crashed"
-            "Something has gone very wrong")
-        id predecessor-blamed
-        config)
-       (maybe-abort "Blame disappeared" current-process-q)]
       [{(or 'blamed 'type-error) _}
        (log-factory
-        error
+        info
         @~a{
             BT VIOLATION: @;
             All blame entered library code while following blame trail @;
@@ -537,7 +514,7 @@ Predecessor (id [~a]) blamed ~a and had config:
        current-process-q]
       [{'runtime-error _}
        (log-factory
-        error
+        info
         @~a{
             BT VIOLATION: @;
             Unable to infer program location from runtime error on trail @;
@@ -548,7 +525,26 @@ Predecessor (id [~a]) blamed ~a and had config:
 
             Blamed: @(run-status-blamed result)
             })
-       current-process-q])))
+       current-process-q]
+      [{(or 'completed 'syntax-error) _}
+       (log-factory
+        error
+        @~a{
+            Mutant in middle of blame trail completes or syntax-errors.
+            Mutant: @mod @"@" @index [@dead-succ-id] {@blame-trail-id}.
+            Config: @dead-succ-config
+
+            Predecessor (id [@id]) had result @result
+            })
+       (maybe-abort "Blame disappeared" current-process-q)]
+      [{outcome _}
+       (log-factory
+        error
+        @~a{
+            Blame has disappeared for unexpected reasons.
+            Mutant: @dead-proc
+            })
+       (maybe-abort "Blame disappeared" current-process-q)])))
 
 (define/contract (make-blame-following-will/fallback no-blame-fallback)
   (mutant-will/c . -> . mutant-will/c)
@@ -869,7 +865,7 @@ Attempting revival ~a / ~a
   (define (report-malformed-output . _)
     (match-define (mutant-process (mutant mod index _) config _ id _ _ _)
       mutant-proc)
-    (log-factory warning
+    (log-factory error
                  "Result read from mutant output not of the expected shape.
 Expected: a run-status with a valid pair of outcome/blamed
 Found: ~v
@@ -1058,7 +1054,6 @@ Mutant: [~a] ~a @ ~a with config:
                     sample-number)
               #f))
   (parameterize ([date-display-format 'iso-8601])
-    (log-factory info @~a{Running on benchmark @(bench-to-run)})
     (run-all-mutants*configs (read-benchmark (bench-to-run))
                              #:log-progress log-progress!
                              #:resume-cache cached-results-for))
