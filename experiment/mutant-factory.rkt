@@ -470,9 +470,18 @@
                            dead-succ-config
                            dead-succ-result
                            dead-succ-id
-                           _
+                           the-blame-trail
                            increased-limits?)
       dead-successor)
+    (define (record-failed-blame-trail! the-process-q)
+      (define the-blame-trail+dead-proc
+        (extend-blame-trail the-blame-trail
+                            dead-successor))
+      (define new-factory
+        (record-blame-trail! (process-Q-get-data the-process-q)
+                             the-blame-trail+dead-proc))
+      (process-Q-set-data the-process-q
+                          new-factory))
     (match* {(run-status-outcome dead-succ-result) increased-limits?}
       [{(and outcome (or 'timeout 'oom)) #f}
        (log-factory info
@@ -497,7 +506,7 @@ Giving up.
 "
                     mod index blame-trail-id
                     dead-succ-id outcome)
-       current-process-q]
+       (record-failed-blame-trail! current-process-q)]
       [{(or 'blamed 'type-error) _}
        (log-factory
         info
@@ -511,7 +520,7 @@ Giving up.
 
             Result: @(run-status-outcome result) on @(run-status-blamed result)
             })
-       current-process-q]
+       (record-failed-blame-trail! current-process-q)]
       [{'runtime-error _}
        (log-factory
         info
@@ -525,7 +534,7 @@ Giving up.
 
             Blamed: @(run-status-blamed result)
             })
-       current-process-q]
+       (record-failed-blame-trail! current-process-q)]
       [{(or 'completed 'syntax-error) _}
        (log-factory
         error
@@ -536,7 +545,7 @@ Giving up.
 
             Predecessor (id [@id]) had result @result
             })
-       (maybe-abort "Blame disappeared" current-process-q)]
+       (maybe-abort "Blame disappeared" (record-failed-blame-trail! current-process-q))]
       [{outcome _}
        (log-factory
         error
@@ -544,7 +553,7 @@ Giving up.
             Blame has disappeared for unexpected reasons.
             Mutant: @dead-proc
             })
-       (maybe-abort "Blame disappeared" current-process-q)])))
+       (maybe-abort "Blame disappeared" (record-failed-blame-trail! current-process-q))])))
 
 (define/contract (make-blame-following-will/fallback no-blame-fallback)
   (mutant-will/c . -> . mutant-will/c)
