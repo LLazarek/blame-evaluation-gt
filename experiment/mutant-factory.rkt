@@ -155,7 +155,46 @@
 
     (log-factory info "Finished enqueing all test mutants. Waiting...")
     (define process-q-finished (process-Q-wait process-q))
-    (factory-results (process-Q-get-data process-q-finished))))
+    (report-completion/sanity-checks bench
+                                     select-mutants)))
+
+(define (report-completion/sanity-checks bench
+                                         select-mutants)
+  (define mutatable-module-names (benchmark->mutatable-modules bench))
+  (define all-trails-logged-for-all-mutants?
+    (for*/and ([module-to-mutate-name mutatable-module-names]
+               [mutation-index (select-mutants module-to-mutate-name
+                                               bench)]
+               [trail-id (sample-size)])
+      (and ((current-result-cache) module-to-mutate-name
+                                   mutation-index
+                                   trail-id)
+           #t)))
+  (define unexpected-state-encountered?
+    (unbox abort-suppressed?))
+  (define mutants-have-error-output?
+    (and (file-exists? (mutant-error-log))
+         ;; things like `echo '' > <log>` make it have size 1 or 2, and any real error messages will
+         ;; have much more than 1 or 2
+         (> (file-size (mutant-error-log)) 2)))
+  (define (or-empty bool msg)
+    (if bool msg ""))
+
+  (displayln
+   @~a{
+
+       Experiment complete, @(if (and all-trails-logged-for-all-mutants?
+                                      (not unexpected-state-encountered?)
+                                      (not mutants-have-error-output?))
+                                 "and basic sanity checks pass."
+                                 "but with failing sanity checks.")
+       @(or-empty (not all-trails-logged-for-all-mutants?)
+                  "⚠ Not all mutants have all of the expected blame trail samples.\n")@;
+       @(or-empty unexpected-state-encountered?
+                  "⚠ Some unexpected states were encountered.\n")@;
+       @(or-empty mutants-have-error-output?
+                  "⚠ Some mutants logged error messages.\n")
+       }))
 
 ;; Spawns a test mutant and if that mutant has a blame result at
 ;; max contract configuration, then samples the precision lattice
@@ -951,6 +990,7 @@ Mutant: [~a] ~a @ ~a with config:
         blamed-mods-in-benchmark)]
   [{_} #f])
 
+(define abort-suppressed? (box #f))
 (define (maybe-abort reason continue-val #:force [force? #f])
   ;; Mark the mutant error file before it gets garbled with error
   ;; messages from killing the current active mutants
@@ -977,6 +1017,7 @@ Mutant: [~a] ~a @ ~a with config:
         [else
          (log-factory warning
                       "Continuing execution despite abort signal...")
+         (set-box! abort-suppressed? #t)
          continue-val]))
 
 (define (pretty-path p)
