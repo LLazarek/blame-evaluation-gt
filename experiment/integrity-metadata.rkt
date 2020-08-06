@@ -22,11 +22,13 @@
                      dbs)
   #:prefab)
 
-(define (create/check-metadata-integrity! metadata [fail-msg "Metadata mismatch"])
+;; metadata-info? -> boolean?
+(define (create/check-metadata-integrity! metadata)
   (if (file-exists? (metadata-info-file metadata))
-      (check-integrity! metadata fail-msg)
+      (check-integrity! metadata)
       (create! metadata)))
 
+;; metadata-info? -> metadata-id?
 (define (metadata-info->id metadata)
   (define config (metadata-info-config metadata))
   (define samples-checksum
@@ -58,12 +60,13 @@
          "transient-special-cases-db" special-cases-checksum
          "pre-computed-results-db" pre-computed-results-checksum)))
 
+;; metadata-info? -> boolean?
 (define (create! metadata)
   (write-to-file (metadata-info->id metadata)
-                 (metadata-info-file metadata)))
+                 (metadata-info-file metadata))
+  #t)
 
-(define (check-integrity! metadata [fail-msg "Metadata mismatch"])
-  (unless (equal? (metadata-info->id metadata)
-                  (file->value (metadata-info-file metadata)))
-    (raise-user-error 'check-integrity!
-                      "Metadata mismatch")))
+;; metadata-info? -> boolean?
+(define (check-integrity! metadata)
+  (equal? (metadata-info->id metadata)
+          (file->value (metadata-info-file metadata))))

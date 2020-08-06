@@ -1157,15 +1157,17 @@ Mutant: [~a] ~a @ ~a with config:
       [_ (eprintf "Not deleted.~n")]))
 
   (when (metadata-file)
-    (create/check-metadata-integrity!
-     (metadata-info (metadata-file)
-                    (bench-to-run)
-                    (current-configuration-path))
-     @~a{
-         This appears to be a resumption of the experiment, but the metadata recorded at @;
-         @(metadata-file) for the previous run does not match that of this run's configuration.
-         Aborting.
-         }))
+    (unless (create/check-metadata-integrity!
+             (metadata-info (metadata-file)
+                            (bench-to-run)
+                            (current-configuration-path)))
+      (raise-user-error
+       'mutant-factory
+       @~a{
+           This appears to be a resumption of the experiment, but the metadata recorded at @;
+           @(metadata-file) for the previous run does not match that of this run's configuration.
+           Aborting.
+           })))
 
   (define (make-cached-results-function)
     (define progress-info-hash
