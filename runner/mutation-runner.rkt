@@ -547,7 +547,9 @@
                               (provide bar)
                               (define (bar x s) (if (positive? x) (- x) x))))))
      (define p (program main (list second))))
-    (test-exn exn:fail:contract?
+    (test-exn (λ (e)
+                (and (exn:fail:runner:runtime? e)
+                     (exn:fail:contract? (exn:fail:runner:runtime-error e))))
               ((make-instrumented-runner
                 (program (mod "main.rkt"
                               #'(module main racket
