@@ -7,6 +7,7 @@
          racket/runtime-path
          syntax/parse
          (prefix-in db: "../../db/db.rkt")
+         "../../db/util.rkt"
          "../../runner/program.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/read-module.rkt"
@@ -14,11 +15,12 @@
          "instrument-module.rkt")
 
 (provide (contract-out
-          [instrument-module module-instrumenter/c])
-         transient-special-cases-db)
+          [instrument-module module-instrumenter/c]
+          [transient-special-cases-db (db-path-relative-to? configurables)]))
 
-(define-runtime-path default-transient-special-cases-db
-  "transient-special-cases/default.rktdb")
+(define-runtime-path configurables "..")
+(define default-transient-special-cases-db
+  "module-instrumentation/transient-special-cases/default.rktdb")
 (define transient-special-cases-db
   (make-parameter default-transient-special-cases-db))
 
@@ -39,7 +41,9 @@
 (define (mod-stx/replace-special-cases a-mod)
   (define mod-relative-path
     (benchmark-mod-relative-path (mod-path a-mod)))
-  (define db (db:get (transient-special-cases-db)))
+  (define resolved-db-path (build-path configurables
+                                       (transient-special-cases-db)))
+  (define db (db:get resolved-db-path))
   (match (db:read db
                   mod-relative-path
                   #f)

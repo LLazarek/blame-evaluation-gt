@@ -38,7 +38,7 @@
          ;; type errors only blame one location and that location must be
          ;; typed
          (log-factory-message
-          'error
+          'warning
           @~a{
               Found a mutant with type error in the buggy module, @;
               but the module is not typed?
@@ -52,7 +52,7 @@
         [(and (not buggy-mod-type-error?)
               all-blamed-at-max-precision?)
          (log-factory-message
-          'error
+          'info
           @~a{
               BT VIOLATION: @;
               Found mutant with blamed/type-error location at types @;

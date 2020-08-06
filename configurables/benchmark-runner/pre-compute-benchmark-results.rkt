@@ -12,6 +12,9 @@
 ;; db layout is:
 ;; bench-name? -> (hash/c (list/c module-name? index?) run-status?)
 
+(define-runtime-paths
+  [configurables-dir ".."])
+
 (define (make-untyped-program-for the-bench untyped-config)
   (define bench-configured-untyped
     (configure-benchmark the-bench
@@ -20,7 +23,9 @@
                 (benchmark-configuration-others bench-configured-untyped)))
 
 (main
- #:arguments {[_ bench-paths]
+ #:arguments {[(hash-table ['out-db results-db]
+                           _ ...)
+               bench-paths]
               #:once-each
               [("-c" "--config")
                'config
@@ -34,8 +39,9 @@
                ("Path to the db to populate with pre-computed results."
                 @~a{Default: @(pre-computed-results-db)})
                #:collect ["path"
-                          (set-parameter pre-computed-results-db)
-                          (pre-computed-results-db)]]
+                          take-latest
+                          (path->string (build-path configurables-dir
+                                                    (pre-computed-results-db)))]]
               #:args bench-paths}
 
  #:check [(not (empty? bench-paths))
@@ -76,6 +82,7 @@
                                           #:memory/gb (default-memory-limit/gb)))))
      (values bench-name
              mutant-results-hash)))
+
  (unless (db:path-to-db? (pre-computed-results-db))
    (db:new! (pre-computed-results-db)))
  (define db (db:get (pre-computed-results-db)))

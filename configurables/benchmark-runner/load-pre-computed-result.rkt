@@ -5,16 +5,18 @@
          racket/match
          racket/runtime-path
          (prefix-in db: "../../db/db.rkt")
+         "../../db/util.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/path-utils.rkt"
          "../../runner/mutation-runner.rkt"
          "benchmark-runner.rkt")
 
-(provide (contract-out [make-benchmark-runner make-benchmark-runner/c])
-         pre-computed-results-db)
+(provide (contract-out [make-benchmark-runner make-benchmark-runner/c]
+                       [pre-computed-results-db (db-path-relative-to? configurables)]))
 
-(define-runtime-path default-pre-computed-results-db
-  "pre-computed-results/default.rktdb")
+(define-runtime-path configurables "..")
+(define default-pre-computed-results-db
+  "benchmark-runner/pre-computed-results/default.rktdb")
 (define pre-computed-results-db
   (make-parameter default-pre-computed-results-db))
 
@@ -24,7 +26,9 @@
   (λ (mod-path)
     (define path (second mod-path))
     (define bench (first (benchmark-mod-relative-path-parts mod-path)))
-    (define db (db:get (pre-computed-results-db)))
+    (define resolved-db-path (build-path configurables
+                                         (pre-computed-results-db)))
+    (define db (db:get resolved-db-path))
     (match (db:read db
                     bench
                     #f)

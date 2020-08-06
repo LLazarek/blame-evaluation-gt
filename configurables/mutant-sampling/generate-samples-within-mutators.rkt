@@ -10,6 +10,9 @@
          racket/random
          racket/hash)
 
+(define-runtime-paths
+  [configurables-dir ".."])
+
 (define current-active-mutator-names (make-parameter #f))
 
 (struct mutant-id (module index)
@@ -381,7 +384,8 @@
                 @~a{Default: @(mutation-analysis-samples-db)})
                #:collect ["path"
                           take-latest
-                          (path->string (mutation-analysis-samples-db))]]
+                          (path->string (build-path configurables-dir
+                                                    (mutation-analysis-samples-db)))]]
 
               [("-n" "--sample-size")
                'sample-size
