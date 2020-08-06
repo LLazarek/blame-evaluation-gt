@@ -382,7 +382,8 @@
   (test-equal? (unbox enqueued) 'fallback)
   "\nEnqueued a mutant following type-error into a library?"))
 
-(parameterize ([abort-on-failure? #f])
+(parameterize ([abort-on-failure? #f]
+               [data-output-dir test-mutant-dir])
   (test-begin/with-env
    #:name make-blame-disappearing-fallback
    (ignore
@@ -612,12 +613,13 @@
                                 [else 6])]
                [sample-size (match (gethostname)
                                 [(regexp "quser[0-9]+") 3]
-                                [else 10])]
+                                [else 3])]
                [abort-on-failure? #f]
                [default-timeout/s (match (gethostname)
                                     [(regexp "quser[0-9]+") 240]
                                     [else 90])]
                [default-memory-limit/gb 1])
+  (set-box! abort-suppressed? #f)
   (displayln @~a{
 
 
@@ -727,9 +729,18 @@
                               0
                               '#hash(("second.rkt" . none)
                                      ("main.rkt" . types)))
-    (define mutant-results (run-all-mutants*configs bench
-                                                    #:log-progress void
-                                                    #:resume-cache (const #f)))
+    (define progress-log-hash
+      (make-hash))
+    (define log-progress:in-hash
+      (match-lambda [(cons k v)
+                     (hash-set! progress-log-hash k v)]))
+    (define log-progress:nowhere void)
+    (define (run-the-experiment! #:log-progress [log-progress log-progress:in-hash])
+      (run-all-mutants*configs bench
+                               #:log-progress
+                               (make-progress-logger log-progress)
+                               #:load-progress
+                               (thunk (make-cached-results-for progress-log-hash))))
     ;; (displayln @~a{Mutant errors: @(file->string (mutant-error-log))})
     ;; (displayln "Data:")
     ;; (for ([{m aggregate-file} (in-hash mutant-results)])
@@ -741,6 +752,9 @@
 
     ;;               }))
     )
+   (extend-test-message
+    (run-the-experiment!)
+    "Sanity checks failed.")
    (test-= (length (directory-list test-mutant-dir))
            (length expected-relevant-mutants))
    (for/and/test ([f (in-directory test-mutant-dir)])
@@ -750,7 +764,8 @@
     (define data
       (for/hash ([f (in-directory test-mutant-dir)])
         (values (file-name-string-from-path f)
-                (for/list ([line (file->lines f)])
+                (file->list f)
+                #;(for/list ([line (file->lines f)])
                   (call-with-input-string line read)))))
     (define (find-mutant-file mod-name mutation-index)
       (findf (λ (f) (regexp-match? (mutant-data-file-name mod-name
@@ -819,7 +834,36 @@
                                                                           'timeout)]))
                                                            _)
                                            ___)]))
-                               ___)] ___))))
+                               ___)] ___))
+
+
+
+   ;; Now try resuming and check nothing changes
+   (extend-test-message
+    (run-the-experiment!)
+    "Sanity checks failed.")
+   (test-= (length (directory-list test-mutant-dir))
+           (length expected-relevant-mutants))
+
+   ;; Now try resuming but there's a missing blame trail that won't get logged
+   (ignore
+    (define a-data-file (build-path test-mutant-dir
+                                    (find-mutant-file "main.rkt" 3)))
+    (define contents (file->list a-data-file))
+    (define to-drop 1)
+    (with-output-to-file a-data-file
+      #:exists 'truncate
+      (thunk (for ([el (in-list contents)]
+                   [i (in-naturals)])
+               (match el
+                 ;; the second trail
+                 [(cons (list "main.rkt" 3 (== to-drop)) _) (void)]
+                 [else (writeln el)]))))
+    (hash-remove! progress-log-hash
+                  (list "main.rkt" 3 to-drop)))
+   (extend-test-message
+    (not (run-the-experiment! #:log-progress log-progress:nowhere))
+    "Sanity checks succeeded but should have failed.")))
 
 
 ;; (display-test-results)

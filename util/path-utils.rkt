@@ -50,6 +50,24 @@
   (apply build-path-string
          (benchmark-mod-relative-path-parts full-path)))
 
+(define (file-or-directory-checksum path)
+  (match (string-split
+          (call-with-output-string
+           (λ (str-out)
+             (if (path-to-existant-file? path)
+                 (parameterize ([current-output-port str-out])
+                   (system @~a{md5sum @path}))
+                 (parameterize ([current-output-port str-out]
+                                [current-directory path])
+                   (system
+                    @~a{
+                        find . -type f -exec md5sum '{}' ';' @;
+                        | sort -k 2 @;
+                        | md5sum
+                        }))))))
+    [(list* sum _) sum]
+    [else #f]))
+
 (module+ test
   (require ruinit)
   (test-begin

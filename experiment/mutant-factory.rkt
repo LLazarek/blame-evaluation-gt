@@ -15,6 +15,7 @@
          "../configurables/configurables.rkt"
          "mutant-factory-data.rkt"
          "blame-trail-data.rkt"
+         "integrity-metadata.rkt"
          racket/file
          racket/format
          racket/match
@@ -65,7 +66,11 @@
            try-get-blamed-modules
            try-get-type-error-module
            mutant->process-will
-           make-blame-following-will/fallback))
+           make-blame-following-will/fallback
+           abort-suppressed?
+
+           make-cached-results-for
+           make-progress-logger))
 
 (define debug:save-individual-mutant-outputs? #f)
 
@@ -109,15 +114,16 @@
 ;; Main entry point of the factory
 (define/contract (run-all-mutants*configs bench
                                           #:log-progress log-progress!
-                                          #:resume-cache cached-results-for)
+                                          #:load-progress load-result-cache)
   (benchmark/c
    #:log-progress (module-name? natural? natural? path-to-existant-file? . -> . any)
-   #:resume-cache (module-name? natural? natural? . -> . (or/c #f path-to-existant-file?))
+   #:load-progress (-> (module-name? natural? natural? . -> . (or/c #f path-to-existant-file?)))
    . -> .
-   mutant-results?)
+   boolean? ; experiment complete and sanity checks pass?
+   )
 
   (parameterize ([current-progress-logger log-progress!]
-                 [current-result-cache cached-results-for])
+                 [current-result-cache (load-result-cache)])
     (log-factory info @~a{Running on benchmark @bench})
     (log-factory info
                  @~a{
@@ -156,20 +162,56 @@
     (log-factory info "Finished enqueing all test mutants. Waiting...")
     (define process-q-finished (process-Q-wait process-q))
     (report-completion/sanity-checks bench
-                                     select-mutants)))
+                                     select-mutants
+                                     (load-result-cache))))
 
-(define (report-completion/sanity-checks bench
-                                         select-mutants)
+(define/contract (report-completion/sanity-checks bench
+                                                  select-mutants
+                                                  logged-results-for)
+  (benchmark/c
+   any/c
+   (-> (module-name? natural? natural? . -> . (or/c #f path-to-existant-file?)))
+   . -> .
+   boolean? ; sanity checks pass?
+   )
+
   (define mutatable-module-names (benchmark->mutatable-modules bench))
+  (define (trail-recorded? module-to-mutate-name
+                           mutation-index
+                           trail-id)
+    (and (logged-results-for module-to-mutate-name
+                             mutation-index
+                             trail-id)
+         #t))
   (define all-trails-logged-for-all-mutants?
     (for*/and ([module-to-mutate-name mutatable-module-names]
                [mutation-index (select-mutants module-to-mutate-name
                                                bench)]
-               [trail-id (sample-size)])
-      (and ((current-result-cache) module-to-mutate-name
-                                   mutation-index
-                                   trail-id)
-           #t)))
+               [all-trails-should-be-recorded?
+                (in-value (trail-recorded? module-to-mutate-name
+                                           mutation-index
+                                           ;; If the first trail is there, all of them should be there
+                                           ;; Otherwise, none should be there
+                                           0))]
+               [trail-id (in-range (sample-size))])
+      (define trail-present?
+        (trail-recorded? module-to-mutate-name
+                         mutation-index
+                         trail-id))
+      (define consistent?
+        (or (and all-trails-should-be-recorded?
+                 trail-present?)
+            (and (not all-trails-should-be-recorded?)
+                 (not trail-present?))))
+      (unless consistent?
+        (log-factory
+         'warning
+         @~a{
+             Expected @(if all-trails-should-be-recorded? "all" "no") trails for @;
+             @module-to-mutate-name @"@" @mutation-index to be recorded, but {@trail-id} @;
+             is @(if trail-present? "recorded" "missing").
+             }))
+      consistent?))
   (define unexpected-state-encountered?
     (unbox abort-suppressed?))
   (define mutants-have-error-output?
@@ -180,12 +222,14 @@
   (define (or-empty bool msg)
     (if bool msg ""))
 
-  (displayln
+  (define all-checks-pass? (and all-trails-logged-for-all-mutants?
+                                (not unexpected-state-encountered?)
+                                (not mutants-have-error-output?)))
+  (log-factory-message
+   (if all-checks-pass? 'info 'error)
    @~a{
 
-       Experiment complete, @(if (and all-trails-logged-for-all-mutants?
-                                      (not unexpected-state-encountered?)
-                                      (not mutants-have-error-output?))
+       Experiment complete, @(if all-checks-pass?
                                  "and basic sanity checks pass."
                                  "but with failing sanity checks.")
        @(or-empty (not all-trails-logged-for-all-mutants?)
@@ -194,7 +238,8 @@
                   "⚠ Some unexpected states were encountered.\n")@;
        @(or-empty mutants-have-error-output?
                   "⚠ Some mutants logged error messages.\n")
-       }))
+       })
+  all-checks-pass?)
 
 ;; Spawns a test mutant and if that mutant has a blame result at
 ;; max contract configuration, then samples the precision lattice
@@ -1024,10 +1069,33 @@ Mutant: [~a] ~a @ ~a with config:
   (path->string (find-relative-path (simple-form-path (current-directory))
                                     (simple-form-path p))))
 
+(define progress-log (make-parameter #f))
+(define (make-cached-results-for progress-info-hash)
+  (λ (module-to-mutate-name
+      mutation-index
+      sample-number)
+    (hash-ref progress-info-hash
+              (list module-to-mutate-name
+                    mutation-index
+                    sample-number)
+              #f)))
+(define (make-progress-logger log-progress!/raw)
+  (λ (module-to-mutate-name
+      mutation-index
+      sample-number
+
+      data-file)
+    (log-progress!/raw (cons (list module-to-mutate-name
+                                   mutation-index
+                                   sample-number)
+                             ;; ensure it's an absolute path in case we resume
+                             ;; from another directory
+                             (path->string
+                              (simple-form-path data-file))))))
 (module+ main
   (require racket/cmdline)
   (define bench-to-run (make-parameter #f))
-  (define progress-log (make-parameter #f))
+  (define metadata-file (make-parameter #f))
   (command-line
    #:once-each
    [("-b" "--benchmark")
@@ -1061,7 +1129,13 @@ Mutant: [~a] ~a @ ~a with config:
     path
     ("Record progress in the given log file."
      "If it exists and is not empty, resume from the point reached in the log.")
-    (progress-log path)])
+    (progress-log path)]
+   [("-m" "--metadata")
+    path
+    ("Record metadata about the configuration used to run an experiment in the given file."
+     "This is useful information, and it is used to prevent resuming an experiment with a"
+     "different configuration than it was started with.")
+    (metadata-file path)])
 
   (unless (bench-to-run)
     (raise-user-error 'mutant-factory "Error: must provide benchmark to run."))
@@ -1076,35 +1150,28 @@ Mutant: [~a] ~a @ ~a with config:
       [(or 'y 'yes) (delete-directory/files (data-output-dir))]
       [_ (eprintf "Not deleted.~n")]))
 
-  (define progress-info
-    (match (progress-log)
-      [(? file-exists? path) (make-hash (file->list path))]
-      [else (hash)]))
+  (when (metadata-file)
+    (create/check-metadata-integrity!
+     (metadata-info (metadata-file)
+                    (bench-to-run)
+                    (current-configuration-path))
+     @~a{
+         This appears to be a resumption of the experiment, but the metadata recorded at @;
+         @(metadata-file) for the previous run does not match that of this run's configuration.
+         Aborting.
+         }))
+
+  (define (make-cached-results-function)
+    (define progress-info-hash
+      (match (progress-log)
+        [(? file-exists? path) (make-hash (file->list path))]
+        [else (hash)]))
+    (make-cached-results-for progress-info-hash))
   (define-values {log-progress!/raw finalize-log!}
     (initialize-progress-log! (progress-log)
                               #:exists 'append))
-  (define (log-progress! module-to-mutate-name
-                         mutation-index
-                         sample-number
-
-                         data-file)
-    (log-progress!/raw (cons (list module-to-mutate-name
-                                   mutation-index
-                                   sample-number)
-                             ;; ensure it's an absolute path in case we resume
-                             ;; from another directory
-                             (path->string
-                              (simple-form-path data-file)))))
-  (define (cached-results-for module-to-mutate-name
-                              mutation-index
-                              sample-number)
-    (hash-ref progress-info
-              (list module-to-mutate-name
-                    mutation-index
-                    sample-number)
-              #f))
   (parameterize ([date-display-format 'iso-8601])
     (run-all-mutants*configs (read-benchmark (bench-to-run))
-                             #:log-progress log-progress!
-                             #:resume-cache cached-results-for))
+                             #:log-progress (make-progress-logger log-progress!/raw)
+                             #:load-progress make-cached-results-function))
   (finalize-log!))

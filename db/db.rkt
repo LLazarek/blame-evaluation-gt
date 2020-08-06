@@ -9,8 +9,11 @@
          racket/match
          racket/path
          racket/pretty
+         racket/port
          (except-in racket/contract/base contract-out)
-         "../util/optional-contracts.rkt")
+         openssl/md5
+         "../util/optional-contracts.rkt"
+         "../util/path-utils.rkt")
 
 (provide (contract-out
           [path-to-db? (path-string? . -> . boolean?)]
@@ -18,7 +21,9 @@
           [new! ({path-string?} {path-string?} . ->* . any)]
           [read ({db? any/c} {failure-result/c} . ->* . any/c)]
           [write! (db? hash? . -> . db?)]
-          [keys (db? . -> . (listof any/c))]))
+          [keys (db? . -> . (listof any/c))]
+
+          [checksum (db? . -> . string?)]))
 
 ;; A DB is a pair of:
 ;; - a file of metadata
@@ -133,3 +138,9 @@
 
 (define (keys a-db)
   (hash-keys (db-map a-db)))
+
+(define (checksum a-db)
+  (define part-sums (list (file-or-directory-checksum (db-path a-db))
+                          (file-or-directory-checksum (db-data-dir a-db))))
+  (define double-sum (apply string-append part-sums))
+  (call-with-input-string double-sum md5))
