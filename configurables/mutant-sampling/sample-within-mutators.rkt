@@ -2,7 +2,8 @@
 
 (require "../../util/optional-contracts.rkt")
 (provide (contract-out [select-mutants mutant-selector/c]
-                       [mutation-analysis-samples-db (db-path-relative-to? configurables)]))
+                       [mutation-analysis-samples-db (db-path-relative-to? configurables)]
+                       [all-mutants-should-have-trails? boolean?]))
 
 (require "mutant-selector.rkt"
          (prefix-in db: "../../db/db.rkt")
@@ -29,3 +30,4 @@
             module-to-mutate-name
             '()))
 
+(define all-mutants-should-have-trails? #t)

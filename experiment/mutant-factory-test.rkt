@@ -613,7 +613,7 @@
                                 [else 6])]
                [sample-size (match (gethostname)
                                 [(regexp "quser[0-9]+") 3]
-                                [else 3])]
+                                [else 7])]
                [abort-on-failure? #f]
                [default-timeout/s (match (gethostname)
                                     [(regexp "quser[0-9]+") 240]

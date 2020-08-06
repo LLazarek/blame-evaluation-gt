@@ -90,7 +90,6 @@
 (define current-result-cache (make-parameter (λ _ #f)))
 (define current-progress-logger (make-parameter void))
 
-
 (define-logger factory)
 (define (log-factory-message level msg . vs)
   (when (log-level? factory-logger level)
@@ -175,7 +174,13 @@
    boolean? ; sanity checks pass?
    )
 
+  (log-factory info
+               "All mutants dead. Performing sanity checks...")
   (define mutatable-module-names (benchmark->mutatable-modules bench))
+  (define all-mutants-should-have-trails?
+    (load-configured (current-configuration-path)
+                     "mutant-sampling"
+                     'all-mutants-should-have-trails?))
   (define (trail-recorded? module-to-mutate-name
                            mutation-index
                            trail-id)
@@ -188,11 +193,12 @@
                [mutation-index (select-mutants module-to-mutate-name
                                                bench)]
                [all-trails-should-be-recorded?
-                (in-value (trail-recorded? module-to-mutate-name
-                                           mutation-index
-                                           ;; If the first trail is there, all of them should be there
-                                           ;; Otherwise, none should be there
-                                           0))]
+                (in-value (or all-mutants-should-have-trails?
+                              ;; If the first trail is there, all of them should be there.
+                              ;; Otherwise, none should be there
+                              (trail-recorded? module-to-mutate-name
+                                               mutation-index
+                                               0)))]
                [trail-id (in-range (sample-size))])
       (define trail-present?
         (trail-recorded? module-to-mutate-name
@@ -205,7 +211,7 @@
                  (not trail-present?))))
       (unless consistent?
         (log-factory
-         'warning
+         warning
          @~a{
              Expected @(if all-trails-should-be-recorded? "all" "no") trails for @;
              @module-to-mutate-name @"@" @mutation-index to be recorded, but {@trail-id} @;
@@ -1170,8 +1176,10 @@ Mutant: [~a] ~a @ ~a with config:
   (define-values {log-progress!/raw finalize-log!}
     (initialize-progress-log! (progress-log)
                               #:exists 'append))
-  (parameterize ([date-display-format 'iso-8601])
-    (run-all-mutants*configs (read-benchmark (bench-to-run))
-                             #:log-progress (make-progress-logger log-progress!/raw)
-                             #:load-progress make-cached-results-function))
-  (finalize-log!))
+  (define completed+checks-pass?
+    (parameterize ([date-display-format 'iso-8601])
+      (run-all-mutants*configs (read-benchmark (bench-to-run))
+                               #:log-progress (make-progress-logger log-progress!/raw)
+                               #:load-progress make-cached-results-function)))
+  (finalize-log!)
+  (exit (if completed+checks-pass? 0 1)))
