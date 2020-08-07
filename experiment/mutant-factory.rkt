@@ -90,6 +90,14 @@
 (define current-result-cache (make-parameter (λ _ #f)))
 (define current-progress-logger (make-parameter void))
 
+(define/contract configuration-outcome-db
+  (parameter/c (or/c #f path-to-db?))
+  (make-parameter #f))
+(define/contract record/check-configuration-outcomes?
+  (parameter/c (or/c #f (or/c (list/c 'record (and/c hash? (not/c immutable?)))
+                              (list/c 'check  (and/c hash? immutable?)))))
+  (make-parameter #f))
+
 (define-logger factory)
 (define (log-factory-message level msg . vs)
   (when (log-level? factory-logger level)
@@ -649,6 +657,7 @@ Giving up.
   (mutant-will/c . -> . mutant-will/c)
 
   (λ (the-process-q dead-proc)
+    (record/check-configuration-outcome! dead-proc)
     (cond
       [(or (try-get-blamed-modules dead-proc)
            (try-get-type-error-module dead-proc))
@@ -1075,6 +1084,38 @@ Mutant: [~a] ~a @ ~a with config:
   (path->string (find-relative-path (simple-form-path (current-directory))
                                     (simple-form-path p))))
 
+(define (record/check-configuration-outcome! dead-proc)
+  (match-define (struct* dead-mutant-process ([result result]
+                                              [mutant (mutant mod-name index _)]
+                                              [config config]))
+    dead-proc)
+  (match* {result (record/check-configuration-outcomes?)}
+    [{(struct* run-status ([outcome 'type-error]))
+      `(record ,outcomes)}
+     (hash-set! outcomes (list mod-name index config) #t)]
+    [{(struct* run-status ([outcome (not 'type-error)]))
+      `(record ,outcomes)}
+     (hash-set! outcomes (list mod-name index config) #f)]
+    [{(struct* run-status ([outcome 'type-error]))
+      `(check ,(hash-table [(list (== mod-name) (== index) (== config)) #f] _ ...))}
+     (maybe-abort
+      @~a{
+          Found that a configuration produces a type-error, but configuration outcomes db @;
+          says that it should not.
+          Mutant: @mod-name @"@" @index @config
+          }
+      (void))]
+    [{(struct* run-status ([outcome (not 'type-error)]))
+      `(check ,(hash-table [(list (== mod-name) (== index) (== config)) #t] _ ...))}
+     (maybe-abort
+      @~a{
+          Found that a configuration does not produce a type-error, but configuration outcomes db @;
+          says that it should.
+          Mutant: @mod-name @"@" @index @config
+          }
+      (void))]
+    [{_ _} (void)]))
+
 (define progress-log (make-parameter #f))
 (define (make-cached-results-for progress-info-hash)
   (λ (module-to-mutate-name
@@ -1099,15 +1140,16 @@ Mutant: [~a] ~a @ ~a with config:
                              (path->string
                               (simple-form-path data-file))))))
 (module+ main
-  (require racket/cmdline)
-  (define bench-to-run (make-parameter #f))
+  (require racket/cmdline
+           (prefix-in db: "../db/db.rkt"))
+  (define bench-path-to-run (make-parameter #f))
   (define metadata-file (make-parameter #f))
   (command-line
    #:once-each
    [("-b" "--benchmark")
     path
     "Path to benchmark to run."
-    (bench-to-run path)]
+    (bench-path-to-run path)]
    [("-c" "--config")
     path
     "Path to the configuration to use."
@@ -1141,12 +1183,28 @@ Mutant: [~a] ~a @ ~a with config:
     ("Record metadata about the configuration used to run an experiment in the given file."
      "This is useful information, and it is used to prevent resuming an experiment with a"
      "different configuration than it was started with.")
-    (metadata-file path)])
+    (metadata-file path)]
+   [("-P" "--record-configuration-outcomes") ; p for parity
+    db-path
+    ("For every configuration visited, record in the given db (which may not exist yet) if the"
+     "configuration produces a type error."
+     "Upon completion, the db can be used with `-p` (which see).")
+    (configuration-outcome-db db-path)
+    (record/check-configuration-outcomes? `(record ,(make-hash)))]
+   [("-p" "--check-configuration-outcomes")
+    db-path
+    ("Check the outcome of every configuration visited against those recorded in the given db"
+     "(produced by `-P`). If the outcome of a configuration does not match the outcome recorded"
+     "in the db, signal a fatal error.")
+    (configuration-outcome-db db-path)
+    (record/check-configuration-outcomes? `(check ,(hash)))])
 
-  (unless (bench-to-run)
+  (unless (bench-path-to-run)
     (raise-user-error 'mutant-factory "Error: must provide benchmark to run."))
   (unless (current-configuration-path)
     (raise-user-error 'mutant-factory "Error: must provide a configuration."))
+
+  (define bench-to-run (read-benchmark (bench-path-to-run)))
 
   (when (and (directory-exists? (data-output-dir))
              (not (progress-log)))
@@ -1159,7 +1217,7 @@ Mutant: [~a] ~a @ ~a with config:
   (when (metadata-file)
     (unless (create/check-metadata-integrity!
              (metadata-info (metadata-file)
-                            (bench-to-run)
+                            (bench-path-to-run)
                             (current-configuration-path)))
       (raise-user-error
        'mutant-factory
@@ -1168,6 +1226,14 @@ Mutant: [~a] ~a @ ~a with config:
            @(metadata-file) for the previous run does not match that of this run's configuration.
            Aborting.
            })))
+
+  (match (record/check-configuration-outcomes?)
+    [`(record ,_)
+     (db:new! (configuration-outcome-db))]
+    [`(check ,_)
+     (define db (db:get (configuration-outcome-db)))
+     (define outcomes (db:read db (benchmark->name bench-to-run)))
+     (record/check-configuration-outcomes? `(check ,outcomes))])
 
   (define (make-cached-results-function)
     (define progress-info-hash
@@ -1180,8 +1246,17 @@ Mutant: [~a] ~a @ ~a with config:
                               #:exists 'append))
   (define completed+checks-pass?
     (parameterize ([date-display-format 'iso-8601])
-      (run-all-mutants*configs (read-benchmark (bench-to-run))
+      (run-all-mutants*configs bench-to-run
                                #:log-progress (make-progress-logger log-progress!/raw)
                                #:load-progress make-cached-results-function)))
+
   (finalize-log!)
+  (match (record/check-configuration-outcomes?)
+    [`(record ,data)
+     (define db (db:get (configuration-outcome-db)))
+     (define benchmark-name (benchmark->name bench-to-run))
+     (db:set! db benchmark-name data)]
+    [`(check ,_)
+     (void)])
+
   (exit (if completed+checks-pass? 0 1)))
