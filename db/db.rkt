@@ -21,6 +21,7 @@
           [new! ({path-string?} {path-string?} . ->* . any)]
           [read ({db? any/c} {failure-result/c} . ->* . any/c)]
           [write! (db? hash? . -> . db?)]
+          [set! (db? any/c any/c . -> . any)]
           [keys (db? . -> . (listof any/c))]
 
           [checksum (db? . -> . string?)]))
@@ -135,6 +136,21 @@
                             new-map
                             data-dir))
   (get (db-path a-db)))
+
+(define (set! a-db key value)
+  (define (find-next-index)
+    (~a (apply max 0 (map string->number (hash-keys (db-map a-db))))))
+
+  (define data-dir-path (db-data-dir a-db))
+  (define file-name (hash-ref (db-map a-db)
+                              key
+                              find-next-index))
+  (define file-path (build-path data-dir-path file-name))
+  (write-to-file value
+                 file-path
+                 #:exists 'replace)
+  (define new-db (struct-copy db a-db [map (hash-set (db-map a-db) key file-name)]))
+  (write-serialized-db! new-db))
 
 (define (keys a-db)
   (hash-keys (db-map a-db)))
