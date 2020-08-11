@@ -70,7 +70,10 @@
            abort-suppressed?
 
            make-cached-results-for
-           make-progress-logger))
+           make-progress-logger
+
+           record/check-configuration-outcomes?
+           record/check-configuration-outcome!))
 
 (define debug:save-individual-mutant-outputs? #f)
 
@@ -90,9 +93,6 @@
 (define current-result-cache (make-parameter (λ _ #f)))
 (define current-progress-logger (make-parameter void))
 
-(define/contract configuration-outcome-db
-  (parameter/c (or/c #f path-to-db?))
-  (make-parameter #f))
 (define/contract record/check-configuration-outcomes?
   (parameter/c (or/c #f (or/c (list/c 'record (and/c hash? (not/c immutable?)))
                               (list/c 'check  (and/c hash? immutable?)))))
@@ -1090,30 +1090,22 @@ Mutant: [~a] ~a @ ~a with config:
                                               [config config]))
     dead-proc)
   (match* {result (record/check-configuration-outcomes?)}
-    [{(struct* run-status ([outcome 'type-error]))
+    [{(struct* run-status ([outcome outcome]))
       `(record ,outcomes)}
-     (hash-set! outcomes (list mod-name index config) #t)]
-    [{(struct* run-status ([outcome (not 'type-error)]))
-      `(record ,outcomes)}
-     (hash-set! outcomes (list mod-name index config) #f)]
-    [{(struct* run-status ([outcome 'type-error]))
-      `(check ,(hash-table [(list (== mod-name) (== index) (== config)) #f] _ ...))}
+     (hash-set! outcomes (list mod-name index config) outcome)]
+
+    [{(struct* run-status ([outcome real-outcome]))
+      `(check ,(hash-table [(list (== mod-name) (== index) (== config))
+                            (and expected-outcome (or 'type-error 'runtime-error))] _ ...))}
+     #:when (not (equal? real-outcome expected-outcome))
      (maybe-abort
       @~a{
-          Found that a configuration produces a type-error, but configuration outcomes db @;
-          says that it should not.
+          Found that a configuration produces @real-outcome, but configuration outcomes db @;
+          says that it should produce @expected-outcome
           Mutant: @mod-name @"@" @index @config
           }
       (void))]
-    [{(struct* run-status ([outcome (not 'type-error)]))
-      `(check ,(hash-table [(list (== mod-name) (== index) (== config)) #t] _ ...))}
-     (maybe-abort
-      @~a{
-          Found that a configuration does not produce a type-error, but configuration outcomes db @;
-          says that it should.
-          Mutant: @mod-name @"@" @index @config
-          }
-      (void))]
+
     [{_ _} (void)]))
 
 (define progress-log (make-parameter #f))
@@ -1144,6 +1136,9 @@ Mutant: [~a] ~a @ ~a with config:
            (prefix-in db: "../db/db.rkt"))
   (define bench-path-to-run (make-parameter #f))
   (define metadata-file (make-parameter #f))
+  (define/contract configuration-outcome-db
+    (parameter/c (or/c #f path-to-db?))
+    (make-parameter #f))
   (command-line
    #:once-each
    [("-b" "--benchmark")
