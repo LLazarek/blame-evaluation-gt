@@ -94,4 +94,10 @@
       (program (mod (string->path "/foo/bar/bench/untyped/main.rkt") #'())
                (list (mod (string->path "/foo/bar/bench/typed/baz.rkt") #'())
                      (mod (string->path "/foo/bar/bench/typed/bez.rkt") #'()))))
-     (string->path "/foo/bar/bench"))))
+     (string->path "/foo/bar/bench"))
+    (test-equal?
+     (find-program-base-path
+      (program (mod (string->path "/foo/bar/bench/typed/main.rkt") #'())
+               (list (mod (string->path "/foo/bar/bench/typed/baz.rkt") #'())
+                     (mod (string->path "/foo/bar/bench/typed/bez.rkt") #'()))))
+     (string->path "/foo/bar/bench/typed"))))

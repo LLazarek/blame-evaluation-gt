@@ -178,7 +178,19 @@
      #:setup-namespace setup-namespace!
      #:run-with (make-configured-runner a-program
                                         (mod->name module-to-mutate)
-                                        mutation-index)))
+                                        mutation-index)
+     ;; Make relative path references work correctly. This is necessary because
+     ;; of unification (see `unify-program.rkt`); without it, relative refs to
+     ;; files in e.g. `base` fail because the `unified` directory doesn't exist.
+     ;; E.g: for `(file->lines "../base/foobar.txt")` the path would become
+     ;;      ".../benchmark/unified/../base/foobar.txt"
+     #:before-main (λ (ns)
+                     (define program-dir-path
+                       (apply build-path-string
+                              (append (drop-right (explode-path (mod-path module-to-mutate)) 2)
+                                      '("untyped"))))
+                     (displayln @~a{Setting dir to @program-dir-path})
+                     (eval `(current-directory ,program-dir-path) ns))))
   (define mutated-id (unbox mutated-id-box))
 
   (values runner mutated-id))
