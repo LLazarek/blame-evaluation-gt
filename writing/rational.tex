@@ -215,34 +215,6 @@ Transient firstborn blame adds value to transient for a program $\system$ over
 
 
 
-\subsection{Where do the trails begin?}
-The above descriptions of blame trails under various modes all assume that every trail has a beginning scenario.
-How we select the scenarios from which the trails start has ramifications for the kinds of results we can find, and what we can learn from them.
-We break this decision into three basic factors, each of which specify an element of the selection.
-
-First, not all debugging scenarios are suitable for evaluating blame across all three semantics.
-For instance, there exist scenarios where Natural's checks discover a problem but Transient and Erasure do not.
-Since Transient and Erasure provide no debugging information (and in particular no blame) in such cases, we have nothing to evaluate.
-As alluded to in the previous paragraph, scenarios where the type checker detects the problem statically are also uninteresting.
-Hence, we select only scenarios which are interesting in all three semantics.
-We can do this simply by leveraging~\citet{??? Ben}'s proof that a dynamic type error in erasure implies a dynamic type error in both Transient and Natural, to only look at scenarios in which Erasure detects the problem.
-In other words, we consider just those debugging scenarios that are interesting under Erasure.
-
-The second factor is that we would like to be able to compare the behavior of blame between each of our three semantics.
-In order to do so, we must evaluate each of the semantics on the same set of scenarios;
-this allows us to compare for any given scenario how Natural compares to Erasure, for instance.
-Hence, we pre-select a sample of scenarios which serve as the starting points to evaluate all three semantics.
-
-Finally, the third factor is that we only want to consider debugging scenarios in which the bug has effects that cross component boundaries.
-In the context of migratory typing, dynamic type enforcement occurs when values cross component boundaries.
-However, a bug may be caught by the runtime before any values it influences flow out of the containing component -- for instance, if the bug is that a direct argument to \texttt{+} becomes a string.
-We consider such scenarios trivial, becase typing the component in which the problem manifests immediately identifies that same component as the buggy one.
-In an effort to avoid these trivial scenarios, we further restrict our sample of debugging scenarios to only those in which the stack trace from Erasure identifies a component other than the buggy one.
-Those scenarios may yet be trivial in the other two semantics -- with more checking and blame tracking -- but this selection ensures that none of our scenarios are trivial ``a priori''.
-
-
-
-
 %% -----------------------------------------------------------------------------
 \subsection{Experimental Process.}
 
