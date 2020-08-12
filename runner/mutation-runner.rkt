@@ -146,13 +146,10 @@
                              'racket/contract
                              ns)
     ;; Require errortrace so that we get accurate runtime error location
-    ;; information
-    ;; lltodo: apparent bug? This fails saying that it can't find errortrace
-    ;; at a path where errortrace exists.
-    #;((namespace-require 'errortrace ns))
-    ;; but this works:
+    ;; information.
+    #;(eval '(require (lib "errortrace")) ns)
     (parameterize ([current-namespace ns])
-      (namespace-require 'errortrace))
+      (namespace-require '(lib "errortrace")))
     ;; Also attach transient blame exn definition module so we can inspect
     ;; those
     (when (try-dynamic-require-transient-blame-exn-predicate!)
@@ -189,7 +186,6 @@
                        (apply build-path-string
                               (append (drop-right (explode-path (mod-path module-to-mutate)) 2)
                                       '("untyped"))))
-                     (displayln @~a{Setting dir to @program-dir-path})
                      (eval `(current-directory ,program-dir-path) ns))))
   (define mutated-id (unbox mutated-id-box))
 
@@ -446,7 +442,7 @@
   (test-begin
     #:name run-with-mutated-module/mutations
     (ignore
-     (define a (mod "a.rkt"
+     (define a (mod "./test-mods/a.rkt"
                     #'(module a racket
                         (#%module-begin
                          (require "b.rkt")
@@ -472,7 +468,7 @@
                          (displayln (list 'a a))
                          (displayln (list 'b b))
                          (foo d c)))))
-     (define b (mod "b.rkt"
+     (define b (mod "./test-mods/b.rkt"
                     #'(module b racket
                         (#%module-begin
                          (provide c d)
@@ -487,7 +483,7 @@
                            (if #t 1 "one"))
                          (displayln (list 'c c))
                          (displayln (list 'd d))))))
-     (define c (mod "c.rkt"
+     (define c (mod "./test-mods/c.rkt"
                     #'(module c typed/racket
                         (#%module-begin
                          (define x : Number 5)
@@ -545,14 +541,14 @@
   (test-begin
     #:name run-with-mutated-module/ctc-violations
     (ignore
-     (define main (mod "main.rkt"
+     (define main (mod "./test-mods/main.rkt"
                        #'(module main racket
                            (#%module-begin
                             (require "second.rkt")
                             (define (foo x) (if (positive? x) (foo (- x)) (* x x 3)))
                             (define (main) (bar (foo 2) "yes"))
                             (main)))))
-     (define second (mod "second.rkt"
+     (define second (mod "./test-mods/second.rkt"
                          #'(module second typed/racket
                              (#%module-begin
                               (: bar (-> Integer String Nonpositive-Integer))
@@ -563,7 +559,7 @@
                 (and (exn:fail:runner:runtime? e)
                      (exn:fail:contract? (exn:fail:runner:runtime-error e))))
               ((make-instrumented-runner
-                (program (mod "main.rkt"
+                (program (mod "./test-mods/main.rkt"
                               #'(module main racket
                                   (#%module-begin
                                    (require "second.rkt")
@@ -598,7 +594,7 @@
   (test-begin
     #:name run-with-mutated-module/type-error
     (ignore
-     (define a (mod/loc "a.rkt"
+     (define a (mod/loc "./test-mods/a.rkt"
                         #'(module a racket
                             (#%module-begin
                              (require "b.rkt")
@@ -619,7 +615,7 @@
                              (displayln (list 'a a))
                              (displayln (list 'b b))
                              (foo d c)))))
-     (define b (mod/loc "b.rkt"
+     (define b (mod/loc "./test-mods/b.rkt"
                         #'(module b typed/racket
                             (#%module-begin
                              (provide c d)
@@ -632,7 +628,7 @@
 
                              (displayln (list 'c c))
                              (displayln (list 'd d))))))
-     (define c (mod/loc "c.rkt"
+     (define c (mod/loc "./test-mods/c.rkt"
                         #'(module c typed/racket
                             (#%module-begin
                              (: x One)
@@ -830,7 +826,34 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")]))))))
+                                               [blamed '("a.rkt")])))))
+
+
+    ;; Test errors that require errortrace to get the right location
+    (ignore
+     (define d (mod/loc (simple-form-path "./test-mods/d.rkt")
+                        #'(module d racket
+                            (#%module-begin
+                             (require "e.rkt")
+                             (define x 0)
+                             (define (main x) (g x))
+                             (main 42)))))
+     (define e (mod/loc (simple-form-path "./test-mods/e.rkt")
+                        #'(module e racket
+                            (#%module-begin
+                             (provide g)
+                             (define (g x) (error 'g "bug"))))))
+     (define p2 (program d (list e))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p2
+                                   d
+                                   0 ; mutation doesn't matter
+                                   p-config
+                                   #:timeout/s 60
+                                   #:memory/gb 1))
+     (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
+                                               [blamed '("e.rkt")]))))))
+
 
   (test-begin
     #:name run-with-mutated-module/runtime-error-locations-with-blame

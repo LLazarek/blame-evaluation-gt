@@ -5,7 +5,8 @@
           [make-extract-runtime-error-location
            (blamed-location-extractor/c-for exn:fail?)]))
 
-(require "../../util/path-utils.rkt"
+(require errortrace/errortrace-key
+         "../../util/path-utils.rkt"
          "../program.rkt"
          "blamed-location-extractor.rkt")
 
@@ -15,34 +16,41 @@
   (λ (e)
     (define ctx (continuation-mark-set->context
                  (exn-continuation-marks e)))
+    (define errortrace-locations
+      (map errortrace-mark->location
+           (continuation-mark-set->list (exn-continuation-marks e)
+                                        errortrace-key)))
     (define mod-with-error
-      (for*/first ([ctx-item (in-list ctx)]
-                   [ctx-mod-path
-                    (in-value
-                     (match ctx-item
-                       [(cons _ (srcloc (? path? path) _ _ _ _))
-                        (path->string path)]
-                       [(cons _ (srcloc (? string? path-str) _ _ _ _))
-                        (string-trim path-str "\"")]
-                       [(cons (? symbol?
-                                 (app symbol->string
-                                      (regexp @regexp{^body of "(.+)"$}
-                                              (list _ path-str))))
-                              _)
-                        path-str]
-                       [(cons (? symbol?
-                                 (app symbol->string
-                                      (regexp @regexp{^body of '(.+)$}
-                                              (list _ mod-name-sym))))
-                              _)
-                        (~a mod-name-sym ".rkt")]
-                       [else #f]))]
-                   #:when ctx-mod-path
-                   [mod (in-list (list* (program-main the-program)
-                                        (program-others the-program)))]
-                   #:when (equal? (file-name-string-from-path (mod-path mod))
-                                  (file-name-string-from-path ctx-mod-path)))
-        (file-name-string-from-path ctx-mod-path)))
+      (match errortrace-locations
+        [(list* mod _) mod]
+        [else
+         (for*/first ([ctx-item (in-list ctx)]
+                      [ctx-mod-path
+                       (in-value
+                        (match ctx-item
+                          [(cons _ (srcloc (? path? path) _ _ _ _))
+                           (path->string path)]
+                          [(cons _ (srcloc (? string? path-str) _ _ _ _))
+                           (string-trim path-str "\"")]
+                          [(cons (? symbol?
+                                    (app symbol->string
+                                         (regexp @regexp{^body of "(.+)"$}
+                                                 (list _ path-str))))
+                                 _)
+                           path-str]
+                          [(cons (? symbol?
+                                    (app symbol->string
+                                         (regexp @regexp{^body of '(.+)$}
+                                                 (list _ mod-name-sym))))
+                                 _)
+                           (~a mod-name-sym ".rkt")]
+                          [else #f]))]
+                      #:when ctx-mod-path
+                      [mod (in-list (list* (program-main the-program)
+                                           (program-others the-program)))]
+                      #:when (equal? (file-name-string-from-path (mod-path mod))
+                                     (file-name-string-from-path ctx-mod-path)))
+           (file-name-string-from-path ctx-mod-path))]))
     (match mod-with-error
       [(? string? name) (list name)]
       [#f
@@ -66,3 +74,6 @@
        ;; This ends up being consistent in a way with how non-`module-name?`
        ;; elements in a list (from blaming library code) get filtered out.
        empty])))
+
+(define (errortrace-mark->location mark)
+  (file-name-string-from-path (second mark)))
