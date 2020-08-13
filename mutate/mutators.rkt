@@ -4,20 +4,22 @@
          (except-in racket/contract/base
                     contract-out))
 (provide (contract-out
-          [arithmetic-op-swap          mutator/c]
-          [boolean-op-swap             mutator/c]
-          [class-method-publicity-swap mutator/c]
-          [delete-super-new            mutator/c]
-          [data-accessor-swap          mutator/c]
+          [arithmetic-op-swap             mutator/c]
+          [boolean-op-swap                mutator/c]
+          [class-method-publicity-swap    mutator/c]
+          [delete-super-new               mutator/c]
+          [data-accessor-swap             mutator/c]
 
-          [replace-constants           mutator/c]
+          [replace-constants              mutator/c]
 
-          [delete-begin-result-expr    mutator/c]
-          [negate-conditionals         mutator/c]
-          [replace-class-parent        mutator/c]
-          [swap-class-initializers     mutator/c]
-          [rearrange-positional-exprs  mutator/c]
-          [add-extra-class-method      mutator/c]
+          [delete-begin-result-expr       mutator/c]
+          [negate-conditionals            mutator/c]
+          [replace-class-parent           mutator/c]
+          [swap-class-initializers        mutator/c]
+          [rearrange-positional-exprs     mutator/c]
+          [add-extra-class-method         mutator/c]
+          [make-method-call-swap-mutator  mutator/c]
+          [nested-list-construction-swap  mutator/c]
 
           [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]
           [make-imported-id-swap-mutator  (syntax? program/c . -> . mutator/c )]))
@@ -64,6 +66,10 @@
 (define-id-mutator data-accessor-swap
   #:type "data-accessor-swap"
   [car #:<-> cdr])
+
+(define-id-mutator nested-list-construction-swap
+  #:type "nested-list-construction-swap"
+  [append #:-> cons])
 
 (define-value-mutator replace-constants
   #:type "constant-swap"
