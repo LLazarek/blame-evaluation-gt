@@ -27,6 +27,8 @@
         "constant-swap"
         "begin-result-deletion"
         "negate-conditional"
+        "force-conditional"
+        "wrap-conditional"
         "class:parent-swap"
         "class:initializer-swap"
         "position-swap"
@@ -58,6 +60,8 @@
     (make-expr-mutator
      (compose-mutators delete-begin-result-expr
                        negate-conditionals
+                       force-conditionals
+                       wrap-conditionals
                        replace-class-parent
                        swap-class-initializers
                        rearrange-positional-exprs

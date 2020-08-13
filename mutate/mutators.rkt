@@ -15,6 +15,8 @@
 
           [delete-begin-result-expr       mutator/c]
           [negate-conditionals            mutator/c]
+          [force-conditionals            mutator/c]
+          [wrap-conditionals            mutator/c]
           [replace-class-parent           mutator/c]
           [swap-class-initializers        mutator/c]
           [rearrange-positional-exprs     mutator/c]
@@ -267,50 +269,78 @@
                          #'(cond [#t 42] ['true (launch-missiles!) -42] [else (displayln 'bye)])
                          #'(cond [#t 42] ['true (launch-missiles!) -42] [else (displayln 'bye) 0])))))
 
-(define (negate-conditionals stx mutation-index counter)
-  (define (negate-condition stx mutation-index counter)
-    (log-mutation-type "negate-conditional")
+
+(define (make-conditional-test-mutator mutate-condition)
+  (λ (stx mutation-index counter)
+    (syntax-parse stx
+      #:datum-literals [cond if]
+      [(cond [test . body] ...)
+       (define test-stxs (attribute test))
+       (mdo* (def mutated-test-stxs (mutate-in-seq test-stxs
+                                                   mutation-index
+                                                   counter
+                                                   mutate-condition))
+             [return
+              (syntax-parse mutated-test-stxs
+                [[mutated-test ...]
+                 (syntax/loc stx
+                   (cond [mutated-test . body] ...))])])]
+      [(if test then-e else-e)
+       (define cond-form #'(cond [test then-e] [else else-e]))
+       (mdo* (def mutated-cond-form (negate-conditionals cond-form
+                                                         mutation-index
+                                                         counter))
+             [return
+              (syntax-parse mutated-cond-form
+                [(cond [mutated-test _] _)
+                 (syntax/loc stx
+                   (if mutated-test then-e else-e))])])]
+      [else
+       (no-mutation stx mutation-index counter)])))
+
+(define (mutation-guard-if condition mutated-v)
+  (mmap (if condition
+            identity
+            mutation-guard)
+        mutated-v))
+
+(define (make-simple-condition-mutator condition-stx-transform
+                                       name)
+  (λ (stx mutation-index counter)
+    (log-mutation-type name)
     (define new-stx
       (syntax-parse stx
         [{~datum else} stx]
-        [condition
-         (syntax/loc stx
-           (not condition))]))
+        [condition (condition-stx-transform stx)]))
     (define stx-mutated
       (maybe-mutate stx
                     new-stx
                     mutation-index
                     counter))
-    (mmap (if (compound-expr? stx)
-              identity
-              mutation-guard)
-          stx-mutated))
+    ;; Guard conditionals so they don't get considered for mutation beyond these
+    ;; condition mutators. This avoids obvious equivalent mutants, but may miss
+    ;; interesting ones.
+    ;; E.g. (if #t a b) -> (if (not #t) a b) and -> (if #f a b)
+    (mutation-guard-if (compound-expr? stx)
+                       stx-mutated)))
+(define negate-condition
+  (make-simple-condition-mutator (λ (condition)
+                                   (quasisyntax/loc condition
+                                     (not #,condition)))
+                                 "negate-conditional"))
+(define force-condition
+  (make-simple-condition-mutator (λ (condition)
+                                   (syntax/loc condition #t))
+                                 "force-conditional"))
+(define wrap-condition
+  (make-simple-condition-mutator (λ (condition)
+                                   (quasisyntax/loc condition
+                                     (cast #,condition Any)))
+                                 "wrap-conditional"))
 
-  (syntax-parse stx
-    #:datum-literals [cond if]
-    [(cond [test . body] ...)
-     (define test-stxs (attribute test))
-     (mdo* (def mutated-test-stxs (mutate-in-seq test-stxs
-                                                 mutation-index
-                                                 counter
-                                                 negate-condition))
-           [return
-            (syntax-parse mutated-test-stxs
-              [[mutated-test ...]
-               (syntax/loc stx
-                 (cond [mutated-test . body] ...))])])]
-    [(if test then-e else-e)
-     (define cond-form #'(cond [test then-e] [else else-e]))
-     (mdo* (def mutated-cond-form (negate-conditionals cond-form
-                                                       mutation-index
-                                                       counter))
-           [return
-            (syntax-parse mutated-cond-form
-              [(cond [mutated-test _] _)
-               (syntax/loc stx
-                 (if mutated-test then-e else-e))])])]
-    [else
-     (no-mutation stx mutation-index counter)]))
+(define negate-conditionals (make-conditional-test-mutator negate-condition))
+(define force-conditionals (make-conditional-test-mutator force-condition))
+(define wrap-conditionals (make-conditional-test-mutator wrap-condition))
 
 (module+ test
   (test-begin
@@ -332,6 +362,32 @@
                                  [else 33])
                          #'(cond [first 42]
                                  [(not (second?)) => values]
+                                 [else 33])
+                         #'(cond [first 42]
+                                 [(second?) => values]
+                                 [else 33])))
+    (test-mutator* force-conditionals
+                   #'(cond [first 42]
+                           [(second?) => values]
+                           [else 33])
+                   (list #'(cond [#t 42]
+                                 [(second?) => values]
+                                 [else 33])
+                         #'(cond [first 42]
+                                 [#t => values]
+                                 [else 33])
+                         #'(cond [first 42]
+                                 [(second?) => values]
+                                 [else 33])))
+    (test-mutator* wrap-conditionals
+                   #'(cond [first 42]
+                           [(second?) => values]
+                           [else 33])
+                   (list #'(cond [(cast first Any) 42]
+                                 [(second?) => values]
+                                 [else 33])
+                         #'(cond [first 42]
+                                 [(cast (second?) Any) => values]
                                  [else 33])
                          #'(cond [first 42]
                                  [(second?) => values]
