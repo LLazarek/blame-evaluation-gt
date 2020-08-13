@@ -26,6 +26,7 @@
          racket/function
          racket/list
          racket/match
+         racket/set
          syntax/parse
          "logger.rkt"
          "mutate-expr.rkt"
@@ -831,3 +832,104 @@
                          #'b-2
                          #'c-1
                          #'c-2))))
+
+
+
+(define (make-method-call-swap-mutator mod-stx)
+  (define all-methods (method-names-in mod-stx))
+  (combined-id-list-swap-mutator all-methods "method-name-swap"))
+
+(define-syntax-class public-method-def
+  #:attributes [name]
+  #:datum-literals [define/public define/pubment define/public-final]
+  (pattern ({~or define/public define/pubment define/public-final}
+            (header:simple-function-or-value-header _ ...)
+            _ ...)
+           #:with name #'header.name))
+
+(define method-names-in
+  (syntax-parser
+    #:datum-literals [class class*]
+    [({~or class class*}
+      {~seq {~not _:public-method-def} ...
+            def:public-method-def} ...
+      {~not _:public-method-def} ...)
+     (syntax->list #'[def.name ...])]
+    [(inner-es ...)
+     (apply set-union
+            (map method-names-in
+                 (attribute inner-es)))]
+    [else empty]))
+
+(module+ test
+  (test-begin
+    #:name method-names-in
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5) (+ x x)}))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5) (+ x (let ([c (class object% (super-new))])
+                                                          (new c)
+                                                          5))}))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                   (super-new)
+                                                                   (define/public y 42))])
+                                                          (new c)
+                                                          5))}))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                   (super-new)
+                                                                   (define/public (m x) (* 42 x)))])
+                                                          (send (new c) m x)))}))
+                 '(m))
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                   (super-new)
+                                                                   (define/public (m x) (* 42 x))
+                                                                   (define/public (n x) (* 42 x)))])
+                                                          (send (new c) m x)))}))
+                 '(m n))
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                   (super-new)
+                                                                   (define/public (m x) (* 42 x))
+                                                                   (define/private (p) (void))
+                                                                   (define/public (n x) (* 42 x)))])
+                                                          (send (new c) m x)))}))
+                 '(m n)))
+
+  (test-begin
+    #:name make-method-call-swap-mutator
+    (ignore
+     (define method-call-swap-mutator
+       (make-method-call-swap-mutator
+        #'{(define x 5) (+ x (let ([c (class object%
+                                        (super-new)
+                                        (define/public (m x) (* 42 x))
+                                        (define/private (p) (void))
+                                        (define/public (n x) (* 42 x)))])
+                               (send (new c) m x)))})))
+    (test-mutator* method-call-swap-mutator
+                   #'x
+                   (list #'x))
+    (test-mutator* method-call-swap-mutator
+                   #'p
+                   (list #'p))
+    (test-mutator* method-call-swap-mutator
+                   #'m
+                   (list #'n
+                         #'m))
+    (test-mutator* method-call-swap-mutator
+                   #'n
+                   (list #'m
+                         #'n))))
+
