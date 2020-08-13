@@ -446,7 +446,9 @@
            identity
            empty)]))
 
-(define (mutate-benchmark program-stx mutation-index
+(define (mutate-benchmark module-body-stxs
+                          mutation-index
+                          #:program [the-program #f]
                           #:top-level-select
                           [top-level-selector select-type-annotations+define-body]
                           #:expression-select
@@ -457,7 +459,7 @@
   (define mutate-program
     (make-program-mutator mutate-expr
                           top-level-selector))
-  (mutate-program program-stx mutation-index))
+  (mutate-program module-body-stxs mutation-index))
 
 (module+ test
   (define mutate-syntax (syntax-only mutate-benchmark))

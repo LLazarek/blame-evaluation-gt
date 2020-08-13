@@ -27,19 +27,20 @@
 
 (define-logger mutant-runner)
 
-;; Produce the mutated syntax for the module at the given path
-(define (mutate-module module-stx mutation-index)
+(define (mutate-module the-module mutation-index #:in the-program)
   (define mutate-benchmark (load-configured (current-configuration-path)
                                             "mutation"
                                             'mutate-benchmark))
-  (syntax-parse module-stx
+  (syntax-parse (mod-stx the-module)
     #:datum-literals [module]
     [(module name lang {~and mod-body (mod-begin body ...)})
      #:do [(define program-stx #'{body ...})
            (match-define (mutated (mutated-program program-stx/mutated
                                                    mutated-id)
                                   _)
-             (mutate-benchmark program-stx mutation-index))]
+             (mutate-benchmark program-stx
+                               mutation-index
+                               #:program the-program))]
      #:with program/mutated program-stx/mutated
      #:with mutated-mod-stx
      (datum->syntax #'mod-body
@@ -79,7 +80,7 @@
        (#:modules-base-path [base-path (or/c simple-form-path? #f)]
         #:write-modules-to [write-to-dir (or/c path-string? #f)]
         #:on-module-exists [on-module-exists (or/c 'error 'replace)]
-        #:mutator [mutate (syntax? natural? . -> . (values syntax? symbol?))])
+        #:mutator [mutate (mod/c natural? #:in program/c . -> . (values syntax? symbol?))])
        #:pre/desc {base-path write-to-dir}
        (or (not (and write-to-dir
                      (not (unsupplied-arg? write-to-dir))
@@ -128,7 +129,7 @@
       [(and (== module-to-mutate)
             (mod path stx))
        (define-values (mutated-stx mutated-id)
-         (mutate stx mutation-index))
+         (mutate a-mod mutation-index #:in a-program))
        (maybe-write-module! (mod path mutated-stx))
 
        ;; ll: see above...
@@ -276,7 +277,7 @@
         #:modules-base-path [base-path (or/c simple-form-path? #f)]
         #:write-modules-to [write-to-dir (or/c path-string? #f)]
         #:on-module-exists [on-module-exists (or/c 'error 'replace)]
-        #:mutator [mutate (syntax? natural? . -> . (values syntax? symbol?))])
+        #:mutator [mutate (mod/c natural? #:in program/c . -> . (values syntax? symbol?))])
 
        #:pre/desc (base-path write-to-dir)
        (or (not (and write-to-dir (not (unsupplied-arg? write-to-dir))

@@ -31,7 +31,8 @@
         "class:initializer-swap"
         "position-swap"
         "class:add-extra-method"
-        "top-level-id-swap"))
+        "top-level-id-swap"
+        "imported-id-swap"))
 (define mutate-atom (compose-mutators arithmetic-op-swap
                                       boolean-op-swap
                                       class-method-publicity-swap
@@ -39,13 +40,17 @@
                                       data-accessor-swap
                                       replace-constants))
 
-(define (mutate-benchmark program-stx mutation-index
+(define (mutate-benchmark module-body-stxs
+                          mutation-index
+                          #:program [the-program #f]
                           #:top-level-select
                           [top-level-selector select-define-body]
                           #:expression-select
                           [expression-selector select-exprs-as-if-untyped])
   (define replace-ids-with-top-level-defs
-    (make-top-level-id-swap-mutator program-stx))
+    (make-top-level-id-swap-mutator module-body-stxs))
+  (define swap-imported-ids
+    (make-imported-id-swap-mutator module-body-stxs the-program))
   (define mutate-expr
     (make-expr-mutator
      (compose-mutators delete-begin-result-expr
@@ -60,7 +65,7 @@
   (define mutate-program
     (make-program-mutator mutate-expr
                           top-level-selector))
-  (mutate-program program-stx mutation-index))
+  (mutate-program module-body-stxs mutation-index))
 
 (module+ test
   (require racket
@@ -76,10 +81,10 @@
            "../../mutate/top-level-selectors.rkt"
            "../../mutate/expression-selectors.rkt")
 
-  (define (mutate-program stx mutation-index
+  (define (mutate-program module-body-stxs mutation-index
                           #:top-level-select [top-level-selector select-define/contract]
                           #:expression-select [select select-any-expr])
-    (mutate-benchmark stx mutation-index
+    (mutate-benchmark module-body-stxs mutation-index
                       #:top-level-select top-level-selector
                       #:expression-select select))
 

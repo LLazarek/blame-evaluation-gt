@@ -19,17 +19,21 @@
           [rearrange-positional-exprs  mutator/c]
           [add-extra-class-method      mutator/c]
 
-          [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]))
+          [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]
+          [make-imported-id-swap-mutator  (syntax? program/c . -> . mutator/c )]))
 
 (require racket/class
          racket/function
+         racket/list
          racket/match
          syntax/parse
          "logger.rkt"
          "mutate-expr.rkt"
          "mutate-util.rkt"
          "mutated.rkt"
-         "mutator-lib.rkt")
+         "mutator-lib.rkt"
+         "../util/program.rkt"
+         "../util/path-utils.rkt")
 
 (define-id-mutator arithmetic-op-swap
   #:type "arithmetic-op-swap"
@@ -548,27 +552,31 @@
                              (field a))))))
 
 (require syntax/parse/lib/function-header)
-(define (make-top-level-id-swap-mutator program-stx)
-  (define all-top-level-identifiers
-    (top-level-definitions program-stx))
-  (define top-level-id-swap-mutators
-    (for/list ([top-level-id (in-list all-top-level-identifiers)])
-      (define (replace-with-top-level-id stx mutation-index counter)
-        (log-mutation-type "top-level-id-swap")
-        (syntax-parse stx
-          [ref:id
-           #:when (member #'ref all-top-level-identifiers free-identifier=?)
-           (maybe-mutate (attribute ref)
-                         top-level-id
-                         mutation-index
-                         counter)]
-          [else
-           (no-mutation stx mutation-index counter)]))
-      replace-with-top-level-id))
-  (match top-level-id-swap-mutators
+
+(define (id-list-swap-mutators ids name)
+  (for/list ([top-level-id (in-list ids)])
+    (define (replace-with-top-level-id stx mutation-index counter)
+      (log-mutation-type name)
+      (syntax-parse stx
+        [ref:id
+         #:when (member #'ref ids free-identifier=?)
+         (maybe-mutate (attribute ref)
+                       top-level-id
+                       mutation-index
+                       counter)]
+        [else
+         (no-mutation stx mutation-index counter)]))
+    replace-with-top-level-id))
+
+(define (combined-id-list-swap-mutator ids name)
+  (define mutators (id-list-swap-mutators ids name))
+  (match mutators
     ['()  no-mutation]
-    [else (apply compose-mutators
-                 top-level-id-swap-mutators)]))
+    [else (apply compose-mutators mutators)]))
+
+(define (make-top-level-id-swap-mutator mod-stx)
+  (define all-top-level-identifiers (top-level-definitions mod-stx))
+  (combined-id-list-swap-mutator all-top-level-identifiers "top-level-id-swap"))
 
 ;; Analagous to `function-header` but:
 ;; - matches for plain ids as well as function headers
@@ -655,3 +663,171 @@
     (test-mutator* top-level-id-swap-mutator/no-ids
                    #'y
                    (list #'y))))
+
+
+; stx? program/c -> mutator/c
+(define (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
+  (define imported-mods (syntactic-module->imported-module-names mod-top-level-forms-stx))
+  (define imported-ids
+    (flatten (for/list ([mod-name (in-list imported-mods)])
+               (define the-mod (program-mod-with-name mod-name containing-program))
+               (syntactic-module->exported-ids the-mod))))
+  (combined-id-list-swap-mutator imported-ids "imported-id-swap"))
+
+(define-syntax-class require-spec
+  #:description "require spec"
+  #:commit
+  #:datum-literals [only-in except-in prefix-in rename-in for-syntax submod]
+  #:attributes [relative-require-mod-path]
+  [pattern {~or relative-require-mod-path:str _:id}]
+  [pattern ({~or only-in except-in prefix-in rename-in for-syntax submod}
+            inner:require-spec _ ...)
+           #:with relative-require-mod-path #'inner.relative-require-mod-path])
+
+(define (syntactic-module->imported-module-names top-level-forms)
+  (syntax-parse top-level-forms
+    #:datum-literals [require]
+    [{{~seq {~not (require _ ...)} ...
+            (require spec:require-spec ...)} ...
+      {~not (require _ ...)} ...}
+     (syntax->datum #'[{~? spec.relative-require-mod-path} ... ...])]))
+
+(define (program-mod-with-name mod-name a-program)
+  (define all-mods (cons (program-main a-program) (program-others a-program)))
+  (findf (compose1 (path-ends-with mod-name) mod-path)
+         all-mods))
+
+(define-syntax-class provide-spec
+  #:description "provide spec"
+  #:commit
+  #:datum-literals [rename-out]
+  #:attributes [[provided-ids 1]]
+  [pattern provided-id:id
+           #:with [provided-ids ...] #'[provided-id]]
+  [pattern (rename-out [_ provided-ids] ...)]
+  [pattern _
+           #:with [provided-ids ...] #'[]])
+
+(define (syntactic-module->exported-ids a-mod)
+  (syntax-parse (mod-stx a-mod)
+    #:datum-literals [provide]
+    [(module _ _
+       (#%module-begin
+        {~seq {~not (provide _ ...)} ...
+              (provide spec:provide-spec ...)} ...
+        {~not (provide _ ...)} ...))
+     (syntax->list #'[spec.provided-ids ... ... ...])]))
+
+(module+ test
+  (test-begin
+    #:name syntactic-module->imported-module-names
+    (test-equal? (syntactic-module->imported-module-names
+                  #'{(provide x)
+                     (require "a.rkt")
+                     (define z 42)
+                     (require "b.rkt" (only-in "c.rkt" c))
+                     (define x y)
+                     (+ 2 2)})
+                 '("a.rkt" "b.rkt" "c.rkt"))
+    (test-equal? (syntactic-module->imported-module-names
+                  #'[(provide x)
+                     (require racket/match
+                              (only-in "c.rkt" c)
+                              syntax/parse)
+                     (define z 42)
+                     (main)])
+                 '("c.rkt"))
+    (test-equal? (syntactic-module->imported-module-names
+                  #'{(+ 2 2)})
+                 '()))
+
+  (test-begin
+    #:name syntactic-module->exported-ids
+    (test-equal? (map
+                  syntax->datum
+                  (syntactic-module->exported-ids
+                   (mod "a.rkt"
+                        #'(module a racket
+                            (#%module-begin
+                             (provide x)
+                             (require "a.rkt")
+                             (define z 42)
+                             (provide foobar)
+                             (define x y)
+                             (+ 2 2))))))
+                 '(x foobar))
+    (test-equal? (map
+                  syntax->datum
+                  (syntactic-module->exported-ids
+                   (mod "a.rkt"
+                        #'(module a racket
+                            (#%module-begin
+                             (provide (rename-out [z a] [x foo]))
+                             (require racket/match
+                                      (only-in "c.rkt" c)
+                                      syntax/parse)
+                             (define z 42)
+                             (main))))))
+                 '(a foo))
+    (test-equal? (map
+                  syntax->datum
+                  (syntactic-module->exported-ids
+                   (mod "a.rkt"
+                        #'(module a racket
+                            (#%module-begin
+                             (+ 2 2))))))
+                 '()))
+
+  (test-begin
+    #:name make-imported-id-swap-mutator
+    (ignore
+     (define imported-id-swap-mutator
+       (make-imported-id-swap-mutator
+        #'{(require foobar
+                    "b.rkt"
+                    racket/match
+                    "c.rkt"
+                    "a.rkt")
+           (define (f x) (c-1 x))
+           (+ 2 2)
+           (define (g a b) (/ (f c-2) b-2))}
+        (program (mod "main.rkt"
+                      #'(module main racket
+                          (#%module-begin
+                           (provide main-1)
+                           (main-1))))
+                 (list (mod "a.rkt"
+                            #'(module main racket
+                                (#%module-begin
+                                 42)))
+                       (mod "b.rkt"
+                            #'(module main racket
+                                (#%module-begin
+                                 (provide b-1 b-2)
+                                 42)))
+                       (mod "c.rkt"
+                            #'(module main racket
+                                (#%module-begin
+                                 (provide c-1 c-2)
+                                 42))))))))
+    (test-mutator* imported-id-swap-mutator
+                   #'x
+                   (list #'x))
+    (test-mutator* imported-id-swap-mutator
+                   #'f
+                   (list #'f))
+    (test-mutator* imported-id-swap-mutator
+                   #'a-1
+                   (list #'a-1))
+    (test-mutator* imported-id-swap-mutator
+                   #'b-1
+                   (list #'b-2
+                         #'c-1
+                         #'c-2
+                         #'b-1))
+    (test-mutator* imported-id-swap-mutator
+                   #'c-2
+                   (list #'b-1
+                         #'b-2
+                         #'c-1
+                         #'c-2))))
