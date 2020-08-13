@@ -18,7 +18,7 @@
          "../util/ctc-utils.rkt"
          "../configurations/config.rkt"
          "sandbox-runner.rkt"
-         "program.rkt"
+         "../util/program.rkt"
          "instrumented-runner.rkt"
          "error-extractors/extract-type-error-source.rkt"
          "error-extractors/extract-runtime-error-location.rkt"

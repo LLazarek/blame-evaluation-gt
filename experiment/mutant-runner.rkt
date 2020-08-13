@@ -8,8 +8,8 @@
          racket/port
          racket/format
          "../runner/mutation-runner.rkt"
-         "../runner/program.rkt"
          "../runner/unify-program.rkt"
+         "../util/program.rkt"
          "../configurables/configurables.rkt")
 
 (define (fail fmt-str . fmt-args)

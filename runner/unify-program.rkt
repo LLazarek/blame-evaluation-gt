@@ -1,6 +1,6 @@
 #lang at-exp racket
 
-(require "program.rkt"
+(require "../util/program.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt")
 

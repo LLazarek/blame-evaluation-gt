@@ -4,7 +4,7 @@
 
 (require racket/contract/base
          racket/math
-         "../../runner/program.rkt"
+         "../../util/program.rkt"
          "../../util/path-utils.rkt")
 
 (define benchmark-runner/c

@@ -8,7 +8,7 @@
          syntax/parse
          (prefix-in db: "../../db/db.rkt")
          "../../db/util.rkt"
-         "../../runner/program.rkt"
+         "../../util/program.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/read-module.rkt"
          "../../util/path-utils.rkt"

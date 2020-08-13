@@ -1,8 +1,8 @@
 #lang at-exp racket
 
 (require "../runner/mutation-runner.rkt"
-         "../runner/program.rkt"
          "../runner/unify-program.rkt"
+         "../util/program.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "../util/optional-contracts.rkt"

@@ -6,7 +6,7 @@
 (require racket/contract/base
          racket/contract/combinator
          "../../util/path-utils.rkt"
-         "../program.rkt"
+         "../../util/program.rkt"
          "../../configurations/config.rkt")
 
 (define blamed-modules/c (listof (or/c module-name?

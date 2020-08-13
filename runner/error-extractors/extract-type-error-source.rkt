@@ -6,7 +6,7 @@
            (blamed-location-extractor/c-for exn:fail:syntax?)]))
 
 (require "../../util/path-utils.rkt"
-         "../program.rkt"
+         "../../util/program.rkt"
          "blamed-location-extractor.rkt"
          syntax/location)
 

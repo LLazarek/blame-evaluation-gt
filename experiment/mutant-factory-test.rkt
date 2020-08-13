@@ -6,10 +6,10 @@
          "blame-trail-data.rkt"
          (submod "mutant-factory.rkt" test)
          "../runner/mutation-runner.rkt"
-         "../runner/program.rkt"
          "../runner/unify-program.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
+         "../util/program.rkt"
          "../util/path-utils.rkt"
          "../process-q/interface.rkt"
          "../configurables/configurables.rkt")

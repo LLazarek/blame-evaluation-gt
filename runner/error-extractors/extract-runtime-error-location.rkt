@@ -7,7 +7,7 @@
 
 (require errortrace/errortrace-key
          "../../util/path-utils.rkt"
-         "../program.rkt"
+         "../../util/program.rkt"
          "blamed-location-extractor.rkt")
 
 (define (make-extract-runtime-error-location the-program

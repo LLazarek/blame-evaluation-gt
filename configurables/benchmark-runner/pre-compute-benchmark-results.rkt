@@ -4,7 +4,7 @@
          (prefix-in db: "../../db/db.rkt")
          "../configurables.rkt"
          "../../configurations/configure-benchmark.rkt"
-         "../../runner/program.rkt"
+         "../../util/program.rkt"
          "../../runner/mutation-runner.rkt"
          "../../util/mutant-util.rkt"
          "../../util/path-utils.rkt")

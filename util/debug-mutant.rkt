@@ -4,7 +4,7 @@
 
 (require "../runner/mutation-runner.rkt"
          (submod "../runner/mutation-runner.rkt" debug)
-         "../runner/program.rkt"
+         "program.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
          "../runner/unify-program.rkt"

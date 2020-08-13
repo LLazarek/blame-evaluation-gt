@@ -11,7 +11,7 @@
 (require "../../util/path-utils.rkt"
          "../../runner/error-extractors/blamed-location-extractor.rkt"
          "../../runner/error-extractors/extract-runtime-error-location.rkt"
-         "../../runner/program.rkt"
+         "../../util/program.rkt"
          racket/random)
 
 (define (make-extract-blamed the-program

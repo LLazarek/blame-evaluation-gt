@@ -11,7 +11,7 @@
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
          "modgraph.rkt"
-         "program.rkt"
+         "../util/program.rkt"
          "../util/path-utils.rkt"
          "../util/optional-contracts.rkt")
 
