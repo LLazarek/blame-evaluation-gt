@@ -192,21 +192,43 @@
 
 
 (define (delete-begin-result-expr stx mutation-index counter)
-  (log-mutation-type "begin-result-deletion")
+  (define (delete-result-expr stx mutation-index counter)
+    (log-mutation-type "begin-result-deletion")
+    (syntax-parse stx
+      [[e ...+ result]
+       (maybe-mutate stx
+                     (syntax/loc stx [e ...])
+                     mutation-index
+                     counter)]
+      [else
+       (no-mutation stx mutation-index counter)]))
   (syntax-parse stx
-    #:datum-literals [begin begin0]
-    [(begin es ...+ e-result)
-     (maybe-mutate stx
-                   (syntax/loc stx
-                     (begin es ...))
-                   mutation-index
-                   counter)]
+    #:datum-literals [λ lambda begin begin0 cond]
+    [({~and {~seq head ...}
+            {~or* begin
+                  {~seq {~or* λ lambda} formals}}}
+      es ...+ e-result)
+     (mdo* (def mutated-es (delete-result-expr (syntax/loc stx [es ... e-result])
+                                               mutation-index
+                                               counter))
+           [return (quasisyntax/loc stx
+                     (head ... #,@mutated-es))])]
     [(begin0 e-result es ...+)
-     (maybe-mutate stx
-                   (syntax/loc stx
-                     (begin0 es ...))
-                   mutation-index
-                   counter)]
+     (mdo* (def mutated-es (delete-result-expr (quasisyntax/loc stx
+                                                 [#,@(reverse (attribute es)) e-result])
+                                               mutation-index
+                                               counter))
+           [return (quasisyntax/loc stx
+                     (begin0 #,@(reverse (syntax->list mutated-es))))])]
+    [(cond [test e ...] ...)
+     (mdo* (def mutated-case-bodies (mutate-in-seq (syntax->list #'[[e ...] ...])
+                                                   mutation-index
+                                                   counter
+                                                   delete-result-expr))
+           [return (syntax-parse mutated-case-bodies
+                     [[[mutated-e ...] ...]
+                      (syntax/loc stx
+                        (cond [test mutated-e ...] ...))])])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -220,7 +242,19 @@
     (test-mutator* delete-begin-result-expr
                    #'(begin0 1 2 3)
                    (list #'(begin0 2 3)
-                         #'(begin0 1 2 3)))))
+                         #'(begin0 1 2 3)))
+    (test-mutator* delete-begin-result-expr
+                   #'(λ _ (displayln 'hi) 42)
+                   (list #'(λ _ (displayln 'hi))
+                         #'(λ _ (displayln 'hi) 42)))
+    (test-mutator* delete-begin-result-expr
+                   #'(λ _ 42)
+                   (list #'(λ _ 42)))
+    (test-mutator* delete-begin-result-expr
+                   #'(cond [#t 42] ['true (launch-missiles!) -42] [else (displayln 'bye) 0])
+                   (list #'(cond [#t 42] ['true (launch-missiles!)] [else (displayln 'bye) 0])
+                         #'(cond [#t 42] ['true (launch-missiles!) -42] [else (displayln 'bye)])
+                         #'(cond [#t 42] ['true (launch-missiles!) -42] [else (displayln 'bye) 0])))))
 
 (define (negate-conditionals stx mutation-index counter)
   (define (negate-condition stx mutation-index counter)

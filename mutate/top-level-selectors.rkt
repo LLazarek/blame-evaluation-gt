@@ -111,10 +111,20 @@
     [({~and define def} id/sig
                         {~optional {~seq : type}}
                         body ...)
-     (define body-stxs (syntax-e (syntax/loc stx (body ...))))
+     (define function? (and (syntax->list #'id/sig) #t))
+     (define body-stxs
+       (if function?
+           (list (syntax/loc stx (begin body ...)))
+           (attribute body)))
      (define (reconstruct-definition body-stxs/mutated)
+       (define body-stxs/no-begin
+         (if function?
+             (syntax-parse body-stxs/mutated
+               [[(begin mutated-body-e ...)]
+                (attribute mutated-body-e)])
+             body-stxs/mutated))
        (quasisyntax/loc stx
-         (def id/sig {~? {~@ : type}} #,@body-stxs/mutated)))
+         (def id/sig {~? {~@ : type}} #,@body-stxs/no-begin)))
      (values body-stxs
              (leftmost-identifier-in #'id/sig)
              reconstruct-definition)]
@@ -149,7 +159,14 @@
                    'x
                    (λ (reconstruct)
                      (test-stx=? (reconstruct (list #'42))
-                                 #'(define x 42))))))
+                                 #'(define x 42))))
+    (test-selector select-define-body
+                   #'(define (f x) 5)
+                   (list #'(begin 5))
+                   'f
+                   (λ (reconstruct)
+                     (test-stx=? (reconstruct (list #'(begin 42)))
+                                 #'(define (f x) 42))))))
 
 (define (select-type-annotations+define-body stx)
   (syntax-parse stx
