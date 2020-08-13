@@ -23,7 +23,7 @@
         "boolean-op-swap"
         "class:publicity"
         "class:super-new"
-        "data-accessor-swap"
+        "nested-list-construction-swap"
         "constant-swap"
         "begin-result-deletion"
         "negate-conditional"
@@ -37,7 +37,8 @@
                                       boolean-op-swap
                                       class-method-publicity-swap
                                       delete-super-new
-                                      data-accessor-swap
+                                      ; data-accessor-swap left off
+                                      nested-list-construction-swap
                                       replace-constants))
 
 (define (mutate-benchmark module-body-stxs
@@ -51,6 +52,8 @@
     (make-top-level-id-swap-mutator module-body-stxs))
   (define swap-imported-ids
     (make-imported-id-swap-mutator module-body-stxs the-program))
+  (define swap-class-method-ids
+    (make-method-call-swap-mutator module-body-stxs))
   (define mutate-expr
     (make-expr-mutator
      (compose-mutators delete-begin-result-expr
@@ -60,6 +63,8 @@
                        rearrange-positional-exprs
                        add-extra-class-method
                        replace-ids-with-top-level-defs
+                       swap-imported-ids
+                       swap-class-method-ids
                        mutate-atom)
      #:select expression-selector))
   (define mutate-program

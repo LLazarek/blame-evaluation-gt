@@ -9,6 +9,7 @@
           [class-method-publicity-swap    mutator/c]
           [delete-super-new               mutator/c]
           [data-accessor-swap             mutator/c]
+          [nested-list-construction-swap  mutator/c]
 
           [replace-constants              mutator/c]
 
@@ -18,11 +19,10 @@
           [swap-class-initializers        mutator/c]
           [rearrange-positional-exprs     mutator/c]
           [add-extra-class-method         mutator/c]
-          [make-method-call-swap-mutator  mutator/c]
-          [nested-list-construction-swap  mutator/c]
 
           [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]
-          [make-imported-id-swap-mutator  (syntax? program/c . -> . mutator/c )]))
+          [make-imported-id-swap-mutator  (syntax? program/c . -> . mutator/c )]
+          [make-method-call-swap-mutator  (syntax? . -> . mutator/c)]))
 
 (require racket/class
          racket/function
