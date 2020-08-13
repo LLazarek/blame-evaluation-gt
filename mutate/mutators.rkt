@@ -415,6 +415,23 @@
                (quasisyntax/loc stx
                  (field-type no-init-field ...
                              [field-id other-field-stuff ... new-init-value] ...))])])]
+    [({~and {~datum new} new}
+      class-e
+      {~and positional-initializer {~not (_ ...)}} ...
+      [field-id:id other-field-stuff ... initial-value:expr]
+      ...)
+     (define init-value-stxs (attribute initial-value))
+     (mdo* (def rearranged-init-value-stxs
+             (rearrange-in-seq init-value-stxs
+                               mutation-index
+                               counter))
+           [return
+            (syntax-parse rearranged-init-value-stxs
+              [[new-init-value ...]
+               (quasisyntax/loc stx
+                 (new class-e
+                      positional-initializer ...
+                      [field-id other-field-stuff ... new-init-value] ...))])])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -457,7 +474,19 @@
                               [c 3]
                               [d : T1 4]
                               [e 5])))
-      @~a{Field: @field-name}))))
+      @~a{Field: @field-name}))
+
+    (test-mutator* swap-class-initializers
+                   #'(new my-class 42 [a 5] [b "hi"])
+                   (list #'(new my-class 42 [a "hi"] [b 5])
+                         #'(new my-class 42 [a 5] [b "hi"])))
+    (test-mutator* swap-class-initializers
+                   #'(new my-class 42 33 [a 5] [b "hi"] [c 'not-this-one])
+                   (list #'(new my-class 42 33 [a "hi"] [b 5] [c 'not-this-one])
+                         #'(new my-class 42 33 [a 5] [b "hi"] [c 'not-this-one])))
+    (test-mutator* swap-class-initializers
+                   #'(new my-class 42 33 [a 5])
+                   (list #'(new my-class 42 33 [a 5])))))
 
 (define (rearrange-positional-exprs stx mutation-index counter)
   (log-mutation-type "position-swap")
