@@ -47,3 +47,38 @@ many years has driven home this lesson, but fortunately, it has also shown that
 the types are in most cases reasonably canonical.  We therefore conjecture that
 a rational programmer would in most cases come up with an equivalent type
 assignment for trail extension as our experimental setup describes.
+
+
+\subsection{Threat: Is our Transient Correct?}
+%% purpose: talk about transient-blame implementation .... what did we do,
+%%  how did we test, what threats remain?
+%%
+%% the benchmark timeouts look like a threat, but this section shows that
+%%  we've looked carefully at those
+
+
+An apparent flaw in our transient is the high cost of blame.
+Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
+ worst-case of 5.4x on fully-typed benchmarks in Reticulated,
+ our configurations frequently exceed a 10 minute timeout with transient blame.
+Unfortunately, our high cost is closer to the truth;
+ Reticulated has two advantages that give low overhead in the prior work.
+First, Reticulated's type inference often assigns the dynamic type to local
+ variables in "fully typed" code.
+This flexible type gives a programmer fewer static errors and less-precise
+ blame,; but it also makes the benchmarks run faster.
+Second, \citet{vss-popl-2017} use relatively small benchmarks.
+Four have since been retired from the official Python benchmark suite
+ because they are too small, unrealistic, and unstable.
+On larger programs, Reticulated suffers from high overhead.
+For example, a Reticulated version of our \texttt{sieve} benchmark runs in
+ ~40 seconds without blame, and with blame times out after 10 minutes.
+
+%% NOTE: Vitousek's benchmarks are from the Python "pyperformance" suite.
+%%   The version notes in the docs talk about retiring benchmarks, but
+%%   you can also look at the current codebase and see what names from POPL'17
+%%   are missing: callsimple, callmethod, callmethodslots, & pystone
+%% <https://github.com/python/pyperformance/tree/master/pyperformance/benchmarks>
+
+
+
