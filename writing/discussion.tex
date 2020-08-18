@@ -62,14 +62,18 @@ Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
  worst-case of 5.4x on fully-typed benchmarks in Reticulated,
  our configurations frequently exceed a 10 minute timeout with transient blame.
 Unfortunately, our high cost is closer to the truth;
- Reticulated has two advantages that give low overhead in the prior work.
-First, Reticulated's type inference often assigns the dynamic type to local
- variables in "fully typed" code.
-This flexible type gives a programmer fewer static errors and less-precise
- blame,; but it also makes the benchmarks run faster.
-Second, \citet{vss-popl-2017} use relatively small benchmarks.
+ there are at least three broad issues that skew the earlier results.
+First, the 2017 implementation of Reticulated fails to insert certain
+ soundness checks\footnote{Missing check: \url{https://github.com/mvitousek/reticulated/issues/36}}
+ and blame-map updates\footnote{Missing cast: \url{https://github.com/mvitousek/reticulated/issues/43}}
+ from the paper.
+Second, Reticulated's type checker assigns the dynamic type to local
+ variables in the "fully typed" benchmarks---often because the type system
+ cannot articulate a more precise type.
+Code that ends up with the dynamic type has fewer constraints to check at run-time.
+Third, \citet{vss-popl-2017} use relatively small benchmarks.
 Four have since been retired from the official Python benchmark suite
- because they are too small, unrealistic, and unstable.
+ because they are too small, unrealistic, and unstable.\footnote{Release notes: \url{https://pyperformance.readthedocs.io/changelog.html}}
 On larger programs, Reticulated suffers from high overhead.
 For example, a Reticulated version of our \texttt{sieve} benchmark runs in
  ~40 seconds without blame, and with blame times out after 10 minutes.
