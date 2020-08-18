@@ -127,27 +127,45 @@
                  (hash)))
   (process-Q-set-data q (update (process-Q-get-data q))))
 
+(define multiple-blamed-mutants?
+  (box #f))
 (define (extract-mutation-type-and-result f max-config)
   (define trimmed-output
     (system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f}))
   (define output-regexp
     (pregexp @~a{
-                 mutate: type: (\S+)
-                 mutate: Mutating.+
-                 #s\(run-status "[^"]+" \d+ \S+ (\S+)
-@; close "{
+                 (?m:@;
+                 mutate: type: (\S+)$
+                 mutate: Mutating.+$
+                 (.+
+                 )*@;
+                 (#s\(run-status.+)$@;
+                 )
            }))
   #;(displayln (list output-regexp
-                     (file->string f)
-                     (regexp-match output-regexp
-                                   (file->string f))))
+                   (file->string f)
+                   (regexp-match output-regexp
+                                 (file->string f))))
   (match trimmed-output
     [(regexp output-regexp
-             (list _ mutation-type outcome))
-     (raise-user-error 'analyze-mutation
-                       "lltodo: This needs to be modified to check if the type error blames a component in the original program. It can do that by checking if one of the blamed components is a key in the config. Without doing that, we can get infinite loops in mutant-factory because a mutant that type errors but only ever blames library code has no valid blame trail roots.")
-     (define type-error? (string=? outcome "type-error"))
-     (values type-error? mutation-type)]
+             (list _ mutation-type _ rs-string))
+     (define the-run-status (with-input-from-string rs-string read))
+     (define type-error? (equal? (run-status-outcome the-run-status)
+                                 'type-error))
+     (define blamed-is-in-program?
+       (match (run-status-blamed the-run-status)
+         [(list blamed)
+          (and (member blamed (hash-keys max-config)) #t)]
+         [else
+          #:when type-error?
+          (log-mutation-analysis-warning
+           @~a{Found type error with non-single blamed: @~v[the-run-status]})
+          (set-box! multiple-blamed-mutants? #t)
+          #f]
+         [else
+          #f]))
+     (values (and type-error? blamed-is-in-program?)
+             mutation-type)]
     [other-contents
      (raise-user-error @~a{
                            Unable to match against file contents:
@@ -215,6 +233,11 @@
                                 #:process-limit (process-limit)
                                 #:log-progress log-progress!
                                 #:resume-cache cached-results-for)
- (finalize-log!))
+ (finalize-log!)
+ (log-mutation-analysis-info
+  "Mutation analysis complete.")
+ (when (unbox multiple-blamed-mutants?)
+   (log-mutation-analysis-warning
+    "But found mutants with type errors blaming not a single location.")))
 
 (module test racket/base)
