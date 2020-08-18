@@ -46,8 +46,7 @@
                            (~a mod-name-sym ".rkt")]
                           [else #f]))]
                       #:when ctx-mod-path
-                      [mod (in-list (list* (program-main the-program)
-                                           (program-others the-program)))]
+                      [mod (in-list (program->mods the-program))]
                       #:when (equal? (file-name-string-from-path (mod-path mod))
                                      (file-name-string-from-path ctx-mod-path)))
            (file-name-string-from-path ctx-mod-path))]))

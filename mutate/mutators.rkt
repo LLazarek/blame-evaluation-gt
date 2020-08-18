@@ -15,16 +15,16 @@
 
           [delete-begin-result-expr       mutator/c]
           [negate-conditionals            mutator/c]
-          [force-conditionals            mutator/c]
-          [wrap-conditionals            mutator/c]
+          [force-conditionals             mutator/c]
+          [wrap-conditionals              mutator/c]
           [replace-class-parent           mutator/c]
           [swap-class-initializers        mutator/c]
           [rearrange-positional-exprs     mutator/c]
           [add-extra-class-method         mutator/c]
 
-          [make-top-level-id-swap-mutator (syntax? . -> . mutator/c)]
-          [make-imported-id-swap-mutator  (syntax? program/c . -> . mutator/c )]
-          [make-method-call-swap-mutator  (syntax? . -> . mutator/c)]))
+          [make-top-level-id-swap-mutator (dependent-mutator/c syntax? program/c)]
+          [make-imported-id-swap-mutator  (dependent-mutator/c syntax? program/c)]
+          [make-method-id-swap-mutator    (dependent-mutator/c syntax? program/c)]))
 
 (require racket/class
          racket/function
@@ -204,9 +204,10 @@
                          1))))
 
 
-(define (delete-begin-result-expr stx mutation-index counter)
+(define-mutator (delete-begin-result-expr stx mutation-index counter)
+  #:type [the-type "begin-result-deletion"]
   (define (delete-result-expr stx mutation-index counter)
-    (log-mutation-type "begin-result-deletion")
+    (log-mutation-type the-type)
     (syntax-parse stx
       [[e ...+ result]
        (maybe-mutate stx
@@ -271,7 +272,7 @@
 
 
 (define (make-conditional-test-mutator mutate-condition)
-  (λ (stx mutation-index counter)
+  (define-mutator (m stx mutation-index counter) #:type [type (mutator-type mutate-condition)]
     (syntax-parse stx
       #:datum-literals [cond if]
       [(cond [test . body] ...)
@@ -287,16 +288,17 @@
                    (cond [mutated-test . body] ...))])])]
       [(if test then-e else-e)
        (define cond-form #'(cond [test then-e] [else else-e]))
-       (mdo* (def mutated-cond-form (negate-conditionals cond-form
-                                                         mutation-index
-                                                         counter))
+       (mdo* (def mutated-cond-form (m cond-form
+                                       mutation-index
+                                       counter))
              [return
               (syntax-parse mutated-cond-form
                 [(cond [mutated-test _] _)
                  (syntax/loc stx
                    (if mutated-test then-e else-e))])])]
       [else
-       (no-mutation stx mutation-index counter)])))
+       (no-mutation stx mutation-index counter)]))
+  m)
 
 (define (mutation-guard-if condition mutated-v)
   (mmap (if condition
@@ -305,9 +307,9 @@
         mutated-v))
 
 (define (make-simple-condition-mutator condition-stx-transform
-                                       name)
-  (λ (stx mutation-index counter)
-    (log-mutation-type name)
+                                       type)
+  (define-mutator (m stx mutation-index counter) #:type [the-type type]
+    (log-mutation-type the-type)
     (define new-stx
       (syntax-parse stx
         [{~datum else} stx]
@@ -322,24 +324,27 @@
     ;; interesting ones.
     ;; E.g. (if #t a b) -> (if (not #t) a b) and -> (if #f a b)
     (mutation-guard-if (compound-expr? stx)
-                       stx-mutated)))
+                       stx-mutated))
+  m)
+
 (define negate-condition
   (make-simple-condition-mutator (λ (condition)
                                    (quasisyntax/loc condition
                                      (not #,condition)))
                                  "negate-conditional"))
+(define negate-conditionals (make-conditional-test-mutator negate-condition))
+
 (define force-condition
   (make-simple-condition-mutator (λ (condition)
                                    (syntax/loc condition #t))
                                  "force-conditional"))
+(define force-conditionals (make-conditional-test-mutator force-condition))
+
 (define wrap-condition
   (make-simple-condition-mutator (λ (condition)
                                    (quasisyntax/loc condition
                                      (cast #,condition Any)))
                                  "wrap-conditional"))
-
-(define negate-conditionals (make-conditional-test-mutator negate-condition))
-(define force-conditionals (make-conditional-test-mutator force-condition))
 (define wrap-conditionals (make-conditional-test-mutator wrap-condition))
 
 (module+ test
@@ -392,6 +397,10 @@
                          #'(cond [first 42]
                                  [(second?) => values]
                                  [else 33])))
+    (test-mutator* wrap-conditionals
+                   #'(if (natural? x) (* 2 x) #f)
+                   (list #'(if (cast (natural? x) Any) (* 2 x) #f)
+                         #'(if (natural? x) (* 2 x) #f)))
 
     (for/and/test
      ([cond-expr (in-list (list #'#t #'(+ 2 2)))]
@@ -419,8 +428,8 @@
                 "not guarded when it should be"
                 "guarded when it shouldn't be")}]))))
 
-(define (replace-class-parent stx mutation-index counter)
-  (log-mutation-type "class:parent-swap")
+(define-mutator (replace-class-parent stx mutation-index counter) #:type [type "class:parent-swap"]
+  (log-mutation-type type)
   (syntax-parse stx
     [(~or ({~and {~datum class}  class-form} superclass:expr . body)
           ({~and {~datum class*} class-form} superclass:expr
@@ -455,8 +464,9 @@
                              (field a)
                              (define/public (foo x) x))))))
 
-(define (swap-class-initializers stx mutation-index counter)
-  (log-mutation-type "class:initializer-swap")
+(define-mutator (swap-class-initializers stx mutation-index counter)
+  #:type [type "class:initializer-swap"]
+  (log-mutation-type type)
   (syntax-parse stx
     [({~and {~or {~datum init-field}
                  {~datum field}}
@@ -477,7 +487,7 @@
                (quasisyntax/loc stx
                  (field-type no-init-field ...
                              [field-id other-field-stuff ... new-init-value] ...))])])]
-    [({~and {~datum new} new}
+    [({~and {~or {~datum new} {~datum instantiate}} instantiator}
       class-e
       {~and positional-initializer {~not (_ ...)}} ...
       [field-id:id other-field-stuff ... initial-value:expr]
@@ -491,7 +501,7 @@
             (syntax-parse rearranged-init-value-stxs
               [[new-init-value ...]
                (quasisyntax/loc stx
-                 (new class-e
+                 (instantiator class-e
                       positional-initializer ...
                       [field-id other-field-stuff ... new-init-value] ...))])])]
     [else
@@ -550,8 +560,8 @@
                    #'(new my-class 42 33 [a 5])
                    (list #'(new my-class 42 33 [a 5])))))
 
-(define (rearrange-positional-exprs stx mutation-index counter)
-  (log-mutation-type "position-swap")
+(define-mutator (rearrange-positional-exprs stx mutation-index counter) #:type [type "position-swap"]
+  (log-mutation-type type)
   (syntax-parse stx
     [({~and head {~not _:special-form}} e ...)
      (define e-stxs (attribute e))
@@ -610,8 +620,8 @@
                    (list #'(a-function c b d)
                          #'(a-function b c d)))))
 
-(define (add-extra-class-method stx mutation-index counter)
-  (log-mutation-type "class:add-extra-method")
+(define-mutator (add-extra-class-method stx mutation-index counter) #:type [type "class:add-extra-method"]
+  (log-mutation-type type)
   (syntax-parse stx
     [(~or ({~and {~datum class}  class-form} superclass:expr . body)
           ({~and {~datum class*} class-form} superclass:expr
@@ -666,9 +676,11 @@
     ['()  no-mutation]
     [else (apply compose-mutators mutators)]))
 
-(define (make-top-level-id-swap-mutator mod-stx)
+(define-dependent-mutator (make-top-level-id-swap-mutator mod-stx containing-program)
+  #:type [type "top-level-id-swap"]
   (define all-top-level-identifiers (top-level-definitions mod-stx))
-  (combined-id-list-swap-mutator all-top-level-identifiers "top-level-id-swap"))
+  (mutator (combined-id-list-swap-mutator all-top-level-identifiers type)
+           type))
 
 ;; Analagous to `function-header` but:
 ;; - matches for plain ids as well as function headers
@@ -728,7 +740,8 @@
         #'{(require foobar)
            (define (f x) x)
            (+ 2 2)
-           (define (g a b) (/ (f a) b))})))
+           (define (g a b) (/ (f a) b))}
+        #f)))
     (test-mutator* top-level-id-swap-mutator
                    #'x
                    (list #'x))
@@ -748,7 +761,8 @@
      (define top-level-id-swap-mutator/no-ids
        (make-top-level-id-swap-mutator
         #'{(require foobar)
-           (+ 2 y)})))
+           (+ 2 y)}
+        #f)))
     (test-mutator* top-level-id-swap-mutator/no-ids
                    #'x
                    (list #'x))
@@ -758,13 +772,16 @@
 
 
 ; stx? program/c -> mutator/c
-(define (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
+(define-dependent-mutator (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
+  #:type [type "imported-id-swap"]
   (define imported-mods (syntactic-module->imported-module-names mod-top-level-forms-stx))
   (define imported-ids
-    (flatten (for/list ([mod-name (in-list imported-mods)])
-               (define the-mod (program-mod-with-name mod-name containing-program))
+    (flatten (for*/list ([mod-name (in-list imported-mods)]
+                         [the-mod (in-value (program-mod-with-name mod-name containing-program))]
+                         #:when the-mod)
                (syntactic-module->exported-ids the-mod))))
-  (combined-id-list-swap-mutator imported-ids "imported-id-swap"))
+  (mutator (combined-id-list-swap-mutator imported-ids type)
+           type))
 
 (define-syntax-class require-spec
   #:description "require spec"
@@ -774,7 +791,7 @@
   [pattern {~or relative-require-mod-path:str _:id}]
   [pattern ({~or only-in except-in prefix-in rename-in for-syntax submod}
             inner:require-spec _ ...)
-           #:with relative-require-mod-path #'inner.relative-require-mod-path])
+           #:with [{~optional relative-require-mod-path}] #'[{~? inner.relative-require-mod-path}]])
 
 (define (syntactic-module->imported-module-names top-level-forms)
   (syntax-parse top-level-forms
@@ -785,9 +802,8 @@
      (syntax->datum #'[{~? spec.relative-require-mod-path} ... ...])]))
 
 (define (program-mod-with-name mod-name a-program)
-  (define all-mods (cons (program-main a-program) (program-others a-program)))
   (findf (compose1 (path-ends-with mod-name) mod-path)
-         all-mods))
+         (program->mods a-program)))
 
 (define-syntax-class provide-spec
   #:description "provide spec"
@@ -926,9 +942,11 @@
 
 
 
-(define (make-method-call-swap-mutator mod-stx)
+(define-dependent-mutator (make-method-id-swap-mutator mod-stx containing-program)
+  #:type [type "method-id-swap"]
   (define all-methods (method-names-in mod-stx))
-  (combined-id-list-swap-mutator all-methods "method-name-swap"))
+  (mutator (combined-id-list-swap-mutator all-methods type)
+           type))
 
 (define-syntax-class public-method-def
   #:attributes [name]
@@ -947,9 +965,10 @@
       {~not _:public-method-def} ...)
      (syntax->list #'[def.name ...])]
     [(inner-es ...)
-     (apply set-union
-            (map method-names-in
-                 (attribute inner-es)))]
+     (remove-duplicates
+      (flatten
+       (map method-names-in
+            (attribute inner-es))))]
     [else empty]))
 
 (module+ test
@@ -996,19 +1015,24 @@
                                                                    (define/private (p) (void))
                                                                    (define/public (n x) (* 42 x)))])
                                                           (send (new c) m x)))}))
-                 '(m n)))
+                 '(m n))
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{}))
+                 '()))
 
   (test-begin
-    #:name make-method-call-swap-mutator
+    #:name make-method-id-swap-mutator
     (ignore
      (define method-call-swap-mutator
-       (make-method-call-swap-mutator
+       (make-method-id-swap-mutator
         #'{(define x 5) (+ x (let ([c (class object%
                                         (super-new)
                                         (define/public (m x) (* 42 x))
                                         (define/private (p) (void))
                                         (define/public (n x) (* 42 x)))])
-                               (send (new c) m x)))})))
+                               (send (new c) m x)))}
+        #f)))
     (test-mutator* method-call-swap-mutator
                    #'x
                    (list #'x))

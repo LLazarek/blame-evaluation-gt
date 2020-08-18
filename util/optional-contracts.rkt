@@ -24,11 +24,11 @@
   (make-provide-pre-transformer
    (λ (stx modes)
      (syntax-parse stx
-       [(_ {~and clause [id _]} ...)
+       [(_ {~and clause {~or* [id _] [rename old-id new-id _]}} ...)
         (pre-expand-export
          (if ENABLE-CONTRACTS
              (syntax/loc this-syntax
                (contract-out clause ...))
              (syntax/loc this-syntax
-               (contract-out [id any/c] ...)))
+               (contract-out {~? [id any/c]} ... {~? [rename old-id new-id any/c]} ...)))
          modes)]))))

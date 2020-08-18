@@ -11,10 +11,12 @@
            (path-string? . -> . mod/c)]
           [mod->name (mod/c . -> . string?)]
           [find-program-base-path
-           (program/c . -> . path-string?)]))
+           (program/c . -> . path-string?)]
+          [program->mods
+           (program/c . -> . (listof mod/c))]))
 
-(require "../util/path-utils.rkt"
-         "../util/read-module.rkt")
+(require "path-utils.rkt"
+         "read-module.rkt")
 
 (struct mod (path stx)
   #:transparent
@@ -51,11 +53,14 @@
 (define (mod->name m)
   (file-name-string-from-path (mod-path m)))
 
+(define (program->mods a-program)
+  (cons (program-main a-program)
+        (program-others a-program)))
+
 (define (find-program-base-path a-program)
   (define files
     (map mod-path
-         (list* (program-main a-program)
-                (program-others a-program))))
+         (program->mods a-program)))
   (define main (first files))
   (define candidate-subpath-parts
     (in-combinations (explode-path main)))

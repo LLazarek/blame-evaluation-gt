@@ -18,30 +18,30 @@
 ;; I can have a `define-mutator` macro that takes the name and the mutator
 ;; function, and introduces a binding for the name.
 ;; For now, keep them manually in-sync.
+(define active-mutators
+  (list arithmetic-op-swap
+        boolean-op-swap
+        class-method-publicity-swap
+        delete-super-new
+        nested-list-construction-swap
+        replace-constants
+        delete-begin-result-expr
+        negate-conditionals
+        force-conditionals
+        wrap-conditionals
+        replace-class-parent
+        swap-class-initializers
+        rearrange-positional-exprs
+        add-extra-class-method))
+
+(define active-dependent-mutators
+  (list make-top-level-id-swap-mutator
+        make-imported-id-swap-mutator
+        make-method-id-swap-mutator))
+
 (define active-mutator-names
-  (list "arithmetic-op-swap"
-        "boolean-op-swap"
-        "class:publicity"
-        "class:super-new"
-        "nested-list-construction-swap"
-        "constant-swap"
-        "begin-result-deletion"
-        "negate-conditional"
-        "force-conditional"
-        "wrap-conditional"
-        "class:parent-swap"
-        "class:initializer-swap"
-        "position-swap"
-        "class:add-extra-method"
-        "top-level-id-swap"
-        "imported-id-swap"))
-(define mutate-atom (compose-mutators arithmetic-op-swap
-                                      boolean-op-swap
-                                      class-method-publicity-swap
-                                      delete-super-new
-                                      ; data-accessor-swap left off
-                                      nested-list-construction-swap
-                                      replace-constants))
+  (append (map mutator-type active-mutators)
+          (map dependent-mutator-type active-dependent-mutators)))
 
 (define (mutate-benchmark module-body-stxs
                           mutation-index
@@ -50,26 +50,14 @@
                           [top-level-selector select-define-body]
                           #:expression-select
                           [expression-selector select-exprs-as-if-untyped])
-  (define replace-ids-with-top-level-defs
-    (make-top-level-id-swap-mutator module-body-stxs))
-  (define swap-imported-ids
-    (make-imported-id-swap-mutator module-body-stxs the-program))
-  (define swap-class-method-ids
-    (make-method-call-swap-mutator module-body-stxs))
+  (define instantiated-dependent-mutators
+    (for/list ([make-mutator (in-list active-dependent-mutators)])
+      (make-mutator module-body-stxs the-program)))
   (define mutate-expr
     (make-expr-mutator
-     (compose-mutators delete-begin-result-expr
-                       negate-conditionals
-                       force-conditionals
-                       wrap-conditionals
-                       replace-class-parent
-                       swap-class-initializers
-                       rearrange-positional-exprs
-                       add-extra-class-method
-                       replace-ids-with-top-level-defs
-                       swap-imported-ids
-                       swap-class-method-ids
-                       mutate-atom)
+     (apply compose-mutators
+            (append active-mutators
+                    instantiated-dependent-mutators))
      #:select expression-selector))
   (define mutate-program
     (make-program-mutator mutate-expr
@@ -88,14 +76,19 @@
            "../../mutate/mutator-lib.rkt"
            "../../mutate/mutators.rkt"
            "../../mutate/top-level-selectors.rkt"
-           "../../mutate/expression-selectors.rkt")
+           "../../mutate/expression-selectors.rkt"
+           "../../util/program.rkt")
 
   (define (mutate-program module-body-stxs mutation-index
-                          #:top-level-select [top-level-selector select-define/contract]
+                          #:program [program (program (mod "main.rkt"
+                                                           #'(module main racket (#%module-begin)))
+                                                      empty)]
+                          #:top-level-select [top-level-selector select-define-body]
                           #:expression-select [select select-any-expr])
     (mutate-benchmark module-body-stxs mutation-index
                       #:top-level-select top-level-selector
-                      #:expression-select select))
+                      #:expression-select select
+                      #:program program))
 
   (define mutate-syntax
     (syntax-only mutate-program))
@@ -137,373 +130,370 @@
     #:name full:constants
     (test-mutation
      0
-     #'{(define/contract a any/c #t)}
-     #'{(define/contract a any/c #f)})
+     #'{(define a #t)}
+     #'{(define a #f)})
     (test-mutation
      0
-     #'{(define/contract a any/c #f)}
-     #'{(define/contract a any/c #t)})
+     #'{(define a #f)}
+     #'{(define a #t)})
 
     (test-mutation
      0
-     #'{(define/contract a positive? 1)}
-     #'{(define/contract a positive? -1)})
+     #'{(define a 1)}
+     #'{(define a -1)})
 
     (test-mutation
      0
-     #'{(define/contract a positive? -1)}
-     #'{(define/contract a positive? 1)})
+     #'{(define a -1)}
+     #'{(define a 1)})
     (test-mutation
      0
-     #'{(define/contract a positive? 5)}
-     #'{(define/contract a positive? -5)})
+     #'{(define a 5)}
+     #'{(define a -5)})
     (test-mutation
      0
-     #'{(define/contract a positive? 3)}
-     #'{(define/contract a positive? -3)})
+     #'{(define a 3)}
+     #'{(define a -3)})
     (test-mutation
      0
-     #'{(define/contract a positive? 3.5)}
-     #'{(define/contract a positive? -3.5)})
+     #'{(define a 3.5)}
+     #'{(define a -3.5)})
     (test-exn
      mutation-index-exception?
      (mutate-syntax/define/c
-      #'{(define/contract a positive? (λ (x) x))}
+      #'{(define a (λ (x) x))}
       0))
 
     (test-mutation/sequence
-     #'{(define/contract a positive? 1)
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract a positive? -1)
-              (define/contract b positive? 2)}]
-       [5 ,#'{(define/contract a positive? 1)
-              (define/contract b positive? -2)}]))
+     #'{(define a 1)
+        (define b 2)}
+     `([0 ,#'{(define a -1)
+              (define b 2)}]
+       [5 ,#'{(define a 1)
+              (define b -2)}]))
 
     (test-mutation
      0
-     #'{(define/contract (f x)
-          (-> positive? positive?)
+     #'{(define (f x)
           1)
-        (define/contract b positive? 2)}
-     #'{(define/contract (f x)
-          (-> positive? positive?)
+        (define b 2)}
+     #'{(define (f x)
           -1)
-        (define/contract b positive? 2)}))
+        (define b 2)}))
 
   (test-begin
     #:name full:operators
     (test-mutation/sequence
-     #'{(define/contract a any/c (+ 1 2))}
-     `([0 ,#'{(define/contract a any/c (+ 2 1))}]
-       [1 ,#'{(define/contract a any/c (- 1 2))}]
-       [2 ,#'{(define/contract a any/c (+ -1 2))}]
-       [7 ,#'{(define/contract a any/c (+ 1 -2))}]))
+     #'{(define a (+ 1 2))}
+     `([0 ,#'{(define a (+ 2 1))}]
+       [1 ,#'{(define a (- 1 2))}]
+       [2 ,#'{(define a (+ -1 2))}]
+       [7 ,#'{(define a (+ 1 -2))}]))
 
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (+ x 2))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (+ 2 x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (- x 2))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (- x 2))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (- 2 x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (+ x 2))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (* x 2))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (* 2 x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (/ x 2))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (quotient x 2))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (quotient 2 x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (/ x 2))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (modulo x 2))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (modulo 2 x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (/ x 2))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
 
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (add1 x))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (sub1 x))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
 
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
-          (car x))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
-                (cdr x))
-              (define/contract b positive? 2)}]))
-
-    (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (and x #t))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (and #t x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (or x #t))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? 2)}
-     `([0 ,#'{(define/contract (f x)
-                any/c
+        (define b 2)}
+     `([0 ,#'{(define (f x)
                 (or #t x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (and x #t))
-              (define/contract b positive? 2)}]))
+              (define b 2)}]))
+    (test-mutation/sequence
+     #'{(define (f x)
+          (append '() '()))
+        (define b 2)}
+     `([0 ,#'{(define (f x)
+                (cons '() '()))
+              (define b 2)}]
+       [1 ,#'{(define (f x)
+                (append '() '()))
+              (define b -2)}]))
 
     ;; Test choices of index
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? 2)}
+        (define b 2)}
      ;; Fixed this! ⇓
-     `(#;[1 ,#'{(define/contract (f x)
-                  any/c
+     `(#;[1 ,#'{(define (f x)
                   (or x #t)) ;; tries to mutate `x` but it's a no-op
-                (define/contract b positive? 2)}]
-       [0 ,#'{(define/contract (f x)
-                any/c
+                (define b 2)}]
+       [0 ,#'{(define (f x)
                 (or #t x))
-              (define/contract b positive? 2)}]
-       [1 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [1 ,#'{(define (f x)
                 (and x #t))
-              (define/contract b positive? 2)}]
-       [2 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [2 ,#'{(define (f x)
                 (or x #f))
-              (define/contract b positive? 2)}]
-       [3 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [3 ,#'{(define (f x)
                 (or x 1))
-              (define/contract b positive? 2)}]
-       [4 ,#'{(define/contract (f x)
-                any/c
+              (define b 2)}]
+       [4 ,#'{(define (f x)
                 (or x #t))
-              (define/contract b positive? -2)}])))
+              (define b -2)}])))
 
   (test-begin
     #:name begin
     (test-mutation
      4
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? (begin 1 2))}
-     #'{(define/contract (f x)
-          any/c
+        (define b (begin 1 2))}
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? (begin 1))})
+        (define b (begin 1))})
     (test-mutation
      4
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? (begin0 1 2))}
-     #'{(define/contract (f x)
-          any/c
+        (define b (begin0 1 2))}
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? (begin0 2))}))
+        (define b (begin0 2))}))
+
+  (test-begin
+    #:name implicit-begins
+    (test-mutation/sequence
+     #'{(define (f x)
+          'one
+          'two)
+        (define b (cond [#t 'one 'two]))
+        (define c (λ () 'one 'two))}
+     `([0 ,#'{(define (f x)
+                'one)
+              (define b (cond [#t 'one 'two]))
+              (define c (λ () 'one 'two))}]
+       [1 ,#'{(define (f x)
+                'two
+                'one)
+              (define b (cond [#t 'one 'two]))
+              (define c (λ () 'one 'two))}]
+       [2 ,#'{(define (f x)
+                'one
+                'two)
+              (define b (cond [#t 'one]))
+              (define c (λ () 'one 'two))}]
+       [3 ,#'{(define (f x)
+                'one
+                'two)
+              (define b (cond [(not #t) 'one 'two]))
+              (define c (λ () 'one 'two))}]
+       [4 ,#'{(define (f x)
+                'one
+                'two)
+              (define b (cond [(cast #t Any) 'one 'two]))
+              (define c (λ () 'one 'two))}]
+       [5 ,#'{(define (f x)
+                'one
+                'two)
+              (define b (cond [#t 'two 'one]))
+              (define c (λ () 'one 'two))}]
+       [6 ,#'{(define (f x)
+                'one
+                'two)
+              (define b (cond [#t 'one 'two]))
+              (define c (λ () 'one))}]))
+    (test-mutation
+     4
+     #'{(define (f x)
+          (or x #t))
+        (define b (begin0 1 2))}
+     #'{(define (f x)
+          (or x #t))
+        (define b (begin0 2))}))
 
   (test-begin
     #:name if
     (test-mutation
      4
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract (g x)
-          any/c
+        (define (g x)
           (if x 1 2))}
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract (g x)
-          any/c
+        (define (g x)
           (if (not x) 1 2))}))
 
   (test-begin
     #:name function-application-args-swapping
     (test-mutation/sequence
-     #'{(define/contract x any/c (f 1 2 3 4 5))}
-     `([0 ,#'{(define/contract x any/c (f 2 1 3 4 5))}]
-       [1 ,#'{(define/contract x any/c (f 1 2 4 3 5))}]
-       [2 ,#'{(define/contract x any/c (f -1 2 3 4 5))}]
+     #'{(define x (f 1 2 3 4 5))}
+     `([0 ,#'{(define x (f 2 1 3 4 5))}]
+       [1 ,#'{(define x (f 1 2 4 3 5))}]
+       [2 ,#'{(define x (f -1 2 3 4 5))}]
        #| ... |#)))
 
 
   (test-begin
     #:name complex-program
     (test-mutation/sequence
-     #'{(define/contract (f x)
-          any/c
+     #'{(define (f x)
           (or x #t))
-        (define/contract b positive? (begin 1 2))
-        (define/contract (g x)
-          any/c
+        (define b (begin 1 2))
+        (define (g x)
           (if x 1 2))}
-     `([4 ,#'{(define/contract (f x)
-                any/c
+     `([4 ,#'{(define (f x)
                 (or x #t))
-              (define/contract b positive? (begin 1))
-              (define/contract (g x)
-                any/c
+              (define b (begin 1))
+              (define (g x)
                 (if x 1 2))}]
-       [5 ,#'{(define/contract (f x)
-                any/c
+       [5 ,#'{(define (f x)
                 (or x #t))
-              (define/contract b positive? (begin 2 1))
-              (define/contract (g x)
-                any/c
+              (define b (begin 2 1))
+              (define (g x)
                 (if x 1 2))}]
-       [6 ,#'{(define/contract (f x)
-                any/c
+       [6 ,#'{(define (f x)
                 (or x #t))
-              (define/contract b positive? (begin -1 2))
-              (define/contract (g x)
-                any/c
+              (define b (begin -1 2))
+              (define (g x)
                 (if x 1 2))}]
-       [11 ,#'{(define/contract (f x)
-                 any/c
+       [11 ,#'{(define (f x)
                  (or x #t))
-               (define/contract b positive? (begin 1 -2))
-               (define/contract (g x)
-                 any/c
+               (define b (begin 1 -2))
+               (define (g x)
                  (if x 1 2))}]
-       [16 ,#'{(define/contract (f x)
-                 any/c
+       [16 ,#'{(define (f x)
                  (or x #t))
-               (define/contract b positive? (begin 1 2))
-               (define/contract (g x)
-                 any/c
+               (define b (begin 1 2))
+               (define (g x)
                  (if (not x) 1 2))}]
-       [17 ,#'{(define/contract (f x)
-                 any/c
+       [17 ,#'{(define (f x)
                  (or x #t))
-               (define/contract b positive? (begin 1 2))
-               (define/contract (g x)
-                 any/c
+               (define b (begin 1 2))
+               (define (g x)
+                 (if #t 1 2))}]
+       [18 ,#'{(define (f x)
+                 (or x #t))
+               (define b (begin 1 2))
+               (define (g x)
+                 (if (cast x Any) 1 2))}]
+       [19 ,#'{(define (f x)
+                 (or x #t))
+               (define b (begin 1 2))
+               (define (g x)
                  (if x -1 2))}]
-       [22 ,#'{(define/contract (f x)
-                 any/c
+       [24 ,#'{(define (f x)
                  (or x #t))
-               (define/contract b positive? (begin 1 2))
-               (define/contract (g x)
-                 any/c
+               (define b (begin 1 2))
+               (define (g x)
                  (if x 1 -2))}])))
 
   (test-begin
     #:name out-of-mutations
     (test-exn
      mutation-index-exception?
-     (mutate-program #'{(define/contract (f x)
-                          any/c
+     (mutate-program #'{(define (f x)
                           (or x #t))
-                        (define/contract b positive? (begin 1 2))
-                        (define/contract (g x)
-                          any/c
+                        (define b (begin 1 2))
+                        (define (g x)
                           (if x 1 x))}
-                     22)))
+                     25)))
 
 
   (test-begin
     #:name classes
     (test-mutation/sequence
-     #'{(define/contract c
-          any/c
+     #'{(define c
           (class my-parent
             (define/public (f x) x)
             (define/private (g x) x)))}
      ;; superclass
-     `([0 ,#'{(define/contract c
-                any/c
+     `([0 ,#'{(define c
                 (class object%
                   (define/public (f x) x)
                   (define/private (g x) x)))}]
        ;; extra method
-       [1 ,#'{(define/contract c
-                any/c
+       [1 ,#'{(define c
                 (class my-parent
                   (define/public (a-nonexistant-method x) x)
                   (define/public (f x) x)
                   (define/private (g x) x)))}]
        ;; method visibility
-       [2 ,#'{(define/contract c
-                any/c
+       [2 ,#'{(define c
                 (class my-parent
                   (define/private (f x) x)
                   (define/private (g x) x)))}]
-       [3 ,#'{(define/contract c
-                any/c
+       [3 ,#'{(define c
                 (class my-parent
                   (define/public (f x) x)
                   (define/public (g x) x)))}]))
     ;; Initializer swapping
     (test-mutation/sequence
-     #'{(define/contract c
-          any/c
+     #'{(define c
           (class o (field w
                           y
                           [v (foo bar)]
@@ -513,8 +503,7 @@
                           [z #f])))}
      ;; Swap first pair of initializers
      `(;; add method
-       [1 ,#'{(define/contract c
-                any/c
+       [1 ,#'{(define c
                 (class o
                   (define/public (a-nonexistant-method x) x)
                   (field w
@@ -525,78 +514,77 @@
                          [b f]
                          [z #f])))}]
        ;; Swap first pair of initializers
-       [2 ,#'{(define/contract c any/c (class o
-                                         (field w
-                                                y
-                                                [v 5]
-                                                [x (foo bar)]
-                                                [a (g 0)]
-                                                [b f]
-                                                [z #f])))}]
+       [2 ,#'{(define c (class o
+                          (field w
+                                 y
+                                 [v 5]
+                                 [x (foo bar)]
+                                 [a (g 0)]
+                                 [b f]
+                                 [z #f])))}]
        ;; Swap second pair of initializers
-       [3 ,#'{(define/contract c any/c (class o
-                                         (field w
-                                                y
-                                                [v (foo bar)]
-                                                [x 5]
-                                                [a f]
-                                                [b (g 0)]
-                                                [z #f])))}]
+       [3 ,#'{(define c (class o
+                          (field w
+                                 y
+                                 [v (foo bar)]
+                                 [x 5]
+                                 [a f]
+                                 [b (g 0)]
+                                 [z #f])))}]
        ;; swap ordering
-       [4 ,#'{(define/contract c any/c (class o
-                                         (field y
-                                                w
-                                                [v (foo bar)]
-                                                [x 5]
-                                                [a (g 0)]
-                                                [b f]
-                                                [z #f])))}]
-       [5 ,#'{(define/contract c any/c (class o
-                                         (field w
-                                                y
-                                                [x 5]
-                                                [v (foo bar)]
-                                                [a (g 0)]
-                                                [b f]
-                                                [z #f])))}]
-       [6 ,#'{(define/contract c any/c (class o
-                                         (field w
-                                                y
-                                                [v (foo bar)]
-                                                [x 5]
-                                                [b f]
-                                                [a (g 0)]
-                                                [z #f])))}]
+       [4 ,#'{(define c (class o
+                          (field y
+                                 w
+                                 [v (foo bar)]
+                                 [x 5]
+                                 [a (g 0)]
+                                 [b f]
+                                 [z #f])))}]
+       [5 ,#'{(define c (class o
+                          (field w
+                                 y
+                                 [x 5]
+                                 [v (foo bar)]
+                                 [a (g 0)]
+                                 [b f]
+                                 [z #f])))}]
+       [6 ,#'{(define c (class o
+                          (field w
+                                 y
+                                 [v (foo bar)]
+                                 [x 5]
+                                 [b f]
+                                 [a (g 0)]
+                                 [z #f])))}]
        ;; Descend into mutating initializer values
        ;; Note that final odd initializer is NOT swapped
-       [7 ,#'{(define/contract c any/c (class o
-                                         (field w
-                                                y
-                                                [v (foo bar)]
-                                                [x -5]
-                                                [a (g 0)]
-                                                [b f]
-                                                [z #f])))}]
-       [12 ,#'{(define/contract c any/c (class o
-                                          (field w
-                                                 y
-                                                 [v (foo bar)]
-                                                 [x 5]
-                                                 [a (g 0.0)]
-                                                 [b f]
-                                                 [z #f])))}]
-       [15 ,#'{(define/contract c any/c (class o
-                                          (field w
-                                                 y
-                                                 [v (foo bar)]
-                                                 [x 5]
-                                                 [a (g 0)]
-                                                 [b f]
-                                                 [z #t])))}]))
+       [7 ,#'{(define c (class o
+                          (field w
+                                 y
+                                 [v (foo bar)]
+                                 [x -5]
+                                 [a (g 0)]
+                                 [b f]
+                                 [z #f])))}]
+       [12 ,#'{(define c (class o
+                           (field w
+                                  y
+                                  [v (foo bar)]
+                                  [x 5]
+                                  [a (g 0.0)]
+                                  [b f]
+                                  [z #f])))}]
+       [15 ,#'{(define c (class o
+                           (field w
+                                  y
+                                  [v (foo bar)]
+                                  [x 5]
+                                  [a (g 0)]
+                                  [b f]
+                                  [z #t])))}]))
     ;; same test with init-field
     (test-mutation/sequence
-     #'{(define/contract c
-          any/c
+     #'{(define c
           (class o (init-field w
                                y
                                [v (foo bar)]
@@ -605,56 +593,54 @@
                                [b f]
                                [z #f])))}
      ;; Swap first pair of initializers
-     `([2 ,#'{(define/contract c any/c (class o
-                                         (init-field w
-                                                     y
-                                                     [v 5]
-                                                     [x (foo bar)]
-                                                     [a (g 0)]
-                                                     [b f]
-                                                     [z #f])))}]))
+     `([2 ,#'{(define c (class o
+                          (init-field w
+                                      y
+                                      [v 5]
+                                      [x (foo bar)]
+                                      [a (g 0)]
+                                      [b f]
+                                      [z #f])))}]))
+
+    ;; Initializer arg swapping at instantiation
+    (test-mutation/sequence
+     #'{(define o (new my-class [a "hi"] [b #f]))}
+     `([0 ,#'{(define o (new my-class [a #f] [b "hi"]))}]))
 
     ;; mutation of method bodies
     (test-mutation/sequence
-     #'{(define/contract c
-          any/c
+     #'{(define c
           (class
             o
             (define/public (my-method x y)
               (- x y))))}
-     `([0 ,#'{(define/contract c
-                any/c
+     `([0 ,#'{(define c
                 (class
                   object% #| <- |#
                   (define/public (my-method x y)
                     (- x y))))}]
-       [1 ,#'{(define/contract c
-                any/c
+       [1 ,#'{(define c
                 (class
                   o
                   (define/public (a-nonexistant-method x) x) ; <-
                   (define/public (my-method x y)
                     (- x y))))}]
-       [2 ,#'{(define/contract c
-                any/c
+       [2 ,#'{(define c
                 (class
                   o
                   (define/private #| <- |# (my-method x y)
                     (- x y))))}]
-       [3 ,#'{(define/contract c
-                any/c
+       [3 ,#'{(define c
                 (class
                   o
                   (define/public (my-method y x #| <- |#)
                     (- x y))))}]
-       [4 ,#'{(define/contract c
-                any/c
+       [4 ,#'{(define c
                 (class
                   o
                   (define/public (my-method x y)
                     (- y #| <-> |# x))))}]
-       [5 ,#'{(define/contract c
-                any/c
+       [5 ,#'{(define c
                 (class
                   o
                   (define/public (my-method x y)
@@ -662,18 +648,15 @@
 
     ;; super-new replacement
     (test-mutation/sequence
-     #'{(define/contract c
-          any/c
+     #'{(define c
           (class o
             (super-new)
             (define/public x 5)))}
-     `([2 ,#'{(define/contract c
-                any/c
+     `([2 ,#'{(define c
                 (class o
                   (void)
                   (define/public x 5)))}]
-       [3 ,#'{(define/contract c
-                any/c
+       [3 ,#'{(define c
                 (class o
                   (super-new)
                   (define/private x 5)))}])))
@@ -681,47 +664,49 @@
   (test-begin
     #:name nested-exprs
     (test-mutation/sequence
-     #'{(define/contract a any/c (+ (+ 1 2)
-                                    (- 3 4)))}
+     #'{(define a (+ (+ 1 2)
+                     (- 3 4)))}
      `(;; flip outer args
-       [0 ,#'{(define/contract a any/c (+ (- 3 4)
-                                          (+ 1 2)))}]
+       [0 ,#'{(define a (+ (- 3 4)
+                           (+ 1 2)))}]
        ;; negate outer +
-       [1 ,#'{(define/contract a any/c (- (+ 1 2)
-                                          (- 3 4)))}]
+       [1 ,#'{(define a (- (+ 1 2)
+                           (- 3 4)))}]
        ;; flip inner args 1
-       [2 ,#'{(define/contract a any/c (+ (+ 2 1)
-                                          (- 3 4)))}]
+       [2 ,#'{(define a (+ (+ 2 1)
+                           (- 3 4)))}]
        ;; negate inner +
-       [3 ,#'{(define/contract a any/c (+ (- 1 2)
-                                          (- 3 4)))}]
+       [3 ,#'{(define a (+ (- 1 2)
+                           (- 3 4)))}]
        ;; mutate inner + args
-       [4 ,#'{(define/contract a any/c (+ (+ -1 2)
-                                          (- 3 4)))}]
+       [4 ,#'{(define a (+ (+ -1 2)
+                           (- 3 4)))}]
        ;; . . . . . . . . .
        ;; flip inner args 2
-       [14 ,#'{(define/contract a any/c (+ (+ 1 2)
-                                           (- 4 3)))}]
+       [14 ,#'{(define a (+ (+ 1 2)
+                            (- 4 3)))}]
        ;; negate inner -
-       [15 ,#'{(define/contract a any/c (+ (+ 1 2)
-                                           (+ 3 4)))}]
+       [15 ,#'{(define a (+ (+ 1 2)
+                            (+ 3 4)))}]
        ;; mutate inner - args
-       [16 ,#'{(define/contract a any/c (+ (+ 1 2)
-                                           (- -3 4)))}]))
-    (test-mutation
-     2
+       [16 ,#'{(define a (+ (+ 1 2)
+                            (- -3 4)))}]))
+    (test-mutation/sequence
      #'{(define (foo x) x)
-        (define/contract a any/c (+ (foo 1) 2))}
-     #'{(define (foo x) x)
-        (define/contract a any/c (+ (foo -1) 2))}))
+        (define a (+ (foo 1) 2))}
+     `([2 ,#'{(define (foo x) x)
+              (define a (+ (a 1) 2))}]
+       [3 ,#'{(define (foo x) x)
+              (define a (+ (foo -1) 2))}])))
 
   (test-begin
     #:name cond-guarding
     (test-mutation/sequence
-     #'{(define/contract a any/c (if #t + -))}
-     `([0 ,#'{(define/contract a any/c (if (not #t) + -))}]
-       [1 ,#'{(define/contract a any/c (if #t - -))}]
-       [2 ,#'{(define/contract a any/c (if #t + +))}])))
+     #'{(define a (if #t + -))}
+     `([0 ,#'{(define a (if (not #t) + -))}]
+       [1 ,#'{(define a (if (cast #t Any) + -))}]
+       [2 ,#'{(define a (if #t - -))}]
+       [3 ,#'{(define a (if #t + +))}])))
 
   (test-begin
     #:name higher-order
@@ -730,40 +715,39 @@
     ;; 2. Primitives that should be mutated (+, -) appear in expression ctx
     ;;    rather than application ctx
     (test-mutation/sequence
-     #'{(define/contract a any/c ((if #t + -) 1 2))}
-     `([0 ,#'{(define/contract a any/c ((if #t + -) 2 1))}]
-       [1 ,#'{(define/contract a any/c ((if (not #t) + -) 1 2))}]
-       [2 ,#'{(define/contract a any/c ((if #t - -) 1 2))}]
-       [3 ,#'{(define/contract a any/c ((if #t + +) 1 2))}]
-       [4 ,#'{(define/contract a any/c ((if #t + -) -1 2))}]
-       [9 ,#'{(define/contract a any/c ((if #t + -) 1 -2))}])))
+     #'{(define a ((if #t + -) 1 2))}
+     `([0 ,#'{(define a ((if #t + -) 2 1))}]
+       [1 ,#'{(define a ((if (not #t) + -) 1 2))}]
+       [2 ,#'{(define a ((if (cast #t Any) + -) 1 2))}]
+       [3 ,#'{(define a ((if #t - -) 1 2))}]
+       [4 ,#'{(define a ((if #t + +) 1 2))}]
+       [5 ,#'{(define a ((if #t + -) -1 2))}]
+       [10 ,#'{(define a ((if #t + -) 1 -2))}])))
 
   (test-begin
     #:name mutated-id-reporting
     (test-equal?
      (mutated-program-mutated-id
       (mutate-program/define/c
-       #'{(define/contract (f x)
-            any/c
+       #'{(define (f x)
             (<= x 2))
-          (define/contract b positive? 2)}
+          (define b 2)}
        5))
      'f)
     (test-equal?
      (mutated-program-mutated-id
       (mutate-program/define/c
-       #'{(define/contract (f x)
-            any/c
+       #'{(define (f x)
             (<= x 2))
-          (define/contract b positive? 2)}
+          (define b 2)}
        6))
      'b)
     (test-equal?
      (mutated-program-mutated-id
       (mutate-program/define/c
        #'{(displayln "B")
-          (define/contract c any/c 1)
-          (define/contract d any/c
+          (define c 1)
+          (define d
             (cond [#t 1]
                   [(not (foobar (+ 1 2))) -1 5]
                   [else (error (quote wrong))]))
@@ -776,23 +760,20 @@
     #:name examples-from-benchmarks
     ;; Tests on snippets from the actual benchmarks
     (test-mutation/sequence
-     #'{(define/contract b positive? 2)
-        (define/contract (singleton-list? x)
-          (configurable-ctc)
+     #'{(define b 2)
+        (define (singleton-list? x)
 
           (and (list? x)
                (not (null? x))
                (null? (cdr x))))}
-     `([5 ,#'{(define/contract b positive? 2)
-              (define/contract (singleton-list? x)
-                (configurable-ctc)
+     `([5 ,#'{(define b 2)
+              (define (singleton-list? x)
 
                 (and (not (null? x))
                      (list? x)
                      (null? (cdr x))))}]
-       [6 ,#'{(define/contract b positive? 2)
-              (define/contract (singleton-list? x)
-                (configurable-ctc)
+       [6 ,#'{(define b 2)
+              (define (singleton-list? x)
 
                 (or (list? x)
                     (not (null? x))
@@ -834,13 +815,12 @@
                           stack-swap
                           ))
 
-        (define (assert v p)
+        (define/ignore (assert v p) ; fake definer for testing
           (unless (p v) (error 'assert))
           v)
 
 
-        (define/contract command%
-          command%/c
+        (define command%
           (class object%
             (super-new)
             (init-field
@@ -848,7 +828,7 @@
              descr
              exec)))
 
-        (define ((env-with/c cmd-ids) env)
+        (define/ignore ((env-with/c cmd-ids) env)
           (cond [(env? env)
                  (define env-cmd-ids
                    (for/list ([env-cmd (in-list env)])
@@ -860,13 +840,7 @@
 
 
         ;; True if the argument is a list with one element
-        (define/contract (singleton-list? x)
-          (configurable-ctc
-           [max (->i ([x list?])
-                     [result (x) (if (empty? x)
-                                     #f
-                                     (empty? (rest x)))])]
-           [types (list? . -> . boolean?)])
+        (define (singleton-list? x)
 
           (and (list? x)
                (not (null? x))
@@ -906,13 +880,12 @@
                                 stack-swap
                                 ))
 
-              (define (assert v p)
+              (define/ignore (assert v p)
                 (unless (p v) (error 'assert))
                 v)
 
 
-              (define/contract command%
-                command%/c
+              (define command%
                 (class object%
                   (define/public (a-nonexistant-method x) x)
                   (super-new)
@@ -921,7 +894,7 @@
                    descr
                    exec)))
 
-              (define ((env-with/c cmd-ids) env)
+              (define/ignore ((env-with/c cmd-ids) env)
                 (cond [(env? env)
                        (define env-cmd-ids
                          (for/list ([env-cmd (in-list env)])
@@ -933,13 +906,7 @@
 
 
               ;; True if the argument is a list with one element
-              (define/contract (singleton-list? x)
-                (configurable-ctc
-                 [max (->i ([x list?])
-                           [result (x) (if (empty? x)
-                                           #f
-                                           (empty? (rest x)))])]
-                 [types (list? . -> . boolean?)])
+              (define (singleton-list? x)
 
                 (and (list? x)
                      (not (null? x))
@@ -979,12 +946,11 @@
                                 stack-swap
                                 ))
 
-              (define (assert v p)
+              (define/ignore (assert v p)
                 (unless (p v) (error 'assert))
                 v)
 
-              (define/contract command%
-                command%/c
+              (define command%
                 (class object%
                   (void)
                   (init-field
@@ -992,7 +958,7 @@
                    descr
                    exec)))
 
-              (define ((env-with/c cmd-ids) env)
+              (define/ignore ((env-with/c cmd-ids) env)
                 (cond [(env? env)
                        (define env-cmd-ids
                          (for/list ([env-cmd (in-list env)])
@@ -1004,13 +970,7 @@
 
 
               ;; True if the argument is a list with one element
-              (define/contract (singleton-list? x)
-                (configurable-ctc
-                 [max (->i ([x list?])
-                           [result (x) (if (empty? x)
-                                           #f
-                                           (empty? (rest x)))])]
-                 [types (list? . -> . boolean?)])
+              (define (singleton-list? x)
 
                 (and (list? x)
                      (not (null? x))
@@ -1050,12 +1010,11 @@
                                 stack-swap
                                 ))
 
-              (define (assert v p)
+              (define/ignore (assert v p)
                 (unless (p v) (error 'assert))
                 v)
 
-              (define/contract command%
-                command%/c
+              (define command%
                 (class object%
                   (super-new)
                   (init-field
@@ -1063,7 +1022,7 @@
                    id
                    exec)))
 
-              (define ((env-with/c cmd-ids) env)
+              (define/ignore ((env-with/c cmd-ids) env)
                 (cond [(env? env)
                        (define env-cmd-ids
                          (for/list ([env-cmd (in-list env)])
@@ -1075,13 +1034,7 @@
 
 
               ;; True if the argument is a list with one element
-              (define/contract (singleton-list? x)
-                (configurable-ctc
-                 [max (->i ([x list?])
-                           [result (x) (if (empty? x)
-                                           #f
-                                           (empty? (rest x)))])]
-                 [types (list? . -> . boolean?)])
+              (define (singleton-list? x)
 
                 (and (list? x)
                      (not (null? x))
@@ -1121,12 +1074,11 @@
                                 stack-swap
                                 ))
 
-              (define (assert v p)
+              (define/ignore (assert v p)
                 (unless (p v) (error 'assert))
                 v)
 
-              (define/contract command%
-                command%/c
+              (define command%
                 (class object%
                   (super-new)
                   (init-field
@@ -1134,7 +1086,7 @@
                    descr
                    exec)))
 
-              (define ((env-with/c cmd-ids) env)
+              (define/ignore ((env-with/c cmd-ids) env)
                 (cond [(env? env)
                        (define env-cmd-ids
                          (for/list ([env-cmd (in-list env)])
@@ -1146,13 +1098,7 @@
 
 
               ;; True if the argument is a list with one element
-              (define/contract (singleton-list? x)
-                (configurable-ctc
-                 [max (->i ([x list?])
-                           [result (x) (if (empty? x)
-                                           #f
-                                           (empty? (rest x)))])]
-                 [types (list? . -> . boolean?)])
+              (define (singleton-list? x)
 
                 (and (not (null? x))
                      (list? x)
@@ -1192,12 +1138,11 @@
                                 stack-swap
                                 ))
 
-              (define (assert v p)
+              (define/ignore (assert v p)
                 (unless (p v) (error 'assert))
                 v)
 
-              (define/contract command%
-                command%/c
+              (define command%
                 (class object%
                   (super-new)
                   (init-field
@@ -1205,7 +1150,7 @@
                    descr
                    exec)))
 
-              (define ((env-with/c cmd-ids) env)
+              (define/ignore ((env-with/c cmd-ids) env)
                 (cond [(env? env)
                        (define env-cmd-ids
                          (for/list ([env-cmd (in-list env)])
@@ -1217,13 +1162,7 @@
 
 
               ;; True if the argument is a list with one element
-              (define/contract (singleton-list? x)
-                (configurable-ctc
-                 [max (->i ([x list?])
-                           [result (x) (if (empty? x)
-                                           #f
-                                           (empty? (rest x)))])]
-                 [types (list? . -> . boolean?)])
+              (define (singleton-list? x)
 
                 (or (list? x)
                     (not (null? x))
@@ -1267,13 +1206,12 @@
                             stack-swap
                             ))
 
-          (define (assert v p)
+          (define/ignore (assert v p)
             (unless (p v) (error 'assert))
             v)
 
 
-          (define/contract command%
-            command%/c
+          (define command%
             (class object%
               (super-new)
               (init-field
@@ -1281,7 +1219,7 @@
                descr
                exec)))
 
-          (define ((env-with/c cmd-ids) env)
+          (define/ignore ((env-with/c cmd-ids) env)
             (cond [(env? env)
                    (define env-cmd-ids
                      (for/list ([env-cmd (in-list env)])
@@ -1293,13 +1231,7 @@
 
 
           ;; True if the argument is a list with one element
-          (define/contract (singleton-list? x)
-            (configurable-ctc
-             [max (->i ([x list?])
-                       [result (x) (if (empty? x)
-                                       #f
-                                       (empty? (rest x)))])]
-             [types (list? . -> . boolean?)])
+          (define (singleton-list? x)
 
             (and (list? x)
                  (not (null? x))
@@ -1334,15 +1266,15 @@
   (test-begin
     #:name selectors
     (test-selector
-     select-any-define
+     select-define-body
      #'(define (f x) (+ y y))
      #:name (make-name-test 'f)
-     #:parts (make-parts-test (list #'(+ y y)))
-     #:reconstructor (make-reconstructor-test (list #'foo)
+     #:parts (make-parts-test (list #'(begin (+ y y))))
+     #:reconstructor (make-reconstructor-test (list #'(begin foo))
                                               #'(define (f x) foo)))
     (test-selector
-     select-any-define
-     #'(defoobar (f x) (+ y y))
+     select-define-body
+     #'(define-type T Any)
      #:name false?
      #:parts false?
      #:reconstructor false?)
@@ -1357,8 +1289,8 @@
      select-define/contract
      #'(define/contract (f x) ctc (+ y y))
      #:name (make-name-test 'f)
-     #:parts (make-parts-test (list #'(+ y y)))
-     #:reconstructor (make-reconstructor-test (list #'foo)
+     #:parts (make-parts-test (list #'(begin (+ y y))))
+     #:reconstructor (make-reconstructor-test (list #'(begin foo))
                                               #'(define/contract (f x) ctc foo)))
     (test-selector
      select-define/contract
@@ -1378,7 +1310,7 @@
                 (- y y))}])
      (λ (stx mi)
        (mutate-syntax stx mi
-                      #:top-level-select select-any-define)))
+                      #:top-level-select select-define-body)))
     (test-exn mutation-index-exception?
               (mutate-program #'{(foobar)
                                  (define (f x)
@@ -1389,17 +1321,26 @@
     #:name expr-filtering
     (test-mutation/sequence
      #'{(: f (-> Number Number))
-        (define/contract (f x) any/c
+        (define (f x)
           (: y Number)
           (define y (+ x x))
           (+ y y))}
      `([0 ,#'{(: f (-> Number Number))
-              (define/contract (f x) any/c
+              (define (f x)
+                (: y Number)
+                (define y (+ x x)))}]
+       [1 ,#'{(: f (-> Number Number))
+              (define (f x)
+                (: y Number)
+                (+ y y)
+                (define y (+ x x)))}]
+       [2 ,#'{(: f (-> Number Number))
+              (define (f x)
                 (: y Number)
                 (define y (- x x))
                 (+ y y))}]
-       [1 ,#'{(: f (-> Number Number))
-              (define/contract (f x) any/c
+       [3 ,#'{(: f (-> Number Number))
+              (define (f x)
                 (: y Number)
                 (define y (+ x x))
                 (- y y))}])
@@ -1418,16 +1359,15 @@
      `([0 ,#'{(: f (-> Number Number))
               (define (f x)
                 (: y Number)
-                (define y (- x x))
-                (+ y y))}]
+                (define y (+ x x)))}]
        [1 ,#'{(: f (-> Number Number))
               (define (f x)
                 (: y Number)
-                (define y (+ x x))
-                (- y y))}])
+                (+ y y)
+                (define y (+ x x)))}])
      (λ (stx mi)
        (mutate-syntax stx mi
-                      #:top-level-select select-any-define
+                      #:top-level-select select-define-body
                       #:expression-select select-exprs-as-if-untyped))))
 
   (test-begin
@@ -1447,43 +1387,242 @@
               (define (main) (if #t (f x) (g x)))}]
        [2 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x g g))
+              (define (g x) (if #t f g))
               (define (main) (if #t (f x) (g x)))}]
        [3 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x main g))
+              (define (g x) (if (cast x Any) f g))
               (define (main) (if #t (f x) (g x)))}]
        [4 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x f f))
+              (define (g x) (if x g g))
               (define (main) (if #t (f x) (g x)))}]
        [5 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x f main))
+              (define (g x) (if x main g))
               (define (main) (if #t (f x) (g x)))}]
        [6 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x f g))
-              (define (main) (if (not #t) (f x) (g x)))}]
+              (define (g x) (if x f f))
+              (define (main) (if #t (f x) (g x)))}]
        [7 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x f g))
-              (define (main) (if #t (g x) (g x)))}]
+              (define (g x) (if x f main))
+              (define (main) (if #t (f x) (g x)))}]
        [8 ,#'{(require foobar)
               (define (f x) (add1 x))
               (define (g x) (if x f g))
-              (define (main) (if #t (main x) (g x)))}]
+              (define (main) (if (not #t) (f x) (g x)))}]
        [9 ,#'{(require foobar)
               (define (f x) (add1 x))
               (define (g x) (if x f g))
-              (define (main) (if #t (f x) (f x)))}]
+              (define (main) (if (cast #t Any) (f x) (g x)))}]
        [10 ,#'{(require foobar)
-              (define (f x) (add1 x))
-              (define (g x) (if x f g))
-              (define (main) (if #t (f x) (main x)))}])
+               (define (f x) (add1 x))
+               (define (g x) (if x f g))
+               (define (main) (if #t (g x) (g x)))}]
+       [11 ,#'{(require foobar)
+               (define (f x) (add1 x))
+               (define (g x) (if x f g))
+               (define (main) (if #t (main x) (g x)))}]
+       [12 ,#'{(require foobar)
+               (define (f x) (add1 x))
+               (define (g x) (if x f g))
+               (define (main) (if #t (f x) (f x)))}]
+       [13 ,#'{(require foobar)
+               (define (f x) (add1 x))
+               (define (g x) (if x f g))
+               (define (main) (if #t (f x) (main x)))}])
      (λ (stx mi)
        (mutate-syntax stx mi
-                      #:top-level-select select-any-define)))))
+                      #:top-level-select select-define-body))))
+
+  (test-begin
+    #:name imported-id-swap
+    (test-mutation/sequence
+     #'{(require "a.rkt")
+        (define x (f (g 'a)))}
+     `([0 ,#'{(require "a.rkt")
+              (define x (g (g 'a)))}]
+       [1 ,#'{(require "a.rkt")
+              (define x (f (f 'a)))}])
+     (λ (stx mi)
+       (mutate-syntax stx mi
+                      #:top-level-select select-define-body
+                      #:program (program (mod "main.rkt" #'(module main racket (#%module-begin)))
+                                         (list (mod "a.rkt"
+                                                    #'(module main racket
+                                                        (#%module-begin
+                                                         (provide f g)
+                                                         (define (f x) x)
+                                                         (define (g x) x))))))))))
+
+  (test-begin
+    #:name method-id-swap
+    (test-mutation/sequence
+     #'{(define c1 (class object%
+                     (define/public (c1-m1 x) x)
+                     (define/public (c1-m2 x) x)))
+        (define another-def 'aaa)
+        (define c2 (box (class object%
+                          (define/public (c2-m1 y) y)
+                          (define/public c2-field 'ccc))))
+        (define result (send (new c1) c1-m2 'bbb))}
+     `(#;[0 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [0 ,#'{(define c1 (class object%
+                           (define/public (a-nonexistant-method x) x)
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [1 ,#'{(define c1 (class object%
+                           (define/private (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [2 ,#'{(define c1 (class object%
+                           (define/public (c1-m2 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [3 ,#'{(define c1 (class object%
+                           (define/public (c2-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       ;; lltodo: wiw: methods get reordered too
+       [4 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/private (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [5 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m1 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [6 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c2-m1 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [7 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                           (define/public (a-nonexistant-method x) x)
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [8 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/private (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [9 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c1-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [10 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c1-m2 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [11 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/private c2-field 'ccc))))
+              (define result (send (new c1) c1-m2 'bbb))}]
+       [12 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send c1-m2 (new c1) 'bbb))}]
+       [13 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new another-def) c1-m2 'bbb))}]
+       [14 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c2) c1-m2 'bbb))}]
+       [15 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new result) c1-m2 'bbb))}]
+       [16 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c1-m1 'bbb))}]
+       [17 ,#'{(define c1 (class object%
+                           (define/public (c1-m1 x) x)
+                           (define/public (c1-m2 x) x)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (define/public (c2-m1 y) y)
+                                (define/public c2-field 'ccc))))
+              (define result (send (new c1) c2-m1 'bbb))}]))))
 
 ;; Potential mutations that have been deferred:
 ;; - (hash a b ...) ~> (make-hash (list (cons a b) ...))

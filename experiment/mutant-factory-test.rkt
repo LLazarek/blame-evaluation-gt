@@ -674,9 +674,11 @@
    #:name test:full-run
 
    ;; Mutations expected:
-   ;; - Mutations: 19
-   ;;   - main.rkt: 17
+   ;; - Mutations: 23
+   ;;   - main.rkt: 19
    ;;     - foo: negate cond (@0)
+   ;;            force cond
+   ;;            wrap cond
    ;;            foo -> main
    ;;            - -> +
    ;;            * -> /
@@ -685,7 +687,7 @@
    ;;                  0
    ;;                  3+0.0i
    ;;                  #f]
-   ;;     - main: swap bar args (@9)
+   ;;     - main: swap bar args (@11)
    ;;             foo -> main
    ;;             2 -> [-2
    ;;                   2.0
@@ -693,10 +695,12 @@
    ;;                   2+0.0i
    ;;                   #f]
    ;;             "yes" -> #"yes"
-   ;;   - second.rkt: 2
+   ;;   - second.rkt: 4
    ;;     - bar: negate cond (@0)
+   ;;            force cond
+   ;;            wrap cond
    ;;            - -> +
-   ;; - Mutations that make type errors: 13
+   ;; - Mutations that make type errors: 15
    ;;   - main.rkt: 11
    ;;     - foo: foo -> main
    ;;            * -> /
@@ -709,28 +713,32 @@
    ;;             2 -> 2+0.0i
    ;;             2 -> #f
    ;;             "yes" -> #"yes"
-   ;;   - second.rkt: 2
+   ;;   - second.rkt: 4
    ;;     - bar: negate cond
+   ;;            force cond
+   ;;            wrap cond
    ;;            - -> +
    ;;
-   ;; - Expect 13 decisions to sample (so 13 total files) (below)
+   ;; - Expect 15 decisions to sample (so 15 total files) (below)
    ;; - Expect (sample-size) samples for each
    (ignore
     (define expected-relevant-mutants
-      '(("main.rkt" 1)
-        ("main.rkt" 3)
+      '(("main.rkt" 3)
         ("main.rkt" 5)
         ("main.rkt" 7)
-        ("main.rkt" 8)
         ("main.rkt" 9)
         ("main.rkt" 10)
+        ("main.rkt" 11)
         ("main.rkt" 12)
         ("main.rkt" 14)
-        ("main.rkt" 15)
         ("main.rkt" 16)
+        ("main.rkt" 17)
+        ("main.rkt" 18)
 
         ("second.rkt" 0)
-        ("second.rkt" 1)))
+        ("second.rkt" 1)
+        ("second.rkt" 2)
+        ("second.rkt" 3)))
 
     (match (mutant-error-log)
       [(? file-exists? path) (delete-file path)]
@@ -757,8 +765,7 @@
       (define mod-to-mutate
         (find-unified-module-to-mutate (findf (path-ends-with name)
                                               (benchmark-typed bench))
-                                       (list* (program-main p)
-                                              (program-others p))))
+                                       (program->mods p)))
       (displayln
        (run-with-mutated-module p
                                 mod-to-mutate
@@ -848,7 +855,11 @@
 
    ;; check that mixed configurations work as expected:
    ;; this is just one mixed config that I know should produce a ctc violation
-   (test-match (hash-ref data (find-mutant-file "main.rkt" 3))
+   (ignore
+    (define some-particular-mutant:mod "main.rkt")
+    (define some-particular-mutant:index 5))
+   (test-match (hash-ref data (find-mutant-file some-particular-mutant:mod
+                                                some-particular-mutant:index))
                (list-no-order
                 (struct* blame-trail-summary
                          ([mutants
@@ -892,7 +903,8 @@
    ;; Now try resuming but there's a missing blame trail that won't get logged
    (ignore
     (define a-data-file (build-path test-mutant-dir
-                                    (find-mutant-file "main.rkt" 3)))
+                                    (find-mutant-file some-particular-mutant:mod
+                                                      some-particular-mutant:index)))
     (define contents (file->list a-data-file))
     (define to-drop 1)
     (with-output-to-file a-data-file
@@ -901,10 +913,12 @@
                    [i (in-naturals)])
                (match el
                  ;; the second trail
-                 [(cons (list "main.rkt" 3 (== to-drop)) _) (void)]
+                 [(cons (list (== some-particular-mutant:mod)
+                              (== some-particular-mutant:index)
+                              (== to-drop)) _) (void)]
                  [else (writeln el)]))))
     (hash-remove! progress-log-hash
-                  (list "main.rkt" 3 to-drop)))
+                  (list some-particular-mutant:mod some-particular-mutant:index to-drop)))
    (extend-test-message
     (not (run-the-experiment! #:log-progress log-progress:nowhere))
     "Sanity checks succeeded but should have failed.")))

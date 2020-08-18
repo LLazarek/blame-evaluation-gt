@@ -20,7 +20,7 @@
           [max-mutation-index
            (module-name? benchmark/c . -> . (or/c -1 natural?))]
           [max-mutation-index-exceeded?
-           (path-to-existant-file? natural? . -> . boolean?)]
+           (path-to-existant-file? natural? program/c . -> . boolean?)]
 
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
@@ -32,6 +32,7 @@
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "../util/binary-search.rkt"
+         "../util/program.rkt"
          "../configurables/configurables.rkt")
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
@@ -123,25 +124,31 @@
   (define the-benchmark-configuration
     (configure-benchmark bench
                          max-config))
-  (define module-to-mutate
+  (define module-to-mutate-path
     (findf
      (path-ends-with module-to-mutate-name)
      (list*
       (benchmark-configuration-main the-benchmark-configuration)
       (benchmark-configuration-others the-benchmark-configuration))))
+  (define the-program
+    (benchmark-configuration->program the-benchmark-configuration))
   (result-index ((lowest-upper-bound-binary-search
                   (λ (index)
-                    (if (max-mutation-index-exceeded? module-to-mutate index)
+                    (if (max-mutation-index-exceeded? module-to-mutate-path
+                                                      index
+                                                      the-program)
                         (go-lower)
                         (go-higher))))
                  #:increase-max? #t)))
 
-(define (max-mutation-index-exceeded? module-to-mutate mutation-index)
+(define (max-mutation-index-exceeded? module-to-mutate-path mutation-index program)
   ;; `mutate-module` throws if index is too large, so just try
   ;; mutating to see whether or not it throws
   (with-handlers ([mutation-index-exception? (λ _ #t)])
-    (mutate-module (read-module module-to-mutate)
-                   mutation-index)
+    (mutate-module (findf (match-lambda [(mod path _) (paths=? path module-to-mutate-path)])
+                          (program->mods program))
+                   mutation-index
+                   #:in program)
     #f))
 
 (module+ test
@@ -152,35 +159,39 @@
 
   (define-runtime-path test-config "../configurables/test.config")
   (current-configuration-path test-config)
-  (define main-mutation-count 17)
-  (define second-mutation-count 2)
+  (define main-mutation-count 19)
+  (define second-mutation-count 4)
   (test-begin/with-env
    #:name max-mutation-index-exceeded?
 
-   (for/and/test ([i (in-range 2)])
-                 (not (max-mutation-index-exceeded? e-path i)))
-   (max-mutation-index-exceeded? e-path 2)
+   (ignore
+    (define the-program (make-program main-path (list e-path loop-path))))
 
-   (not (max-mutation-index-exceeded? main-path 0))
-   (max-mutation-index-exceeded? main-path 1)
+   (for/and/test ([i (in-range 2)])
+                 (not (max-mutation-index-exceeded? e-path i the-program)))
+   (max-mutation-index-exceeded? e-path 5 the-program)
+
+   (not (max-mutation-index-exceeded? main-path 0 the-program))
+   (max-mutation-index-exceeded? main-path 1 the-program)
 
    (for/and/test
     ([rt-main (in-list (list rt-main/t rt-main/ut))]
      [rt-second (in-list (list rt-second/t rt-second/ut))])
+    (define rt/program (make-program rt-main (list rt-second)))
     (and/test/message
      [(for/and/test ([i (in-range main-mutation-count)])
                     (extend-test-message
-                     (not (max-mutation-index-exceeded? rt-main i))
+                     (not (max-mutation-index-exceeded? rt-main i rt/program))
                      @~a{(stopped at index @i)}))
       @~a{Not all expected mutations of @rt-main happening}]
-     [(max-mutation-index-exceeded? rt-main main-mutation-count)
+     [(max-mutation-index-exceeded? rt-main main-mutation-count rt/program)
       @~a{@rt-main has more mutations than expected}]
      [(for/and/test ([i (in-range second-mutation-count)])
                     (extend-test-message
-                     (not (max-mutation-index-exceeded? rt-second i))
+                     (not (max-mutation-index-exceeded? rt-second i rt/program))
                      @~a{(stopped at index @i)}))
       @~a{@rt-second doesn't have the expected mutations}]
-     [(max-mutation-index-exceeded? rt-second second-mutation-count)
+     [(max-mutation-index-exceeded? rt-second second-mutation-count rt/program)
       @~a{@rt-second has more mutations than expected}])))
 
   ;; equiv to above, but as a stream

@@ -4,10 +4,29 @@
          (except-in racket/contract/base
                     contract-out))
 
-(define mutator/c (any/c mutation-index? counter? . -> . mutated?))
+(struct mutator (function type)
+  #:property prop:procedure (struct-field-index function))
+(struct dependent-mutator (maker type)
+  #:property prop:procedure (struct-field-index maker))
+
+(define mutator-function/c (any/c mutation-index? counter? . -> . mutated?))
+(define mutator-type? string?)
+(define mutator/c (or/c (struct/c mutator mutator-function/c mutator-type?)
+                        mutator-function/c))
+(define (dependent-mutator/c . arg/cs)
+  (struct/c dependent-mutator
+            (dynamic->* #:mandatory-domain-contracts arg/cs
+                        #:range-contracts mutator-function/c)
+            mutator-type?))
 
 (provide (contract-out
           [mutator/c contract?]
+          [dependent-mutator/c (contract? ... . -> . contract?)]
+
+          [rename try-get-mutator-type
+                  mutator-type
+                  ({mutator/c} {string?} . ->* . string?)]
+
           ;; Base mutator
           ;; essentially a more restricted mutator/c
           [maybe-mutate
@@ -36,8 +55,13 @@
           [compose-mutators (mutator/c mutator/c ... . -> . mutator/c)]
           [no-mutation mutator/c])
 
+         (except-out (struct-out mutator) mutator-type)
+         (struct-out dependent-mutator)
+
          define-id-mutator
-         define-value-mutator)
+         define-value-mutator
+         define-mutator
+         define-dependent-mutator)
 
 (require racket/dict
          racket/format
@@ -46,6 +70,21 @@
          (for-syntax racket/base)
          "logger.rkt"
          "mutated.rkt")
+
+(define (try-get-mutator-type m [default "<?>"])
+  (if (mutator? m)
+      (mutator-type m)
+      default))
+
+(define-simple-macro (define-mutator (name stx mutation-index counter) #:type [type-name type] e ...)
+  (define name (let ([type-name type])
+                 (mutator (λ (stx mutation-index counter) e ...)
+                          type-name))))
+(define-simple-macro (define-dependent-mutator (name . args) #:type [type-name type] e ...)
+  (define name (let ([type-name type])
+                 (dependent-mutator (λ args e ...)
+                                    type))))
+
 
 ;; Base mutator: all mutation happens through this function
 ;;
@@ -96,7 +135,7 @@
   #:with [left-right-pair ...] #'[{~@ (left . right) (right . left)} ...]
   (begin
     (define swaps '((orig . new) ... left-right-pair ...))
-    (define (name maybe-atom-stx mutation-index counter)
+    (define-mutator (name maybe-atom-stx mutation-index counter) #:type [type-name type]
       (if (syntax->list maybe-atom-stx)
           ;; Value mutators only make sense for atoms, so don't even try to apply
           ;; them on syntax-lists. This prevents accidentally stripping
@@ -112,7 +151,7 @@
                                   swaps
                                   mutation-index
                                   counter
-                                  #:type type))))))
+                                  #:type type-name))))))
 
 (define (apply-swap-alist original-value
                           swap-alist
@@ -134,8 +173,7 @@
                        #:type type:expr
                        #:bind-value value-name:id
                        [pat:expr #:-> replacement:expr] ...)
-  (define (name maybe-atom-stx mutation-index counter)
-    (define the-type type)
+  (define-mutator (name maybe-atom-stx mutation-index counter) #:type [the-type type]
     (define mutation-sequence
       (list
        (make-guarded-mutator (λ (v) (match v
@@ -172,8 +210,8 @@
 ;; mutator needs to guard any syntax from mutation, because the application of
 ;; `maybe-mutate` is out of your control, and guarding must be done outside of
 ;; that.
-(define (make-guarded-mutator should-apply? apply)
-  (λ (orig-v mutation-index counter)
+(define (make-guarded-mutator should-apply? apply [type "<guarded-mutator>"])
+  (define-mutator (the-mutator orig-v mutation-index counter) #:type [_ type]
     (if (and (<= counter mutation-index)
              (should-apply? orig-v))
         (maybe-mutate-value orig-v
@@ -181,9 +219,10 @@
                             mutation-index
                             counter)
         (mutated orig-v
-                 counter))))
+                 counter)))
+  the-mutator)
 
-(define (no-mutation v mutation-index counter)
+(define-mutator (no-mutation v mutation-index counter) #:type [_ "<no-mutation>"]
   (mutated v counter))
 
 (define (compose-mutators . mutators)

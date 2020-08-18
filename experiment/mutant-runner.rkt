@@ -123,8 +123,7 @@
     (make-unified-program (main-module)
                           (other-modules)))
 
-  (define the-program-mods (list* (program-main the-program)
-                                  (program-others the-program)))
+  (define the-program-mods (program->mods the-program))
 
   (define the-module-to-mutate
     (find-unified-module-to-mutate (module-to-mutate)
@@ -205,8 +204,7 @@
                                                 (list test-module-2)))
      (define to-mutate
        (find-unified-module-to-mutate test-module-1
-                                      (list* (program-main test-program)
-                                             (program-others test-program)))))
+                                      (program->mods test-program))))
 
     (or (run-with-mutated-module
          test-program

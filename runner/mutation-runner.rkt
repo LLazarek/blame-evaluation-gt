@@ -88,8 +88,7 @@
                          (unsupplied-arg? base-path))))
            "must specify #:modules-base-path if #:write-modules-to is specified")
        #:pre/desc {a-program module-to-mutate}
-       (or (->bool (member module-to-mutate (list* (program-main a-program)
-                                                   (program-others a-program))))
+       (or (->bool (member module-to-mutate (program->mods a-program)))
            "module-to-mutate must be part of a-program")
 
        (values [runner (-> any)]
@@ -99,8 +98,7 @@
     (and
      write-to-dir
      (for/fold ([new-paths #hash()])
-               ([mod (in-list (list* (program-main a-program)
-                                     (program-others a-program)))])
+               ([mod (in-list (program->mods a-program))])
        (define old-path (mod-path mod))
        (define rel-path (find-relative-path base-path old-path))
        (define new-path (simple-form-path (build-path write-to-dir rel-path)))
@@ -577,7 +575,7 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    main
-                                   3
+                                   5
                                    p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
@@ -658,7 +656,7 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
-                                   11 ;; runtime error -> blame on a.rkt
+                                   13 ;; runtime error -> blame on a.rkt
                                    p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
@@ -918,7 +916,7 @@
 
   (require "../util/read-module.rkt"
            ruinit/diff/diff)
-  (define (diff-mutation module-to-mutate mutation-index)
+  (define (diff-mutation module-to-mutate mutation-index the-program)
     (define orig-module-stx
       (match module-to-mutate
         [(mod _ stx) stx]
@@ -927,7 +925,7 @@
                                      "either a mod/c or a path-string?"
                                      other)]))
     (define-values (mutated-program-stx mutated-id)
-      (mutate-module orig-module-stx mutation-index))
+      (mutate-module orig-module-stx mutation-index #:in the-program))
     (printf "--------------------\nMutated: ~a\n" mutated-id)
     (dumb-diff-lines/string
      (pretty-format (syntax->datum orig-module-stx))

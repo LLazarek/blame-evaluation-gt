@@ -73,8 +73,7 @@
                          mutated-module-name))
     (define the-program (make-unified-program main-path
                                               others-paths))
-    (define the-program-mods (list* (program-main the-program)
-                                    (program-others the-program)))
+    (define the-program-mods (program->mods the-program))
     (define the-module-to-mutate
       (find-unified-module-to-mutate module-to-mutate-path
                                      the-program-mods))
@@ -88,7 +87,7 @@
            }))
 
     (when diff-mutant?
-      (define diff (diff-mutation the-module-to-mutate index))
+      (define diff (diff-mutation the-module-to-mutate index the-program))
       (if stop-diff-early?
           (for/fold ([after-ctx #f])
                     ([line (in-list (string-split diff "\n"))]

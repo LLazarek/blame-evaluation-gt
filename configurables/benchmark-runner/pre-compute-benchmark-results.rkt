@@ -71,8 +71,7 @@
          (display @~a{@mod-name @"@" @index                              @"\r"})
          (define mod
            (findf (compose1 (path-ends-with mod-name) mod-path)
-                  (list* (program-main bench-untyped-program)
-                         (program-others bench-untyped-program))))
+                  (program->mods bench-untyped-program)))
          (values (list mod-name index)
                  (run-with-mutated-module bench-untyped-program
                                           mod

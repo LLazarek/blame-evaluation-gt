@@ -8,7 +8,7 @@
           [top-level-selector/c    contract?]
           [select-all                          top-level-selector/c]
           [select-define/contract              top-level-selector/c]
-          [select-any-define                   top-level-selector/c]
+          [select-any-define-named-form        top-level-selector/c]
 
           [select-define-body                  top-level-selector/c]
           [select-type-annotations+define-body top-level-selector/c]
@@ -78,20 +78,24 @@
                            Original: @stx
                            Mutated: @a-bigger-list
                            })]))]))
+
 (define (select-define/contract stx)
   (syntax-parse stx
     [def:contracted-definition
-      (define body-stxs (syntax->list (syntax/loc stx
-                                        (def.body ...))))
+      (define-values {to-mutate id reconstructor}
+        (select-define-body #'(define def.id/sig def.body ...)))
       (define (reconstruct-definition body-stxs/mutated)
-        (quasisyntax/loc stx
-          (def.def/c def.id/sig def.ctc
-            #,@body-stxs/mutated)))
-      (values body-stxs
+        (syntax-parse (reconstructor body-stxs/mutated)
+          [(define _ mutated-body-e ...)
+           (syntax/loc stx
+             (def.def/c def.id/sig def.ctc
+               mutated-body-e ...))]))
+      (values to-mutate
               (leftmost-identifier-in #'def.id/sig)
               reconstruct-definition)]
     [_ (values #f #f #f)]))
-(define (select-any-define stx)
+
+(define (select-any-define-named-form stx)
   (syntax-parse stx
     [def:definition
       (define body-stxs (syntax->list (syntax/loc stx
@@ -120,7 +124,8 @@
        (define body-stxs/no-begin
          (if function?
              (syntax-parse body-stxs/mutated
-               [[(begin mutated-body-e ...)]
+               [[{~describe "begin-wrapped function body (from select-define-body reconstructor)"
+                            (begin mutated-body-e ...)}]
                 (attribute mutated-body-e)])
              body-stxs/mutated))
        (quasisyntax/loc stx

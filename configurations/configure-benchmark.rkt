@@ -22,7 +22,13 @@
                 (or (->bool (findf (path-ends-with "main.rkt")
                                    (benchmark-typed bench)))
                     "Benchmark does not have a main.rkt module.")
-                [result benchmark-configuration/c])])
+                [result benchmark-configuration/c])]
+
+          [benchmark->program/no-common
+           (benchmark/c . -> . program/c)]
+          [benchmark-configuration->program
+           (benchmark-configuration/c . -> . program/c)])
+
          (struct-out benchmark-configuration)
          (struct-out benchmark)
          benchmark-configuration/c
@@ -30,7 +36,8 @@
 
 (require "config.rkt"
          "../util/path-utils.rkt"
-         "../util/ctc-utils.rkt")
+         "../util/ctc-utils.rkt"
+         "../util/program.rkt")
 
 (struct benchmark-configuration (main others base-dir config)
   #:transparent)
@@ -132,6 +139,7 @@
              (sort-file-names (hash-keys config))))
    @~a{a config for @~v[b]}))
 
+;; Produces the names of the mutatable modules in `a-benchmark`
 (define (benchmark->mutatable-modules a-benchmark)
   (map file-name-string-from-path
        (benchmark-typed a-benchmark)))
@@ -146,6 +154,20 @@
     [(list* (app explode-path/string
                  (list _ ... name "typed" _)) _)
      name]))
+
+(define (benchmark->program/no-common bench)
+  (define mods (benchmark-typed bench))
+  (define main (pick-file-by-name mods "main.rkt"))
+  (unless main
+    (raise-argument-error
+     'benchmark->program/no-common
+     "a benchmark with standard structure (i.e. having a main module named `main.rkt`)"
+     bench))
+  (make-program main (remove main mods)))
+
+(define (benchmark-configuration->program c-bench)
+  (make-program (benchmark-configuration-main c-bench)
+                (benchmark-configuration-others c-bench)))
 
 (module+ test
   (require ruinit)
@@ -266,4 +288,16 @@
                                                    "b/base"
                                                    #f))
                  (hash "a.rkt" 'types
-                       "b.rkt" 'types))))
+                       "b.rkt" 'types)))
+
+  (test-begin
+    #:name benchmark->program/no-common
+    #:short-circuit
+    #:before (setup!)
+    #:after (cleanup!)
+    (test-equal? (benchmark->program/no-common (benchmark (list main/t a/t b/t)
+                                                          (list main a b)
+                                                          #f
+                                                          #f))
+                 (make-program main/t
+                               (list a/t b/t)))))
