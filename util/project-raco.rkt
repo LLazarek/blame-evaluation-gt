@@ -19,7 +19,8 @@
 (define glob-patterns-to-ignore
   '("mutation-analysis/plot-mutation-analyses.rkt"
     "util/places-suck-demonstration.rkt"
-    "util/mutation-index-cache-performance-check.rkt"))
+    "util/mutation-index-cache-performance-check.rkt"
+    "data-analysis/*"))
 (define (ignored-path? p)
   (ormap (λ (pat) (glob-match? pat p))
          glob-patterns-to-ignore))
