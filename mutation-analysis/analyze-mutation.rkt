@@ -104,7 +104,8 @@
           }
          })
     (define-values {type-error? mutation-type}
-      (extract-mutation-type-and-result outfile max-config))
+      (extract-mutation-type-and-result outfile max-config (list module-to-mutate-name
+                                                                 index)))
     (log-progress! module-to-mutate-name
                    index
                    type-error?
@@ -129,7 +130,7 @@
 
 (define multiple-blamed-mutants?
   (box #f))
-(define (extract-mutation-type-and-result f max-config)
+(define (extract-mutation-type-and-result f max-config mutant)
   (define trimmed-output
     (system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f}))
   (define output-regexp
@@ -168,7 +169,7 @@
              mutation-type)]
     [other-contents
      (raise-user-error @~a{
-                           Unable to match against file contents:
+                           Unable to match against file contents for @|mutant|:
                            @other-contents
                            })]))
 
