@@ -362,7 +362,9 @@
         [(? type-checker-failure?)
          ((make-status* 'type-error)
           (extract-type-error-source e))]
-        [(? exn:fail:syntax?)
+        [(? exn:fail?)
+         ;; Any failures during compilation that aren't type errors are
+         ;; categorized as syntax errors.
          ((make-status* 'syntax-error))]
         [else
          (report-unexpected-error 'handle-module-evaluation-error
@@ -383,7 +385,7 @@
          ((make-status* 'runtime-error)
           (extract-runtime-error-location e))]
         [else
-         (report-unexpected-error 'handle-module-evaluation-error
+         (report-unexpected-error 'handle-runtime-error
                                   "Unexpected non-`exn:fail?` error while running program."
                                   e)]))
     (define run/handled
@@ -910,43 +912,21 @@
 
 ;; for debugging
 (module+ debug
-  (provide diff-mutation
-           mutant-count
-           format-raw-config-for-runner)
+  (provide diff-mutation)
 
   (require "../util/read-module.rkt"
            ruinit/diff/diff)
   (define (diff-mutation module-to-mutate mutation-index the-program)
-    (define orig-module-stx
+    (define the-mod
       (match module-to-mutate
-        [(mod _ stx) stx]
-        [(? path-string? path) (read-module path)]
+        [(mod _ stx) module-to-mutate]
+        [(? path-string? path) (make-mod path)]
         [other (raise-argument-error 'diff-mutation
                                      "either a mod/c or a path-string?"
                                      other)]))
     (define-values (mutated-program-stx mutated-id)
-      (mutate-module orig-module-stx mutation-index #:in the-program))
+      (mutate-module the-mod mutation-index #:in the-program))
     (printf "--------------------\nMutated: ~a\n" mutated-id)
     (dumb-diff-lines/string
-     (pretty-format (syntax->datum orig-module-stx))
-     (pretty-format (syntax->datum mutated-program-stx))))
-  (define (mutant-count module-to-mutate)
-    (define module-stx (read-module module-to-mutate))
-    (let next-mutant ([index 0])
-      (define index-exceeded?
-        (with-handlers ([mutation-index-exception? (λ _ #t)])
-          (mutate-module module-stx index)
-          #f))
-      (if index-exceeded?
-          index
-          (next-mutant (add1 index)))))
-  (define (maybe-make-path x)
-    (if (string? x)
-        (simple-form-path x)
-        x))
-  (define (format-raw-config-for-runner config)
-    (for/hash ([(mod mod-ids) (in-hash config)])
-      (values (maybe-make-path mod)
-              (for/hash ([(id level) (in-hash mod-ids)])
-                (values (maybe-make-path id)
-                        level))))))
+     (pretty-format (syntax->datum (mod-stx the-mod)))
+     (pretty-format (syntax->datum mutated-program-stx)))))

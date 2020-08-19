@@ -24,6 +24,8 @@
 (define (run-with:require main-mod-path)
   (eval `(require ,main-mod-path)))
 
+;; Module evaluation is basically compilation. Not even top level forms run
+;; until the runtime phase.
 (struct exn:fail:runner:module-evaluation exn:fail (error))
 (struct exn:fail:runner:runtime exn:fail (error))
 
