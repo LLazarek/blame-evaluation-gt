@@ -776,10 +776,11 @@
   #:type [type "imported-id-swap"]
   (define imported-mods (syntactic-module->imported-module-names mod-top-level-forms-stx))
   (define imported-ids
-    (flatten (for*/list ([mod-name (in-list imported-mods)]
-                         [the-mod (in-value (program-mod-with-name mod-name containing-program))]
-                         #:when the-mod)
-               (syntactic-module->exported-ids the-mod))))
+    (sort (flatten (for*/list ([mod-name (in-list imported-mods)]
+                               [the-mod (in-value (program-mod-with-name mod-name containing-program))]
+                               #:when the-mod)
+                     (syntactic-module->exported-ids the-mod)))
+          (λ (a b) (symbol<? (syntax->datum a) (syntax->datum b)))))
   (mutator (combined-id-list-swap-mutator imported-ids type)
            type))
 
@@ -793,13 +794,28 @@
             inner:require-spec _ ...)
            #:with [{~optional relative-require-mod-path}] #'[{~? inner.relative-require-mod-path}]])
 
+(define-syntax-class require/typed*-id
+  #:description "a require/typed(/.+)? form"
+  #:commit
+  #:datum-literals [require/typed/check require/typed require/typed/provide]
+  [pattern {~or require/typed/check require/typed require/typed/provide}])
+
+(define-syntax-class require-form
+  #:description "a require form"
+  #:commit
+  #:datum-literals [require]
+  [pattern ({~or require _:require/typed*-id} _ ...)])
+
 (define (syntactic-module->imported-module-names top-level-forms)
-  (syntax-parse top-level-forms
-    #:datum-literals [require]
-    [{{~seq {~not (require _ ...)} ...
-            (require spec:require-spec ...)} ...
-      {~not (require _ ...)} ...}
-     (syntax->datum #'[{~? spec.relative-require-mod-path} ... ...])]))
+  [syntax-parse top-level-forms
+    #:datum-literals [require require/typed/check require/typed require/typed/provide]
+    [{{~seq {~not _:require-form} ...
+            {~or (require spec:require-spec ...)
+                 (_:require/typed*-id {~between spec:require-spec 1 1} ; nesting depth hack
+                                      ...
+                                      _ ...)}} ...
+      {~not _:require-form} ...}
+     (syntax->datum #'[{~? spec.relative-require-mod-path} ... ...])]])
 
 (define (program-mod-with-name mod-name a-program)
   (findf (compose1 (path-ends-with mod-name) mod-path)
@@ -816,15 +832,46 @@
   [pattern _
            #:with [provided-ids ...] #'[]])
 
+(define-syntax-class require/typed/provide/contract-clause
+  #:description "clause of a require/typed/provide or provide/contract form"
+  #:commit
+  #:datum-literals [rename struct]
+  #:attributes [provided-id]
+  ;; both
+  [pattern [provided-id:id _]]
+  ;; provide/contract
+  [pattern [rename _:id provided-id:id _]]
+  [pattern [struct provided-id:id _ ...]]
+  [pattern [struct (provided-id:id _:id) _ ...]]
+  ;; require/typed/provide
+  [pattern [(_:id provided-id:id) _]]
+  [pattern [#:struct {~optional (_ ...)} provided-id:id _ ...]]
+  [pattern [#:struct {~optional (_ ...)} (provided-id:id _) _ ...]])
+
+(define-syntax-class require/typed/provide/contract-id
+  #:description "either a require/typed/provide or provide/contract form"
+  #:commit
+  #:datum-literals [require/typed/provide provide/contract]
+  [pattern {~or require/typed/provide provide/contract}])
+
+(define-syntax-class provide-form
+  #:description "a provide form"
+  #:commit
+  #:datum-literals [provide]
+  [pattern ({~or provide _:require/typed/provide/contract-id} _ ...)])
+
 (define (syntactic-module->exported-ids a-mod)
   (syntax-parse (mod-stx a-mod)
-    #:datum-literals [provide]
+    #:datum-literals [provide require/typed/provide provide/contract]
     [(module _ _
        (#%module-begin
-        {~seq {~not (provide _ ...)} ...
-              (provide spec:provide-spec ...)} ...
-        {~not (provide _ ...)} ...))
-     (syntax->list #'[spec.provided-ids ... ... ...])]))
+        {~seq {~not _:provide-form} ...
+              {~or (provide spec:provide-spec ...)
+                   (_:require/typed/provide/contract-id
+                    {~optional _:require-spec}
+                    clause:require/typed/provide/contract-clause ...)}} ...
+        {~not _:provide-form} ...))
+     (syntax->list #'[{~? {~@ spec.provided-ids ... ...}} ... {~? {~@ clause.provided-id ...}} ...])]))
 
 (module+ test
   (test-begin
@@ -847,7 +894,26 @@
                  '("c.rkt"))
     (test-equal? (syntactic-module->imported-module-names
                   #'{(+ 2 2)})
-                 '()))
+                 '())
+    (test-equal? (syntactic-module->imported-module-names
+                  #'{(provide x)
+                     (require racket/match
+                              (only-in "c.rkt" c)
+                              syntax/parse)
+                     (require/typed/check
+                      "abc.rkt"
+                      [foo Any]
+                      [#:struct posn ([x : Real]
+                                      [y : Real])]
+                      [(bar new-bar) T])
+                     (define z 42)
+                     (main)})
+                 '("c.rkt" "abc.rkt"))
+    (test-equal? (syntactic-module->imported-module-names
+                  #'{(require/typed
+                      "abc.rkt"
+                      [foo Any])})
+                 '("abc.rkt")))
 
   (test-begin
     #:name syntactic-module->exported-ids
@@ -884,7 +950,31 @@
                         #'(module a racket
                             (#%module-begin
                              (+ 2 2))))))
-                 '()))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (syntactic-module->exported-ids
+                   (mod "a.rkt"
+                        #'(module a typed/racket
+                            (#%module-begin
+                             (require/typed/provide "m.rkt"
+                               [a T]
+                               [(old-b new-b) T]
+                               [#:struct posn ([x : Real]
+                                               [y : Real])]))))))
+                 '(a new-b posn))
+    (test-equal? (map
+                  syntax->datum
+                  (syntactic-module->exported-ids
+                   (mod "a.rkt"
+                        #'(module a racket
+                            (#%module-begin
+                             (provide/contract
+                               [a T]
+                               [rename old-b new-b T]
+                               [struct posn ([x Real]
+                                             [y Real])]))))))
+                 '(a new-b posn)))
 
   (test-begin
     #:name make-imported-id-swap-mutator
