@@ -36,7 +36,7 @@
 
 (define active-dependent-mutators
   (list make-top-level-id-swap-mutator
-        make-imported-id-swap-mutator
+        ;; make-imported-id-swap-mutator
         make-method-id-swap-mutator))
 
 (define active-mutator-names
