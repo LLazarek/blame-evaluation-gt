@@ -30,8 +30,11 @@
          racket/function
          racket/list
          racket/match
+         racket/format
          racket/set
+         racket/string
          syntax/parse
+         syntax/id-set
          "logger.rkt"
          "mutate-expr.rkt"
          "mutate-util.rkt"
@@ -775,8 +778,21 @@
 (define-dependent-mutator (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
   #:type [type "imported-id-swap"]
   (define imported-mods (syntactic-module->imported-module-names mod-top-level-forms-stx))
+  (define program-mods (program->mods containing-program))
+  (define imported-mods/skipping-adapters
+    (filter-map
+     (match-lambda
+       [(and adapter
+             (regexp @regexp{^(.+)-adapt(ed|or|er).rkt} (list _ base-mod-name _)))
+        (define reconstructed-base-mod (~a base-mod-name ".rkt"))
+        (and (findf (λ (m) (string-suffix? (~a (mod-path m))
+                                           reconstructed-base-mod))
+                    program-mods)
+             reconstructed-base-mod)]
+       [non-adapter non-adapter])
+     imported-mods))
   (define imported-ids
-    (sort (flatten (for*/list ([mod-name (in-list imported-mods)]
+    (sort (flatten (for*/list ([mod-name (in-list imported-mods/skipping-adapters)]
                                [the-mod (in-value (program-mod-with-name mod-name containing-program))]
                                #:when the-mod)
                      (syntactic-module->exported-ids the-mod)))
@@ -832,46 +848,42 @@
   [pattern _
            #:with [provided-ids ...] #'[]])
 
-(define-syntax-class require/typed/provide/contract-clause
-  #:description "clause of a require/typed/provide or provide/contract form"
+(define-syntax-class provide/contract-clause
+  #:description "clause of a provide/contract form"
   #:commit
   #:datum-literals [rename struct]
   #:attributes [provided-id]
-  ;; both
   [pattern [provided-id:id _]]
-  ;; provide/contract
   [pattern [rename _:id provided-id:id _]]
   [pattern [struct provided-id:id _ ...]]
-  [pattern [struct (provided-id:id _:id) _ ...]]
-  ;; require/typed/provide
-  [pattern [(_:id provided-id:id) _]]
-  [pattern [#:struct {~optional (_ ...)} provided-id:id _ ...]]
-  [pattern [#:struct {~optional (_ ...)} (provided-id:id _) _ ...]])
-
-(define-syntax-class require/typed/provide/contract-id
-  #:description "either a require/typed/provide or provide/contract form"
-  #:commit
-  #:datum-literals [require/typed/provide provide/contract]
-  [pattern {~or require/typed/provide provide/contract}])
+  [pattern [struct (provided-id:id _:id) _ ...]])
 
 (define-syntax-class provide-form
   #:description "a provide form"
   #:commit
-  #:datum-literals [provide]
-  [pattern ({~or provide _:require/typed/provide/contract-id} _ ...)])
+  #:datum-literals [provide provide/contract]
+  [pattern ({~or provide provide/contract} _ ...)])
 
 (define (syntactic-module->exported-ids a-mod)
   (syntax-parse (mod-stx a-mod)
-    #:datum-literals [provide require/typed/provide provide/contract]
+    #:datum-literals [provide provide/contract]
     [(module _ _
-       (#%module-begin
-        {~seq {~not _:provide-form} ...
-              {~or (provide spec:provide-spec ...)
-                   (_:require/typed/provide/contract-id
-                    {~optional _:require-spec}
-                    clause:require/typed/provide/contract-clause ...)}} ...
-        {~not _:provide-form} ...))
-     (syntax->list #'[{~? {~@ spec.provided-ids ... ...}} ... {~? {~@ clause.provided-id ...}} ...])]))
+       {~and
+        (#%module-begin
+         {~seq {~not _:provide-form} ...
+               {~or (provide spec:provide-spec ...)
+                    (provide/contract clause:provide/contract-clause ...)}} ...
+         {~not _:provide-form} ...)
+        (_
+         top-level-form ...)})
+     (define all-provided-ids
+       (syntax->list #'[{~? {~@ spec.provided-ids ... ...}}
+                        ...
+                        {~? {~@ clause.provided-id ...}}
+                        ...]))
+     (define ids-defined-in-the-mod (top-level-definitions #'[top-level-form ...]))
+     (set->list (set-intersect (immutable-free-id-set all-provided-ids)
+                               (immutable-free-id-set ids-defined-in-the-mod)))]))
 
 (module+ test
   (test-begin
@@ -926,10 +938,10 @@
                              (provide x)
                              (require "a.rkt")
                              (define z 42)
-                             (provide foobar)
+                             (provide foobar-not-defined)
                              (define x y)
                              (+ 2 2))))))
-                 '(x foobar))
+                 '(x))
     (test-equal? (map
                   syntax->datum
                   (syntactic-module->exported-ids
@@ -942,7 +954,8 @@
                                       syntax/parse)
                              (define z 42)
                              (main))))))
-                 '(a foo))
+                 ;; renaming not supported
+                 '())
     (test-equal? (map
                   syntax->datum
                   (syntactic-module->exported-ids
@@ -962,7 +975,7 @@
                                [(old-b new-b) T]
                                [#:struct posn ([x : Real]
                                                [y : Real])]))))))
-                 '(a new-b posn))
+                 '())
     (test-equal? (map
                   syntax->datum
                   (syntactic-module->exported-ids
@@ -973,8 +986,9 @@
                                [a T]
                                [rename old-b new-b T]
                                [struct posn ([x Real]
-                                             [y Real])]))))))
-                 '(a new-b posn)))
+                                             [y Real])])
+                             (define a 42))))))
+                 '(a)))
 
   (test-begin
     #:name make-imported-id-swap-mutator
@@ -984,7 +998,7 @@
         #'{(require foobar
                     "b.rkt"
                     racket/match
-                    "c.rkt"
+                    "c-adapted.rkt"
                     "a.rkt")
            (define (f x) (c-1 x))
            (+ 2 2)
@@ -1001,13 +1015,23 @@
                        (mod "b.rkt"
                             #'(module main racket
                                 (#%module-begin
-                                 (provide b-1 b-2)
+                                 (require "b3.rkt")
+                                 (provide b-1 b-2 b-3)
+                                 (define b-1 42)
+                                 (define b-2 42)
                                  42)))
                        (mod "c.rkt"
                             #'(module main racket
                                 (#%module-begin
                                  (provide c-1 c-2)
-                                 42))))))))
+                                 (define c-1 42)
+                                 (define c-2 42)
+                                 42)))
+                       (mod "c-adapted.rkt"
+                            #'(module main racket
+                                (#%module-begin
+                                 (require "c.rkt")
+                                 (provide (all-from-out "c.rkt"))))))))))
     (test-mutator* imported-id-swap-mutator
                    #'x
                    (list #'x))
