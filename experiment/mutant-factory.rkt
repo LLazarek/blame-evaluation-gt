@@ -162,9 +162,9 @@
                  [mutation-index (select-mutants module-to-mutate-name
                                                  bench)])
         (sample-blame-trails-if-type-error process-q
-                                           (mutant module-to-mutate-name
-                                                   mutation-index
-                                                   #t))))
+                                           (mutant #f
+                                                   module-to-mutate-name
+                                                   mutation-index))))
 
     (log-factory info "Finished enqueing all test mutants. Waiting...")
     (define process-q-finished (process-Q-wait process-q))
@@ -263,7 +263,7 @@
 (define/contract (sample-blame-trails-if-type-error process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
-  (match-define (mutant module-to-mutate-name mutation-index #t) mutant-program)
+  (match-define (mutant #f module-to-mutate-name mutation-index) mutant-program)
   (log-factory debug
                "  Trying to spawn test mutant for ~a @ ~a."
                module-to-mutate-name
@@ -337,12 +337,6 @@
                    will:sample-if-type-error
                    #:test-mutant? #t)]))
 
-(define (mutant-module-name a-mutant)
-  (define mod (mutant-module a-mutant))
-  (if (mutant-abstract? a-mutant)
-      mod
-      (file-name-string-from-path mod)))
-
 (define/contract (sample-blame-trail-roots process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
@@ -355,11 +349,11 @@
   (define max-config (bench-info-max-config (factory-bench the-factory)))
   (define samples (config-samples max-config
                                   (sample-size)
-                                  (mutant-module-name mutant-program)))
+                                  (mutant-module mutant-program)))
   (define (resample a-factory)
     (define sample (first (config-samples max-config
                                           1
-                                          (mutant-module-name mutant-program))))
+                                          (mutant-module mutant-program))))
     (cond
       ;; ll: by default, sample *with* replacement
       [(and (sample-without-replacement?)
@@ -417,7 +411,7 @@
    . -> .
    (process-Q/c factory/c))
 
-  (match-define (mutant module-to-mutate-name mutation-index #t)
+  (match-define (mutant #f module-to-mutate-name mutation-index)
     mutant-program)
   (match ((current-result-cache) module-to-mutate-name
                                  mutation-index
@@ -476,7 +470,7 @@
          [else "`dead-proc` should have a blame label"])
        [result (process-Q/c factory/c)])
 
-  (match-define (dead-mutant-process (mutant mod index #t)
+  (match-define (dead-mutant-process (mutant #f mod index)
                                      config
                                      result
                                      id
@@ -555,7 +549,7 @@
    . -> .
    ((process-Q/c factory/c) dead-mutant-process/c . -> . (process-Q/c factory/c)))
 
-  (match-define (dead-mutant-process (mutant mod index #t)
+  (match-define (dead-mutant-process (mutant #f mod index)
                                      config
                                      result
                                      id
@@ -739,7 +733,7 @@ Giving up.
             [test-mutant?            (blame-trail test-mutant-flag
                                                   '())]))
     (define mutant-proc
-      (mutant-process (mutant module-to-mutate-name mutation-index #t)
+      (mutant-process (mutant #f module-to-mutate-name mutation-index)
                       precision-config
                       outfile
                       mutant-id
@@ -783,7 +777,7 @@ Giving up.
 
   (define (outer-will process-q the-process-info)
     (match-define (and mutant-proc
-                       (mutant-process (mutant mod index #t)
+                       (mutant-process (mutant #f mod index)
                                        config
                                        file
                                        id the-blame-trail
@@ -831,7 +825,7 @@ Giving up.
                         config: @~s[config]
                         })
        (define dead-mutant-proc
-         (dead-mutant-process (mutant mod index #t)
+         (dead-mutant-process (mutant #f mod index)
                               config
                               result
                               id
@@ -859,7 +853,7 @@ Giving up.
   (match-define (struct* mutant-process
                          ([id             id]
                           [blame-trail    the-blame-trail]
-                          [mutant         (mutant mod index #t)]
+                          [mutant         (mutant #f mod index)]
                           [config         config]
                           [revival-count  revival-count]))
     a-mutant-process)
@@ -918,7 +912,7 @@ Attempting revival ~a / ~a
    factory/c)
 
   (match-define (and the-mutant
-                     (mutant module-to-mutate-name mutation-index #t))
+                     (mutant #f module-to-mutate-name mutation-index))
     (dead-mutant-process-mutant (first (blame-trail-parts the-blame-trail))))
   (define the-results (factory-results the-factory))
   (define mutant-data-file
@@ -950,7 +944,7 @@ Attempting revival ~a / ~a
     (map summarize-dead-mutant-process
          (blame-trail-parts the-blame-trail)))
   (match-define (list* (struct* dead-mutant-process
-                                ([mutant (mutant mod index #t)]))
+                                ([mutant (mutant #f mod index)]))
                        _)
     (blame-trail-parts the-blame-trail))
   (blame-trail-summary mod
@@ -971,7 +965,7 @@ Attempting revival ~a / ~a
 
   (define path (mutant-process-file mutant-proc))
   (define (report-malformed-output . _)
-    (match-define (mutant-process (mutant mod index _) config _ id _ _ _)
+    (match-define (mutant-process (mutant _ mod index) config _ id _ _ _)
       mutant-proc)
     (log-factory error
                  "Result read from mutant output not of the expected shape.
@@ -1086,7 +1080,7 @@ Mutant: [~a] ~a @ ~a with config:
 
 (define (record/check-configuration-outcome! dead-proc)
   (match-define (struct* dead-mutant-process ([result result]
-                                              [mutant (mutant mod-name index _)]
+                                              [mutant (mutant _ mod-name index)]
                                               [config config]))
     dead-proc)
   (match* {result (record/check-configuration-outcomes?)}

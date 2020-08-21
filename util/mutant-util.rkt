@@ -24,7 +24,8 @@
 
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
-          [default-timeout/s (parameter/c (and/c number? positive?))]))
+          [default-timeout/s (parameter/c (and/c number? positive?))])
+         (struct-out mutant))
 
 (require racket/runtime-path
          "../configurations/configure-benchmark.rkt"
@@ -150,6 +151,8 @@
                    mutation-index
                    #:in program)
     #f))
+
+(struct mutant (benchmark module index) #:prefab)
 
 (module+ test
   (require ruinit

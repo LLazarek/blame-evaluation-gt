@@ -4,8 +4,7 @@
          racket/math
          racket/set)
 
-(provide (struct-out mutant)
-         (struct-out blame-trail)
+(provide (struct-out blame-trail)
          (struct-out mutant-process)
          (struct-out dead-mutant-process)
          (struct-out bench-info)
@@ -26,20 +25,16 @@
          factory/c
          mutant-will/c)
 
-[require "../util/path-utils.rkt"
+(require "../util/path-utils.rkt"
+         "../util/mutant-util.rkt"
          "../runner/mutation-runner.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
          "../process-q/interface.rkt"
-         syntax/parse/define]
+         syntax/parse/define)
 
 ;; see last result of `process`
 (define process-ctl? procedure?)
-
-;; module:    path-string?
-;; index:     natural?
-;; abstract?: boolean? ; is module a `module-name?` rather than a resolved path?
-(struct mutant (module index abstract?) #:transparent)
 
 (struct blame-trail (id parts) #:transparent)
 
@@ -109,11 +104,9 @@
 (define blame-labels? (non-empty-listof module-name?))
 (define mutant/c
   (struct/dc mutant
-             [module (abstract?) (if abstract?
-                                     module-name?
-                                     path-to-existant-file?)]
-             [index natural?]
-             [abstract? boolean?]))
+             [benchmark #f]
+             [module module-name?]
+             [index natural?]))
 (define result/c run-status/c)
 (define blame-trail-id? (or/c natural?
                               test-mutant-flag))

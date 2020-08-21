@@ -2,6 +2,7 @@
 
 (require "../../configurations/config.rkt"
          "../../experiment/mutant-factory-data.rkt"
+         "../../util/mutant-util.rkt"
          "../../runner/mutation-runner.rkt"
          "../../util/optional-contracts.rkt")
 
@@ -15,7 +16,7 @@
 (define (blame-trail-ended? dead-proc
                             blamed/type-error-locations
                             log-factory-message)
-  (match-define (dead-mutant-process (mutant mod index #t)
+  (match-define (dead-mutant-process (mutant _ mod index)
                                      config
                                      result
                                      id

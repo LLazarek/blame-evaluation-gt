@@ -95,7 +95,7 @@
 (define main.rkt (file-name-string-from-path main-path))
 (define loop.rkt (file-name-string-from-path loop-path))
 (define dead-e-proc/crashed
-  (dead-mutant-process (mutant e.rkt 0 #t)
+  (dead-mutant-process (mutant #f e.rkt 0)
                        (hash e.rkt 'none
                              main.rkt 'none
                              loop.rkt 'none)
@@ -148,8 +148,8 @@
 (define mutant0-mod "mutant0.rkt")
 (define mutant1-mod "mutant1.rkt")
 (define mutant2-mod "mutant2.rkt")
-(define mutant0 (mutant mutant0-mod 0 #t))
-(define mutant1 (mutant mutant1-mod 1 #t))
+(define mutant0 (mutant #f mutant0-mod 0))
+(define mutant1 (mutant #f mutant1-mod 1))
 (define/match (mp->dead a-mp [result (file->value (mutant-process-file a-mp))])
   [{(mutant-process mutant config _ id blame-trail _ increased-limits?)
     _}
@@ -484,7 +484,7 @@
                     q)
                   #:following-trail the-trail))
    (test-match (unbox enqueued)
-               (mutant-process (mutant main.rkt 42 #t)
+               (mutant-process (mutant #f main.rkt 42)
                                (== the-config)
                                _
                                _
@@ -514,7 +514,7 @@
                            q)))
     (process-will:housekeeping+do-nothing
      mock-Q
-     (process-info (mutant-process (mutant main.rkt 42 #t)
+     (process-info (mutant-process (mutant #f main.rkt 42)
                                    (hash main.rkt 'none
                                          e.rkt 'none
                                          loop.rkt 'types)
@@ -578,7 +578,7 @@
   (parameterize ([current-result-cache
                   (λ _ mutant0-path)])
     (sample-blame-trails-if-type-error mock-q
-                                       (mutant main.rkt 0 #t))))
+                                       (mutant #f main.rkt 0))))
  (test-match calls
              (hash-table [_ 0] ___))
 
@@ -590,7 +590,7 @@
                     mutant0-path]
                    [{_ _ _} #f])])
     (sample-blame-trails-if-type-error mock-q
-                                       (mutant main.rkt 0 #t))))
+                                       (mutant #f main.rkt 0))))
  (test-match calls
              (hash-table ['enq (== remaining-procs)] [_ 0] ___))
 
@@ -599,7 +599,7 @@
   (parameterize ([current-result-cache
                   (λ _ #f)])
     (sample-blame-trails-if-type-error mock-q
-                                       (mutant main.rkt 0 #t))))
+                                       (mutant #f main.rkt 0))))
  (test-match calls
              ;; only 1 because must spawn test mutant
              (hash-table ['enq 1] [_ 0] ___)))
@@ -614,7 +614,7 @@
            (record/check-configuration-outcome! dead-e-proc/crashed)))
  (match dead-e-proc/crashed
    [(struct* dead-mutant-process
-             ([mutant (mutant mod index _)]
+             ([mutant (mutant #f mod index)]
               [config config]))
     (test-match the-hash
                 (hash-table [(== (list mod index config))
@@ -624,7 +624,7 @@
            (record/check-configuration-outcome! dead-e-proc/blame-e)))
  (match dead-e-proc/blame-e
    [(struct* dead-mutant-process
-             ([mutant (mutant mod index _)]
+             ([mutant (mutant #f mod index)]
               [config config]))
     (test-match the-hash
                 (hash-table [(== (list mod index config))
