@@ -204,7 +204,8 @@
                'progress-log
                ("Record progress in the given log file."
                 "If it exists and is not empty, resume from the point reached in the log.")
-               #:collect ["path" take-latest #f]]}
+               #:collect ["path" take-latest #f]
+               #:mandatory]}
  (current-configuration-path (hash-ref flags 'config-path))
  (define progress-log (hash-ref flags 'progress-log))
  (define progress
