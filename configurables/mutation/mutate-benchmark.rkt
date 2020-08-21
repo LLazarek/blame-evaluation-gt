@@ -1437,7 +1437,8 @@
        (mutate-syntax stx mi
                       #:top-level-select select-define-body))))
 
-  (test-begin
+  ;; disabled, see above
+  #;(test-begin
     #:name imported-id-swap
     (test-mutation/sequence
      #'{(require "a.rkt")
