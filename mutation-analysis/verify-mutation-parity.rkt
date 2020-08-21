@@ -5,6 +5,7 @@
 (require "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
          "../configurations/configure-benchmark.rkt"
+         "../configurables/configurables.rkt"
          "../util/program.rkt"
          "../mutate/mutate-program.rkt"
          "../process-q/priority.rkt"
@@ -47,6 +48,7 @@
            mutated-id-for-typed/untyped-agrees?)
 
   (require "../configurations/configure-benchmark.rkt"
+           "../configurables/configurables.rkt"
            "../mutate/mutate-program.rkt"
            "../mutate/logger.rkt"
            "../mutate/expression-selectors.rkt"
@@ -60,7 +62,7 @@
            syntax/parse)
 
   (struct no-more-mutants () #:prefab)
-  (define (extract-mutation stx index)
+  (define (extract-mutation mod index program)
     (define mutated-expr (box #f))
     (define mutated-id
       (with-intercepted-logging
@@ -70,7 +72,7 @@
           [other (void)])
         (thunk
          (define-values {_ id}
-           (mutate-module stx index))
+           (mutate-module mod index #:in program))
          id)
         #:logger mutate-logger
         'info))
@@ -104,14 +106,24 @@
                    (or/c no-more-mutants?
                          (list/c symbol? any/c)))
            #t))
+
+    (define typed-config (make-max-bench-config a-benchmark))
+    (define untyped-config (for/hash ([{mod _} (in-hash typed-config)])
+                             (values mod 'none)))
+    (define typed-benchmark-configuration (configure-benchmark a-benchmark typed-config))
+    (define untyped-benchmark-configuration (configure-benchmark a-benchmark untyped-config))
+    (define typed-program (benchmark-configuration->program typed-benchmark-configuration))
+    (define untyped-program (benchmark-configuration->program untyped-benchmark-configuration))
+
+    (define mod-to-mutate? (compose1 (path-ends-with a-module-to-mutate)
+                                     mod-path))
+
     (define mutateds
-      (for/list ([typed-or-untyped-files (in-list (list benchmark-typed
-                                                        benchmark-untyped))])
-        (define mod-path (pick-file-by-name (typed-or-untyped-files a-benchmark)
-                                            a-module-to-mutate))
-        (define mod (make-mod mod-path))
+      (for/list ([typed-or-untyped-program (in-list (list typed-program
+                                                          untyped-program))])
+        (define mod (findf mod-to-mutate? (program->mods typed-or-untyped-program)))
         (with-handlers ([mutation-index-exception? (const (no-more-mutants))])
-          (extract-mutation (mod-stx mod) mutation-index))))
+          (extract-mutation mod mutation-index typed-or-untyped-program))))
     (match mutateds
       [(list (no-more-mutants) (no-more-mutants))
        (no-more-mutants)]
@@ -152,6 +164,7 @@
   (define (process-parity-check-main/binary-search)
     (define a-benchmark (apply benchmark (read)))
     (define a-module-to-mutate (read))
+    (current-configuration-path (read))
     (define result
       (parity-check/binary-search a-benchmark
                                   a-module-to-mutate))
@@ -160,6 +173,7 @@
   (define (process-parity-check-main/exhaustive)
     (define a-benchmark (apply benchmark (read)))
     (define a-module-to-mutate (read))
+    (current-configuration-path (read))
     (define index-range (read))
     (define result
       (parity-check/exhaustive a-benchmark
@@ -194,6 +208,7 @@
                     (if both (path->string both) both))])
            stdin)
   (writeln mod-to-mutate stdin)
+  (writeln (current-configuration-path) stdin)
   (match mode
     [(or 'exhaustive 'simple-exhaustive) (writeln maybe-index-range stdin)]
     ['quick      (void)])
@@ -500,6 +515,11 @@
                 "may be slower than --exhaustive.")
                #:conflicts '(exhaustive?)
                #:record]
+              [("-c" "--config")
+               'config
+               ("Configuration specifying the mutators to use.")
+               #:collect ["path" (set-parameter current-configuration-path) #f]
+               #:mandatory]
               #:args [benchmarks-dir]}
  (file-stream-buffer-mode (current-output-port) 'line)
  (define n-processes (string->number (hash-ref flags 'procs)))
