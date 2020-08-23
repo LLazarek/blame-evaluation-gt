@@ -777,27 +777,33 @@
 ; stx? program/c -> mutator/c
 (define-dependent-mutator (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
   #:type [type "imported-id-swap"]
-  (define imported-mods (syntactic-module->imported-module-names mod-top-level-forms-stx))
   (define program-mods (program->mods containing-program))
-  (define imported-mods/skipping-adapters
-    (filter-map
-     (match-lambda
-       [(and adapter
-             (regexp @regexp{^(.+)-adapt(ed|or|er).rkt} (list _ base-mod-name _)))
-        (define reconstructed-base-mod (~a base-mod-name ".rkt"))
-        (and (findf (λ (m) (string-suffix? (~a (mod-path m))
-                                           reconstructed-base-mod))
-                    program-mods)
-             reconstructed-base-mod)]
-       [non-adapter non-adapter])
-     imported-mods))
-  (define imported-ids
-    (sort (flatten (for*/list ([mod-name (in-list imported-mods/skipping-adapters)]
-                               [the-mod (in-value (program-mod-with-name mod-name containing-program))]
-                               #:when the-mod)
-                     (syntactic-module->exported-ids the-mod)))
-          (λ (a b) (symbol<? (syntax->datum a) (syntax->datum b)))))
-  (mutator (combined-id-list-swap-mutator imported-ids type)
+  (define try-unadapt
+    (match-lambda
+      [(and adapter
+            (regexp @regexp{^(.+)-adapt(ed|or|er).rkt} (list _ base-mod-name _)))
+       (define reconstructed-base-mod (~a base-mod-name ".rkt"))
+       (and (findf (λ (m) (string-suffix? (~a (mod-path m))
+                                          reconstructed-base-mod))
+                   program-mods)
+            reconstructed-base-mod)]
+      [non-adapter non-adapter]))
+  (define imported-mods
+    (sort (remove-duplicates
+           (filter-map try-unadapt
+                       (syntactic-module->imported-module-names mod-top-level-forms-stx)))
+          string<?))
+  (define imported-id-swap-mutators
+    (for*/list ([mod-name (in-list imported-mods)]
+                [the-mod (in-value (program-mod-with-name mod-name containing-program))]
+                #:when the-mod)
+      (define mod-exported-ids
+        (sort
+         (syntactic-module->exported-ids the-mod)
+         (λ (a b) (symbol<? (syntax->datum a) (syntax->datum b)))))
+      (log-mutate-debug @~a{ids from @mod-name : @mod-exported-ids})
+      (combined-id-list-swap-mutator mod-exported-ids type)))
+  (mutator (apply compose-mutators imported-id-swap-mutators)
            type))
 
 (define-syntax-class require-spec
@@ -1018,7 +1024,6 @@
                                  (require "b3.rkt")
                                  (provide b-1 b-2 b-3)
                                  (define b-1 42)
-                                 (define b-2 42)
                                  42)))
                        (mod "c.rkt"
                             #'(module main racket
@@ -1041,17 +1046,13 @@
     (test-mutator* imported-id-swap-mutator
                    #'a-1
                    (list #'a-1))
+    ;; only one valid id exported
     (test-mutator* imported-id-swap-mutator
                    #'b-1
-                   (list #'b-2
-                         #'c-1
-                         #'c-2
-                         #'b-1))
+                   (list #'b-1))
     (test-mutator* imported-id-swap-mutator
                    #'c-2
-                   (list #'b-1
-                         #'b-2
-                         #'c-1
+                   (list #'c-1
                          #'c-2))))
 
 

@@ -36,7 +36,7 @@
 
 (define active-dependent-mutators
   (list make-top-level-id-swap-mutator
-        ;; make-imported-id-swap-mutator
+        make-imported-id-swap-mutator
         make-method-id-swap-mutator))
 
 (define active-mutator-names
@@ -1438,15 +1438,18 @@
                       #:top-level-select select-define-body))))
 
   ;; disabled, see above
-  #;(test-begin
+  (test-begin
     #:name imported-id-swap
     (test-mutation/sequence
      #'{(require "a.rkt")
-        (define x (f (g 'a)))}
+        (require "b.rkt")
+        (define x (f (g (h 'a))))}
      `([0 ,#'{(require "a.rkt")
-              (define x (g (g 'a)))}]
+              (require "b.rkt")
+              (define x (g (g (h 'a))))}]
        [1 ,#'{(require "a.rkt")
-              (define x (f (f 'a)))}])
+              (require "b.rkt")
+              (define x (f (f (h 'a))))}])
      (λ (stx mi)
        (mutate-syntax stx mi
                       #:top-level-select select-define-body
@@ -1456,7 +1459,12 @@
                                                         (#%module-begin
                                                          (provide f g)
                                                          (define (f x) x)
-                                                         (define (g x) x))))))))))
+                                                         (define (g x) x))))
+                                               (mod "a.rkt"
+                                                    #'(module main racket
+                                                        (#%module-begin
+                                                         (provide h something-else)
+                                                         (define (h x) x))))))))))
 
   (test-begin
     #:name method-id-swap
