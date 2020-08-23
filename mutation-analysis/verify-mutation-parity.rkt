@@ -82,16 +82,18 @@
           mutated-expr/annotations-stripped))
 
   (define (strip-annotations mutated-expr)
-    (define stripped-expr (first (select-exprs-as-if-untyped mutated-expr)))
-    (match (syntax->list stripped-expr)
-      [(list lone-subexpr)
-       #:when (syntax-parse mutated-expr
-                [[name:id {~datum :} T] #t]
-                [else #f])
-       (strip-annotations lone-subexpr)]
-      [(? list? subexprs)
-       (map strip-annotations subexprs)]
-      [#f (syntax->datum stripped-expr)]))
+    (match (select-exprs-as-if-untyped mutated-expr)
+      [(list stripped-expr _ _)
+       (match (syntax->list stripped-expr)
+         [(list lone-subexpr)
+          #:when (syntax-parse mutated-expr
+                   [[name:id {~datum :} T] #t]
+                   [else #f])
+          (strip-annotations lone-subexpr)]
+         [(? list? subexprs)
+          (filter-map strip-annotations subexprs)]
+         [#f (syntax->datum stripped-expr)])]
+      [#f #f]))
 
   (define/contract (mutated-id-for-typed/untyped-agrees? a-benchmark
                                                          a-module-to-mutate
