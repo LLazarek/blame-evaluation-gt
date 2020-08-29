@@ -1,6 +1,6 @@
 #lang at-exp rscript
 
-(require plot/no-gui
+(require plot
          plot/utils
          plot-util/quick/infer
          plot-util/histogram
@@ -13,25 +13,48 @@
 
 (define PLOT-WIDTH 500)
 
-(struct annotated (data points))
+(struct annotated (data points) #:prefab)
+(struct serializable-point-label (point label size color) #:prefab)
+
+(define (serializable-point-label->point-label spl)
+  (match-define (serializable-point-label p l s c) spl)
+  (point-label p l #:point-size s #:color c))
+
+(define (make-serializable-point-label p l #:point-size s #:color c)
+  (serializable-point-label p l s c))
+
+
 (define (read-data-files log-files
                          #:data-type data-type)
-  (for/hash ([log (in-list log-files)])
-    (define-values {data
-                    total-mutant-count
-                    total-success-count
-                    plot-annotations}
-      (read-data-from-log log
-                          #:data-type data-type))
-    (define title (~a (path->benchmark-name log) " "
-                      "("
-                      total-success-count " / " total-mutant-count " type error"
-                      ")"
-                      ;; " ("
-                      ;; (round (* 100 (/ total-success-count total-mutant-count)))
-                      ;; "%)"
-                      ))
-    (values title (annotated data plot-annotations))))
+  (match data-type
+    ['successful-population-count
+     (define benchmark-success-hashes
+       (for/hash ([log-file (in-list log-files)])
+         (values (path->benchmark-name log-file)
+                 (hash-ref (log->data log-file) 'success))))
+     (for/list ([mutator (in-list (current-mutation-types))])
+       (define success-counts-per-benchmark
+         (for/list ([{benchmark success-data-hash} (in-hash benchmark-success-hashes)])
+           (list benchmark (hash-ref success-data-hash mutator 0))))
+       (list mutator
+             success-counts-per-benchmark))]
+    [(or 'total-counts 'success-ratios)
+     (for/hash ([log (in-list log-files)])
+       (define-values {data
+                       total-mutant-count
+                       total-success-count
+                       plot-annotations}
+         (read-data-from-log log
+                             #:data-type data-type))
+       (define title (~a (path->benchmark-name log) " "
+                         "("
+                         total-success-count " / " total-mutant-count " type error"
+                         ")"
+                         ;; " ("
+                         ;; (round (* 100 (/ total-success-count total-mutant-count)))
+                         ;; "%)"
+                         ))
+       (values title (annotated data plot-annotations)))]))
 
 (define (path->benchmark-name path)
   (match (basename path)
@@ -42,52 +65,55 @@
      (raise-user-error 'plot-mutation-analyses
                        @~a{Given file that doesn't look like a log: @path})]))
 
-(define (read-data-from-log path #:data-type data-type)
+(define (log->data path)
   (match (file->string path)
     [(regexp @regexp{#hash.+$}
              (list data-hash-str))
-     (define hit+miss-data
-       (call-with-input-string data-hash-str read))
-     (define all-hits
-       (hash-ref hit+miss-data 'success))
-     (define all-misses
-       (hash-ref hit+miss-data 'fail))
-     (define ratios
-       (for/list ([type (in-list (current-mutation-types))])
-         (define ratio
-           (match* {(hash-ref all-hits type 0)
-                    (hash-ref all-misses type 0)
-                    data-type}
-             [{0 0 _} 0]
-             [{hits misses 'success-ratios}
-              (/ hits (+ hits misses))]
-             [{hits misses 'total-counts}
-              (match (hash-ref hit+miss-data 'total)
-                [0 0]
-                [total (/ (+ hits misses) total)])]))
-         (cons type ratio)))
-     (define annotations
-       (data-annotations all-hits all-misses))
-     (when (equal? data-type 'total-counts)
-       (define sum (apply + (dict-values ratios)))
-       (unless (< (abs (- sum 1)) 0.001)
-         (raise-user-error
-          'plot-mutation-analyses
-          @~a{
-              The sum of mutation operator occurrence ratios is not 1 @;
-              in log @path !
-              This probably means that there are missing mutation types, @;
-              or otherwise there is a bug.
-              The mutation types I looked for are:
-              @(pretty-format (dict-keys ratios))
-              })))
-     (values ratios
-             (hash-ref hit+miss-data 'total)
-             (apply + (hash-values all-hits))
-             annotations)]
+     (call-with-input-string data-hash-str read)]
     [else
      (raise-user-error 'plot-mutation-analyses
                        @~a{Given file that doesn't look like a log: @path})]))
+
+(define (read-data-from-log path #:data-type data-type)
+  (define hit+miss-data
+    (log->data log))
+  (define all-hits
+    (hash-ref hit+miss-data 'success))
+  (define all-misses
+    (hash-ref hit+miss-data 'fail))
+  (define ratios
+    (for/list ([type (in-list (current-mutation-types))])
+      (define ratio
+        (match* {(hash-ref all-hits type 0)
+                 (hash-ref all-misses type 0)
+                 data-type}
+          [{0 0 _} 0]
+          [{hits misses 'success-ratios}
+           (/ hits (+ hits misses))]
+          [{hits misses 'total-counts}
+           (match (hash-ref hit+miss-data 'total)
+             [0 0]
+             [total (/ (+ hits misses) total)])]))
+      (cons type ratio)))
+  (define annotations
+    (data-annotations all-hits all-misses))
+  (when (equal? data-type 'total-counts)
+    (define sum (apply + (dict-values ratios)))
+    (unless (< (abs (- sum 1)) 0.001)
+      (raise-user-error
+       'plot-mutation-analyses
+       @~a{
+           The sum of mutation operator occurrence ratios is not 1 @;
+           in log @path !
+           This probably means that there are missing mutation types, @;
+           or otherwise there is a bug.
+           The mutation types I looked for are:
+           @(pretty-format (dict-keys ratios))
+           })))
+  (values ratios
+          (hash-ref hit+miss-data 'total)
+          (apply + (hash-values all-hits))
+          annotations))
 
 (define (data-annotations all-hits all-misses)
   (define bar-offset 1)
@@ -98,10 +124,10 @@
                              (hash-ref all-misses type 0)}
                       [{0 0} #t]
                       [{_ _} #f]))
-    (point-label (list label-y (+ (* i bar-offset) 0.5))
-                 "N/A"
-                 #:point-size 0
-                 #:color "gray")))
+    (make-serializable-point-label (list label-y (+ (* i bar-offset) 0.5))
+                                   "N/A"
+                                   #:point-size 0
+                                   #:color "gray")))
 
 
 ;; plot-y-far-tick-label-anchor
@@ -121,6 +147,54 @@
         (simple-inferred-plotter (curry discrete-histogram
                                         #:add-ticks? #t)
                                  #:plot (make-angled-label-plotter plot-pict)))
+
+(define (plot-benchmark-table all-data
+                              plot-type
+                              columns)
+  (define label-offset
+    (inexact->exact
+     (round
+      (let ([x (length (current-mutation-types))])
+        #;(+ (* -8.33333333333 x)
+             138.333333333)
+        (+ 18
+           (* (exp 8.358)
+              (expt x -1.905))))))
+    #;(match (length (current-mutation-types))
+        [13 30]
+        [10 55]))
+  (define picts
+    (flatten
+     (for/list ([{benchmark data+annotations} (in-hash all-data)]
+                [i (in-naturals)])
+       (define draw-labels? (zero? (modulo i columns)))
+       (match-define (annotated data points) data+annotations)
+       (define plot-bars-pict (make-plotter draw-labels?
+                                            #:extra (map serializable-point-label->point-label
+                                                         points)))
+       (define pict
+         (parameterize ([plot-width (- PLOT-WIDTH (if draw-labels? 0 labels-width))]
+                        [plot-height (+ 400 (if draw-labels? label-offset 0))])
+           (vc-append
+            (plot-bars-pict data
+                            #:title benchmark
+                            #:y-label #f
+                            #:x-label #f
+                            #:x-max 1)
+            (if draw-labels? (blank 0) (blank 0 label-offset)))))
+       pict)))
+  (fill-background
+   (vc-append
+    10
+    (text (match plot-type
+            ['total-counts "Proportion of all mutants created by operator"]
+            ['success-ratios "Ratio of mutants causing type errors, per operator"])
+          '(bold)
+          30)
+    (table/fill-missing picts
+                        #:columns columns
+                        #:column-spacing 10
+                        #:row-spacing 0))))
 
 (main
  #:arguments {[flags log-files]
@@ -142,11 +216,18 @@
                ("Number of columns in which to arrange plots."
                 "Default: 4")
                #:collect ["count" take-latest "4"]]
-              [("--population")
-               'total-counts
-               ("Plot the breakdown of mutation type counts for each benchmark"
-                "instead of mutation type success ratios.")
-               #:record]
+              [("-t" "--type")
+               'plot-type
+               ("Which type of plot to produce for the data. Options below; default is population."
+                "  population : plot the breakdown of entire mutant population by mutators"
+                "  success-ratios : plot the ratio of successful mutants produced by each mutator"
+                "  successful-population-count : plot the number of successful mutants produced by each mutator, aggregating over benchmarks; this opens an interactive window rather than producing a plot image")
+               #:collect {"type" take-latest "population"}]
+              [("-s" "--save")
+               'save-data-file
+               ("Save processed data into this file, or read it from the file"
+                "if it already exists.")
+               #:collect ["path" take-latest #f]]
               #:args log-files}
 
  #:check [(not (empty? log-files))
@@ -158,49 +239,55 @@
                         "mutation"
                         'active-mutator-names)))
 
- (define label-offset
-   (match (length (current-mutation-types))
-     [13 30]
-     [10 55]))
-
- (define plot-type (if (hash-ref flags 'total-counts)
-                       'total-counts
-                       'success-ratios))
+ (define plot-type
+   (match (hash-ref flags 'plot-type)
+     ["population" 'total-counts]
+     ["success-ratios" 'success-ratios]
+     ["successful-population-count" 'successful-population-count]))
  (define columns (string->number (hash-ref flags 'cols)))
- (define picts
-   (flatten
-    (for/list ([{benchmark data+annotations} (in-hash (read-data-files
-                                                       log-files
-                                                       #:data-type plot-type))]
-               [i (in-naturals)])
-      (define draw-labels? (zero? (modulo i columns)))
-      (match-define (annotated data points) data+annotations)
-      (define plot-bars-pict (make-plotter draw-labels?
-                                           #:extra points))
-      (define pict
-        (parameterize ([plot-width (- PLOT-WIDTH (if draw-labels? 0 labels-width))]
-                       [plot-height (+ 400 (if draw-labels? label-offset 0))])
-          (vc-append
-           (plot-bars-pict data
-                          #:title benchmark
-                          #:y-label #f
-                          #:x-label #f
-                          #:x-max 1)
-           (if draw-labels? (blank 0) (blank 0 label-offset)))))
-      pict)))
- (define together
-   (fill-background
-    (vc-append
-     10
-     (text (match plot-type
-             ['total-counts "Proportion of all mutants created by operator"]
-             ['success-ratios "Ratio of mutants causing type errors, per operator"])
-           '(bold)
-           30)
-     (table/fill-missing picts
-                         #:columns columns
-                         #:column-spacing 10
-                         #:row-spacing 0))))
- (pict->png! together (hash-ref flags 'outfile)))
+ (define all-data
+   (match (hash-ref flags 'save-data-file)
+     [(? path-to-existant-file? path)
+      (file->value path)]
+     [maybe-save-path
+      (define data
+        (read-data-files
+         log-files
+         #:data-type plot-type))
+      (when maybe-save-path
+        (write-to-file data maybe-save-path))
+      data]))
+ (define the-plot-pict
+   (match plot-type
+     ['successful-population-count
+      (plot-new-window? #t)
+      (plot/labels-angled
+       (grouped-category-stacked-histogram all-data
+                                           #:label-groups? #f
+                                           #:common-legend? #t)
+       #:legend-anchor 'top-left
+       #:title @~a{Ill-typed mutant population breakdown by mutator}
+       #:y-label (match plot-type
+                   ['successful-population-count
+                    "count"]
+                   ['successful-population-ratios
+                    "ratio"])
+       #:x-label "Mutator"
+       #:y-max (match plot-type
+                 ['successful-population-count
+                  #f]
+                 ['successful-population-ratios
+                  1])
+       #:y-min (match plot-type
+                 ['successful-population-count
+                  #f]
+                 ['successful-population-ratios
+                  0]))
+      (disk 5)]
+     [(or 'total-counts 'success-ratios)
+      (plot-benchmark-table all-data
+                            plot-type
+                            columns)]))
+ (pict->png! the-plot-pict (hash-ref flags 'outfile)))
 
 (module test racket)
