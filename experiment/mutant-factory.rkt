@@ -986,8 +986,7 @@ Mutant: [~a] ~a @ ~a with config:
                          ([outcome (or 'completed
                                        'syntax-error
                                        'timeout
-                                       'oom
-                                       'runtime-error)]
+                                       'oom)]
                           [blamed #f]))
                 (struct* run-status
                          ([outcome (or 'blamed
