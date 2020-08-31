@@ -124,7 +124,7 @@
       [(? dynamic-error?)
        (log-mutant-dynamic-errors-info @~a{@mutant => #t})
        (log-progress! benchmark-name mutant #t)
-       (process-Q-update-data (add-to-list mutant))]
+       (process-Q-update-data q (add-to-list mutant))]
       [(? other-outcome?)
        (log-mutant-dynamic-errors-info @~a{@mutant => #f})
        (log-progress! benchmark-name mutant #f)
