@@ -159,7 +159,7 @@
     (define old-mod-summary (hash-ref summaries mod-name #f))
     (define new-indices-by-mutator
       (for/hash ([{mutator indices} (in-hash (summary-valid-indices old-mod-summary))])
-        (define indices-as-mutants (map (λ (i) (mutant #f mod-name i))))
+        (define indices-as-mutants (map (λ (i) (mutant #f mod-name i)) indices))
         (define intersection-with-mutants
           (set-intersect indices-as-mutants mutants))
         (values mutator
