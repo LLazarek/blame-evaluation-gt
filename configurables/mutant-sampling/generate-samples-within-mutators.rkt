@@ -7,8 +7,7 @@
          "../configurables.rkt"
          "mutant-selector.rkt"
          "sample-within-mutators.rkt"
-         racket/random
-         racket/hash)
+         racket/random)
 
 (define-runtime-paths
   [configurables-dir ".."])
@@ -19,31 +18,6 @@
   #:transparent)
 (define ((mutant-id-for module) index)
   (mutant-id module index))
-;; This contains the same information as the hash table
-;; containing summaries produced by `summarize-mutation-analysis.rkt`
-;; but in a form that makes sampling much easier
-;; since we sample mutants from a benchmark *across modules*.
-(struct benchmark-summary
-  (mutants-by-mutator ; (hash/c mutator-name? (listof mutant-id?))
-   )
-  #:transparent)
-
-(define (module-summaries->benchmark-summary module-summaries)
-  (define (module-summary->benchmark-summary mod-name mod-summary)
-    (for/hash ([{mutator indices} (in-hash
-                                   (summary-valid-indices mod-summary))])
-      (values mutator
-              (map (mutant-id-for mod-name) indices))))
-
-  (define all-mutants-by-mutator
-    (for/fold ([all-mutants-by-mutator (hash)])
-              ([{mod-name mod-summary} (in-hash module-summaries)])
-      (define summary-for-this-mod
-        (module-summary->benchmark-summary mod-name mod-summary))
-      (hash-union all-mutants-by-mutator
-                  summary-for-this-mod
-                  #:combine append)))
-  (benchmark-summary all-mutants-by-mutator))
 
 (define (module-samples->benchmark-samples module-samples)
   (hash-map mutant-id module-samples))

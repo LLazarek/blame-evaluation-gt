@@ -7,7 +7,10 @@
          pict
          (except-in pict-util line)
          pict-util/file
-         "../configurables/configurables.rkt")
+         "../configurables/configurables.rkt"
+         (prefix-in db: "../db/db.rkt")
+         "mutation-analysis-summaries.rkt"
+         "../util/for-first-star.rkt")
 
 (define current-mutation-types (make-parameter #f))
 
@@ -73,6 +76,31 @@
     [else
      (raise-user-error 'plot-mutation-analyses
                        @~a{Given file that doesn't look like a log: @path})]))
+
+;; db:db-path? -> (listof (list/c mutator-name?
+;;                                (listof (list/c benchmark-name?
+;;                                                natural?))))
+(define (read-data-from-summaries db-path)
+  (define db (db:get db-path))
+  (define benchmarks (db:keys db))
+  (define data-dict
+    (for/fold ([data empty])
+              ([benchmark (in-list benchmarks)])
+      (define summaries-by-module
+        (db:read db benchmark))
+      (define benchmark-summary
+        (benchmark-summary-mutants-by-mutator
+         (module-summaries->benchmark-summary summaries-by-module)))
+      (for/fold ([data data])
+                ([mutator (in-list (map ~a (current-mutation-types)))])
+        (define ill-typed-mutant-count (length (hash-ref benchmark-summary mutator empty)))
+        (dict-update data
+                     mutator
+                     (λ (benchmark-counts)
+                       (append benchmark-counts
+                               (list (list benchmark ill-typed-mutant-count))))
+                     empty))))
+  (dict-map data-dict list))
 
 (define (read-data-from-log path #:data-type data-type)
   (define hit+miss-data
@@ -196,6 +224,14 @@
                         #:column-spacing 10
                         #:row-spacing 0))))
 
+;; (listof real?) (listof (list/c real? color/c)) -> (listof color/c)
+(define (cutoff-bucket-colors numbers bucket-colors)
+  (define (color-for n)
+    (for/first* ([bucket (in-list bucket-colors)])
+                (and (< n (first bucket))
+                     (second bucket))))
+  (map color-for numbers))
+
 (main
  #:arguments {[flags log-files]
               #:once-each
@@ -221,16 +257,23 @@
                ("Which type of plot to produce for the data. Options below; default is population."
                 "  population : plot the breakdown of entire mutant population by mutators"
                 "  success-ratios : plot the ratio of successful mutants produced by each mutator"
-                "  successful-population-count : plot the number of successful mutants produced by each mutator, aggregating over benchmarks; this opens an interactive window rather than producing a plot image")
+                "  successful-population-count : plot the number of successful mutants produced by each mutator, aggregating over benchmarks; this opens an interactive window rather than producing a plot image"
+                "  successful-population-heatmap : plot a heatmap-like stacked bar chart color-coding the number of successful mutants produced by each mutator, aggregating over benchmarks")
                #:collect {"type" take-latest "population"}]
               [("-s" "--save")
                'save-data-file
                ("Save processed data into this file, or read it from the file"
                 "if it already exists.")
                #:collect ["path" take-latest #f]]
+              [("-d" "--summaries-db")
+               'summaries-db
+               ("Read data from the given summaries db instead of log files. This only works"
+                "with the following plot types (see -t): successful-population-count")
+               #:collect ["path" take-latest #f]]
               #:args log-files}
 
- #:check [(not (empty? log-files))
+ #:check [(or (not (empty? log-files))
+              (hash-ref flags 'summaries-db))
           @~a{Must provide at least one log file to plot.}]
 
  (current-mutation-types
@@ -243,7 +286,8 @@
    (match (hash-ref flags 'plot-type)
      ["population" 'total-counts]
      ["success-ratios" 'success-ratios]
-     ["successful-population-count" 'successful-population-count]))
+     ["successful-population-count" 'successful-population-count]
+     ["successful-population-heatmap" 'successful-population-heatmap]))
  (define columns (string->number (hash-ref flags 'cols)))
  (define all-data
    (match (hash-ref flags 'save-data-file)
@@ -251,43 +295,90 @@
       (file->value path)]
      [maybe-save-path
       (define data
-        (read-data-files
-         log-files
-         #:data-type plot-type))
+        (match* {log-files (hash-ref flags 'summaries-db)}
+          [{'() (and (not #f) db-path)}
+           (unless (equal? plot-type 'successful-population-count)
+             (raise-user-error 'plot-mutation-analyses
+                               "-d can only be used with plot type successful-population-count"))
+           (read-data-from-summaries db-path)]
+          [{(? cons?) #f}
+           (read-data-files
+            log-files
+            #:data-type plot-type)]
+          [{_ _} (raise-user-error 'plot-mutation-analyses
+                                   "-d/--summaries-db and positional args are mutually exclusive")]))
       (when maybe-save-path
         (write-to-file data maybe-save-path))
       data]))
- (define the-plot-pict
-   (match plot-type
-     ['successful-population-count
-      (plot-new-window? #t)
-      (plot/labels-angled
-       (grouped-category-stacked-histogram all-data
-                                           #:label-groups? #f
-                                           #:common-legend? #t)
-       #:legend-anchor 'top-left
-       #:title @~a{Ill-typed mutant population breakdown by mutator}
-       #:y-label (match plot-type
-                   ['successful-population-count
-                    "count"]
-                   ['successful-population-ratios
-                    "ratio"])
-       #:x-label "Mutator"
-       #:y-max (match plot-type
+ (match plot-type
+   ['successful-population-count
+    (plot-new-window? #t)
+    (plot/labels-angled
+     (grouped-category-stacked-histogram all-data
+                                         #:label-groups? #f
+                                         #:common-legend? #t)
+     #:legend-anchor 'top-left
+     #:title @~a{Ill-typed mutant population breakdown by mutator}
+     #:y-label (match plot-type
                  ['successful-population-count
-                  #f]
+                  "count"]
                  ['successful-population-ratios
-                  1])
-       #:y-min (match plot-type
-                 ['successful-population-count
-                  #f]
-                 ['successful-population-ratios
-                  0]))
-      (disk 5)]
-     [(or 'total-counts 'success-ratios)
-      (plot-benchmark-table all-data
-                            plot-type
-                            columns)]))
- (pict->png! the-plot-pict (hash-ref flags 'outfile)))
+                  "ratio"])
+     #:x-label "Mutator"
+     #:y-max (match plot-type
+               ['successful-population-count
+                #f]
+               ['successful-population-ratios
+                1])
+     #:y-min (match plot-type
+               ['successful-population-count
+                #f]
+               ['successful-population-ratios
+                0]))]
+   ['successful-population-heatmap
+    (define bucket-colors
+      '((10 "red")
+        (50 "orange")
+        (100 "blue")
+        (+inf.0 "green")))
+    (define picts
+      (for/list ([mutator-stack (in-list all-data)])
+        (define benchmark-successful-mutant-count-pairs
+          (second mutator-stack))
+        (define ones (map (const 1) benchmark-successful-mutant-count-pairs))
+        (define colors
+          (cutoff-bucket-colors (map second benchmark-successful-mutant-count-pairs)
+                                bucket-colors))
+        (plot-pict
+         (stacked-histogram (list (list (first mutator-stack)
+                                        ones))
+                            #:colors colors)
+         #:x-label #f
+         #:y-label #f)))
+    (define the-plot-pict
+      (fill-background
+       (vc-append
+        10
+        (text (apply ~a
+                     "Successful mutant heatmap; "
+                     (add-between
+                      (for/list ([bucket (in-list bucket-colors)])
+                        (~a (second bucket) ": <" (first bucket)))
+                      ", "))
+              '(bold)
+              30)
+        (table/fill-missing picts
+                            #:columns columns
+                            #:column-spacing 10
+                            #:row-spacing 0))))
+    (pict->png!
+     the-plot-pict
+     (hash-ref flags 'outfile))]
+   [(or 'total-counts 'success-ratios)
+    (pict->png!
+     (plot-benchmark-table all-data
+                           plot-type
+                           columns)
+     (hash-ref flags 'outfile))]))
 
 (module test racket)
