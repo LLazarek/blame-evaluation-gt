@@ -337,7 +337,8 @@
                 0]))]
    ['successful-population-heatmap
     (define bucket-colors
-      '((10 "red")
+      '((1 "black")
+        (10 "red")
         (50 "orange")
         (100 "blue")
         (+inf.0 "green")))
