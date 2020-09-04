@@ -142,8 +142,8 @@
                   the-module-to-mutate
                   index
                   config
-                  #:timeout/s (* 10 60)
-                  #:memory/gb 5
+                  #:timeout/s (* 2 60)
+                  #:memory/gb 3
                   #:modules-base-path (find-program-base-path the-program)
                   #:write-modules-to dump-dir-path-or-name
                   #:on-module-exists 'replace
@@ -155,7 +155,8 @@
                  (define outfile (make-temporary-file))
                  (define errfile (make-temporary-file))
                  (define ctl
-                   (parameterize ([mutant-error-log errfile])
+                   (parameterize ([mutant-error-log errfile]
+                                  [default-memory-limit/gb 3])
                      (spawn-mutant-runner
                       the-benchmark-configuration
                       mutated-module-name
@@ -177,10 +178,10 @@
                             (sleep 1)
                             (when interactive?
                               (displayln "Killed. Error file contents:"))
-                            (system @~a{cat @errfile})
+                            (displayln (file->string errfile))
                             (file->string outfile)]
                            [else
-                            (system @~a{cat @errfile})
+                            (displayln (file->string errfile))
                             (file->value outfile)])
                    (delete-file outfile)
                    (delete-file errfile))]))
