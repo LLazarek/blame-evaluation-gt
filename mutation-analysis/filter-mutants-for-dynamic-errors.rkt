@@ -20,7 +20,8 @@
          racket/random)
 
 (define-runtime-paths
-  [TR-config "../configurables/configs/TR.rkt"])
+  [erasure-config-path "../configurables/configs/dynamic-error-analysis-erasure.rkt"]
+  [natural-config-path "../configurables/configs/dynamic-error-analysis-natural.rkt"])
 
 (define working-dir (make-parameter "find-mutant-dynamic-errors-scratch"))
 
@@ -63,17 +64,18 @@
   mutants-with-dynamic-errors)
 
 (define (blamed-is-interesting? blamed-list a-config mutant)
-  (define at-least-1-blamed-in-program?
-    (> (count (λ (blamed) (hash-has-key? a-config blamed)) blamed-list) 0))
-  (define mutated-mod-not-blamed?
-    (not (member (mutant-module mutant) blamed-list)))
-  (log-mutant-dynamic-errors-debug
-   @~a{
-       @mutant blamed interesting?: @;
-       in-program? @at-least-1-blamed-in-program? | not-mutated-mod? @mutated-mod-not-blamed?
-       })
-  (and at-least-1-blamed-in-program?
-       mutated-mod-not-blamed?))
+  (match (current-mode)
+    ['erasure-interesting
+     (define blamed-mods-in-program
+       (filter (λ (blamed) (hash-has-key? a-config blamed)) blamed-list))
+     (define 3-unique-mods-on-stack?
+       (>= (count (remove-duplicates blamed-mods-in-program)) 3))
+     (log-mutant-dynamic-errors-debug
+      @~a{
+          @mutant blamed interesting?, blamed: @blamed-mods-in-program : @3-unique-mods-on-stack?
+          })
+     3-unique-mods-on-stack?]
+    ['natural #t]))
 
 (struct dynamic-error ())
 (struct other-outcome ())
@@ -84,8 +86,10 @@
     [(struct* run-status ([outcome (or 'runtime-error 'blamed)]
                           [blamed blamed-list]))
      #:when (blamed-is-interesting? blamed-list config mutant)
+     (log-mutant-dynamic-errors-info @~a{@mutant => @(run-status-outcome result) : accepted})
      (dynamic-error)]
     [(? run-status?)
+     (log-mutant-dynamic-errors-info @~a{@mutant => @(run-status-outcome result) : filtered})
      (other-outcome)]
     [else
      (log-mutant-dynamic-errors-error
@@ -99,9 +103,16 @@
 (define (dynamic-error-checker mutant benchmark
                                #:log-progress log-progress!)
   (define benchmark-name (benchmark->name benchmark))
-  (define max-config (make-max-bench-config benchmark))
-  (define min-config (for/hash ([mod (in-hash-keys max-config)])
-                       (values mod 'none)))
+  (define max-configuration (make-max-bench-config benchmark))
+  (define-values {run-configuration config-path}
+    (match (current-mode)
+      ['erasure-interesting
+       (values (for/hash ([mod (in-hash-keys max-configuration)])
+                 (values mod 'none))
+               erasure-config-path)]
+      ['natural
+       (values (hash-set max-configuration (mutant-module mutant) 'none)
+               natural-config-path)]))
 
   (define ((mutant-spawner config will))
     (define configured-benchmark
@@ -116,22 +127,20 @@
                              (mutant-module mutant)
                              (mutant-index mutant)
                              outfile
-                             TR-config)))
+                             config-path)))
     (process-info outfile ctl will))
 
   (define (will:record-outcome! q info)
-    (match (extract-outcome (process-info-data info) mutant min-config)
+    (match (extract-outcome (process-info-data info) mutant run-configuration)
       [(? dynamic-error?)
-       (log-mutant-dynamic-errors-info @~a{@mutant => #t})
        (log-progress! benchmark-name mutant #t)
        (process-Q-update-data q (add-to-list mutant))]
       [(? other-outcome?)
-       (log-mutant-dynamic-errors-info @~a{@mutant => #f})
        (log-progress! benchmark-name mutant #f)
        q]
       [else q]))
 
-  (mutant-spawner min-config
+  (mutant-spawner run-configuration
                   will:record-outcome!))
 
 (define (process-Q-update-data q f)
@@ -169,13 +178,16 @@
                          old-mod-summary
                          [valid-indices new-indices-by-mutator]))))
 
+(define current-mode (make-parameter 'erasure-interesting))
+
 (main
  #:arguments ({(hash-table ['summaries-db summaries-db-path]
                            ['restricted-summaries-db restricted-summaries-db-path]
                            ['benchmarks-dir benchmarks-dir]
                            ['progress-log progress-log-path]
                            ['working-dir _]
-                           ['process-limit (app string->number process-limit)])
+                           ['process-limit (app string->number process-limit)]
+                           ['mode _])
                args}
               #:once-each
               [("-s" "--summaries-db")
@@ -211,10 +223,22 @@
                'process-limit
                ("How many parallel processes to use."
                 "Default: 1")
-               #:collect {"N" take-latest "1"}])
+               #:collect {"N" take-latest "1"}]
+
+              [("-m" "--mode")
+               'mode
+               ("Set the mode of filtering. Options are:"
+                "  erasure-interesting : using erasure, interesting dynamic errors"
+                "  natural : using natural with all but mutated @ types, any dynamic error"
+                @~a{Default: @(current-mode)})
+               #:collect {"name" (set-parameter current-mode string->symbol) #f}])
 
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
+ #:check [(member (current-mode) '(erasure-interesting natural))
+          @~a{@(current-mode) isn't a valid mode}]
+
+ (log-mutant-dynamic-errors-info @~a{Mode: @(current-mode)})
 
  (define progress
    (match progress-log-path
