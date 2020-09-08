@@ -20,7 +20,7 @@
          racket/random)
 
 (define-runtime-paths
-  [TR-config "../configurables/TR.config"])
+  [TR-config "../configurables/configs/TR.rkt"])
 
 (define working-dir (make-parameter "find-mutant-dynamic-errors-scratch"))
 

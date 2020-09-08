@@ -15,7 +15,7 @@
          racket/runtime-path)
 
 (define-runtime-path benchmarks-dir "../../gtp-benchmarks/benchmarks")
-(define-runtime-path config-dir "../configurables")
+(define-runtime-path config-dir "../configurables/configs")
 
 (define (find-benchmark name-or-path)
   (match name-or-path
@@ -53,158 +53,158 @@
                       #:write-modules-to [dump-dir-path-or-name #f]
                       #:suppress-output? [suppress-output? (not interactive?)]
                       #:config [config-name "TR"])
-  (define experiment-config (build-path config-dir (~a config-name ".config")))
+  (define experiment-config (build-path config-dir (~a config-name ".rkt")))
   (unless (file-exists? experiment-config)
     (raise-user-error
      'debug-mutant
      @~a{Unable to find config named @|config-name|.config in @config-dir}))
 
-  (parameterize ([current-configuration-path experiment-config])
-    (define bench-path (find-benchmark bench-name-or-path))
-    (define the-benchmark (read-benchmark bench-path))
-    (define config (read-config identifier the-benchmark))
-    (match-define (and the-benchmark-configuration
-                       (struct* benchmark-configuration
-                                ([main main-path]
-                                 [others others-paths])))
-      (configure-benchmark the-benchmark config))
-    (define module-to-mutate-path
-      (pick-file-by-name (list* main-path others-paths)
-                         mutated-module-name))
-    (define the-program (make-unified-program main-path
-                                              others-paths))
-    (define the-program-mods (program->mods the-program))
-    (define the-module-to-mutate
-      (find-unified-module-to-mutate module-to-mutate-path
-                                     the-program-mods))
+  (install-configuration! experiment-config)
+  (define bench-path (find-benchmark bench-name-or-path))
+  (define the-benchmark (read-benchmark bench-path))
+  (define config (read-config identifier the-benchmark))
+  (match-define (and the-benchmark-configuration
+                     (struct* benchmark-configuration
+                              ([main main-path]
+                               [others others-paths])))
+    (configure-benchmark the-benchmark config))
+  (define module-to-mutate-path
+    (pick-file-by-name (list* main-path others-paths)
+                       mutated-module-name))
+  (define the-program (make-unified-program main-path
+                                            others-paths))
+  (define the-program-mods (program->mods the-program))
+  (define the-module-to-mutate
+    (find-unified-module-to-mutate module-to-mutate-path
+                                   the-program-mods))
 
-    (unless (member the-module-to-mutate the-program-mods)
-      (raise-user-error
-       @~a{
-           Error: Module to mutate not in given program.
-           Program: @the-program
-           Module: @the-module-to-mutate
-           }))
+  (unless (member the-module-to-mutate the-program-mods)
+    (raise-user-error
+     @~a{
+         Error: Module to mutate not in given program.
+         Program: @the-program
+         Module: @the-module-to-mutate
+         }))
 
-    (when diff-mutant?
-      (define diff (diff-mutation the-module-to-mutate index the-program))
-      (if stop-diff-early?
-          (for/fold ([after-ctx #f])
-                    ([line (in-list (string-split diff "\n"))]
-                     #:break (and after-ctx
-                                  (> after-ctx 3)))
-            (displayln line)
-            (match* {after-ctx line}
-              [{#f (regexp "^[<>]")}
-               0]
-              [{(? integer? n) _}
-               (add1 n)]
-              [{_ _} #f]))
-          (displayln diff)))
-    (when (or run?
-              run-via-process?)
-      (with-handlers ([exn:fail?
-                       (λ (e)
-                         (cond [interactive?
-                                (displayln @~a{
-                                               Mutant crashed with exn:
-                                               @pretty-format[e]
+  (when diff-mutant?
+    (define diff (diff-mutation the-module-to-mutate index the-program))
+    (if stop-diff-early?
+        (for/fold ([after-ctx #f])
+                  ([line (in-list (string-split diff "\n"))]
+                   #:break (and after-ctx
+                                (> after-ctx 3)))
+          (displayln line)
+          (match* {after-ctx line}
+            [{#f (regexp "^[<>]")}
+             0]
+            [{(? integer? n) _}
+             (add1 n)]
+            [{_ _} #f]))
+        (displayln diff)))
+  (when (or run?
+            run-via-process?)
+    (with-handlers ([exn:fail?
+                     (λ (e)
+                       (cond [interactive?
+                              (displayln @~a{
+                                             Mutant crashed with exn:
+                                             @pretty-format[e]
 
-                                               exn has msg:
-                                               })
-                                ((error-display-handler)
-                                 ""
-                                 e)]
-                               [else
-                                (run-status the-module-to-mutate
-                                            index
-                                            '?
-                                            '<crashed>
-                                            #f
-                                            e)]))])
-        (when interactive?
-          (displayln "Running mutant..."))
-        (when (and interactive?
-                   (not suppress-output?))
-          (displayln @~a{
-                         Mutant output:
-                         ,------------------------------
-                         }))
-        (match-define (and rs
-                           (struct* run-status
-                                    ([mutated-id mutated-id]
-                                     [outcome outcome]
-                                     [blamed blamed]
-                                     [result-value result-value])))
-          (cond [run?
-                 (run-with-mutated-module
-                  the-program
-                  the-module-to-mutate
-                  index
-                  config
-                  #:timeout/s (* 2 60)
-                  #:memory/gb 3
-                  #:modules-base-path (find-program-base-path the-program)
-                  #:write-modules-to dump-dir-path-or-name
-                  #:on-module-exists 'replace
-                  #:suppress-output? suppress-output?)]
-                [run-via-process?
-                 (when interactive?
-                   (displayln
-                    "Running as seperate process via `spawn-mutant-runner`..."))
-                 (define outfile (make-temporary-file))
-                 (define errfile (make-temporary-file))
-                 (define ctl
-                   (parameterize ([mutant-error-log errfile]
-                                  [default-memory-limit/gb 3])
-                     (spawn-mutant-runner
-                      the-benchmark-configuration
-                      mutated-module-name
-                      index
-                      outfile
-                      experiment-config
-                      #:write-modules-to dump-dir-path-or-name
-                      #:force-module-write? #t)))
-                 (when interactive?
-                   (displayln "Waiting up to 6min for mutant to finish..."))
-                 (define wait-thd
-                   (thread (thunk (ctl 'wait))))
-                 (sync/timeout (* 6 60) wait-thd)
-                 (begin0 (match (ctl 'status)
-                           ['running
-                            (when interactive?
-                              (displayln "Mutant is still running. Killing it."))
-                            (ctl 'kill)
-                            (sleep 1)
-                            (when interactive?
-                              (displayln "Killed. Error file contents:"))
-                            (displayln (file->string errfile))
-                            (file->string outfile)]
-                           [else
-                            (displayln (file->string errfile))
-                            (file->value outfile)])
-                   (delete-file outfile)
-                   (delete-file errfile))]))
-        (when (and interactive?
-                   (not suppress-output?))
-          (displayln @~a{
-                         `------------------------------
-                         }))
-        (if interactive?
-            (displayln
-             @~a{
-                 Mutated: @mutated-id
-                 Outcome: @outcome @;
-                 @(match outcome
-                    [(or 'type-error 'blamed)
-                     @~a{
+                                             exn has msg:
+                                             })
+                              ((error-display-handler)
+                               ""
+                               e)]
+                             [else
+                              (run-status the-module-to-mutate
+                                          index
+                                          '?
+                                          '<crashed>
+                                          #f
+                                          e)]))])
+      (when interactive?
+        (displayln "Running mutant..."))
+      (when (and interactive?
+                 (not suppress-output?))
+        (displayln @~a{
+                       Mutant output:
+                       ,------------------------------
+                       }))
+      (match-define (and rs
+                         (struct* run-status
+                                  ([mutated-id mutated-id]
+                                   [outcome outcome]
+                                   [blamed blamed]
+                                   [result-value result-value])))
+        (cond [run?
+               (run-with-mutated-module
+                the-program
+                the-module-to-mutate
+                index
+                config
+                #:timeout/s (* 2 60)
+                #:memory/gb 3
+                #:modules-base-path (find-program-base-path the-program)
+                #:write-modules-to dump-dir-path-or-name
+                #:on-module-exists 'replace
+                #:suppress-output? suppress-output?)]
+              [run-via-process?
+               (when interactive?
+                 (displayln
+                  "Running as seperate process via `spawn-mutant-runner`..."))
+               (define outfile (make-temporary-file))
+               (define errfile (make-temporary-file))
+               (define ctl
+                 (parameterize ([mutant-error-log errfile]
+                                [default-memory-limit/gb 3])
+                   (spawn-mutant-runner
+                    the-benchmark-configuration
+                    mutated-module-name
+                    index
+                    outfile
+                    experiment-config
+                    #:write-modules-to dump-dir-path-or-name
+                    #:force-module-write? #t)))
+               (when interactive?
+                 (displayln "Waiting up to 6min for mutant to finish..."))
+               (define wait-thd
+                 (thread (thunk (ctl 'wait))))
+               (sync/timeout (* 6 60) wait-thd)
+               (begin0 (match (ctl 'status)
+                         ['running
+                          (when interactive?
+                            (displayln "Mutant is still running. Killing it."))
+                          (ctl 'kill)
+                          (sleep 1)
+                          (when interactive?
+                            (displayln "Killed. Error file contents:"))
+                          (displayln (file->string errfile))
+                          (file->string outfile)]
+                         [else
+                          (displayln (file->string errfile))
+                          (file->value outfile)])
+                 (delete-file outfile)
+                 (delete-file errfile))]))
+      (when (and interactive?
+                 (not suppress-output?))
+        (displayln @~a{
+                       `------------------------------
+                       }))
+      (if interactive?
+          (displayln
+           @~a{
+               Mutated: @mutated-id
+               Outcome: @outcome @;
+               @(match outcome
+                  [(or 'type-error 'blamed)
+                   @~a{
 
-                         Blamed:  @blamed
-                         }]
-                    [else ""])
-                 Result:  @result-value
-                 })
-            rs)))))
+                       Blamed:  @blamed
+                       }]
+                  [else ""])
+               Result:  @result-value
+               })
+          rs))))
 
 (define debug-mutant/infer
   (make-keyword-procedure

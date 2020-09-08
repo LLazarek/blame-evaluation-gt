@@ -28,9 +28,7 @@
 (define-logger mutant-runner)
 
 (define (mutate-module the-module mutation-index #:in the-program)
-  (define mutate-benchmark (load-configured (current-configuration-path)
-                                            "mutation"
-                                            'mutate-benchmark))
+  (define mutate-benchmark (configured:mutate-benchmark))
   (syntax-parse (mod-stx the-module)
     #:datum-literals [module]
     [(module name lang {~and mod-body (mod-begin body ...)})
@@ -156,15 +154,8 @@
                                'typed-racket/utils/transient-contract-struct
                                ns)))
 
-  (define configured-instrumenter
-    (load-configured (current-configuration-path)
-                     "module-instrumentation"
-                     'instrument-module))
-
-  (define make-configured-runner
-    (load-configured (current-configuration-path)
-                     "benchmark-runner"
-                     'make-benchmark-runner))
+  (define configured-instrumenter (configured:instrument-module))
+  (define make-configured-runner (configured:make-benchmark-runner))
 
   (define runner
     (make-instrumented-runner
@@ -309,10 +300,7 @@
       (thunk (format-mutant-info a-program
                                  module-to-mutate
                                  mutation-index)))
-    (define make-extract-blamed
-      (load-configured (current-configuration-path)
-                       "blame-following"
-                       'make-extract-blamed))
+    (define make-extract-blamed (configured:make-extract-blamed))
     (define extract-blamed
       (make-extract-blamed a-program
                            program-config
@@ -429,12 +417,14 @@
   (require ruinit
            racket/runtime-path)
 
-  (define-runtime-path test-config "../configurables/test.config")
-  (define-runtime-path transient-config "../configurables/transient-oldest.config")
-  (current-configuration-path test-config)
+  (define-runtime-path test-config "../configurables/configs/test.rkt")
+  (define-runtime-path transient-config "../configurables/configs/transient-oldest.rkt")
+  (install-configuration! test-config)
 
   (define-test (test/no-error run-thunk test-thunk)
-    (with-handlers ([exn:fail? (λ (e) (fail (exn-message e)))])
+    (with-handlers ([exn:fail? (λ (e)
+                                 ((error-display-handler) "" e)
+                                 (fail "test raised exception"))])
       (test-thunk (run-thunk))))
   (define p-config
     ;; this doesn't matter for the natural blame strategy used by the test
@@ -896,18 +886,21 @@
                              (define (f x)
                                (+ x x))))))
      (define p (program a (list b))))
-    (parameterize ([current-configuration-path transient-config])
-      (test/no-error
-       (λ _ (run-with-mutated-module p
-                                     a
-                                     0 ; #f -> #t
-                                     p-config
-                                     #:timeout/s 60
-                                     #:memory/gb 1
-                                     #:suppress-output? #f))
-       (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
-                                                 [blamed '("b.rkt"
-                                                           "a.rkt")]))))))))
+    (test/no-error
+     (λ _
+       (call-with-configuration
+        transient-config
+        (λ _
+          (run-with-mutated-module p
+                                   a
+                                   0 ; #f -> #t
+                                   p-config
+                                   #:timeout/s 60
+                                   #:memory/gb 1
+                                   #:suppress-output? #f))))
+     (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
+                                               [blamed '("b.rkt"
+                                                         "a.rkt")])))))))
 
 
 ;; for debugging

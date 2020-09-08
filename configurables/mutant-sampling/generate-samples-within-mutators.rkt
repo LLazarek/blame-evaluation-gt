@@ -6,7 +6,7 @@
          "../../mutation-analysis/mutation-analysis-summaries.rkt"
          "../configurables.rkt"
          "mutant-selector.rkt"
-         "sample-within-mutators.rkt"
+         "use-pre-selected-samples.rkt"
          racket/random)
 
 (define-runtime-paths
@@ -14,26 +14,24 @@
 
 (define current-active-mutator-names (make-parameter #f))
 
-(struct mutant-id (module index)
-  #:transparent)
-(define ((mutant-id-for module) index)
-  (mutant-id module index))
+(define ((mutant-for module) index)
+  (mutant #f module index))
 
 (define (module-samples->benchmark-samples module-samples)
-  (hash-map mutant-id module-samples))
+  (hash-map mutant-for module-samples))
 (define (benchmark-samples->module-samples benchmark-samples)
   (define ((add-to-list x) l)
     (cons x l))
   (for/fold ([samples-by-module (hash)])
             ([sample (in-list benchmark-samples)])
-    (match-define (mutant-id module-name index) sample)
+    (match-define (mutant _ module-name index) sample)
     (hash-update samples-by-module
                  module-name
                  (add-to-list index)
                  empty)))
 
 
-;; string? benchmark-summary? -> (listof mutant-id?)
+;; string? benchmark-summary? -> (listof mutant?)
 (define (summarized-indices-for-mutator mutator benchmark-summary)
   (hash-ref (benchmark-summary-mutants-by-mutator benchmark-summary)
             mutator
@@ -157,6 +155,7 @@
   (require ruinit
            "../../util/path-utils.rkt")
 
+  (install-configuration! "../configs/test.rkt")
   (test-begin
     #:name distribute-sample-size-to-mutators
     (test-match (distribute-sample-size-to-mutators 100
@@ -240,7 +239,7 @@
      (benchmark-summary
       (for/hash ([{mutator indices} (in-hash operator-indices)])
         (values mutator
-                (map (mutant-id-for test-mod-name) indices))))))
+                (map (mutant-for test-mod-name) indices))))))
 
   (define call-with-deterministic-random
     (let ([rando (make-pseudo-random-generator)])
@@ -262,10 +261,7 @@
             (define sampled-indices-by-operator
               (call-with-deterministic-random
                (thunk
-                (parameterize ([current-active-mutator-names
-                                (load-configured "../TR.config"
-                                                 "mutation"
-                                                 'active-mutator-names)])
+                (parameterize ([current-active-mutator-names (configured:active-mutator-names)])
                   (sample-indices-by-mutator the-summary sample-size))))))
     (test-match sampled-indices-by-operator
                 (hash-table ["arithmetic-op-swap" (app length 6)]
@@ -282,9 +278,7 @@
               (call-with-deterministic-random
                (thunk
                 (parameterize ([current-active-mutator-names
-                                (load-configured "../TR.config"
-                                                 "mutation"
-                                                 'active-mutator-names)])
+                                (configured:active-mutator-names)])
                   (sample-indices-by-mutator the-summary-2 sample-size))))))
     ;; Now there's double the number of mutants, so things can be more evenly
     ;; distributed: 26/5 = 5 to start with:
@@ -317,9 +311,7 @@
               (call-with-deterministic-random
                (thunk
                 (parameterize ([current-active-mutator-names
-                                (load-configured "../TR.config"
-                                                 "mutation"
-                                                 'active-mutator-names)])
+                                (configured:active-mutator-names)])
                   (sample-indices-by-mutator the-summary
                                              sample-size
                                              #:exclude already-sampled))))))
@@ -329,7 +321,7 @@
 
 (define default-sample-size-multiplier 20)
 (main
- #:arguments {[(hash-table ['config-path _]
+ #:arguments {[(hash-table ['config-path config-path]
                            ['summaries-db summaries-db-path]
                            ['samples-db samples-db-path]
                            ['benchmarks-dir benchmarks-dir]
@@ -343,7 +335,7 @@
                ("Configuration to use for generating samples."
                 "This argument is mandatory.")
                #:mandatory
-               #:collect ["path" (set-parameter current-configuration-path) #f]]
+               #:collect ["path" take-latest #f]]
 
               [("-s" "--sumaries-db")
                'summaries-db
@@ -391,9 +383,8 @@
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
 
- (current-active-mutator-names (load-configured (current-configuration-path)
-                                                "mutation"
-                                                'active-mutator-names))
+ (install-configuration! config-path)
+ (current-active-mutator-names (configured:active-mutator-names))
 
  (define sample-size
    (match maybe-sample-size

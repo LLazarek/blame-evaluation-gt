@@ -166,7 +166,7 @@
   (define (process-parity-check-main/binary-search)
     (define a-benchmark (apply benchmark (read)))
     (define a-module-to-mutate (read))
-    (current-configuration-path (read))
+    (install-configuration! (read))
     (define result
       (parity-check/binary-search a-benchmark
                                   a-module-to-mutate))
@@ -175,13 +175,15 @@
   (define (process-parity-check-main/exhaustive)
     (define a-benchmark (apply benchmark (read)))
     (define a-module-to-mutate (read))
-    (current-configuration-path (read))
+    (install-configuration! (read))
     (define index-range (read))
     (define result
       (parity-check/exhaustive a-benchmark
                                a-module-to-mutate
                                index-range))
     (writeln result)))
+
+(define configuration-path (make-parameter #f))
 
 (define (process-checker-for a-benchmark
                              mod-to-mutate
@@ -210,7 +212,7 @@
                     (if both (path->string both) both))])
            stdin)
   (writeln mod-to-mutate stdin)
-  (writeln (current-configuration-path) stdin)
+  (writeln (configuration-path) stdin)
   (match mode
     [(or 'exhaustive 'simple-exhaustive) (writeln maybe-index-range stdin)]
     ['quick      (void)])
@@ -520,10 +522,11 @@
               [("-c" "--config")
                'config
                ("Configuration specifying the mutators to use.")
-               #:collect ["path" (set-parameter current-configuration-path) #f]
+               #:collect ["path" (set-parameter configuration-path) #f]
                #:mandatory]
               #:args [benchmarks-dir]}
  (file-stream-buffer-mode (current-output-port) 'line)
+ (install-configuration! (configuration-path))
  (define n-processes (string->number (hash-ref flags 'procs)))
  (define mode (cond [(hash-ref flags 'exhaustive?)
                      'exhaustive]

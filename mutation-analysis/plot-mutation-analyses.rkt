@@ -238,9 +238,7 @@
               [("-c" "--config")
                'config
                "Config from which to obtain active mutator names."
-               #:collect ["path"
-                          (set-parameter current-configuration-path)
-                          #f]
+               #:collect ["path" take-latest #f]
                #:mandatory]
               [("-o" "--outfile")
                'outfile
@@ -276,11 +274,10 @@
               (hash-ref flags 'summaries-db))
           @~a{Must provide at least one log file to plot.}]
 
+ (install-configuration! (hash-ref flags 'config))
+
  (current-mutation-types
-  (map string->symbol
-       (load-configured (current-configuration-path)
-                        "mutation"
-                        'active-mutator-names)))
+  (map string->symbol (configured:active-mutator-names)))
 
  (define plot-type
    (match (hash-ref flags 'plot-type)

@@ -9,7 +9,10 @@
          racket/runtime-path
          (prefix-in db: "../db/db.rkt")
          "../util/path-utils.rkt"
-         "../configurables/configurables.rkt")
+         "../configurables/configurables.rkt"
+         "../configurables/mutant-sampling/use-pre-selected-samples.rkt"
+         "../configurables/module-instrumentation/type-with-transient.rkt"
+         "../configurables/benchmark-runner/load-pre-computed-result.rkt")
 
 (define-runtime-path configurables-dir "../configurables")
 
@@ -35,23 +38,17 @@
     (with-handlers ([exn:fail? (const #f)])
       (db:checksum
        (db:get (build-path configurables-dir
-                           (load-configured config
-                                            "mutant-sampling"
-                                            'mutation-analysis-samples-db))))))
+                           (mutation-analysis-samples-db))))))
   (define special-cases-checksum
     (with-handlers ([exn:fail? (const #f)])
       (db:checksum
        (db:get (build-path configurables-dir
-                           (load-configured config
-                                            "module-instrumentation"
-                                            'transient-special-cases-db))))))
+                           (transient-special-cases-db))))))
   (define pre-computed-results-checksum
     (with-handlers ([exn:fail? (const #f)])
       (db:checksum
        (db:get (build-path configurables-dir
-                           (load-configured config
-                                            "benchmark-runner"
-                                            'pre-computed-results-db))))))
+                           (pre-computed-results-db))))))
   (define benchmark-path (metadata-info-benchmark metadata))
   (metadata-id
    (file-name-string-from-path benchmark-path) (file-or-directory-checksum benchmark-path)

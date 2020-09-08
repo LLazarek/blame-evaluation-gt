@@ -50,6 +50,7 @@
  #:arguments {[(hash-table ['data-dir data-dir]
                            ['out-dir  out-dir]
                            ['name     name]
+                           ['config   config-path]
                            _ ...)
                args]
               #:once-each
@@ -79,10 +80,10 @@
               [("-c" "--config")
                'config
                ("Config for obtaining active mutator names.")
-               #:collect ["path"
-                          (set-parameter current-configuration-path)
-                          #f]
+               #:collect ["path" take-latest #f]
                #:mandatory]}
+
+ (install-configuration! config-path)
 
  (define mutant-mutators
    (read-mutants-by-mutator (mutation-analysis-summaries-db)))

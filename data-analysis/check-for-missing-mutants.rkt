@@ -1,6 +1,6 @@
 #lang at-exp rscript
 
-(require "../configurables/mutant-sampling/sample-within-mutators.rkt"
+(require "../configurables/mutant-sampling/use-pre-selected-samples.rkt"
          (prefix-in db: "../db/db.rkt")
          "read-data.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"

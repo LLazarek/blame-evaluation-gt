@@ -132,11 +132,6 @@
   (parameterize ([current-progress-logger log-progress!]
                  [current-result-cache (load-result-cache)])
     (log-factory info @~a{Running on benchmark @bench})
-    (log-factory info
-                 @~a{
-                     Running experiment with config @;
-                     @(current-configuration-path)
-                     })
 
     (define mutatable-module-names (benchmark->mutatable-modules bench))
     (define max-config (make-max-bench-config bench))
@@ -147,10 +142,7 @@
       (log-factory debug "Creating output directory ~a." (data-output-dir))
       (make-directory (data-output-dir)))
 
-    (define select-mutants
-      (load-configured (current-configuration-path)
-                       "mutant-sampling"
-                       'select-mutants))
+    (define select-mutants (configured:select-mutants))
     (define process-q
       (for/fold ([process-q (make-process-Q (process-limit)
                                             (factory (bench-info bench max-config)
@@ -186,9 +178,7 @@
                "All mutants dead. Performing sanity checks...")
   (define mutatable-module-names (benchmark->mutatable-modules bench))
   (define all-mutants-should-have-trails?
-    (load-configured (current-configuration-path)
-                     "mutant-sampling"
-                     'all-mutants-should-have-trails?))
+    (configured:all-mutants-should-have-trails?))
   (define (trail-recorded? module-to-mutate-name
                            mutation-index
                            trail-id)
@@ -340,10 +330,7 @@
 (define/contract (sample-blame-trail-roots process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
-  (define config-samples
-    (load-configured (current-configuration-path)
-                     "configuration-sampling"
-                     'config-samples))
+  (define config-samples (configured:config-samples))
 
   (define the-factory (process-Q-get-data process-q))
   (define max-config (bench-info-max-config (factory-bench the-factory)))
@@ -481,10 +468,7 @@
     (extend-blame-trail the-blame-trail
                         dead-proc))
 
-  (define blame-trail-ended?
-    (load-configured (current-configuration-path)
-                     "trail-completion"
-                     'blame-trail-ended?))
+  (define blame-trail-ended? (configured:blame-trail-ended?))
 
   (cond [(blame-trail-ended? dead-proc
                              blamed/type-error-locations
@@ -1129,6 +1113,7 @@ Mutant: [~a] ~a @ ~a with config:
            (prefix-in db: "../db/db.rkt"))
   (define bench-path-to-run (make-parameter #f))
   (define metadata-file (make-parameter #f))
+  (define configuration-path (make-parameter #f))
   (define/contract configuration-outcome-db
     (parameter/c (or/c #f path-to-db?))
     (make-parameter #f))
@@ -1141,7 +1126,7 @@ Mutant: [~a] ~a @ ~a with config:
    [("-c" "--config")
     path
     "Path to the configuration to use."
-    (current-configuration-path path)]
+    (configuration-path path)]
    [("-o" "--output-dir")
     dir
     "Data output directory."
@@ -1189,8 +1174,10 @@ Mutant: [~a] ~a @ ~a with config:
 
   (unless (bench-path-to-run)
     (raise-user-error 'mutant-factory "Error: must provide benchmark to run."))
-  (unless (current-configuration-path)
+  (unless (configuration-path)
     (raise-user-error 'mutant-factory "Error: must provide a configuration."))
+
+  (install-configuration! (configuration-path))
 
   (define bench-to-run (read-benchmark (bench-path-to-run)))
 
@@ -1206,7 +1193,7 @@ Mutant: [~a] ~a @ ~a with config:
     (unless (create/check-metadata-integrity!
              (metadata-info (metadata-file)
                             (bench-path-to-run)
-                            (current-configuration-path)))
+                            (configuration-path)))
       (raise-user-error
        'mutant-factory
        @~a{
@@ -1232,6 +1219,13 @@ Mutant: [~a] ~a @ ~a with config:
   (define-values {log-progress!/raw finalize-log!}
     (initialize-progress-log! (progress-log)
                               #:exists 'append))
+
+  (log-factory info
+               @~a{
+                   Running experiment with config @;
+                   @(configuration-path)
+                   })
+
   (define completed+checks-pass?
     (parameterize ([date-display-format 'iso-8601])
       (run-all-mutants*configs bench-to-run

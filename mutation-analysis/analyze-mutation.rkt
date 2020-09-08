@@ -206,7 +206,7 @@
                 "If it exists and is not empty, resume from the point reached in the log.")
                #:collect ["path" take-latest #f]
                #:mandatory]}
- (current-configuration-path (hash-ref flags 'config-path))
+ (install-configuration! (hash-ref flags 'config-path))
  (define progress-log (hash-ref flags 'progress-log))
  (define progress
    (match progress-log

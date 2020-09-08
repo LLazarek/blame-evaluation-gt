@@ -90,9 +90,11 @@
                #:record]
               #:args benchmark-names}
 
- (current-configuration-path config-path)
+ (install-configuration! config-path)
  (define mutants
    (apply append
           (for/list ([bench (in-list benchmark-names)])
             (pick-mutants bench n))))
  (for-each (diff-mutant real-diff?) mutants))
+
+(module test racket)

@@ -29,6 +29,7 @@
   (define memory/gb (make-parameter #f))
   (define mutant-output-path (make-parameter #f))
   (define bench-config (make-parameter #f))
+  (define configuration-path (make-parameter #f))
 
   (command-line
    #:once-each
@@ -85,7 +86,7 @@
     path
     ("The configuration with which to run the mutant."
      "This is a mandatory argument.")
-    (current-configuration-path path)]
+    (configuration-path path)]
 
    [("-C" "--bench-config")
     config-str
@@ -109,7 +110,7 @@
                                     (other-modules)
                                     (module-to-mutate)
                                     (mutation-index)
-                                    (current-configuration-path)
+                                    (configuration-path)
                                     (bench-config)))]
                 [flag (in-list '(-m -o -M -i -c -C))]
                 #:unless arg)
@@ -118,6 +119,8 @@
   (when missing-arg
     (fail
      @~a{Error: Missing mandatory argument: @missing-arg}))
+
+  (install-configuration! (configuration-path))
 
   (define the-program
     (make-unified-program (main-module)
@@ -163,8 +166,8 @@
            "../configurables/configurables.rkt"
            racket/runtime-path)
 
-  (define-runtime-path test-config "../configurables/test.config")
-  (current-configuration-path test-config)
+  (define-runtime-path test-config "../configurables/configs/test.rkt")
+  (install-configuration! (simple-form-path test-config))
 
   (define-test-env {setup! cleanup!}
     #:directories ([test-bench "./test-bench"]

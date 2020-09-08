@@ -332,7 +332,7 @@
 
   (define mutation-analysis-samples-db
     (load/report-failure
-     "configurables/mutant-sampling/sample-within-mutators.rkt"
+     "configurables/mutant-sampling/use-pre-selected-samples.rkt"
      'mutation-analysis-samples-db))
   (unless (check-db/keys (mutation-analysis-samples-db)
                          gtp-benchmark-names)

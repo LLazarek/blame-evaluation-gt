@@ -24,15 +24,14 @@
 
 (main
  #:arguments {[(hash-table ['out-db results-db]
+                           ['config config-path]
                            _ ...)
                bench-paths]
               #:once-each
               [("-c" "--config")
                'config
                "Config for selecting which mutants to compute results for."
-               #:collect ["path"
-                          (set-parameter current-configuration-path)
-                          #f]
+               #:collect ["path" take-latest #f]
                #:mandatory]
               [("-o" "--out-db")
                'out-db
@@ -50,6 +49,8 @@
               paths for which to compute mutant results.
               }]
 
+ (install-configuration! config-path)
+
  (define results
    (for/hash ([bench-path (in-list bench-paths)])
      (define the-bench (read-benchmark bench-path))
@@ -59,10 +60,7 @@
          (values mod 'none)))
      (define bench-untyped-program
        (make-untyped-program-for the-bench untyped-config))
-     (define select-mutants
-       (load-configured (current-configuration-path)
-                        "mutant-sampling"
-                        'select-mutants))
+     (define select-mutants (configured:select-mutants))
 
      (displayln @~a{Computing result of @bench-name ...})
      (define mutant-results-hash

@@ -2,6 +2,7 @@
 
 (require ruinit
          racket/logging
+         racket/runtime-path
          "mutant-factory-test-helper.rkt"
          "blame-trail-data.rkt"
          (submod "mutant-factory.rkt" test)
@@ -89,7 +90,9 @@
     (test-= (process-Q-get-data (process-Q-set-data mock-q 2))
             2)))
 
-(current-configuration-path (simple-form-path "../configurables/test.config"))
+
+(define-runtime-path test-config "../configurables/configs/test.rkt")
+(install-configuration! (simple-form-path test-config))
 
 (define e.rkt (file-name-string-from-path e-path))
 (define main.rkt (file-name-string-from-path main-path))

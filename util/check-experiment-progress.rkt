@@ -46,10 +46,7 @@
                        "Unable to infer path to config for this experiment.")]))
 
 (define (all-mutants-for bench)
-  (define select-mutants
-    (load-configured (current-configuration-path)
-                     "mutant-sampling"
-                     'select-mutants))
+  (define select-mutants (configured:select-mutants))
   (for*/list ([module-to-mutate-name (in-list (benchmark->mutatable-modules bench))]
               [mutation-index (select-mutants module-to-mutate-name bench)])
     (mutant module-to-mutate-name mutation-index #t)))
@@ -94,7 +91,7 @@
    (guess-path benchmark-dir (~a (basename benchmark-dir) ".log")))
  (define bench (infer-benchmark log-path))
 
- (current-configuration-path (infer-configuration log-path))
+ (install-configuration! (infer-configuration log-path))
  (define all-mutants (all-mutants-for bench))
 
  (define progress-log-path

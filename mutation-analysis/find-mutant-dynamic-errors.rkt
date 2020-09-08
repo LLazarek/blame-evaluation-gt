@@ -213,7 +213,7 @@
  #:arguments ({(hash-table ['summaries-db summaries-db-path]
                            ['restricted-summaries-db restricted-summaries-db-path]
                            ['dynamic-error-configs-db dynamic-error-configs-db-path]
-                           ['config _]
+                           ['config config-path]
                            ['benchmarks-dir benchmarks-dir]
                            ['progress-log progress-log-path]
                            ['search-size (app string->number search-size)]
@@ -243,7 +243,7 @@
               [("-c" "--config")
                'config
                ("The config with which to identify blame trail roots.")
-               #:collect {"path" (set-parameter current-configuration-path) #f}
+               #:collect {"path" take-latest #f}
                #:mandatory]
               [("-b" "--benchmarks")
                'benchmarks-dir
@@ -280,6 +280,8 @@
 
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
+
+ (install-configuration! config-path)
 
  (define progress
    (match progress-log-path

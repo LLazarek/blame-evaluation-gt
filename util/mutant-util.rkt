@@ -160,8 +160,8 @@
            "../configurables/configurables.rkt"
            racket/runtime-path)
 
-  (define-runtime-path test-config "../configurables/test.config")
-  (current-configuration-path test-config)
+  (define-runtime-path test-config "../configurables/configs/test.rkt")
+  (install-configuration! (simple-form-path test-config))
   (define main-mutation-count 19)
   (define second-mutation-count 4)
   (test-begin/with-env

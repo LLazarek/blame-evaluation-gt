@@ -1,108 +1,95 @@
 #lang at-exp racket
 
-(require "../util/optional-contracts.rkt")
-(provide (contract-out
-          [load-specific (string? string? symbol? . -> . any/c)]
-          [load-configured (path-string? string? symbol? . -> . any/c)]
-          [current-configuration-path (parameter/c (or/c #f path-string?))]))
+(provide configure!
+         install-configuration!
+         current-configuration-path
+         call-with-configuration)
 
-(require racket/runtime-path)
+(require "configurable-implementation.rkt")
 
-(define-runtime-path configurables-path "all-configurables.rktd")
-(define implementation-paths-root
-  (let-values ([{parent _1 _2} (split-path configurables-path)])
-    parent))
+(define-configurable mutation
+  #:provides [mutate-benchmark active-mutator-names]
 
-(unless (file-exists? configurables-path)
-  (raise-user-error 'configurables
-                    @~a{Unable to find configuration at @configurables-path}))
+  (define-implementation type-mistakes-in-code
+    #:module "mutation/mutate-benchmark.rkt")
 
-(define configurable-interface?
-  (or/c
-   ; a name
-   string?
+  (define-implementation type-annotation-mistakes
+    #:module "mutation/mutate-types.rkt"))
 
-   ; a name and parameters
-   (cons/c string?
-           (listof symbol?))))
-(define configurables/c
-  (hash/c string?
-          (hash/c configurable-interface?
-                  path-string?)))
-(define configurables (file->value configurables-path))
+(define-configurable mutant-sampling
+  #:provides [select-mutants all-mutants-should-have-trails?]
 
-(unless (hash? configurables)
-  (raise-user-error 'configurables
-                    @~a{Malformed configurables at @configurables}))
+  (define-implementation none
+    #:module "mutant-sampling/no-sampling.rkt")
 
-(struct implementation (relative-path ; path-string?
-                        parameters ; listof symbol?
-                        ))
+  (define-implementation use-pre-selected-samples
+    #:module "mutant-sampling/use-pre-selected-samples.rkt"
+    #:parameters [mutation-analysis-samples-db]))
 
-;; string? string? . -> . implementation?
-(define (read-implementation-for category name)
-  (match (hash-ref configurables
-                   category
-                   (λ _ (error
-                         'read-implementation-for
-                         @~a{@category not found in configurables})))
-    [(hash-table [(== name) path] _ ...) (implementation path empty)]
-    [(hash-table [(list* (== name) params) path] _ ...) (implementation path params)]
-    [else
-     (error
-      'read-implementation-for
-      @~a{@name not found in configurables for @category})]))
+(define-configurable blame-following
+  #:provides [make-extract-blamed]
 
-(define (load-specific category name id parameter-values)
-  (define the-implementation (read-implementation-for category name))
-  (define relative-path (implementation-relative-path the-implementation))
-  (define absolute-path (build-path implementation-paths-root
-                                    relative-path))
-  (define mod-path `(file ,(path->string absolute-path)))
+  (define-implementation null
+    #:module "blame-following/null.rkt")
 
-  (define parameters (implementation-parameters the-implementation))
-  (unless (equal? (length parameters) (length parameter-values))
-    (raise-user-error 'configurables
-                      @~a{
-                          Configurable for @category @name given the wrong number of parameters.
-                          Expected: @~e[parameters]
-                          Given:    @~e[parameter-values]
-                          }))
-  (for ([parameter-name (in-list parameters)]
-        [value          (in-list parameter-values)])
-    (define parameter
-      (dynamic-require mod-path
-                       parameter-name
-                       (λ _
-                         (error 'load-specific
-                                @~a{
-                                    Implementation from configurables @relative-path either @;
-                                    does not exist or does not provide parameter @parameter-name
-                                    }))))
-    (parameter value))
-  (dynamic-require
-   mod-path
-   id
-   (λ _
-     (error 'load-specific
-            @~a{
-                Implementation from configurables @relative-path either does not exist or @;
-                does not provide @id
-                }))))
+  (define-implementation natural-blame
+    #:module "blame-following/natural-blame.rkt")
 
-(define (load-configured config-path category id)
-  (define config (file->value config-path))
-  (define-values {name parameter-values}
-    (match (hash-ref config category)
-      [(list (? string? name) vals ...) (values name vals)]
-      [(? string? name)  (values name empty)]
-      [other (raise-user-error
-              'load-configured
-              @~a{
-                  Malformed configuration value in @config-path
-                  Expected: either a list starting with a string, or a string
-                  Got:      @~e[other]
-                  })]))
-  (load-specific category name id parameter-values))
+  (define-implementation transient-oldest
+    #:module "blame-following/transient-oldest.rkt")
+  (define-implementation transient-all
+    #:module "blame-following/transient-all.rkt")
 
-(define current-configuration-path (make-parameter #f))
+  (define-implementation stack
+    #:module "blame-following/stack.rkt"))
+
+(define-configurable stack-location-selection
+  #:provides [make-extract-runtime-error-location]
+
+  (define-implementation top
+    #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
+    #:fixed-parameters ([pick-locations (λ (all) (take all 1))]))
+  (define-implementation all
+    #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
+    #:fixed-parameters ([pick-locations values])))
+
+(define-configurable module-instrumentation
+  #:provides [instrument-module]
+
+  (define-implementation none
+    #:module "module-instrumentation/none.rkt")
+
+  (define-implementation transient-types
+    #:module "module-instrumentation/type-with-transient.rkt"
+    #:parameters [transient-special-cases-db]))
+
+(define-configurable benchmark-runner
+  #:provides [make-benchmark-runner]
+
+  (define-implementation run-it
+    #:module "benchmark-runner/run-it.rkt")
+
+  (define-implementation none
+    #:module "benchmark-runner/nothing.rkt")
+
+  (define-implementation load-pre-computed-result
+    #:module "benchmark-runner/load-pre-computed-result.rkt"
+    #:parameters [pre-computed-results-db]))
+
+(define-configurable configuration-sampling
+  #:provides [config-samples]
+
+  (define-implementation uniform-with-replacement
+    #:module "configuration-sampling/uniform-with-replacement.rkt")
+
+  (define-implementation uniform-with-replacement/typing-mod-to-mutate
+    #:module "configuration-sampling/uniform-with-replacement-typing-mod-to-mutate.rkt"))
+
+(define-configurable trail-completion
+  #:provides [blame-trail-ended?]
+
+  (define-implementation any-type-error
+    #:module "trail-completion/any-type-error.rkt")
+
+  (define-implementation mutated-type-error/blamed-at-max
+    #:module "trail-completion/mutated-type-error-or-blamed-at-max.rkt"))
