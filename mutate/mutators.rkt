@@ -24,7 +24,8 @@
 
           [make-top-level-id-swap-mutator (dependent-mutator/c syntax? program/c)]
           [make-imported-id-swap-mutator  (dependent-mutator/c syntax? program/c)]
-          [make-method-id-swap-mutator    (dependent-mutator/c syntax? program/c)]))
+          [make-method-id-swap-mutator    (dependent-mutator/c syntax? program/c)]
+          [make-field-id-swap-mutator     (dependent-mutator/c syntax? program/c)]))
 
 (require racket/class
          racket/function
@@ -1159,6 +1160,129 @@
                    (list #'n
                          #'m))
     (test-mutator* method-call-swap-mutator
+                   #'n
+                   (list #'m
+                         #'n))))
+
+(define-dependent-mutator (make-field-id-swap-mutator mod-stx containing-program)
+  #:type [type "field-id-swap"]
+  (define all-fields (field-names-in mod-stx))
+  (mutator (combined-id-list-swap-mutator all-fields type)
+           type))
+
+(define-syntax-class class-maybe-renamed
+  #:attributes [name internal-name]
+  (pattern name:id
+           #:with internal-name #'name)
+  (pattern [internal-name:id name:id]))
+
+(define-syntax-class field-defs
+  #:attributes [(name 1)]
+  #:datum-literals [field inherit-field]
+  (pattern (field [clause:class-maybe-renamed _] ...)
+           #:with [name ...] #'[clause.name ...])
+  (pattern (inherit-field clause:class-maybe-renamed ...)
+           #:with [name ...] #'[clause.name ...]))
+
+(define field-names-in
+  (syntax-parser
+    #:datum-literals [class class*]
+    [({~or class class*}
+      {~seq {~not _:field-defs} ...
+            def:field-defs} ...
+      {~and after {~not _:field-defs}} ...)
+     (syntax->list #'[def.name ... ...])]
+    [(inner-es ...)
+     (remove-duplicates
+      (flatten
+       (map field-names-in
+            (attribute inner-es))))]
+    [else empty]))
+
+(module+ test
+  (test-begin
+    #:name field-names-in
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x x)}))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object% (super-new))])
+                                                          (new c)
+                                                          5))}))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                  (super-new)
+                                                                  (define/public y 42))])
+                                                         (new c)
+                                                         5))}))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                  (super-new)
+                                                                  (field [m 5])
+                                                                  (define/public (l) #f))])
+                                                         (send (new c) m x)))}))
+                 '(m))
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                  (super-new)
+                                                                  (field [m 5]
+                                                                         [n 42])
+                                                                  (define/public (l) #f))])
+                                                         (send (new c) m x)))}))
+                 '(m n))
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                  (super-new)
+                                                                  (inherit-field m)
+                                                                  (define/public (l) #f)
+                                                                  (field [n 42]))])
+                                                         (send (new c) m x)))}))
+                 '(m n))
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                  (super-new)
+                                                                  (define/public (l) #f)
+                                                                  (inherit-field m
+                                                                                 [internal-n n]))])
+                                                         (send (new c) m x)))}))
+                 '(m n))
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{}))
+                 '()))
+
+  (test-begin
+    #:name make-field-id-swap-mutator
+    (ignore
+     (define field-call-swap-mutator
+       (make-field-id-swap-mutator
+        #'{(define x 5) (+ x (let ([c (class object%
+                                        (super-new)
+                                        (inherit-field m)
+                                        (field [n 42])
+                                        (define/public (mtd) m))])
+                               (send (new c) mtd 42)))}
+        #f)))
+    (test-mutator* field-call-swap-mutator
+                   #'x
+                   (list #'x))
+    (test-mutator* field-call-swap-mutator
+                   #'mtd
+                   (list #'mtd))
+    (test-mutator* field-call-swap-mutator
+                   #'m
+                   (list #'n
+                         #'m))
+    (test-mutator* field-call-swap-mutator
                    #'n
                    (list #'m
                          #'n))))

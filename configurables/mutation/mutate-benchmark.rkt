@@ -12,12 +12,6 @@
          "../../mutate/top-level-selectors.rkt"
          "../../mutate/expression-selectors.rkt")
 
-;; lltodo: this should really be the list of mutators themselves, and there
-;; should be a way to get a mutator's name from the mutator.
-;; Probably I want a struct with prop:procedure, and a field for the name.
-;; I can have a `define-mutator` macro that takes the name and the mutator
-;; function, and introduces a binding for the name.
-;; For now, keep them manually in-sync.
 (define active-mutators
   (list arithmetic-op-swap
         boolean-op-swap
@@ -37,7 +31,8 @@
 (define active-dependent-mutators
   (list make-top-level-id-swap-mutator
         make-imported-id-swap-mutator
-        make-method-id-swap-mutator))
+        make-method-id-swap-mutator
+        make-field-id-swap-mutator))
 
 (define active-mutator-names
   (append (map mutator-type active-mutators)
@@ -1631,7 +1626,205 @@
               (define c2 (box (class object%
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
-              (define result (send (new c1) c2-m1 'bbb))}]))))
+              (define result (send (new c1) c2-m1 'bbb))}])))
+
+  (test-begin
+    #:name field-id-swap
+    (test-mutation/sequence
+     #'{(define c1 (class object%
+                     (field [c1-f1 'aaa])
+                     (define/public (c1-m1 x) c1-f1)))
+        (define another-def 'aaa)
+        (define c2 (box (class object%
+                          (inherit-field c2-f1 [blah c2-f2])
+                          (define/public (c2-m1 y) c2-f2))))
+        (define result (send (new c1) c1-m1 'bbb))}
+     `(#;[0 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [0 ,#'{(define c1 (class object%
+                           (define/public (a-nonexistant-method x) x)
+                           (field [c1-f1 'aaa])
+                           (define/public (c1-m1 x) c1-f1)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (inherit-field c2-f1 [blah c2-f2])
+                                (define/public (c2-m1 y) c2-f2))))
+              (define result (send (new c1) c1-m1 'bbb))}]
+       [1 ,#'{(define c1 (class object%
+                             (field [c2-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [2 ,#'{(define c1 (class object%
+                             (field [c2-f2 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [3 ,#'{(define c1 (class object%
+                           (field [c1-f1 'aaa])
+                           (define/private (c1-m1 x) c1-f1)))
+              (define another-def 'aaa)
+              (define c2 (box (class object%
+                                (inherit-field c2-f1 [blah c2-f2])
+                                (define/public (c2-m1 y) c2-f2))))
+              (define result (send (new c1) c1-m1 'bbb))}]
+       [4 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c2-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [5 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c2-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [6 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c2-f2)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [7 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (define/public (a-nonexistant-method x) x)
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [8 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field [blah c2-f2] c2-f1)
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [9 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c1-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [10 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f2 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [11 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c1-f1])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [12 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f1])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [13 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/private (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [14 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c1-m1 y) c2-f2))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [15 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c1-f1))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [16 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f1))))
+                (define result (send (new c1) c1-m1 'bbb))}]
+       [17 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send c1-m1 (new c1) 'bbb))}]
+       [18 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new another-def) c1-m1 'bbb))}]
+       [19 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c2) c1-m1 'bbb))}]
+       [20 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new result) c1-m1 'bbb))}]
+       [21 ,#'{(define c1 (class object%
+                             (field [c1-f1 'aaa])
+                             (define/public (c1-m1 x) c1-f1)))
+                (define another-def 'aaa)
+                (define c2 (box (class object%
+                                  (inherit-field c2-f1 [blah c2-f2])
+                                  (define/public (c2-m1 y) c2-f2))))
+                (define result (send (new c1) c2-m1 'bbb))}]))))
 
 ;; Potential mutations that have been deferred:
 ;; - (hash a b ...) ~> (make-hash (list (cons a b) ...))
