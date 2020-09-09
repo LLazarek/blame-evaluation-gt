@@ -1179,7 +1179,10 @@
 (define-syntax-class field-defs
   #:attributes [(name 1)]
   #:datum-literals [field inherit-field]
-  (pattern (field [clause:class-maybe-renamed _] ...)
+  ;; Extra-liberal pattern here: this discovery of field names has to work for
+  ;; both untyped and typed, which might have type annotations as well as the
+  ;; default value
+  (pattern (field [clause:class-maybe-renamed . _] ...)
            #:with [name ...] #'[clause.name ...])
   (pattern (inherit-field clause:class-maybe-renamed ...)
            #:with [name ...] #'[clause.name ...]))
@@ -1258,7 +1261,15 @@
     (test-equal? (map
                   syntax->datum
                   (field-names-in #'{}))
-                 '()))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5) (+ x (let ([c (class object%
+                                                                  (super-new)
+                                                                  (field [m : SomeType 5])
+                                                                  (define/public (l) #f))])
+                                                         (send (new c) m x)))}))
+                 '(m)))
 
   (test-begin
     #:name make-field-id-swap-mutator
