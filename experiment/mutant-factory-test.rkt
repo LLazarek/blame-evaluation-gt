@@ -858,6 +858,9 @@
 
    ;; check that mixed configurations work as expected:
    ;; this is just one mixed config that I know should produce a ctc violation
+   ;;
+   ;; lltodo: use pre-selected BT roots to ensure that this config is selected so that we don't
+   ;; get intermittent failures from this test
    (ignore
     (define some-particular-mutant:mod "main.rkt")
     (define some-particular-mutant:index 5))
