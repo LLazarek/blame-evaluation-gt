@@ -57,7 +57,7 @@
   (unless (file-exists? experiment-config)
     (raise-user-error
      'debug-mutant
-     @~a{Unable to find config named @|config-name|.config in @config-dir}))
+     @~a{Unable to find config named @|config-name|.rkt in @config-dir}))
 
   (install-configuration! experiment-config)
   (define bench-path (find-benchmark bench-name-or-path))
