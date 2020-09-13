@@ -7,7 +7,142 @@
 (provide order-by-dependencies)
 
 (require syntax/to-string
-         "../util/read-module.rkt")
+         "../util/read-module.rkt"
+         "../util/path-utils.rkt")
+
+
+
+(define/contract (module-dependencies m possible-depends
+                                      [read-module read-module]
+                                      [get-path-string identity])
+  (->i ([m any/c]
+        [possible-depends (listof any/c)])
+       ([read-module (any/c . -> . syntax?)]
+        [get-path-string (any/c . -> . string?)])
+       [result (possible-depends)
+               (and/c (listof any/c)
+                      (curryr subset? possible-depends))])
+
+  (define module-stx (read-module m))
+  (define module-str (syntax->string module-stx))
+  (define (module-mentions? other-module)
+    (define basename (file-name-string-from-path (get-path-string other-module)))
+    (or (string-contains? module-str (~a "\"" basename "\""))
+        (string-contains? module-str (~a "/" basename "\""))))
+  (filter module-mentions? (set-subtract possible-depends
+                                         (list m))))
+
+(module+ test
+  (require ruinit)
+  (define-test-env {setup-test-env! cleanup-test-env!}
+    #:directories ()
+    #:files ([a.rkt
+              "a.rkt"
+              "#lang racket
+(require bar
+         \"b.rkt\"
+         foo
+         \"c.rkt\")
+(+ 2 2)
+"]
+             [b.rkt
+              "b.rkt"
+              "#lang racket
+(require foo
+         \"c.rkt\"
+         \"another-a.rkt\"
+         syntax/to-string
+         baz)
+(+ 2 2)
+"]
+             [c.rkt
+              "c.rkt"
+              "#lang racket
+(require racket/match)
+(+ 2 2)
+"]
+             [another-a.rkt
+              "another-a.rkt"
+              "#lang racket
+(provide foo)
+"]))
+
+  (test-begin
+    #:name module-dependencies
+    #:before (setup-test-env!)
+    #:after (cleanup-test-env!)
+    ;; Test artifical programs
+    (test-equal? (module-dependencies "a.rkt" '("a.rkt" "b.rkt" "c.rkt" "another-a.rkt"))
+                 '("c.rkt" "b.rkt"))
+    (test-equal? (module-dependencies "b.rkt" '("a.rkt" "b.rkt" "c.rkt" "another-a.rkt"))
+                 '("another-a.rkt" "c.rkt"))
+    (test-equal? (module-dependencies "c.rkt" '("a.rkt" "b.rkt" "c.rkt" "another-a.rkt"))
+                 '())
+
+    ;; Test on forth benchmark
+    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
+                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
+                 '("../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"))
+    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
+                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
+                 '("../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
+    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
+                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
+                 '("../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"
+                   "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"))
+    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"
+                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
+                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
+                 '())
+
+    (when (directory-exists? "../../gtp-benchmarks/benchmarks/take5-mixin")
+      (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/deck.rkt"
+                                        (map path->string
+                                             (directory-list "../../gtp-benchmarks/benchmarks/take5-mixin/untyped"
+                                                             #:build? #t)))
+                   '("../../gtp-benchmarks/benchmarks/take5-mixin/untyped/for-player.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/for-dealer.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/basics.rkt"))))
+
+  (test-begin
+    #:name order-by-dependencies
+    (test-equal? (order-by-dependencies (map path->string
+                                             (directory-list "../../gtp-benchmarks/benchmarks/take5/untyped"
+                                                             #:build? #t)))
+                 '("../../gtp-benchmarks/benchmarks/take5/untyped/basics.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/card.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/stack.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/player.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/card-pool.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/deck.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/dealer.rkt"
+                   "../../gtp-benchmarks/benchmarks/take5/untyped/main.rkt"))
+    (when (directory-exists? "../../gtp-benchmarks/benchmarks/take5-mixin")
+      (test-equal? (order-by-dependencies (map path->string
+                                               (directory-list "../../gtp-benchmarks/benchmarks/take5-mixin/untyped"
+                                                               #:build? #t)))
+                   '("../../gtp-benchmarks/benchmarks/take5-mixin/untyped/basics.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/card.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/stack.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/player.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/card-pool.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/for-dealer.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/for-player.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/deck.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/dealer.rkt"
+                     "../../gtp-benchmarks/benchmarks/take5-mixin/untyped/main.rkt")))))
+
 
 ;; (listof path?) -> (listof path?)
 ;; Order the given set of modules such that every module in the list
@@ -21,7 +156,7 @@
 (define (order-by-dependencies modules
                                [read-module read-module]
                                [get-path-string identity])
-  (->i ([modules (listof any/c)])
+  #;(->i ([modules (listof any/c)])
        ([read-module (any/c . -> . syntax?)]
         [get-path-string (any/c . -> . path-string?)])
        [result (listof any/c)]
@@ -57,44 +192,17 @@
            (when (empty? feasible-modules)
              (error 'order-by-dependencies
                     "Module dependency cycle found in ~v"
-                    (get-path-string modules)))
+                    (map get-path-string modules)))
            (loop (append module-order-so-far feasible-modules)
                  (set-subtract modules-remaining feasible-modules))])))
 
 (module+ test
-  (require ruinit)
-  (define-test-env {setup-test-env! cleanup-test-env!}
-    #:directories ()
-    #:files ([a.rkt
-              "a.rkt"
-              "#lang racket
-(require bar
-         \"b.rkt\"
-         foo
-         \"c.rkt\")
-(+ 2 2)
-"]
-             [b.rkt
-              "b.rkt"
-              "#lang racket
-(require foo
-         \"c.rkt\"
-         syntax/to-string
-         baz)
-(+ 2 2)
-"]
-             [c.rkt
-              "c.rkt"
-              "#lang racket
-(require racket/match)
-(+ 2 2)
-"]))
   (test-begin
     #:name order-by-dependencies
     #:before (setup-test-env!)
     #:after (cleanup-test-env!)
-    (test-equal? (order-by-dependencies '("a.rkt" "b.rkt" "c.rkt"))
-                 '("c.rkt" "b.rkt" "a.rkt"))
+    (test-equal? (order-by-dependencies '("a.rkt" "b.rkt" "c.rkt" "another-a.rkt"))
+                 '("c.rkt" "another-a.rkt" "b.rkt" "a.rkt"))
     (test-equal? (order-by-dependencies '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
                                           "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
                                           "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
@@ -122,62 +230,3 @@
     (test-equal? (prefixes '(1 2 3))
                  '(() (1) (1 2) (1 2 3)))))
 
-(define/contract (module-dependencies m possible-depends
-                                      [read-module read-module]
-                                      [get-path-string identity])
-  (->i ([m any/c]
-        [possible-depends (listof any/c)])
-       ([read-module (any/c . -> . syntax?)]
-        [get-path-string (any/c . -> . string?)])
-       [result (possible-depends)
-               (and/c (listof any/c)
-                      (curryr subset? possible-depends))])
-
-  (define module-stx (read-module m))
-  (define module-str (syntax->string module-stx))
-  (define (module-mentions? other-module)
-    (define-values (__1 basename __2)
-      (split-path (get-path-string other-module)))
-    (string-contains? module-str (path->string basename)))
-  (filter module-mentions? (set-subtract possible-depends
-                                         (list m))))
-
-(module+ test
-  (test-begin
-    #:name module-dependencies
-    #:before (setup-test-env!)
-    #:after (cleanup-test-env!)
-    ;; Test artifical programs
-    (test-equal? (module-dependencies "a.rkt" '("a.rkt" "b.rkt" "c.rkt"))
-                 '("c.rkt" "b.rkt"))
-    (test-equal? (module-dependencies "b.rkt" '("a.rkt" "b.rkt" "c.rkt"))
-                 '("c.rkt"))
-    (test-equal? (module-dependencies "c.rkt" '("a.rkt" "b.rkt" "c.rkt"))
-                 '())
-
-    ;; Test on forth benchmark
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '("../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"))
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '("../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '("../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"
-                   "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"))
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '())))
