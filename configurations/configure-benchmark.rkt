@@ -53,10 +53,15 @@
     bench)
   (define configured-files
     (for/list ([(file level) (in-hash config)])
-      (pick-file-by-name (match level
-                           ['none untyped]
-                           ['types typed])
-                         file)))
+      (define configured-file
+        (pick-file-by-name (match level
+                             ['none untyped]
+                             ['types typed])
+                           file))
+      (or configured-file
+          (raise-user-error
+           'configure-benchmark
+           @~a{Unable to find module in benchmark corresponding to name in config for @file}))))
   (match-define-values {(list main) others}
                        (partition (path-ends-with "main.rkt")
                                   configured-files))
