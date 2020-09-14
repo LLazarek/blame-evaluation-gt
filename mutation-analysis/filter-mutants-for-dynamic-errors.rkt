@@ -69,7 +69,7 @@
      (define blamed-mods-in-program
        (filter (λ (blamed) (hash-has-key? a-config blamed)) blamed-list))
      (define 3-unique-mods-on-stack?
-       (>= (count (remove-duplicates blamed-mods-in-program)) 3))
+       (>= (length (remove-duplicates blamed-mods-in-program)) 3))
      (log-mutant-dynamic-errors-debug
       @~a{
           @mutant blamed interesting?, blamed: @blamed-mods-in-program : @3-unique-mods-on-stack?
