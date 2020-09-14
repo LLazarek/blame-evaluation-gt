@@ -3,7 +3,7 @@
 (require "../configurables.rkt")
 
 (configure! mutation                 type-mistakes-in-code)
-(configure! mutant-sampling          use-pre-selected-samples "../dbs/mutant-samples.rktdb")
+(configure! mutant-sampling          use-pre-selected-samples "../dbs/code-mutations/mutant-samples.rktdb")
 (configure! blame-following          natural-blame)
 (configure! stack-location-selection top)
 (configure! module-instrumentation   none)
