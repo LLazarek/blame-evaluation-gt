@@ -21,8 +21,11 @@
 (struct instrumented-module
   (path-string module-path file-path containing-directory stx))
 
-(define (run-with:require main-mod-path)
-  (eval `(require ,main-mod-path)))
+(define ((run-with:require require-main-submod?) main-mod-path)
+  (define mod-res (eval `(require ,main-mod-path)))
+  (if require-main-submod?
+      (eval `(require (submod ,main-mod-path main)))
+      mod-res))
 
 ;; Module evaluation is basically compilation. Not even top level forms run
 ;; until the runtime phase.
@@ -43,7 +46,7 @@
                                            #:make-result
                                            [make-result (λ (ns r) r)]
                                            #:run-with
-                                           [run-main run-with:require])
+                                           [run-main (run-with:require #f)])
   (->i ([a-program program/c]
         [instrument-module (mod/c . -> . syntax?)])
        (#:setup-namespace [setup-namespace! (namespace? . -> . void?)]
