@@ -21,9 +21,12 @@
 (struct instrumented-module
   (path-string module-path file-path containing-directory stx))
 
-(define ((run-with:require require-main-submod?) main-mod-path)
+;; Requires `main-mod-path` and then `(submod main-mod-path main)`, if it has a main submodule
+(define (run-with:require main-mod-path)
   (define mod-res (eval `(require ,main-mod-path)))
-  (if require-main-submod?
+  (define has-main-submod?
+    (eval `(module-declared? '(submod ,main-mod-path main))))
+  (if has-main-submod?
       (eval `(require (submod ,main-mod-path main)))
       mod-res))
 
@@ -46,7 +49,7 @@
                                            #:make-result
                                            [make-result (λ (ns r) r)]
                                            #:run-with
-                                           [run-main (run-with:require #f)])
+                                           [run-main run-with:require])
   (->i ([a-program program/c]
         [instrument-module (mod/c . -> . syntax?)])
        (#:setup-namespace [setup-namespace! (namespace? . -> . void?)]
@@ -146,6 +149,16 @@
                                 (#%module-begin
                                  (define (f x) (* x x))
                                  (displayln (f 2))))))
+     (define run-m (make-instrumented-runner
+                    (program m empty)
+                    mod-stx)))
+    (test-equal? (with-output-to-string run-m)
+                 "4\n")
+    (ignore
+     (define m (mod "m.rkt" #'(module m racket
+                                (#%module-begin
+                                 (define (f x) (* x x))
+                                 (module+ main (displayln (f 2)))))))
      (define run-m (make-instrumented-runner
                     (program m empty)
                     mod-stx)))
