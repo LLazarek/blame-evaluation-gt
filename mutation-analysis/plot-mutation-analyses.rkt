@@ -104,7 +104,7 @@
 
 (define (read-data-from-log path #:data-type data-type)
   (define hit+miss-data
-    (log->data log))
+    (log->data path))
   (define all-hits
     (hash-ref hit+miss-data 'success))
   (define all-misses
