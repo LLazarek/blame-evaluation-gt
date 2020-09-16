@@ -701,6 +701,7 @@
     #:datum-literals [define]
     [{{~or (define header:simple-function-or-value-header . _)
            _} ...}
+     ;; No need to remove duplicates, can't have duplicate top level id definitions
      (syntax->list #'[header.name ...])]))
 
 (module+ test
@@ -774,6 +775,10 @@
                    #'y
                    (list #'y))))
 
+(define (normalize-name-list l #:< [< symbol<?] #:key [get-key syntax->datum])
+  (sort (remove-duplicates l #:key get-key)
+        <
+        #:key get-key))
 
 ; stx? program/c -> mutator/c
 (define-dependent-mutator (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
@@ -790,18 +795,18 @@
             reconstructed-base-mod)]
       [non-adapter non-adapter]))
   (define imported-mods
-    (sort (remove-duplicates
-           (filter-map try-unadapt
-                       (syntactic-module->imported-module-names mod-top-level-forms-stx)))
-          string<?))
+    (normalize-name-list
+     (filter-map try-unadapt
+                 (syntactic-module->imported-module-names mod-top-level-forms-stx))
+     #:key values
+     #:< string<?))
   (define imported-id-swap-mutators
     (for*/list ([mod-name (in-list imported-mods)]
                 [the-mod (in-value (program-mod-with-name mod-name containing-program))]
                 #:when the-mod)
+      (define mod-exported-ids+duplicates (syntactic-module->exported-ids the-mod))
       (define mod-exported-ids
-        (sort
-         (syntactic-module->exported-ids the-mod)
-         (λ (a b) (symbol<? (syntax->datum a) (syntax->datum b)))))
+        (normalize-name-list mod-exported-ids+duplicates))
       (log-mutate-debug @~a{ids from @mod-name : @mod-exported-ids})
       (combined-id-list-swap-mutator mod-exported-ids type)))
   (mutator (apply compose-mutators imported-id-swap-mutators)
@@ -995,6 +1000,15 @@
                                [struct posn ([x Real]
                                              [y Real])])
                              (define a 42))))))
+                 '(a))
+    (test-equal? (map
+                  syntax->datum
+                  (syntactic-module->exported-ids
+                   (mod "a.rkt"
+                        #'(module a racket
+                            (#%module-begin
+                             (provide a b a)
+                             (define a 42))))))
                  '(a)))
 
   (test-begin
@@ -1072,20 +1086,22 @@
             _ ...)
            #:with name #'header.name))
 
-(define method-names-in
-  (syntax-parser
-    #:datum-literals [class class*]
-    [({~or class class*}
-      {~seq {~not _:public-method-def} ...
-            def:public-method-def} ...
-      {~not _:public-method-def} ...)
-     (syntax->list #'[def.name ...])]
-    [(inner-es ...)
-     (remove-duplicates
-      (flatten
-       (map method-names-in
-            (attribute inner-es))))]
-    [else empty]))
+(define (method-names-in mod-stx)
+  (define collect-method-names
+    (syntax-parser
+      #:datum-literals [class class*]
+      [({~or class class*}
+        {~seq {~not _:public-method-def} ...
+              def:public-method-def} ...
+        {~not _:public-method-def} ...)
+       (syntax->list #'[def.name ...])]
+      [(inner-es ...)
+       (flatten
+        (map collect-method-names
+             (attribute inner-es)))]
+      [else empty]))
+  (define methods+duplicates (collect-method-names mod-stx))
+  (normalize-name-list methods+duplicates))
 
 (module+ test
   (test-begin
@@ -1135,7 +1151,19 @@
     (test-equal? (map
                   syntax->datum
                   (method-names-in #'{}))
-                 '()))
+                 '())
+    (test-equal? (map
+                  syntax->datum
+                  (method-names-in #'{(define x 5)
+                                      (+ x (let ([c (class object%
+                                                      (super-new)
+                                                      (define/public (m x) (* 42 x)))])
+                                             (send (new c) m x)))
+                                      (+ x (let ([c (class object%
+                                                      (super-new)
+                                                      (define/public (m x) (* 42 x)))])
+                                             (send (new c) m x)))}))
+                 '(m)))
 
   (test-begin
     #:name make-method-id-swap-mutator
@@ -1162,7 +1190,24 @@
     (test-mutator* method-call-swap-mutator
                    #'n
                    (list #'m
-                         #'n))))
+                         #'n))
+
+    (ignore
+     (define method-call-swap-mutator/double
+       (make-method-id-swap-mutator
+        #'{(define x 5) (+ x (let ([c (class object%
+                                        (super-new)
+                                        (define/public (m x) (* 42 x))
+                                        (define/private (p) (void))
+                                        (define/public (n x) (* 42 x)))])
+                               (send (class object%
+                                        (super-new)
+                                       (define/public (n x) (* 42 x))) m x)))}
+        #f)))
+    (test-mutator* method-call-swap-mutator/double
+                   #'m
+                   (list #'n
+                         #'m))))
 
 (define-dependent-mutator (make-field-id-swap-mutator mod-stx containing-program)
   #:type [type "field-id-swap"]
@@ -1187,20 +1232,22 @@
   (pattern (inherit-field clause:class-maybe-renamed ...)
            #:with [name ...] #'[clause.name ...]))
 
-(define field-names-in
-  (syntax-parser
-    #:datum-literals [class class*]
-    [({~or class class*}
-      {~seq {~not _:field-defs} ...
-            def:field-defs} ...
-      {~and after {~not _:field-defs}} ...)
-     (syntax->list #'[def.name ... ...])]
-    [(inner-es ...)
-     (remove-duplicates
-      (flatten
-       (map field-names-in
-            (attribute inner-es))))]
-    [else empty]))
+(define (field-names-in mod-stx)
+  (define collect-field-names
+    (syntax-parser
+      #:datum-literals [class class*]
+      [({~or class class*}
+        {~seq {~not _:field-defs} ...
+              def:field-defs} ...
+        {~and after {~not _:field-defs}} ...)
+       (syntax->list #'[def.name ... ...])]
+      [(inner-es ...)
+       (flatten
+        (map collect-field-names
+             (attribute inner-es)))]
+      [else empty]))
+  (define field-names+duplicates (collect-field-names mod-stx))
+  (normalize-name-list field-names+duplicates))
 
 (module+ test
   (test-begin
@@ -1269,6 +1316,20 @@
                                                                   (field [m : SomeType 5])
                                                                   (define/public (l) #f))])
                                                          (send (new c) m x)))}))
+                 '(m))
+    (test-equal? (map
+                  syntax->datum
+                  (field-names-in #'{(define x 5)
+                                     (+ x (let ([c (class object%
+                                                     (super-new)
+                                                     (field [m : SomeType 5])
+                                                     (define/public (l) #f))])
+                                            (send (new c) m x)))
+                                     (+ x (let ([c (class object%
+                                                     (super-new)
+                                                     (field [m : SomeType 5])
+                                                     (define/public (l) #f))])
+                                            (send (new c) m x)))}))
                  '(m)))
 
   (test-begin
@@ -1276,12 +1337,18 @@
     (ignore
      (define field-call-swap-mutator
        (make-field-id-swap-mutator
-        #'{(define x 5) (+ x (let ([c (class object%
-                                        (super-new)
-                                        (inherit-field m)
-                                        (field [n 42])
-                                        (define/public (mtd) m))])
-                               (send (new c) mtd 42)))}
+        #'{(define x 5) (+ x
+                           (let ([c (class object%
+                                      (super-new)
+                                      (inherit-field m)
+                                      (field [n 42])
+                                      (define/public (mtd) m))])
+                             (send (new c) mtd 42))
+                           (+ x (let ([c (class object%
+                                           (super-new)
+                                           (field [m : SomeType 5])
+                                           (define/public (l) #f))])
+                                  (send (new c) m x))))}
         #f)))
     (test-mutator* field-call-swap-mutator
                    #'x
