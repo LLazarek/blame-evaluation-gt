@@ -10,8 +10,8 @@
   (define p-name (file-name-string-from-path p))
   (string=? p-name name))
 
-(define (pick-file-by-name files name)
-  (findf (path-ends-with name) files))
+(define (pick-file-by-name files name #:key [key values])
+  (findf (compose1 (path-ends-with name) key) files))
 
 (define path-to-existant-directory?
   (and/c path-string? directory-exists?))
