@@ -50,51 +50,15 @@
   (require "../configurations/configure-benchmark.rkt"
            "../configurables/configurables.rkt"
            "../mutate/mutate-program.rkt"
-           "../mutate/logger.rkt"
-           "../mutate/expression-selectors.rkt"
            "../runner/mutation-runner.rkt"
            "../util/program.rkt"
            "../util/path-utils.rkt"
            "../util/for-first-star.rkt"
            "../util/binary-search.rkt"
-           (submod ".." common)
-           racket/logging
-           syntax/parse)
+           "../util/mutant-util.rkt"
+           (submod ".." common))
 
   (struct no-more-mutants () #:prefab)
-  (define (extract-mutation mod index program)
-    (define mutated-expr (box #f))
-    (define mutated-id
-      (with-intercepted-logging
-        (match-lambda
-          [(vector _ _ (list before after) _)
-           (set-box! mutated-expr (list before after))]
-          [other (void)])
-        (thunk
-         (define-values {_ id}
-           (mutate-module mod index #:in program))
-         id)
-        #:logger mutate-logger
-        'info))
-    (define mutated-expr/annotations-stripped
-      (strip-annotations (unbox mutated-expr)))
-    (list mutated-id
-          mutated-expr/annotations-stripped))
-
-  (define (strip-annotations mutated-expr)
-    (match (select-exprs-as-if-untyped mutated-expr)
-      [(list stripped-expr _ _)
-       (match (syntax->list stripped-expr)
-         [(list lone-subexpr)
-          #:when (syntax-parse mutated-expr
-                   [[name:id {~datum :} T] #t]
-                   [else #f])
-          (strip-annotations lone-subexpr)]
-         [(? list? subexprs)
-          (filter-map strip-annotations subexprs)]
-         [#f (syntax->datum stripped-expr)])]
-      [#f #f]))
-
   (define/contract (mutated-id-for-typed/untyped-agrees? a-benchmark
                                                          a-module-to-mutate
                                                          mutation-index)

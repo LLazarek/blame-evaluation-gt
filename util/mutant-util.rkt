@@ -21,6 +21,8 @@
            (module-name? benchmark/c . -> . (or/c -1 natural?))]
           [max-mutation-index-exceeded?
            (path-to-existant-file? natural? program/c . -> . boolean?)]
+          [extract-mutation
+           (mod/c natural? program/c . -> . (list/c symbol? (list/c any/c any/c)))]
 
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
@@ -28,6 +30,10 @@
          (struct-out mutant))
 
 (require racket/runtime-path
+         racket/logging
+         syntax/parse
+         "../mutate/logger.rkt"
+         "../mutate/expression-selectors.rkt"
          "../configurations/configure-benchmark.rkt"
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
@@ -154,6 +160,40 @@
 
 (struct mutant (benchmark module index) #:prefab)
 
+(define (extract-mutation mod index program
+                          #:normalize [normalize strip-annotations])
+  (define mutated-expr (box #f))
+  (define mutated-id
+    (with-intercepted-logging
+      (match-lambda
+        [(vector _ _ (list before after) _)
+         (set-box! mutated-expr (list before after))]
+        [other (void)])
+      (thunk
+       (define-values {_ id}
+         (mutate-module mod index #:in program))
+       id)
+      #:logger mutate-logger
+      'info))
+  (define mutated-expr/annotations-stripped
+    (normalize (unbox mutated-expr)))
+  (list mutated-id
+        mutated-expr/annotations-stripped))
+
+(define (strip-annotations mutated-expr)
+  (match (select-exprs-as-if-untyped mutated-expr)
+    [(list stripped-expr _ _)
+     (match (syntax->list stripped-expr)
+       [(list lone-subexpr)
+        #:when (syntax-parse mutated-expr
+                 [[name:id {~datum :} T] #t]
+                 [else #f])
+        (strip-annotations lone-subexpr)]
+       [(? list? subexprs)
+        (filter-map strip-annotations subexprs)]
+       [#f (syntax->datum stripped-expr)])]
+    [#f #f]))
+
 (module+ test
   (require ruinit
            "../experiment/mutant-factory-test-helper.rkt"
@@ -204,4 +244,21 @@
    (test-equal? (stream->list (in-mutation-indices "main.rkt" bench))
                 (build-list main-mutation-count values))
    (test-equal? (stream->list (in-mutation-indices "second.rkt" bench))
-                (build-list second-mutation-count values))))
+                (build-list second-mutation-count values)))
+
+  (test-begin
+    #:name extract-mutation
+    (ignore (define test-mod (mod "test.rkt"
+                                  #'(module test racket
+                                      (#%module-begin
+                                       (define x (+ 'a 'b))))))
+            (define test-prog (program test-mod empty)))
+    (test-equal? (extract-mutation test-mod 1 test-prog)
+                 '(x (+ -)))
+    (ignore (define test-mod-typed (mod "test.rkt"
+                                  #'(module test racket
+                                      (#%module-begin
+                                       (define x ((ann + T) 'a 'b))))))
+            (define test-prog-typed (program test-mod-typed empty)))
+    (test-equal? (extract-mutation test-mod-typed 1 test-prog-typed)
+                 '(x (+ -)))))
