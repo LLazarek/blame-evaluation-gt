@@ -227,6 +227,7 @@
 
 (define (compose-mutators . mutators)
   (λ (stx mutation-index counter)
+    ;; lltodo: this should handle 0 mutators by appending `no-mutation'
     (apply-mutators stx mutators mutation-index counter)))
 
 (module+ test
