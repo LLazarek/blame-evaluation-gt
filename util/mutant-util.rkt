@@ -202,17 +202,17 @@
 
   (define-runtime-path test-config "../configurables/configs/test.rkt")
   (install-configuration! (simple-form-path test-config))
-  (define main-mutation-count 19)
-  (define second-mutation-count 4)
+  (define main-mutation-count 18)
+  (define second-mutation-count 3)
   (test-begin/with-env
    #:name max-mutation-index-exceeded?
 
    (ignore
     (define the-program (make-program main-path (list e-path loop-path))))
 
-   (for/and/test ([i (in-range 2)])
+   (for/and/test ([i (in-range 3)])
                  (not (max-mutation-index-exceeded? e-path i the-program)))
-   (max-mutation-index-exceeded? e-path 5 the-program)
+   (max-mutation-index-exceeded? e-path 3 the-program)
 
    (not (max-mutation-index-exceeded? main-path 0 the-program))
    (max-mutation-index-exceeded? main-path 1 the-program)

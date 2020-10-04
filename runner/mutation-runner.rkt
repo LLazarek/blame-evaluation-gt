@@ -567,7 +567,7 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    main
-                                   5
+                                   4
                                    p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))

@@ -681,7 +681,6 @@
    ;;   - main.rkt: 19
    ;;     - foo: negate cond (@0)
    ;;            force cond
-   ;;            wrap cond
    ;;            foo -> main
    ;;            - -> +
    ;;            * -> /
@@ -690,7 +689,7 @@
    ;;                  0
    ;;                  3+0.0i
    ;;                  #f]
-   ;;     - main: swap bar args (@11)
+   ;;     - main: swap bar args (@10)
    ;;             foo -> main
    ;;             2 -> [-2
    ;;                   2.0
@@ -701,9 +700,8 @@
    ;;   - second.rkt: 4
    ;;     - bar: negate cond (@0)
    ;;            force cond
-   ;;            wrap cond
    ;;            - -> +
-   ;; - Mutations that make type errors: 15
+   ;; - Mutations that make type errors: 14
    ;;   - main.rkt: 11
    ;;     - foo: foo -> main
    ;;            * -> /
@@ -716,10 +714,9 @@
    ;;             2 -> 2+0.0i
    ;;             2 -> #f
    ;;             "yes" -> #"yes"
-   ;;   - second.rkt: 4
+   ;;   - second.rkt: 3
    ;;     - bar: negate cond
    ;;            force cond
-   ;;            wrap cond
    ;;            - -> +
    ;;
    ;; - Expect 15 decisions to sample (so 15 total files) (below)
@@ -740,7 +737,6 @@
 
         ("second.rkt" 0)
         ("second.rkt" 1)
-        ("second.rkt" 2)
         ("second.rkt" 3)))
 
     (match (mutant-error-log)
