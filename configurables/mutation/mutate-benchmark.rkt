@@ -22,11 +22,9 @@
         delete-begin-result-expr
         negate-conditionals
         force-conditionals
-        wrap-conditionals
         replace-class-parent
         swap-class-initializers
-        rearrange-positional-exprs
-        add-extra-class-method))
+        rearrange-positional-exprs))
 
 (define active-dependent-mutators
   (list make-top-level-id-swap-mutator
@@ -349,14 +347,9 @@
        [4 ,#'{(define (f x)
                 'one
                 'two)
-              (define b (cond [(cast #t Any) 'one 'two]))
-              (define c (λ () 'one 'two))}]
-       [5 ,#'{(define (f x)
-                'one
-                'two)
               (define b (cond [#t 'two 'one]))
               (define c (λ () 'one 'two))}]
-       [6 ,#'{(define (f x)
+       [5 ,#'{(define (f x)
                 'one
                 'two)
               (define b (cond [#t 'one 'two]))
@@ -435,13 +428,8 @@
                  (or x #t))
                (define b (begin 1 2))
                (define (g x)
-                 (if (cast x Any) 1 2))}]
-       [19 ,#'{(define (f x)
-                 (or x #t))
-               (define b (begin 1 2))
-               (define (g x)
                  (if x -1 2))}]
-       [24 ,#'{(define (f x)
+       [23 ,#'{(define (f x)
                  (or x #t))
                (define b (begin 1 2))
                (define (g x)
@@ -471,18 +459,12 @@
                 (class object%
                   (define/public (f x) x)
                   (define/private (g x) x)))}]
-       ;; extra method
-       [1 ,#'{(define c
-                (class my-parent
-                  (define/public (a-nonexistant-method x) x)
-                  (define/public (f x) x)
-                  (define/private (g x) x)))}]
        ;; method visibility
-       [2 ,#'{(define c
+       [1 ,#'{(define c
                 (class my-parent
                   (define/private (f x) x)
                   (define/private (g x) x)))}]
-       [3 ,#'{(define c
+       [2 ,#'{(define c
                 (class my-parent
                   (define/public (f x) x)
                   (define/public (g x) x)))}]))
@@ -497,19 +479,8 @@
                           [b f]
                           [z #f])))}
      ;; Swap first pair of initializers
-     `(;; add method
-       [1 ,#'{(define c
-                (class o
-                  (define/public (a-nonexistant-method x) x)
-                  (field w
-                         y
-                         [v (foo bar)]
-                         [x 5]
-                         [a (g 0)]
-                         [b f]
-                         [z #f])))}]
-       ;; Swap first pair of initializers
-       [2 ,#'{(define c (class o
+     `(;; Swap first pair of initializers
+       [1 ,#'{(define c (class o
                           (field w
                                  y
                                  [v 5]
@@ -518,7 +489,7 @@
                                  [b f]
                                  [z #f])))}]
        ;; Swap second pair of initializers
-       [3 ,#'{(define c (class o
+       [2 ,#'{(define c (class o
                           (field w
                                  y
                                  [v (foo bar)]
@@ -527,7 +498,7 @@
                                  [b (g 0)]
                                  [z #f])))}]
        ;; swap ordering
-       [4 ,#'{(define c (class o
+       [3 ,#'{(define c (class o
                           (field y
                                  w
                                  [v (foo bar)]
@@ -535,7 +506,7 @@
                                  [a (g 0)]
                                  [b f]
                                  [z #f])))}]
-       [5 ,#'{(define c (class o
+       [4 ,#'{(define c (class o
                           (field w
                                  y
                                  [x 5]
@@ -543,7 +514,7 @@
                                  [a (g 0)]
                                  [b f]
                                  [z #f])))}]
-       [6 ,#'{(define c (class o
+       [5 ,#'{(define c (class o
                           (field w
                                  y
                                  [v (foo bar)]
@@ -553,7 +524,7 @@
                                  [z #f])))}]
        ;; Descend into mutating initializer values
        ;; Note that final odd initializer is NOT swapped
-       [7 ,#'{(define c (class o
+       [6 ,#'{(define c (class o
                           (field w
                                  y
                                  [v (foo bar)]
@@ -561,7 +532,7 @@
                                  [a (g 0)]
                                  [b f]
                                  [z #f])))}]
-       [12 ,#'{(define c (class o
+       [11 ,#'{(define c (class o
                            (field w
                                   y
                                   [v (foo bar)]
@@ -569,7 +540,7 @@
                                   [a (g 0.0)]
                                   [b f]
                                   [z #f])))}]
-       [15 ,#'{(define c (class o
+       [14 ,#'{(define c (class o
                            (field w
                                   y
                                   [v (foo bar)]
@@ -588,7 +559,7 @@
                                [b f]
                                [z #f])))}
      ;; Swap first pair of initializers
-     `([2 ,#'{(define c (class o
+     `([1 ,#'{(define c (class o
                           (init-field w
                                       y
                                       [v 5]
@@ -617,25 +588,19 @@
        [1 ,#'{(define c
                 (class
                   o
-                  (define/public (a-nonexistant-method x) x) ; <-
-                  (define/public (my-method x y)
+                  (define/private #| <- |# (my-method x y)
                     (- x y))))}]
        [2 ,#'{(define c
                 (class
                   o
-                  (define/private #| <- |# (my-method x y)
+                  (define/public (my-method y x #| <- |#)
                     (- x y))))}]
        [3 ,#'{(define c
                 (class
                   o
-                  (define/public (my-method y x #| <- |#)
-                    (- x y))))}]
-       [4 ,#'{(define c
-                (class
-                  o
                   (define/public (my-method x y)
                     (- y #| <-> |# x))))}]
-       [5 ,#'{(define c
+       [4 ,#'{(define c
                 (class
                   o
                   (define/public (my-method x y)
@@ -647,11 +612,11 @@
           (class o
             (super-new)
             (define/public x 5)))}
-     `([2 ,#'{(define c
+     `([1 ,#'{(define c
                 (class o
                   (void)
                   (define/public x 5)))}]
-       [3 ,#'{(define c
+       [2 ,#'{(define c
                 (class o
                   (super-new)
                   (define/private x 5)))}])))
@@ -699,9 +664,8 @@
     (test-mutation/sequence
      #'{(define a (if #t + -))}
      `([0 ,#'{(define a (if (not #t) + -))}]
-       [1 ,#'{(define a (if (cast #t Any) + -))}]
-       [2 ,#'{(define a (if #t - -))}]
-       [3 ,#'{(define a (if #t + +))}])))
+       [1 ,#'{(define a (if #t - -))}]
+       [2 ,#'{(define a (if #t + +))}])))
 
   (test-begin
     #:name higher-order
@@ -713,11 +677,10 @@
      #'{(define a ((if #t + -) 1 2))}
      `([0 ,#'{(define a ((if #t + -) 2 1))}]
        [1 ,#'{(define a ((if (not #t) + -) 1 2))}]
-       [2 ,#'{(define a ((if (cast #t Any) + -) 1 2))}]
-       [3 ,#'{(define a ((if #t - -) 1 2))}]
-       [4 ,#'{(define a ((if #t + +) 1 2))}]
-       [5 ,#'{(define a ((if #t + -) -1 2))}]
-       [10 ,#'{(define a ((if #t + -) 1 -2))}])))
+       [2 ,#'{(define a ((if #t - -) 1 2))}]
+       [3 ,#'{(define a ((if #t + +) 1 2))}]
+       [4 ,#'{(define a ((if #t + -) -1 2))}]
+       [9 ,#'{(define a ((if #t + -) 1 -2))}])))
 
   (test-begin
     #:name mutated-id-reporting
@@ -879,11 +842,9 @@
                 (unless (p v) (error 'assert))
                 v)
 
-
               (define command%
                 (class object%
-                  (define/public (a-nonexistant-method x) x)
-                  (super-new)
+                  (void)
                   (init-field
                    id
                    descr
@@ -947,70 +908,6 @@
 
               (define command%
                 (class object%
-                  (void)
-                  (init-field
-                   id
-                   descr
-                   exec)))
-
-              (define/ignore ((env-with/c cmd-ids) env)
-                (cond [(env? env)
-                       (define env-cmd-ids
-                         (for/list ([env-cmd (in-list env)])
-                           (get-field id env-cmd)))
-                       (for/and ([c (in-list cmd-ids)])
-                         (member c env-cmd-ids))]
-                      [else #f]))
-
-
-
-              ;; True if the argument is a list with one element
-              (define (singleton-list? x)
-
-                (and (list? x)
-                     (not (null? x))
-                     (null? (cdr x))))}]
-       [2 ,#'{(provide
-               command%
-               CMD*
-               )
-
-              (require
-               racket/match
-               racket/class
-               (only-in racket/string string-join string-split)
-               (for-syntax racket/base racket/syntax syntax/parse)
-               racket/contract
-               "../../../ctcs/precision-config.rkt"
-               (only-in racket/function curry)
-               (only-in racket/list empty? first second rest)
-               (only-in "../../../ctcs/common.rkt"
-                        class/c*
-                        or-#f/c
-                        command%/c
-                        command%?
-                        command%?-with-exec
-                        stack?
-                        env?
-                        list-with-min-size/c
-                        equal?/c)
-               )
-              (require (only-in "stack.rkt"
-                                stack-drop
-                                stack-dup
-                                stack-init
-                                stack-over
-                                stack-pop
-                                stack-push
-                                stack-swap
-                                ))
-
-              (define/ignore (assert v p)
-                (unless (p v) (error 'assert))
-                v)
-
-              (define command%
-                (class object%
                   (super-new)
                   (init-field
                    descr
@@ -1034,7 +931,7 @@
                 (and (list? x)
                      (not (null? x))
                      (null? (cdr x))))}]
-       [3 ,#'{(provide
+       [2 ,#'{(provide
                command%
                CMD*
                )
@@ -1098,7 +995,7 @@
                 (and (not (null? x))
                      (list? x)
                      (null? (cdr x))))}]
-       [4 ,#'{(provide
+       [3 ,#'{(provide
                command%
                CMD*
                )
@@ -1386,45 +1283,37 @@
               (define (main) (if #t (f x) (g x)))}]
        [3 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if (cast x Any) f g))
+              (define (g x) (if x g g))
               (define (main) (if #t (f x) (g x)))}]
        [4 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x g g))
+              (define (g x) (if x main g))
               (define (main) (if #t (f x) (g x)))}]
        [5 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x main g))
+              (define (g x) (if x f f))
               (define (main) (if #t (f x) (g x)))}]
        [6 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x f f))
+              (define (g x) (if x f main))
               (define (main) (if #t (f x) (g x)))}]
        [7 ,#'{(require foobar)
               (define (f x) (add1 x))
-              (define (g x) (if x f main))
-              (define (main) (if #t (f x) (g x)))}]
-       [8 ,#'{(require foobar)
-              (define (f x) (add1 x))
               (define (g x) (if x f g))
               (define (main) (if (not #t) (f x) (g x)))}]
-       [9 ,#'{(require foobar)
-              (define (f x) (add1 x))
-              (define (g x) (if x f g))
-              (define (main) (if (cast #t Any) (f x) (g x)))}]
-       [10 ,#'{(require foobar)
+       [8 ,#'{(require foobar)
                (define (f x) (add1 x))
                (define (g x) (if x f g))
                (define (main) (if #t (g x) (g x)))}]
-       [11 ,#'{(require foobar)
+       [9 ,#'{(require foobar)
                (define (f x) (add1 x))
                (define (g x) (if x f g))
                (define (main) (if #t (main x) (g x)))}]
-       [12 ,#'{(require foobar)
+       [10 ,#'{(require foobar)
                (define (f x) (add1 x))
                (define (g x) (if x f g))
                (define (main) (if #t (f x) (f x)))}]
-       [13 ,#'{(require foobar)
+       [11 ,#'{(require foobar)
                (define (f x) (add1 x))
                (define (g x) (if x f g))
                (define (main) (if #t (f x) (main x)))}])
@@ -1481,15 +1370,6 @@
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
        [0 ,#'{(define c1 (class object%
-                           (define/public (a-nonexistant-method x) x)
-                           (define/public (c1-m1 x) x)
-                           (define/public (c1-m2 x) x)))
-              (define another-def 'aaa)
-              (define c2 (box (class object%
-                                (define/public (c2-m1 y) y)
-                                (define/public c2-field 'ccc))))
-              (define result (send (new c1) c1-m2 'bbb))}]
-       [1 ,#'{(define c1 (class object%
                            (define/private (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1497,7 +1377,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [2 ,#'{(define c1 (class object%
+       [1 ,#'{(define c1 (class object%
                            (define/public (c1-m2 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1505,7 +1385,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [3 ,#'{(define c1 (class object%
+       [2 ,#'{(define c1 (class object%
                            (define/public (c2-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1514,7 +1394,7 @@
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
        ;; lltodo: wiw: methods get reordered too
-       [4 ,#'{(define c1 (class object%
+       [3 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/private (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1522,7 +1402,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [5 ,#'{(define c1 (class object%
+       [4 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m1 x) x)))
               (define another-def 'aaa)
@@ -1530,7 +1410,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [6 ,#'{(define c1 (class object%
+       [5 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c2-m1 x) x)))
               (define another-def 'aaa)
@@ -1538,16 +1418,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [7 ,#'{(define c1 (class object%
-                           (define/public (c1-m1 x) x)
-                           (define/public (c1-m2 x) x)))
-              (define another-def 'aaa)
-              (define c2 (box (class object%
-                           (define/public (a-nonexistant-method x) x)
-                                (define/public (c2-m1 y) y)
-                                (define/public c2-field 'ccc))))
-              (define result (send (new c1) c1-m2 'bbb))}]
-       [8 ,#'{(define c1 (class object%
+       [6 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1555,7 +1426,7 @@
                                 (define/private (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [9 ,#'{(define c1 (class object%
+       [7 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1563,7 +1434,7 @@
                                 (define/public (c1-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [10 ,#'{(define c1 (class object%
+       [8 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1571,7 +1442,7 @@
                                 (define/public (c1-m2 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [11 ,#'{(define c1 (class object%
+       [9 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1579,7 +1450,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/private c2-field 'ccc))))
               (define result (send (new c1) c1-m2 'bbb))}]
-       [12 ,#'{(define c1 (class object%
+       [10 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1587,7 +1458,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send c1-m2 (new c1) 'bbb))}]
-       [13 ,#'{(define c1 (class object%
+       [11 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1595,7 +1466,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new another-def) c1-m2 'bbb))}]
-       [14 ,#'{(define c1 (class object%
+       [12 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1603,7 +1474,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c2) c1-m2 'bbb))}]
-       [15 ,#'{(define c1 (class object%
+       [13 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1611,7 +1482,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new result) c1-m2 'bbb))}]
-       [16 ,#'{(define c1 (class object%
+       [14 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1619,7 +1490,7 @@
                                 (define/public (c2-m1 y) y)
                                 (define/public c2-field 'ccc))))
               (define result (send (new c1) c1-m1 'bbb))}]
-       [17 ,#'{(define c1 (class object%
+       [15 ,#'{(define c1 (class object%
                            (define/public (c1-m1 x) x)
                            (define/public (c1-m2 x) x)))
               (define another-def 'aaa)
@@ -1648,15 +1519,6 @@
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
        [0 ,#'{(define c1 (class object%
-                           (define/public (a-nonexistant-method x) x)
-                           (field [c1-f1 'aaa])
-                           (define/public (c1-m1 x) c1-f1)))
-              (define another-def 'aaa)
-              (define c2 (box (class object%
-                                (inherit-field c2-f1 [blah c2-f2])
-                                (define/public (c2-m1 y) c2-f2))))
-              (define result (send (new c1) c1-m1 'bbb))}]
-       [1 ,#'{(define c1 (class object%
                              (field [c2-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1664,7 +1526,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [2 ,#'{(define c1 (class object%
+       [1 ,#'{(define c1 (class object%
                              (field [c2-f2 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1672,7 +1534,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [3 ,#'{(define c1 (class object%
+       [2 ,#'{(define c1 (class object%
                            (field [c1-f1 'aaa])
                            (define/private (c1-m1 x) c1-f1)))
               (define another-def 'aaa)
@@ -1680,7 +1542,7 @@
                                 (inherit-field c2-f1 [blah c2-f2])
                                 (define/public (c2-m1 y) c2-f2))))
               (define result (send (new c1) c1-m1 'bbb))}]
-       [4 ,#'{(define c1 (class object%
+       [3 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c2-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1688,7 +1550,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [5 ,#'{(define c1 (class object%
+       [4 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c2-f1)))
                 (define another-def 'aaa)
@@ -1696,7 +1558,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [6 ,#'{(define c1 (class object%
+       [5 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c2-f2)))
                 (define another-def 'aaa)
@@ -1704,16 +1566,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [7 ,#'{(define c1 (class object%
-                             (field [c1-f1 'aaa])
-                             (define/public (c1-m1 x) c1-f1)))
-                (define another-def 'aaa)
-                (define c2 (box (class object%
-                                  (define/public (a-nonexistant-method x) x)
-                                  (inherit-field c2-f1 [blah c2-f2])
-                                  (define/public (c2-m1 y) c2-f2))))
-                (define result (send (new c1) c1-m1 'bbb))}]
-       [8 ,#'{(define c1 (class object%
+       [6 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1721,7 +1574,7 @@
                                   (inherit-field [blah c2-f2] c2-f1)
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [9 ,#'{(define c1 (class object%
+       [7 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1729,7 +1582,7 @@
                                   (inherit-field c1-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [10 ,#'{(define c1 (class object%
+       [8 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1737,7 +1590,7 @@
                                   (inherit-field c2-f2 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [11 ,#'{(define c1 (class object%
+       [9 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1745,7 +1598,7 @@
                                   (inherit-field c2-f1 [blah c1-f1])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [12 ,#'{(define c1 (class object%
+       [10 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1753,7 +1606,7 @@
                                   (inherit-field c2-f1 [blah c2-f1])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [13 ,#'{(define c1 (class object%
+       [11 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1761,7 +1614,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/private (c2-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [14 ,#'{(define c1 (class object%
+       [12 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1769,7 +1622,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c1-m1 y) c2-f2))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [15 ,#'{(define c1 (class object%
+       [13 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1777,7 +1630,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c1-f1))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [16 ,#'{(define c1 (class object%
+       [14 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1785,7 +1638,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f1))))
                 (define result (send (new c1) c1-m1 'bbb))}]
-       [17 ,#'{(define c1 (class object%
+       [15 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1793,7 +1646,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send c1-m1 (new c1) 'bbb))}]
-       [18 ,#'{(define c1 (class object%
+       [16 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1801,7 +1654,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new another-def) c1-m1 'bbb))}]
-       [19 ,#'{(define c1 (class object%
+       [17 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1809,7 +1662,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new c2) c1-m1 'bbb))}]
-       [20 ,#'{(define c1 (class object%
+       [18 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
@@ -1817,7 +1670,7 @@
                                   (inherit-field c2-f1 [blah c2-f2])
                                   (define/public (c2-m1 y) c2-f2))))
                 (define result (send (new result) c1-m1 'bbb))}]
-       [21 ,#'{(define c1 (class object%
+       [19 ,#'{(define c1 (class object%
                              (field [c1-f1 'aaa])
                              (define/public (c1-m1 x) c1-f1)))
                 (define another-def 'aaa)
