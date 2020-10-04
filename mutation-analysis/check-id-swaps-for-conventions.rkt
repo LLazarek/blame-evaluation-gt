@@ -12,12 +12,20 @@
 (define-runtime-paths
   [default-benchmarks-dir "../../gtp-benchmarks/benchmarks"])
 
-(define (which-convention-swap? mutation)
+(define (within-which-convention-swap? mutation)
   (match mutation
     [(list (? symbol? a) (? symbol? b))
      (for/first* ([{name predicate} (in-hash naming-conventions)])
                  (and (predicate (symbol->string a))
                       (predicate (symbol->string b))
+                      name))]
+    [else #f]))
+(define (into/outof-which-convention-swap? mutation)
+  (match mutation
+    [(list (? symbol? a) (? symbol? b))
+     (for/first* ([{name predicate} (in-hash naming-conventions)])
+                 (and (xor (predicate (symbol->string a))
+                           (predicate (symbol->string b)))
                       name))]
     [else #f]))
 
@@ -77,6 +85,6 @@
                                                 id-swap-mutator
                                                 empty))])
    (define mutation (second (extract-mutation mod index bench-program)))
-   (define maybe-convention-swap (which-convention-swap? mutation))
+   (define maybe-convention-swap (into/outof-which-convention-swap? mutation))
    (when maybe-convention-swap
      (displayln @~a{@bench-name @mod-name @index : @maybe-convention-swap @mutation}))))
