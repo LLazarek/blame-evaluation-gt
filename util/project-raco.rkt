@@ -34,28 +34,26 @@
               [("-c" "--compile")
                'compile
                "Compile project code."
-               #:record
-               #:conflicts '(clean-compiled)]
+               #:record]
               [("-C" "--clean-compiled")
                'clean-compiled
                "Clean all previously compiled project code."
                #:record]}
- (cond
-   [compile?
-    (parameterize ([current-directory blame-evaluation-gt])
-      (apply system*
-             raco
-             "make"
-             "-v"
-             (for/list ([f (in-directory)]
-                        #:when (and (path-has-extension? f ".rkt")
-                                    (file-exists? f)
-                                    (not (ignored-path? f))))
-               f)))]
-   [clean-compiled?
-    (system* (find-executable-path "find")
-             blame-evaluation-gt
-             "-name" "compiled"
-             "-type" "d"
-             "-prune"
-             "-exec" "rm" "-rf" "{}" ";")]))
+ (when clean-compiled?
+   (system* (find-executable-path "find")
+            blame-evaluation-gt
+            "-name" "compiled"
+            "-type" "d"
+            "-prune"
+            "-exec" "rm" "-rf" "{}" ";"))
+ (when compile?
+   (parameterize ([current-directory blame-evaluation-gt])
+     (apply system*
+            raco
+            "make"
+            "-v"
+            (for/list ([f (in-directory)]
+                       #:when (and (path-has-extension? f ".rkt")
+                                   (file-exists? f)
+                                   (not (ignored-path? f))))
+              f)))))
