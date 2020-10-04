@@ -3,3 +3,4 @@ mutation-analysis/summaries/
 configurables/mutant-sampling/samples/
 configurables/module-instrumentation/transient-special-cases/
 configurables/benchmark-runner/pre-computed-results/
+dbs/
