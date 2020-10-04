@@ -310,6 +310,33 @@
  (match plot-type
    ['successful-population-count
     (plot-new-window? #t)
+    (stacked-histogram-colors
+     '((240 163 255)
+       (0 117 220)
+       (153 63 0)
+       (43 206 72)
+       (128 128 128)
+       (148 255 181)
+       (157 204 0)
+       (94 241 242)
+       (116 10 255)
+       (255 164 5)
+       (0 51 128)
+       (76 0 92)
+       (0 92 49)
+       (255 204 153)
+       (143 124 0)
+       (194 0 136)
+       (255 168 187)
+       (66 102 0)
+       (255 0 16)
+       (0 153 143)
+       (224 255 102)
+       (153 0 0)
+       (255 255 128)
+       (255 255 0)
+       (255 80 5)))
+    (stacked-histogram-line-colors (stacked-histogram-colors))
     (plot/labels-angled
      (grouped-category-stacked-histogram all-data
                                          #:label-groups? #f
@@ -334,11 +361,12 @@
                 0]))]
    ['successful-population-heatmap
     (define bucket-colors
-      '((1 "black")
+      '((1 "gray")
         (10 "red")
         (50 "orange")
-        (100 "blue")
+        (100 "cyan")
         (+inf.0 "green")))
+    (plot-y-ticks no-ticks)
     (define picts
       (for/list ([mutator-stack (in-list all-data)])
         (define benchmark-successful-mutant-count-pairs
@@ -348,9 +376,15 @@
           (cutoff-bucket-colors (map second benchmark-successful-mutant-count-pairs)
                                 bucket-colors))
         (plot-pict
-         (stacked-histogram (list (list (first mutator-stack)
-                                        ones))
-                            #:colors colors)
+         (list (stacked-histogram (list (list (first mutator-stack)
+                                              ones))
+                                  #:colors colors)
+               (for/list ([benchmark-name
+                           (sequence-map first
+                                         benchmark-successful-mutant-count-pairs)]
+                          [i (in-naturals)])
+                 (point-label (list 0.1 (+ i 0.5)) benchmark-name
+                              #:point-size 0)))
          #:x-label #f
          #:y-label #f)))
     (define the-plot-pict
