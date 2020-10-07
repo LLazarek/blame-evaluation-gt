@@ -30,7 +30,7 @@
 (define (read-data-files log-files
                          #:data-type data-type)
   (match data-type
-    ['successful-population-count
+    [(or 'successful-population-count 'successful-population-heatmap)
      (define benchmark-success-hashes
        (for/hash ([log-file (in-list log-files)])
          (values (path->benchmark-name log-file)
@@ -294,9 +294,9 @@
       (define data
         (match* {log-files (hash-ref flags 'summaries-db)}
           [{'() (and (not #f) db-path)}
-           (unless (equal? plot-type 'successful-population-count)
+           (unless (member plot-type '(successful-population-count successful-population-heatmap))
              (raise-user-error 'plot-mutation-analyses
-                               "-d can only be used with plot type successful-population-count"))
+                               "-d can only be used with plot types successful-population-*"))
            (read-data-from-summaries db-path)]
           [{(? cons?) #f}
            (read-data-files
