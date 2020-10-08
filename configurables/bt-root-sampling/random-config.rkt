@@ -1,4 +1,4 @@
-#lang at-exp racket
+#lang at-exp racket/base
 
 (provide random-config-variant)
 

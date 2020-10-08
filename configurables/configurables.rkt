@@ -76,15 +76,6 @@
     #:module "benchmark-runner/load-pre-computed-result.rkt"
     #:parameters [pre-computed-results-db]))
 
-(define-configurable configuration-sampling
-  #:provides [config-samples]
-
-  (define-implementation uniform-with-replacement
-    #:module "configuration-sampling/uniform-with-replacement.rkt")
-
-  (define-implementation uniform-with-replacement/typing-mod-to-mutate
-    #:module "configuration-sampling/uniform-with-replacement-typing-mod-to-mutate.rkt"))
-
 (define-configurable trail-completion
   #:provides [blame-trail-ended?]
 
@@ -93,3 +84,13 @@
 
   (define-implementation mutated-type-error/blamed-at-max
     #:module "trail-completion/mutated-type-error-or-blamed-at-max.rkt"))
+
+(define-configurable bt-root-sampling
+  #:provides [make-bt-root-sampler]
+
+  (define-implementation random-with-replacement
+    #:module "bt-root-sampling/random-with-replacement.rkt")
+
+  (define-implementation pre-selected
+    #:module "bt-root-sampling/pre-selected.rkt"
+    #:parameters [pre-selected-bt-root-db]))

@@ -319,7 +319,7 @@
                 (hash-table ["constant-swap" (app length 2)]))))
 
 
-(define default-sample-size-multiplier 20)
+(define default-sample-size-multiplier 5)
 (main
  #:arguments {[(hash-table ['config-path config-path]
                            ['summaries-db summaries-db-path]
@@ -337,13 +337,13 @@
                #:mandatory
                #:collect ["path" take-latest #f]]
 
-              [("-s" "--sumaries-db")
+              [("-s" "--summaries-db")
                'summaries-db
-               ("Database in which to find benchmark mutant summaries."
-                @~a{Default: @(mutation-analysis-summaries-db)})
+               ("Database in which to find benchmark mutant summaries.")
                #:collect ["path"
                           take-latest
-                          (path->string (mutation-analysis-summaries-db))]]
+                          #f]
+               #:mandatory]
               [("-o" "--samples-db")
                'samples-db
                ("Database in which to place benchmark mutant summaries."

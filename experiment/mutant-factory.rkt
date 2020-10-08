@@ -57,7 +57,6 @@
            extend-blame-trail
            record-blame-trail!
            mutant-data-file-name
-           record-sampled-config
            follow-blame-from-dead-process
            make-blame-disappearing-fallback
            spawn-mutant
@@ -85,10 +84,7 @@
 
 (define process-limit (make-parameter 3))
 (define data-output-dir (make-parameter "./mutant-data"))
-(define sample-size (make-parameter 96))
 (define abort-on-failure? (make-parameter #t))
-
-(define sample-without-replacement? (make-parameter #f))
 
 (define current-result-cache (make-parameter (λ _ #f)))
 (define current-progress-logger (make-parameter void))
@@ -330,57 +326,24 @@
 (define/contract (sample-blame-trail-roots process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
-  (define config-samples (configured:config-samples))
-
   (define the-factory (process-Q-get-data process-q))
-  (define max-config (bench-info-max-config (factory-bench the-factory)))
-  (define samples (config-samples max-config
-                                  (sample-size)
-                                  (mutant-module mutant-program)))
+  (define N-samples-please
+    ((configured:make-bt-root-sampler) (factory-bench the-factory)
+                                  mutant-program))
+  (define samples (N-samples-please (sample-size)))
   (define (resample a-factory)
-    (define sample (first (config-samples max-config
-                                          1
-                                          (mutant-module mutant-program))))
-    (cond
-      ;; ll: by default, sample *with* replacement
-      [(and (sample-without-replacement?)
-            (set-member? (hash-ref (factory-mutant-samples a-factory)
-                                   mutant-program)
-                         sample))
-       (resample a-factory)]
-      [else
-       (values sample
-               (record-sampled-config a-factory mutant-program sample))]))
+    (first (N-samples-please 1)))
   (for/fold ([current-process-q process-q])
             ([sampled-config (in-list samples)]
              [sample-number (in-naturals)])
-    (define current-factory (process-Q-get-data current-process-q))
-    (define factory+sample
-      (record-sampled-config current-factory mutant-program sampled-config))
     (log-factory
      debug
      @~a{    Sample: trying to sample root @sample-number for @mutant-program})
-    (spawn-blame-trail-root-mutant (process-Q-set-data current-process-q
-                                                       factory+sample)
+    (spawn-blame-trail-root-mutant current-process-q
                                    mutant-program
                                    sampled-config
                                    resample
                                    sample-number)))
-
-(define/contract (record-sampled-config the-factory mutant-program new-sample)
-  (factory/c mutant/c config/c . -> . factory/c)
-
-  ;; This tracking is only necessary when sampling without replacement
-  (cond [(sample-without-replacement?)
-         (define mutant-samples (factory-mutant-samples the-factory))
-         (define samples-for-mutant (hash-ref mutant-samples mutant-program
-                                              (λ _ (set))))
-         (define mutant-samples+sample
-           (hash-set mutant-samples mutant-program
-                     (set-add samples-for-mutant new-sample)))
-         (copy-factory the-factory
-                       [mutant-samples mutant-samples+sample])]
-        [else the-factory]))
 
 ;; Spawns a mutant that attempts to follow a blame trail,
 ;; if the given `config` doesn't cause blame for `mutant-program`
@@ -393,7 +356,7 @@
   ((process-Q/c factory/c)
    mutant/c
    config/c
-   (factory/c . -> . (values config/c factory/c))
+   (factory/c . -> . config/c)
    natural?
    . -> .
    (process-Q/c factory/c))
@@ -418,11 +381,9 @@
                        (dead-mutant-process-id dead-proc)
                        (mutant-module (dead-mutant-process-mutant dead-proc))
                        (mutant-index (dead-mutant-process-mutant dead-proc)))
-                      (define-values {new-sample new-factory}
+                      (define new-sample
                         (resample (process-Q-get-data current-process-q)))
-                      (define new-process-q (process-Q-set-data current-process-q
-                                                                new-factory))
-                      (spawn-blame-trail-root-mutant new-process-q
+                      (spawn-blame-trail-root-mutant current-process-q
                                                      mutant-program
                                                      new-sample
                                                      resample

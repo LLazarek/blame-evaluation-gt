@@ -8,5 +8,5 @@
 (configure! stack-location-selection all)
 (configure! module-instrumentation   none)
 (configure! benchmark-runner         load-pre-computed-result "../dbs/code-mutations/pre-computed-mutant-results.rktdb")
-(configure! configuration-sampling   uniform-with-replacement)
+(configure! bt-root-sampling         random-with-replacement)
 (configure! trail-completion         mutated-type-error/blamed-at-max)

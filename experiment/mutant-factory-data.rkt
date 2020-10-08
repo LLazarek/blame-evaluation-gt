@@ -12,6 +12,8 @@
          copy-factory
          test-mutant-flag
 
+         sample-size
+
          mutant-results?
          process-ctl?
          blame-labels?
@@ -144,3 +146,6 @@
 
 (define mutant-will/c
   ((process-Q/c factory/c) dead-mutant-process/c . -> . (process-Q/c factory/c)))
+
+(define sample-size (make-parameter 96))
+

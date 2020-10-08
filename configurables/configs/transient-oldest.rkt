@@ -8,5 +8,5 @@
 (configure! stack-location-selection top)
 (configure! module-instrumentation   transient-types "../dbs/code-mutations/transient-special-cases.rktdb")
 (configure! benchmark-runner         run-it)
-(configure! configuration-sampling   uniform-with-replacement)
+(configure! bt-root-sampling         random-with-replacement)
 (configure! trail-completion         mutated-type-error/blamed-at-max)

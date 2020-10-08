@@ -653,6 +653,13 @@
 
 
 (require racket/os)
+
+;; This is just one mixed config that I know should produce a ctc violation,
+;; use it to spot-check blame trail data
+(define mutant-with-config-blaming-main.rkt:mod "main.rkt")
+(define mutant-with-config-blaming-main.rkt:index 4)
+(define mutant-with-config-blaming-main.rkt:config (hash "main.rkt" 'none
+                                                         "second.rkt" 'types))
 ;; Full run test
 (parameterize ([data-output-dir test-mutant-dir]
                [process-limit (match (gethostname)
@@ -665,7 +672,21 @@
                [default-timeout/s (match (gethostname)
                                     [(regexp "quser[0-9]+") 240]
                                     [else 90])]
-               [default-memory-limit/gb 1])
+               [default-memory-limit/gb 1]
+               [configured:make-bt-root-sampler
+                (let ([original-sampler (configured:make-bt-root-sampler)])
+                  (λ (bench-info the-mutant)
+                    (λ (n)
+                      (match the-mutant
+                        ;; Make sure this config is in the set of sampled bt-roots
+                        ;; See test below that expects it
+                        [(mutant _ "main.rkt" 5)
+                         (define roots-1
+                           ((original-sampler bench-info mutant) (sub1 n)))
+                         (cons mutant-with-config-blaming-main.rkt:config
+                               roots-1)]
+                        [else
+                         ((original-sampler bench-info mutant) n)]))))])
   (set-box! abort-suppressed? #f)
   (displayln @~a{
 
@@ -677,8 +698,8 @@
    #:name test:full-run
 
    ;; Mutations expected:
-   ;; - Mutations: 23
-   ;;   - main.rkt: 19
+   ;; - Mutations: 21
+   ;;   - main.rkt: 18
    ;;     - foo: negate cond (@0)
    ;;            force cond
    ;;            foo -> main
@@ -697,7 +718,7 @@
    ;;                   2+0.0i
    ;;                   #f]
    ;;             "yes" -> #"yes"
-   ;;   - second.rkt: 4
+   ;;   - second.rkt: 3
    ;;     - bar: negate cond (@0)
    ;;            force cond
    ;;            - -> +
@@ -723,21 +744,32 @@
    ;; - Expect (sample-size) samples for each
    (ignore
     (define expected-relevant-mutants
-      '(("main.rkt" 3)
-        ("main.rkt" 5)
-        ("main.rkt" 7)
+      '(("main.rkt" 2)
+        ("main.rkt" 4)
+        ("main.rkt" 6)
+        ("main.rkt" 8)
         ("main.rkt" 9)
         ("main.rkt" 10)
         ("main.rkt" 11)
-        ("main.rkt" 12)
-        ("main.rkt" 14)
+        ("main.rkt" 13)
+        ("main.rkt" 15)
         ("main.rkt" 16)
         ("main.rkt" 17)
-        ("main.rkt" 18)
 
         ("second.rkt" 0)
         ("second.rkt" 1)
-        ("second.rkt" 3)))
+        ("second.rkt" 2)))
+    (unless (member (list mutant-with-config-blaming-main.rkt:mod
+                          mutant-with-config-blaming-main.rkt:index)
+                    expected-relevant-mutants)
+      (raise-user-error
+       'full-run-test
+       @~a{
+           The mutations / relevant mutants are misconfigured:
+           mutant-with-config-blaming-main.rkt: @(list mutant-with-config-blaming-main.rkt:mod
+                                                       mutant-with-config-blaming-main.rkt:index) @;
+           is missing from expected-relevant-mutants.
+           }))
 
     (match (mutant-error-log)
       [(? file-exists? path) (delete-file path)]
@@ -852,16 +884,8 @@
               (sample-size))
       @~a{@mutant-file doesn't contain `(sample-size)` blame trails:}]))
 
-   ;; check that mixed configurations work as expected:
-   ;; this is just one mixed config that I know should produce a ctc violation
-   ;;
-   ;; lltodo: use pre-selected BT roots to ensure that this config is selected so that we don't
-   ;; get intermittent failures from this test
-   (ignore
-    (define some-particular-mutant:mod "main.rkt")
-    (define some-particular-mutant:index 5))
-   (test-match (hash-ref data (find-mutant-file some-particular-mutant:mod
-                                                some-particular-mutant:index))
+   (test-match (hash-ref data (find-mutant-file mutant-with-config-blaming-main.rkt:mod
+                                                mutant-with-config-blaming-main.rkt:index))
                (list-no-order
                 (struct* blame-trail-summary
                          ([mutants
@@ -870,8 +894,7 @@
                                             (struct* run-status
                                                      ([outcome 'blamed]
                                                       [blamed '("main.rkt")]))
-                                            (== (hash "main.rkt" 'none
-                                                      "second.rkt" 'types)))
+                                            (== mutant-with-config-blaming-main.rkt:config))
                             _ ___)]))
                 _ ___))
 
@@ -905,8 +928,8 @@
    ;; Now try resuming but there's a missing blame trail that won't get logged
    (ignore
     (define a-data-file (build-path test-mutant-dir
-                                    (find-mutant-file some-particular-mutant:mod
-                                                      some-particular-mutant:index)))
+                                    (find-mutant-file mutant-with-config-blaming-main.rkt:mod
+                                                      mutant-with-config-blaming-main.rkt:index)))
     (define contents (file->list a-data-file))
     (define to-drop 1)
     (with-output-to-file a-data-file
@@ -915,12 +938,14 @@
                    [i (in-naturals)])
                (match el
                  ;; the second trail
-                 [(cons (list (== some-particular-mutant:mod)
-                              (== some-particular-mutant:index)
+                 [(cons (list (== mutant-with-config-blaming-main.rkt:mod)
+                              (== mutant-with-config-blaming-main.rkt:index)
                               (== to-drop)) _) (void)]
                  [else (writeln el)]))))
     (hash-remove! progress-log-hash
-                  (list some-particular-mutant:mod some-particular-mutant:index to-drop)))
+                  (list mutant-with-config-blaming-main.rkt:mod
+                        mutant-with-config-blaming-main.rkt:index
+                        to-drop)))
    (extend-test-message
     (not (run-the-experiment! #:log-progress log-progress:nowhere))
     "Sanity checks succeeded but should have failed.")))
