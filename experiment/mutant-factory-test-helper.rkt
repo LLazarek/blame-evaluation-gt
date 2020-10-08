@@ -49,7 +49,9 @@
                       @~a{
                           #lang typed/racket
 
-                          (require "e.rkt" "loop.rkt")
+                          (require "loop.rkt")
+                          (require/typed "e.rkt"
+                            [baz (-> Number Number Number)])
 
                           (: foo (-> Number Number))
                           (define (foo x)
