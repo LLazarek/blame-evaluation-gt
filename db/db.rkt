@@ -19,8 +19,8 @@
           [path-to-db? (path-string? . -> . boolean?)]
           [get (path-string? . -> . db?)]
           [new! ({path-string?} {path-string?} . ->* . any)]
-          [read ({db? any/c} {failure-result/c} . ->* . any/c)]
-          [write! (db? hash? . -> . db?)]
+          [read ({db? any/c} {failure-result/c #:reader (path-string? . -> . any/c)} . ->* . any/c)]
+          [write! ({db? hash?} {#:writer (any/c . -> . any)} . -> . db?)]
           [set! (db? any/c any/c . -> . any)]
           [keys (db? . -> . (listof any/c))]
 
@@ -108,19 +108,22 @@
     (error 'get @~a{@path doesn't exist or it doesn't look like a db}))
   (read-serialized-db! path))
 
-(define (read a-db key [fail-result
-                        (λ _
-                          (error 'read
-                                 @~a{key not found in db: @~e[key]}))])
+(define (read a-db
+              key
+              [fail-result
+               (λ _
+                 (error 'read
+                        @~a{key not found in db: @~e[key]}))]
+              #:reader [read-from-file file->value])
   (define file-name (hash-ref (db-map a-db) key #f))
   (cond [file-name
          (define data-dir-path (db-data-dir a-db))
          (define file-path (build-path data-dir-path file-name))
-         (file->value file-path)]
+         (read-from-file file-path)]
         [(procedure? fail-result) (fail-result)]
         [else fail-result]))
 
-(define (write! a-db contents)
+(define (write! a-db contents #:writer [write-value-to-file write-to-file])
   (define data-dir (db-data-dir a-db))
   (delete-directory/files data-dir)
   (make-directory data-dir)
@@ -129,8 +132,7 @@
                [i (in-naturals)])
       (define file-name (~a i))
       (define outfile (path->string (build-path data-dir file-name)))
-      (with-output-to-file outfile
-        (thunk (write data)))
+      (write-value-to-file data outfile)
       (values key file-name)))
   (write-serialized-db! (db (db-path a-db)
                             new-map
