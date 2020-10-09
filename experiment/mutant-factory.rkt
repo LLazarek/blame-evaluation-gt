@@ -1165,7 +1165,8 @@ Mutant: [~a] ~a @ ~a with config:
 
   (match (record/check-configuration-outcomes?)
     [`(record ,_)
-     (db:new! (configuration-outcome-db))]
+     (unless (db:path-to-db? (configuration-outcome-db))
+       (db:new! (configuration-outcome-db)))]
     [`(check ,_)
      (define db (db:get (configuration-outcome-db)))
      (define outcomes (db:read db (benchmark->name bench-to-run)))
