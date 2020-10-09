@@ -10,7 +10,7 @@
          "../../util/path-utils.rkt")
 
 ;; db layout is:
-;; bench-name? -> (hash/c (list/c module-name? index?) run-status?)
+;; bench-name? -> (hash/c mutant/c run-status?)
 
 (define-runtime-paths
   [configurables-dir ".."])
@@ -70,7 +70,7 @@
          (define mod
            (findf (compose1 (path-ends-with mod-name) mod-path)
                   (program->mods bench-untyped-program)))
-         (values (list mod-name index)
+         (values (mutant #f mod-name index)
                  (run-with-mutated-module bench-untyped-program
                                           mod
                                           index

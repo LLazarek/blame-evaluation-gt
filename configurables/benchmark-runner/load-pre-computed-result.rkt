@@ -8,6 +8,7 @@
          "../../db/util.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/path-utils.rkt"
+         "../../util/mutant-util.rkt"
          "../../runner/mutation-runner.rkt"
          "benchmark-runner.rkt")
 
@@ -32,8 +33,9 @@
     (match (db:read db
                     bench
                     #f)
-      [(hash-table [(list (== module-to-mutate)
-                          (== mutation-index))
+      [(hash-table [(mutant _
+                            (== module-to-mutate)
+                            (== mutation-index))
                     result]
                    _ ...)
        (raise result)]
