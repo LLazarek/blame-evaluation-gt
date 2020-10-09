@@ -6,15 +6,19 @@
          "../../configurations/configure-benchmark.rkt"
          "make-bt-root-sampler.rkt"
          racket/format
-         racket/random)
+         racket/random
+         racket/runtime-path)
 
 (provide (contract-out [make-bt-root-sampler make-bt-root-sampler/c]
                        [pre-selected-bt-root-db (parameter/c path-to-db?)]))
 
+(define-runtime-path configurables "..")
 (define pre-selected-bt-root-db (make-parameter #f))
 
 (define (make-bt-root-sampler bench-info mutant)
-  (define db (db:get (pre-selected-bt-root-db)))
+  (define resolved-db-path (build-path configurables
+                                       (pre-selected-bt-root-db)))
+  (define db (db:get resolved-db-path))
   (define pre-selected-roots-by-mutant
     (db:read db
              (benchmark->name (bench-info-benchmark bench-info))))
@@ -26,7 +30,7 @@
        'pre-selected:make-bt-root-sampler
        @~a{
            Got a request for @n samples but there are @(length pre-selected-roots) @;
-           in the db @(pre-selected-bt-root-db).
+           in the db @resolved-db-path
            Request was for mutant: @~v[mutant]
            @(if (= n 1)
                 "n = 1 so this was probably a resample, meaning a pre-selected root is not valid!"
