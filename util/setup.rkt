@@ -1,5 +1,13 @@
 #lang at-exp rscript
 
+(require syntax/location
+         (prefix-in db: "../db/db.rkt"))
+
+(define-runtime-paths
+  [repo-parent-path "../../"]
+  [repo-path ".."]
+  [dbs-dir "../dbs"])
+
 ;; ==================================================
 ;;  Modify these to configure setup
 ;; ==================================================
@@ -14,14 +22,18 @@
 (define racket-download-url
   "https://mirror.racket-lang.org/installers/7.7/racket-7.7-x86_64-linux-cs.sh")
 
+(define expected-benchmark-names
+  (map ~a '(suffixtree kcfa snake take5 acquire tetris synth gregor quadT quadU)))
+
+(define expected-dbs
+  ;;    dir                    db                        entry-per-bench?
+  (hash "code-mutations" (hash "dyn-err-summaries.rktdb" #t
+                               "mutant-samples.rktdb"    #t
+                               "pre-computed-mutant-results.rktdb" #t
+                               "pre-selected-bt-roots.rktdb" #t
+                               "transient-special-cases.rktdb" #f)))
+
 ;; ==================================================
-
-(require syntax/location
-         (prefix-in db: "../db/db.rkt"))
-
-(define-runtime-paths
-  [repo-parent-path "../../"]
-  [repo-path ".."])
 
 (define (pretty-path p)
   (find-relative-path (simple-form-path (current-directory))
@@ -277,7 +289,7 @@
            (displayln
             @~a{
 
-                WARNING: Missing default database at @path-to-db
+                WARNING: Missing database at @path-to-db
                 }))
          #f]
         [(and expected-keys
@@ -288,30 +300,14 @@
            (displayln
             @~a{
 
-                WARNING: Default database at @path-to-db @;
-                has missing keys.
-                Specifically: @missing
+                WARNING: Database at @path-to-db doesn't have every expected benchmark.
+                Specifically, these are missing: @missing
                 }))
          #f]
         [else #t]))
 
+
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
-  (define (load/report-failure mod-path/rel-to-repo-root id)
-    (define mod-path/abs (build-path-string repo-path
-                                            mod-path/rel-to-repo-root))
-    (with-handlers ([exn:fail:filesystem?
-                     (λ (e)
-                       (displayln
-                        @~a{
-
-                            @~v[e]
-
-                            WARNING: Unable to load dependencies.
-                            Have you run this script to install them?
-                            })
-                       (const #f))])
-      (dynamic-require `(file ,mod-path/abs) id)))
-
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
   (match-define (list gtp-branches-str
@@ -323,57 +319,10 @@
   (define racket-version-ok?
     (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
   (define gtp-branch-ok?
-    (regexp-match? @regexp{\* hash-top} gtp-branches-str))
+    (regexp-match? @regexp{\* master} gtp-branches-str))
   (define gtp-up-to-date?
     (regexp-match? @regexp{hash-top.*up to date} gtp-origin-str))
-
-  (define gtp-benchmark-names
-    (map ~a (directory-list (build-path gtp-dir "benchmarks"))))
-
-  (define mutation-analysis-samples-db
-    (load/report-failure
-     "configurables/mutant-sampling/use-pre-selected-samples.rkt"
-     'mutation-analysis-samples-db))
-  (unless (check-db/keys (mutation-analysis-samples-db)
-                         gtp-benchmark-names)
-    (displayln
-     @~a{
-         This database stores mutant samples which must be collected @;
-         for every benchmark before the experiment can run with mutant sampling.
-
-         Generate them with `mutation-analysis/analyze-mutation.rkt`, @;
-         followed by summarizing the analysis results by running @;
-         `mutation-analysis/summarize-mutation.rkt`
-         followed by generating samples with @;
-         `configurables/mutant-sampling/generate-samples-within-mutators.rkt`
-         }))
-  (define transient-special-cases-db
-    (load/report-failure
-     "configurables/module-instrumentation/type-with-transient.rkt"
-     'transient-special-cases-db))
-  (unless (check-db/keys (transient-special-cases-db))
-    (displayln
-     @~a{
-         This database stores specialized versions of the benchmark necessary @;
-         to run the experiment with Transient type enforcement.
-
-         This database is manually populated.
-         }))
-  (define pre-computed-results-db
-    (load/report-failure
-     "configurables/benchmark-runner/load-pre-computed-result.rkt"
-     'pre-computed-results-db))
-  (unless (check-db/keys (pre-computed-results-db)
-                         gtp-benchmark-names)
-    (displayln
-     @~a{
-         This database stores pre-computed results for the untyped version of @;
-         each mutant necessary to run the experiment with Erasure type @;
-         enforcement.
-
-         Generate it with @;
-         `configurables/benchmark-runner/pre-compute-benchmark-results.rkt`.
-         }))
+  (define dbs-ok? (check-expected-dbs))
 
   (unless racket-version-ok?
     (displayln
@@ -389,7 +338,7 @@
 
          ERROR: The wrong branch of gtp-benchmarks is active.
          current branch:  @gtp-branches-str
-         required branch: hash-top
+         required branch: master
          }))
   (define gtp-up-to-date?*
     (if gtp-up-to-date?
@@ -406,7 +355,15 @@
   (and racket-version-ok?
        gtp-branch-ok?
        gtp-up-to-date?*
-       (check-TR-install racket-dir TR-dir #:display-failures? #t)))
+       (check-TR-install racket-dir TR-dir #:display-failures? #t)
+       dbs-ok?))
+
+(define (check-expected-dbs)
+  (for*/and ([{dir dbs} (in-hash expected-dbs)]
+             [{db-name should-have-all-expected-benchmarks?} (in-hash dbs)])
+    (define db-path (build-path dbs-dir dir db-name))
+    (check-db/keys db-path (and should-have-all-expected-benchmarks?
+                                expected-benchmark-names))))
 
 (main
  #:arguments {[flags args]
