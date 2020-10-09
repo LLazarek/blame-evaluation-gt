@@ -105,7 +105,7 @@
 
 (define (get path)
   (unless (path-to-db? path)
-    (error 'get @~a{@path doesn't exist or it doesn't look like a db}))
+    (error 'get @~a{@(simple-form-path path) doesn't exist or it doesn't look like a db}))
   (read-serialized-db! path))
 
 (define (read a-db
@@ -139,7 +139,7 @@
                             data-dir))
   (get (db-path a-db)))
 
-(define (set! a-db key value)
+(define (set! a-db key value #:writer [write-value-to-file write-to-file])
   (define (find-next-index)
     (~a (apply max 0 (map string->number (hash-keys (db-map a-db))))))
 
@@ -148,9 +148,10 @@
                               key
                               find-next-index))
   (define file-path (build-path data-dir-path file-name))
-  (write-to-file value
-                 file-path
-                 #:exists 'replace)
+  (when (file-exists? file-path)
+    (delete-file file-path))
+  (write-value-to-file value
+                       file-path)
   (define new-db (struct-copy db a-db [map (hash-set (db-map a-db) key file-name)]))
   (write-serialized-db! new-db))
 
