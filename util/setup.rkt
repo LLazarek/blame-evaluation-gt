@@ -35,6 +35,7 @@
 
 (define expected-TR-branch "transient-blame")
 (define expected-gtp-branch "master")
+(define expected-blgt-branch "mutations")
 
 ;; ==================================================
 
@@ -228,6 +229,7 @@
   ;;     [(list path) (string-contains? path (path->string racket-dir))]
   ;;     [else #f]))
 
+  (displayln "Checking TR for transient implementation...")
   (define (error-has-interface-from? e)
     (equal? (blame-positive (exn:fail:contract:blame-object e))
             '(interface for first from (only-in racket first))))
@@ -346,6 +348,11 @@
   (define racket-version-ok?
     (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
 
+  (displayln "Checking blgt repo ...")
+  (define blgt-active-branch (get-repo-current-branch repo-path))
+  (define blgt-branch-ok? (equal? blgt-active-branch expected-blgt-branch))
+  (define blgt-up-to-date? (repo-branch-up-to-date-with-remote? repo-path blgt-active-branch))
+
   (displayln "Checking gtp-benchmarks repo...")
   (define gtp-active-branch (get-repo-current-branch gtp-dir))
   (define gtp-branch-ok? (equal? gtp-active-branch expected-gtp-branch))
@@ -371,6 +378,8 @@
   (report-repo-status TR-dir TR-active-branch expected-TR-branch TR-up-to-date?)
 
   (and racket-version-ok?
+       blgt-branch-ok?
+       blgt-up-to-date?
        gtp-branch-ok?
        gtp-up-to-date?
        TR-branch-ok?
