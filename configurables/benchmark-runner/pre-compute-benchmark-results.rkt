@@ -80,7 +80,7 @@
      (values bench-name
              mutant-results-hash)))
 
- (unless (db:path-to-db? (pre-computed-results-db))
-   (db:new! (pre-computed-results-db)))
- (define db (db:get (pre-computed-results-db)))
+ (unless (db:path-to-db? results-db)
+   (db:new! results-db))
+ (define db (db:get results-db))
  (void (db:write! db results)))
