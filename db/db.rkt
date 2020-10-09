@@ -6,6 +6,7 @@
 (require racket/file
          racket/format
          racket/function
+         racket/list
          racket/match
          racket/path
          racket/pretty
@@ -37,6 +38,16 @@
 ;;
 ;; Note that the data-directory-path is relative to the metadata file
 ;; location.
+;;
+;;
+;; DB's are not really intended to be used concurrently.
+;;
+;; The only function that considers concurrency is `set!`, which will obtain a
+;; lock of the DB to perform the write, so that multiple processes can in
+;; parallel do `set!`s on a DB without losing any one of their data.
+;; Reading operations *do not consider concurrency*.
+;; The takeaway is that DBs can be banged on concurrently by `set!`s, but
+;; reading and writing should not happen concurrently.
 
 (struct db (path ; path to the db metadata file
             map ; mapping from keys to file names in data dir
@@ -139,21 +150,38 @@
                             data-dir))
   (get (db-path a-db)))
 
+(define WRITE-TIMEOUT-SECS (* 5 60))
 (define (set! a-db key value #:writer [write-value-to-file write-to-file])
-  (define (find-next-index)
-    (~a (apply max 0 (map string->number (hash-keys (db-map a-db))))))
+  (define lock-file (build-path (db-data-dir a-db) "write-lock"))
+  (call-with-file-lock/timeout
+   #f
+   #:lock-file lock-file
+   'exclusive
+   (thunk
+    (let ([a-db (read-serialized-db! (db-path a-db))])
+      (define (find-next-index)
+        (define numbers (map string->number (hash-values (db-map a-db))))
+        (define next-index
+          (if (empty? numbers)
+              0
+              (add1 (apply max 0 numbers))))
+        (~a next-index))
 
-  (define data-dir-path (db-data-dir a-db))
-  (define file-name (hash-ref (db-map a-db)
-                              key
-                              find-next-index))
-  (define file-path (build-path data-dir-path file-name))
-  (when (file-exists? file-path)
-    (delete-file file-path))
-  (write-value-to-file value
-                       file-path)
-  (define new-db (struct-copy db a-db [map (hash-set (db-map a-db) key file-name)]))
-  (write-serialized-db! new-db))
+      (define data-dir-path (db-data-dir a-db))
+      (define file-name (hash-ref (db-map a-db)
+                                  key
+                                  find-next-index))
+      (define file-path (build-path data-dir-path file-name))
+      (when (file-exists? file-path)
+        (delete-file file-path))
+      (write-value-to-file value
+                           file-path)
+      (define new-db (struct-copy db a-db [map (hash-set (db-map a-db) key file-name)]))
+      (write-serialized-db! new-db)))
+   (thunk
+    (error 'db:set!
+           @~a{Timeout waiting on lock to write db: @(db-path a-db)}))
+   #:max-delay 1))
 
 (define (keys a-db)
   (hash-keys (db-map a-db)))
@@ -163,3 +191,62 @@
                           (file-or-directory-checksum (db-data-dir a-db))))
   (define double-sum (apply string-append part-sums))
   (call-with-input-string double-sum md5))
+
+(module+ test
+  (require (except-in racket set! read)
+           ruinit)
+
+  (define-test-env {setup! cleanup!}
+    #:directories ([test-dir "./test-dir"])
+    #:files ())
+
+  (test-begin
+    #:before (setup!)
+    #:after (cleanup!)
+
+    ;; Basics
+    (ignore (define a-db-path (build-path test-dir "a.rktdb")))
+    (not (path-to-db? a-db-path))
+    (ignore (define a-db (begin (new! a-db-path)
+                                (get a-db-path))))
+    (path-to-db? a-db-path)
+    (test-equal? (keys a-db) empty)
+    (test-exn exn:fail? (read a-db "key1"))
+
+    (ignore (write! a-db (hash "key1" 42 "key77" 77))
+            (define a-db/2* (get a-db-path)))
+    (set=? (keys a-db/2*) '("key1" "key77"))
+    (test-equal? (read a-db/2* "key1") 42)
+    (test-equal? (read a-db/2* "key77") 77)
+
+    (ignore (write! a-db (hash "key1" 42))
+            (define a-db/2 (get a-db-path)))
+    (test-equal? (keys a-db/2) '("key1"))
+    (test-equal? (read a-db/2 "key1") 42)
+
+    ;; Concurrent set! integrity.
+    ;; Two consecutive set!'s don't overwrite each other
+    (ignore (set! a-db/2 "key2" 43)
+            (set! a-db/2 "key3" 50)
+            (define a-db/3 (get a-db-path)))
+    (set=? (keys a-db/3) '("key1" "key2" "key3"))
+    (test-equal? (read a-db/3 "key1") 42)
+    (test-equal? (read a-db/3 "key2") 43)
+    (test-equal? (read a-db/3 "key3") 50)
+
+    ;; Concurrent set!'s don't either
+    (ignore (define thd
+              (thread
+               (thunk (set! a-db/3 "key4" 4 #:writer (λ (v f)
+                                                       (sleep 0.5)
+                                                       (write-to-file v f))))))
+            (sleep 0.1)
+            (set! a-db/3 "key5" 5)
+            (thread-wait thd)
+            (define a-db/4 (get a-db-path)))
+    (set=? (keys a-db/4) '("key1" "key2" "key3" "key4" "key5"))
+    (test-equal? (read a-db/4 "key1") 42)
+    (test-equal? (read a-db/4 "key2") 43)
+    (test-equal? (read a-db/4 "key3") 50)
+    (test-equal? (read a-db/4 "key4") 4)
+    (test-equal? (read a-db/4 "key5") 5)))
