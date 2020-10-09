@@ -33,6 +33,9 @@
                                "pre-selected-bt-roots.rktdb" #t
                                "transient-special-cases.rktdb" #f)))
 
+(define expected-TR-branch "transient-blame")
+(define expected-gtp-branch "master")
+
 ;; ==================================================
 
 (define (pretty-path p)
@@ -165,7 +168,7 @@
   (parameterize ([current-directory TR-dir])
     (shell* "git"
             "checkout"
-            "transient-blame"))
+            expected-TR-branch))
   (directory-exists? TR-dir))
 
 (define (setup-existing-TR-dir! raco-path TR-dir)
@@ -210,7 +213,7 @@
   (parameterize ([current-directory gtp-dir])
     (shell* "git"
             "checkout"
-            "hash-top"))
+            expected-gtp-branch))
   (displayln "Done."))
 
 (define (check-TR-install racket-dir
@@ -307,21 +310,53 @@
         [else #t]))
 
 
+(define (get-repo-current-branch repo-path)
+  (parameterize ([current-directory repo-path])
+    (match (system/string "git branch")
+      [(regexp @regexp{(?m:^\* (.+)$)} (list _ name))
+       name]
+      [else
+       (eprintf "WARNING: couldn't get current branch for repo ~a~n"
+                repo-path)
+       #f])))
+(define (repo-branch-up-to-date-with-remote? repo-path branch [remote-name "origin"])
+  (parameterize ([current-directory repo-path])
+    (regexp-match? @regexp{@|branch|.*up to date}
+                   (system/string @~a{git remote show @remote-name}))))
+(define (report-repo-status repo-dir active-branch expected-branch up-to-date?)
+  (unless (equal? active-branch expected-branch)
+    (displayln
+     @~a{
+
+         ERROR: The wrong branch of @repo-dir is active.
+         current branch:  @active-branch
+         required branch: @expected-branch
+         }))
+  (unless up-to-date?
+    (displayln
+     @~a{
+
+         ERROR: @repo-dir is out of date (there are upstream commits)
+         })))
+
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
+  (displayln "Checking racket version...")
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
-  (match-define (list gtp-branches-str
-                      gtp-origin-str)
-    (parameterize ([current-directory gtp-dir])
-      (list (system/string "git branch")
-            (system/string "git remote show origin"))))
-
   (define racket-version-ok?
     (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
-  (define gtp-branch-ok?
-    (regexp-match? @regexp{\* master} gtp-branches-str))
-  (define gtp-up-to-date?
-    (regexp-match? @regexp{hash-top.*up to date} gtp-origin-str))
+
+  (displayln "Checking gtp-benchmarks repo...")
+  (define gtp-active-branch (get-repo-current-branch gtp-dir))
+  (define gtp-branch-ok? (equal? gtp-active-branch expected-gtp-branch))
+  (define gtp-up-to-date? (repo-branch-up-to-date-with-remote? gtp-dir gtp-active-branch))
+
+  (displayln "Checking TR repo...")
+  (define TR-active-branch (get-repo-current-branch TR-dir))
+  (define TR-branch-ok? (equal? TR-active-branch expected-TR-branch))
+  (define TR-up-to-date? (repo-branch-up-to-date-with-remote? TR-dir TR-active-branch))
+
+  (displayln "Checking dbs...")
   (define dbs-ok? (check-expected-dbs))
 
   (unless racket-version-ok?
@@ -332,31 +367,16 @@
          installed: @racket-version-str
          required:  Racket v7.7 [cs]
          }))
-  (unless gtp-branch-ok?
-    (displayln
-     @~a{
-
-         ERROR: The wrong branch of gtp-benchmarks is active.
-         current branch:  @gtp-branches-str
-         required branch: master
-         }))
-  (define gtp-up-to-date?*
-    (if gtp-up-to-date?
-        #t
-        (and (user-prompt!
-              @~a{
-
-                  ERROR: gtp-benchmarks is out of date. @;
-                  Do you want to update it?
-                  })
-             (parameterize ([current-directory gtp-dir])
-               (system "git pull")))))
+  (report-repo-status gtp-dir gtp-active-branch expected-gtp-branch gtp-up-to-date?)
+  (report-repo-status TR-dir TR-active-branch expected-TR-branch TR-up-to-date?)
 
   (and racket-version-ok?
        gtp-branch-ok?
-       gtp-up-to-date?*
-       (check-TR-install racket-dir TR-dir #:display-failures? #t)
-       dbs-ok?))
+       gtp-up-to-date?
+       TR-branch-ok?
+       TR-up-to-date?
+       dbs-ok?
+       (check-TR-install racket-dir TR-dir #:display-failures? #t)))
 
 (define (check-expected-dbs)
   (for*/and ([{dir dbs} (in-hash expected-dbs)]
