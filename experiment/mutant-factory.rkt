@@ -1120,8 +1120,8 @@ Mutant: [~a] ~a @ ~a with config:
     (metadata-file path)]
    [("-P" "--record-configuration-outcomes") ; p for parity
     db-path
-    ("For every configuration visited, record in the given db (which may not exist yet) if the"
-     "configuration produces a type error."
+    ("For every configuration visited, record in the given db (which may not exist yet) the"
+     "configuration's outcome."
      "Upon completion, the db can be used with `-p` (which see).")
     (configuration-outcome-db db-path)
     (record/check-configuration-outcomes? `(record ,(make-hash)))]
@@ -1198,7 +1198,9 @@ Mutant: [~a] ~a @ ~a with config:
     [`(record ,data)
      (define db (db:get (configuration-outcome-db)))
      (define benchmark-name (benchmark->name bench-to-run))
-     (db:set! db benchmark-name data)]
+     (db:set! db benchmark-name data #:writer (λ (v path)
+                                                (with-output-to-file path
+                                                  (thunk (pretty-write v)))))]
     [`(check ,_)
      (void)])
 
