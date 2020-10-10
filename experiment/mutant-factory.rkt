@@ -1024,23 +1024,24 @@ Mutant: [~a] ~a @ ~a with config:
 
 (define (record/check-configuration-outcome! dead-proc)
   (match-define (struct* dead-mutant-process ([result result]
-                                              [mutant (mutant _ mod-name index)]
+                                              [mutant mutant]
                                               [config config]))
     dead-proc)
+  (define (get-outcome outcome-for)
+    (outcome-for mutant config))
   (match* {result (record/check-configuration-outcomes?)}
     [{(struct* run-status ([outcome outcome]))
-      `(record ,outcomes)}
-     (hash-set! outcomes (list mod-name index config) outcome)]
+      `(record ,record!)}
+     (record! mutant config outcome)]
 
     [{(struct* run-status ([outcome real-outcome]))
-      `(check ,(hash-table [(list (== mod-name) (== index) (== config))
-                            (and expected-outcome (or 'type-error 'runtime-error))] _ ...))}
+      `(check ,(app get-outcome (and expected-outcome (or 'type-error 'runtime-error))))}
      #:when (not (equal? real-outcome expected-outcome))
      (maybe-abort
       @~a{
           Found that a configuration produces @real-outcome, but configuration outcomes db @;
           says that it should produce @expected-outcome
-          Mutant: @mod-name @"@" @index @config
+          Mutant: @mutant @config
           }
       (void))]
 
@@ -1075,9 +1076,6 @@ Mutant: [~a] ~a @ ~a with config:
   (define bench-path-to-run (make-parameter #f))
   (define metadata-file (make-parameter #f))
   (define configuration-path (make-parameter #f))
-  (define/contract configuration-outcome-db
-    (parameter/c (or/c #f path-to-db?))
-    (make-parameter #f))
   (command-line
    #:once-each
    [("-b" "--benchmark")
@@ -1119,19 +1117,17 @@ Mutant: [~a] ~a @ ~a with config:
      "different configuration than it was started with.")
     (metadata-file path)]
    [("-P" "--record-configuration-outcomes") ; p for parity
-    db-path
+    log-path
     ("For every configuration visited, record in the given db (which may not exist yet) the"
      "configuration's outcome."
      "Upon completion, the db can be used with `-p` (which see).")
-    (configuration-outcome-db db-path)
-    (record/check-configuration-outcomes? `(record ,(make-hash)))]
+    (record/check-configuration-outcomes? `(record ,log-path))]
    [("-p" "--check-configuration-outcomes")
-    db-path
+    log-path
     ("Check the outcome of every configuration visited against those recorded in the given db"
      "(produced by `-P`). If the outcome of a configuration does not match the outcome recorded"
      "in the db, signal a fatal error.")
-    (configuration-outcome-db db-path)
-    (record/check-configuration-outcomes? `(check ,(hash)))])
+    (record/check-configuration-outcomes? `(check ,log-path))])
 
   (unless (bench-path-to-run)
     (raise-user-error 'mutant-factory "Error: must provide benchmark to run."))
@@ -1163,19 +1159,28 @@ Mutant: [~a] ~a @ ~a with config:
            Aborting.
            })))
 
-  (match (record/check-configuration-outcomes?)
-    [`(record ,_)
-     (unless (db:path-to-db? (configuration-outcome-db))
-       (db:new! (configuration-outcome-db)))]
-    [`(check ,_)
-     (define db (db:get (configuration-outcome-db)))
-     (define outcomes (db:read db (benchmark->name bench-to-run)))
-     (record/check-configuration-outcomes? `(check ,outcomes))])
+  (define finalize-configuration-outcomes!
+    (match (record/check-configuration-outcomes?)
+      [`(record ,path)
+       (define-values {log-outcome!/raw finalize-log!}
+         (initialize-progress-log! path
+                                   #:exists 'append))
+       (define (log-outcome! mutant config outcome)
+         (log-outcome!/raw (cons (list mutant config) outcome)))
+       (record/check-configuration-outcomes? `(record ,log-outcome!))
+       finalize-log!]
+      [`(check ,path)
+       (define outcomes (make-immutable-hash (file->list path)))
+       (define (outcome-for mutant config)
+         (hash-ref outcomes (list mutant config) '<unrecorded>))
+       (record/check-configuration-outcomes? `(check ,outcome-for))
+       void]
+      [else void]))
 
   (define (make-cached-results-function)
     (define progress-info-hash
       (match (progress-log)
-        [(? file-exists? path) (make-hash (file->list path))]
+        [(? file-exists? path) (make-immutable-hash (file->list path))]
         [else (hash)]))
     (make-cached-results-for progress-info-hash))
   (define-values {log-progress!/raw finalize-log!}
@@ -1195,14 +1200,6 @@ Mutant: [~a] ~a @ ~a with config:
                                #:load-progress make-cached-results-function)))
 
   (finalize-log!)
-  (match (record/check-configuration-outcomes?)
-    [`(record ,data)
-     (define db (db:get (configuration-outcome-db)))
-     (define benchmark-name (benchmark->name bench-to-run))
-     (db:set! db benchmark-name data #:writer (λ (v path)
-                                                (with-output-to-file path
-                                                  (thunk (pretty-write v)))))]
-    [`(check ,_)
-     (void)])
+  (finalize-configuration-outcomes!)
 
   (exit (if completed+checks-pass? 0 1)))

@@ -613,40 +613,44 @@
 
  ;; record
  (ignore (define the-hash (make-hash))
-         (parameterize ([record/check-configuration-outcomes? `(record ,the-hash)])
+         (define (record! mutant config outcome)
+           (hash-set! the-hash (list mutant config) outcome))
+         (define (check mutant config)
+           (hash-ref the-hash (list mutant config) '<not-recorded>))
+         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
            (record/check-configuration-outcome! dead-e-proc/crashed)))
  (match dead-e-proc/crashed
    [(struct* dead-mutant-process
-             ([mutant (mutant #f mod index)]
+             ([mutant mutant]
               [config config]))
     (test-match the-hash
-                (hash-table [(== (list mod index config))
+                (hash-table [(== (list mutant config))
                              'runtime-error]))])
  (ignore (hash-clear! the-hash)
-         (parameterize ([record/check-configuration-outcomes? `(record ,the-hash)])
+         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
            (record/check-configuration-outcome! dead-e-proc/blame-e)))
  (match dead-e-proc/blame-e
    [(struct* dead-mutant-process
-             ([mutant (mutant #f mod index)]
+             ([mutant mutant]
               [config config]))
     (test-match the-hash
-                (hash-table [(== (list mod index config))
+                (hash-table [(== (list mutant config))
                              'blamed]))])
 
  ;; check
  (ignore (hash-clear! the-hash)
          (set-box! abort-suppressed? #f)
-         (parameterize ([record/check-configuration-outcomes? `(record ,the-hash)])
+         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
            (record/check-configuration-outcome! dead-e-proc/blame-e))
-         (parameterize ([record/check-configuration-outcomes? `(check ,the-hash)]
+         (parameterize ([record/check-configuration-outcomes? `(check ,check)]
                         [abort-on-failure? #f])
            (record/check-configuration-outcome! dead-e-proc/blame-e)))
  (not (unbox abort-suppressed?))
  (ignore (hash-clear! the-hash)
          (set-box! abort-suppressed? #f)
-         (parameterize ([record/check-configuration-outcomes? `(record ,the-hash)])
+         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
            (record/check-configuration-outcome! dead-e-proc/crashed))
-         (parameterize ([record/check-configuration-outcomes? `(check ,the-hash)]
+         (parameterize ([record/check-configuration-outcomes? `(check ,check)]
                         [abort-on-failure? #f])
            (record/check-configuration-outcome! dead-e-proc/type-error-in-d)))
  (unbox abort-suppressed?))
