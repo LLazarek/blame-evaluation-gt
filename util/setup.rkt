@@ -27,8 +27,7 @@
 
 (define expected-dbs
   ;;    dir                    db                        entry-per-bench?
-  (hash "code-mutations" (hash "dyn-err-summaries.rktdb" #t
-                               "mutant-samples.rktdb"    #t
+  (hash "code-mutations" (hash "mutant-samples.rktdb"    #t
                                "pre-computed-mutant-results.rktdb" #t
                                "pre-selected-bt-roots.rktdb" #t
                                "transient-special-cases.rktdb" #f)))
