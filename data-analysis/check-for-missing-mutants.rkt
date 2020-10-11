@@ -96,10 +96,10 @@
               [("-s" "--samples-db")
                'samples-db
                ("Samples db to check against."
-                @~a{Default: @(mutation-analysis-samples-db)})
+                @~a{Default: @(pre-selected-mutant-samples-db)})
                #:collect ["path"
-                          (set-parameter mutation-analysis-samples-db)
-                          (mutation-analysis-samples-db)]]
+                          (set-parameter pre-selected-mutant-samples-db)
+                          (pre-selected-mutant-samples-db)]]
               [("-S" "--summaries-db")
                'summaries-db
                ("Summaries db to check against."
@@ -128,7 +128,7 @@
                               racket
                               me
                               "-s"
-                              (mutation-analysis-samples-db)
+                              (pre-selected-mutant-samples-db)
                               "-S"
                               (mutation-analysis-summaries-db)
                               dir))
@@ -152,7 +152,7 @@
         (file-stream-buffer-mode (current-output-port) 'line)
 
         (define mutants-by-mutator (read-mutants-by-mutator (mutation-analysis-summaries-db)))
-        (define samples-db (db:get (mutation-analysis-samples-db)))
+        (define samples-db (db:get (pre-selected-mutant-samples-db)))
         (for ([dir-to-check (in-list dirs-to-check)])
           (displayln (~a "⟶ " dir-to-check))
           (for ([bench-name (in-list benchmarks-to-check)])

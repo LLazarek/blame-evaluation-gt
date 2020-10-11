@@ -54,10 +54,10 @@
               [("-s" "--samples-db")
                'samples-db
                ("Samples db to check against."
-                @~a{Default: @(mutation-analysis-samples-db)})
+                @~a{Default: @(pre-selected-mutant-samples-db)})
                #:collect ["path"
-                          (set-parameter mutation-analysis-samples-db)
-                          (mutation-analysis-samples-db)]]
+                          (set-parameter pre-selected-mutant-samples-db)
+                          (pre-selected-mutant-samples-db)]]
               [("-S" "--summaries-db")
                'summaries-db
                ("Summaries db to check against."

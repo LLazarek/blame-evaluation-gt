@@ -347,11 +347,11 @@
               [("-o" "--samples-db")
                'samples-db
                ("Database in which to place benchmark mutant summaries."
-                @~a{Default: @(mutation-analysis-samples-db)})
+                @~a{Default: @(pre-selected-mutant-samples-db)})
                #:collect ["path"
                           take-latest
                           (path->string (build-path configurables-dir
-                                                    (mutation-analysis-samples-db)))]]
+                                                    (pre-selected-mutant-samples-db)))]]
 
               [("-n" "--sample-size")
                'sample-size

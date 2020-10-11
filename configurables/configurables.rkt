@@ -24,7 +24,7 @@
 
   (define-implementation use-pre-selected-samples
     #:module "mutant-sampling/use-pre-selected-samples.rkt"
-    #:parameters [mutation-analysis-samples-db]))
+    #:parameters [pre-selected-mutant-samples-db]))
 
 (define-configurable blame-following
   #:provides [make-extract-blamed]

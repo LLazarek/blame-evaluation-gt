@@ -2,7 +2,7 @@
 
 (require "../../util/optional-contracts.rkt")
 (provide (contract-out [select-mutants mutant-selector/c]
-                       [mutation-analysis-samples-db (db-path-relative-to? configurables)]
+                       [pre-selected-mutant-samples-db (db-path-relative-to? configurables)]
                        [all-mutants-should-have-trails? boolean?]))
 
 (require "mutant-selector.rkt"
@@ -13,7 +13,7 @@
 
 (define-runtime-path configurables "..")
 (define default-samples-db "mutant-sampling/samples/default.rktdb")
-(define mutation-analysis-samples-db (make-parameter default-samples-db))
+(define pre-selected-mutant-samples-db (make-parameter default-samples-db))
 
 (define (select-mutants module-to-mutate-name the-bench)
   (define samples (samples-for the-bench module-to-mutate-name))
@@ -23,7 +23,7 @@
 (define (samples-for the-bench module-to-mutate-name)
   (define bench-name (benchmark->name the-bench))
   (define resolved-db-path (build-path configurables
-                                       (mutation-analysis-samples-db)))
+                                       (pre-selected-mutant-samples-db)))
   (define db (db:get resolved-db-path))
   (define samples-by-module (db:read db bench-name))
   (hash-ref samples-by-module
