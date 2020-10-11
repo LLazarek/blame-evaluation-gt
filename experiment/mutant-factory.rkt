@@ -72,7 +72,8 @@
            make-progress-logger
 
            record/check-configuration-outcomes?
-           record/check-configuration-outcome!))
+           record/check-configuration-outcome!
+           setup-configuration-outcome-record/checking!))
 
 (define debug:save-individual-mutant-outputs? #f)
 
@@ -1070,6 +1071,25 @@ Mutant: [~a] ~a @ ~a with config:
                              ;; from another directory
                              (path->string
                               (simple-form-path data-file))))))
+
+(define (setup-configuration-outcome-record/checking!)
+  (match (record/check-configuration-outcomes?)
+    [`(record ,path)
+     (define-values {log-outcome!/raw finalize-log!}
+       (initialize-progress-log! path
+                                 #:exists 'append))
+     (define (log-outcome! mutant config outcome)
+       (log-outcome!/raw (cons (list mutant config) outcome)))
+     (record/check-configuration-outcomes? `(record ,log-outcome!))
+     finalize-log!]
+    [`(check ,path)
+     (define outcomes (make-immutable-hash (file->list path)))
+     (define (outcome-for mutant config)
+       (hash-ref outcomes (list mutant config) '<unrecorded>))
+     (record/check-configuration-outcomes? `(check ,outcome-for))
+     void]
+    [else void]))
+
 (module+ main
   (require racket/cmdline
            (prefix-in db: "../db/db.rkt"))
@@ -1160,22 +1180,7 @@ Mutant: [~a] ~a @ ~a with config:
            })))
 
   (define finalize-configuration-outcomes!
-    (match (record/check-configuration-outcomes?)
-      [`(record ,path)
-       (define-values {log-outcome!/raw finalize-log!}
-         (initialize-progress-log! path
-                                   #:exists 'append))
-       (define (log-outcome! mutant config outcome)
-         (log-outcome!/raw (cons (list mutant config) outcome)))
-       (record/check-configuration-outcomes? `(record ,log-outcome!))
-       finalize-log!]
-      [`(check ,path)
-       (define outcomes (make-immutable-hash (file->list path)))
-       (define (outcome-for mutant config)
-         (hash-ref outcomes (list mutant config) '<unrecorded>))
-       (record/check-configuration-outcomes? `(check ,outcome-for))
-       void]
-      [else void]))
+    (setup-configuration-outcome-record/checking!))
 
   (define (make-cached-results-function)
     (define progress-info-hash

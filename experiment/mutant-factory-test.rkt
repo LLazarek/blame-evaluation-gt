@@ -608,52 +608,65 @@
              (hash-table ['enq 1] [_ 0] ___)))
 
 
-(test-begin/with-env
- #:name configuration-outcome-record/check
+(parameterize ([record/check-configuration-outcomes? #f])
+  (test-begin/with-env
+   #:name configuration-outcome-record/check
 
- ;; record
- (ignore (define the-hash (make-hash))
-         (define (record! mutant config outcome)
-           (hash-set! the-hash (list mutant config) outcome))
-         (define (check mutant config)
-           (hash-ref the-hash (list mutant config) '<not-recorded>))
-         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
-           (record/check-configuration-outcome! dead-e-proc/crashed)))
- (match dead-e-proc/crashed
-   [(struct* dead-mutant-process
-             ([mutant mutant]
-              [config config]))
-    (test-match the-hash
-                (hash-table [(== (list mutant config))
-                             'runtime-error]))])
- (ignore (hash-clear! the-hash)
-         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
-           (record/check-configuration-outcome! dead-e-proc/blame-e)))
- (match dead-e-proc/blame-e
-   [(struct* dead-mutant-process
-             ([mutant mutant]
-              [config config]))
-    (test-match the-hash
-                (hash-table [(== (list mutant config))
-                             'blamed]))])
+   ;; record
+   (ignore (define (current-log-contents)
+             (make-immutable-hash (file->list config-outcomes-log)))
+           (define (clear-log-contents!)
+             (with-output-to-file config-outcomes-log #:exists 'replace
+               (thunk (displayln ""))))
+           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
+             (let ([finalize! (setup-configuration-outcome-record/checking!)])
+               (record/check-configuration-outcome! dead-e-proc/crashed)
+               (finalize!))))
+   (match dead-e-proc/crashed
+     [(struct* dead-mutant-process
+               ([mutant mutant]
+                [config config]))
+      (test-match (current-log-contents)
+                  (hash-table [(== (list mutant config))
+                               'runtime-error]))])
+   (ignore (clear-log-contents!)
+           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
+             (let ([finalize! (setup-configuration-outcome-record/checking!)])
+               (record/check-configuration-outcome! dead-e-proc/blame-e)
+               (finalize!))))
+   (match dead-e-proc/blame-e
+     [(struct* dead-mutant-process
+               ([mutant mutant]
+                [config config]))
+      (test-match (current-log-contents)
+                  (hash-table [(== (list mutant config))
+                               'blamed]))])
 
- ;; check
- (ignore (hash-clear! the-hash)
-         (set-box! abort-suppressed? #f)
-         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
-           (record/check-configuration-outcome! dead-e-proc/blame-e))
-         (parameterize ([record/check-configuration-outcomes? `(check ,check)]
-                        [abort-on-failure? #f])
-           (record/check-configuration-outcome! dead-e-proc/blame-e)))
- (not (unbox abort-suppressed?))
- (ignore (hash-clear! the-hash)
-         (set-box! abort-suppressed? #f)
-         (parameterize ([record/check-configuration-outcomes? `(record ,record!)])
-           (record/check-configuration-outcome! dead-e-proc/crashed))
-         (parameterize ([record/check-configuration-outcomes? `(check ,check)]
-                        [abort-on-failure? #f])
-           (record/check-configuration-outcome! dead-e-proc/type-error-in-d)))
- (unbox abort-suppressed?))
+   ;; check
+   (ignore (clear-log-contents!)
+           (set-box! abort-suppressed? #f)
+           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
+             (let ([finalize! (setup-configuration-outcome-record/checking!)])
+               (record/check-configuration-outcome! dead-e-proc/blame-e)
+               (finalize!)))
+           (parameterize ([record/check-configuration-outcomes? `(check ,config-outcomes-log)])
+             (let ([finalize! (setup-configuration-outcome-record/checking!)])
+               (parameterize ([abort-on-failure? #f])
+                 (record/check-configuration-outcome! dead-e-proc/blame-e))
+               (finalize!))))
+   (not (unbox abort-suppressed?))
+   (ignore (clear-log-contents!)
+           (set-box! abort-suppressed? #f)
+           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
+             (let ([finalize! (setup-configuration-outcome-record/checking!)])
+               (record/check-configuration-outcome! dead-e-proc/crashed)
+               (finalize!)))
+           (parameterize ([record/check-configuration-outcomes? `(check ,config-outcomes-log)])
+             (let ([finalize! (setup-configuration-outcome-record/checking!)])
+               (parameterize ([abort-on-failure? #f])
+                 (record/check-configuration-outcome! dead-e-proc/type-error-in-d))
+               (finalize!))))
+   (unbox abort-suppressed?)))
 
 
 (require racket/os)

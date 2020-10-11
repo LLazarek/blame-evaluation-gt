@@ -155,7 +155,9 @@
                             #lang typed/racket
                             (: bar (-> Integer String Nonpositive-Integer))
                             @rt-second-body
-                            }])
+                            }]
+
+           [config-outcomes-log "tmp--test-config-outcomes-log.rktd" ""])
 
   #:provide)
 
