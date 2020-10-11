@@ -1075,6 +1075,7 @@ Mutant: [~a] ~a @ ~a with config:
 (define (setup-configuration-outcome-record/checking!)
   (match (record/check-configuration-outcomes?)
     [`(record ,path)
+     (make-parent-directory* path)
      (define-values {log-outcome!/raw finalize-log!}
        (initialize-progress-log! path
                                  #:exists 'append))
@@ -1170,7 +1171,8 @@ Mutant: [~a] ~a @ ~a with config:
     (unless (create/check-metadata-integrity!
              (metadata-info (metadata-file)
                             (bench-path-to-run)
-                            (configuration-path)))
+                            (configuration-path)
+                            (record/check-configuration-outcomes?)))
       (raise-user-error
        'mutant-factory
        @~a{
