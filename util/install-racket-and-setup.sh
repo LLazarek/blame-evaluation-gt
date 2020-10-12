@@ -18,7 +18,11 @@ else
     INSTALLER="racket-7.7-x86_64-linux-cs.sh"
     wget "https://mirror.racket-lang.org/installers/7.7/$INSTALLER"
     chmod u+x ./$INSTALLER
-    ./$INSTALLER
+    ./$INSTALLER <<EOF
+no
+4
+
+EOF
 fi
 
 printf "Installing setup script dependencies if necessary\n\n\n"
@@ -28,7 +32,9 @@ fi
 if [ ! -d "./rscript" ]; then
     git clone https://github.com/LLazarek/rscript.git
 fi
-./racket/bin/raco pkg install --skip-installed -D ./ruinit ./rscript
+# Can't do them at the same time, it breaks?
+./racket/bin/raco pkg install --skip-installed -D ./ruinit
+./racket/bin/raco pkg install --skip-installed -D ./rscript
 
 printf "Running setup script\n\n\n"
 ./racket/bin/racket blame-evaluation-gt/util/setup.rkt
