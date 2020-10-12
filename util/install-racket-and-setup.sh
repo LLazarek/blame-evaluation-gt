@@ -11,6 +11,10 @@ esac
 
 pushd "$1"
 
+pushd "$1"/blame-evaluation-gt
+git checkout mutations
+popd
+
 printf "Installing Racket if necessary\n\n\n"
 if [ -d "./racket" ]; then
     echo "$(pwd)/racket already exists; skipping installing racket"
