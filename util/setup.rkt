@@ -322,7 +322,7 @@
        #f])))
 (define (repo-branch-up-to-date-with-remote? repo-path branch [remote-name "origin"])
   (parameterize ([current-directory repo-path])
-    (regexp-match? @regexp{@|branch|.*up to date}
+    (regexp-match? @~a{@|branch|.*up to date}
                    (system/string @~a{git remote show @remote-name}))))
 (define (report-repo-status repo-dir active-branch expected-branch up-to-date?)
   (unless (equal? active-branch expected-branch)
