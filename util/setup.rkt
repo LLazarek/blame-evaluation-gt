@@ -373,6 +373,7 @@
          installed: @racket-version-str
          required:  Racket v7.7 [cs]
          }))
+  (report-repo-status repo-path blgt-active-branch expected-blgt-branch blgt-up-to-date?)
   (report-repo-status gtp-dir gtp-active-branch expected-gtp-branch gtp-up-to-date?)
   (report-repo-status TR-dir TR-active-branch expected-TR-branch TR-up-to-date?)
 
@@ -449,7 +450,7 @@
       (displayln "\nInstall is configured correctly.")
       (exit 0)]
      [#f
-      (displayln "\nInstall is misconfigured.")
+      (displayln "\nWARNING: Install is misconfigured.")
       (exit 1)]))
  (when (hash-ref flags 'verify-install)
    (verify-install!))
