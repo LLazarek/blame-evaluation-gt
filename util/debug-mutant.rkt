@@ -196,7 +196,7 @@
                Mutated: @mutated-id
                Outcome: @outcome @;
                @(match outcome
-                  [(or 'type-error 'blamed)
+                  [(or 'type-error 'blamed 'runtime-error)
                    @~a{
 
                        Blamed:  @blamed
