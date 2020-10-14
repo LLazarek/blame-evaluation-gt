@@ -24,10 +24,14 @@
       (map errortrace-mark->location
            (continuation-mark-set->list (exn-continuation-marks e)
                                         errortrace-key)))
+    (define (mutatable-mod-in-program? name)
+      (hash-has-key? program-config name))
+    (define errortrace-locations-in-program
+      (filter mutatable-mod-in-program? errortrace-locations))
     (define mods-with-error
-      (match errortrace-locations
+      (match errortrace-locations-in-program
         [(? cons?)
-         ((pick-locations) errortrace-locations)]
+         ((pick-locations) errortrace-locations-in-program)]
         [else
          (define stacktrace-locations
            (for*/list ([ctx-item (in-list ctx)]
@@ -51,11 +55,12 @@
                                   _)
                             (~a mod-name-sym ".rkt")]
                            [else #f]))]
-                       #:when ctx-mod-path
-                       [mod (in-list (program->mods the-program))]
-                       #:when (equal? (file-name-string-from-path (mod-path mod))
-                                      (file-name-string-from-path ctx-mod-path)))
-             (file-name-string-from-path ctx-mod-path)))
+                       [ctx-mod-name
+                        (in-value (and ctx-mod-path
+                                       (file-name-string-from-path ctx-mod-path)))]
+                       #:when (and ctx-mod-name
+                                   (mutatable-mod-in-program? ctx-mod-name)))
+             ctx-mod-name))
          ((pick-locations) stacktrace-locations)]))
     (match mods-with-error
       [(? list?) mods-with-error]

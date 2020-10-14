@@ -48,7 +48,7 @@
 
   (define-implementation top
     #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
-    #:fixed-parameters ([pick-locations (λ (all) (take all 1))]))
+    #:fixed-parameters ([pick-locations (λ (all) (if (empty? all) all (take all 1)))]))
   (define-implementation all
     #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
     #:fixed-parameters ([pick-locations values])))
