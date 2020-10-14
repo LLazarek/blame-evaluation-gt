@@ -397,15 +397,10 @@
 (main
  #:arguments {[flags args]
               #:once-each
-              [("-D" "--deps-only")
-               'deps-only
-               ("Only install pkg dependencies.")
-               #:record]
               [("-v" "--verify-install")
                'verify-install
                ("Verify the current installation to ensure that"
                 "all dependencies have the right versions or customizations.")
-               #:conflicts '(deps-only)
                #:record]
               [("--dry-run")
                'dry-run
@@ -462,15 +457,17 @@
 
  (define raco-path (build-path racket-dir "bin" "raco"))
 
- (install-pkg-dependencies raco-path)
- (when (hash-ref flags 'deps-only)
-   (exit 0))
-
  (unless (directory-exists? TR-dir)
    (download-TR raco-path TR-dir))
  (modify-TR TR-dir)
  (unless (check-TR-install racket-dir TR-dir)
    (setup-existing-TR-dir! raco-path TR-dir))
+
+ ;; Note: this must come AFTER installing TR, so that the pkgs which use TR use
+ ;; the modified version of TR (which will behave the same as normal TR for the
+ ;; pkgs, just some protocols in the implementation are different and if they
+ ;; don't match we'll get runtime errors)
+ (install-pkg-dependencies raco-path)
 
  (unless (directory-exists? gtp-dir)
    (install-gtp-repo gtp-dir))
