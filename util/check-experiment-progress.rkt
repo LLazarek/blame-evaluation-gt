@@ -23,9 +23,10 @@
       [(regexp #px"(?m:Running on benchmark (.+)$)" (list _ path))
        #:when (path-to-existant-directory? path)
        path]
-      [(regexp #px"(?m:Running on benchmark (.+)$)" (list _ path))
-       (displayln @~a{path-to-existant-directory? of @(simple-form-path path) => @(path-to-existant-directory? path)})
-       (exit 1)]
+      [(regexp #px"(?m:Running on benchmark #\\(struct:benchmark (.+)$)" (list _ benchmark-parts-str))
+       (define benchmark-parts (call-with-input-string (~a "(" benchmark-parts-str) read))
+       (define a-mod-path-symbol (first (first benchmark-parts)))
+       (simple-form-path (build-path (~a a-mod-path-symbol) ".." ".."))]
       [other
        (displayln @~a{Got other: @other})
        (raise-user-error
@@ -91,7 +92,15 @@
    (guess-path benchmark-dir (~a (basename benchmark-dir) ".log")))
  (define bench (infer-benchmark log-path))
 
- (install-configuration! (infer-configuration log-path))
+ (define config-path (infer-configuration log-path))
+ (install-configuration! config-path)
+
+ (displayln @~a{
+                Inferred benchmark @(benchmark->name bench) @;
+                and config @(find-relative-path (simple-form-path configs-dir)
+                                                (simple-form-path config-path))
+                })
+
  (define all-mutants (all-mutants-for bench))
 
  (define progress-log-path
