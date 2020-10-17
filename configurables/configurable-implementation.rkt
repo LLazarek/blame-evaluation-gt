@@ -2,6 +2,7 @@
 
 (require racket/contract
          racket/format
+         racket/runtime-path
          "../util/path-utils.rkt")
 
 (provide define-configurable
@@ -37,7 +38,7 @@
         ...)
       (define-implementation name . impl-body) ...)))
 
-(define-for-syntax this-file-parent-dir (path-only (quote-source-file)))
+(define-runtime-path configurables-dir "../configurables")
 
 (define-simple-macro (define-implementation configurable-name name
                        #:module path-expr
@@ -49,9 +50,8 @@
                                                     [(config-parameter-expr 1) '()])}}
                        ...)
   #:with install-params! (datum->syntax #'name 'install-params!)
-  #:with this-file-parent-dir-str (datum->syntax this-syntax (~a this-file-parent-dir))
   (begin
-    (define path (path->string (build-path this-file-parent-dir-str path-expr)))
+    (define path (path->string (build-path configurables-dir path-expr)))
     (define (name {~? {~@ parameter ...}})
       ((dynamic-require `(file ,path) 'config-parameter) config-parameter-expr) ...
       ((dynamic-require `(file ,path) 'parameter) parameter) ...
@@ -61,7 +61,7 @@
 (define-simple-macro (configure! configurable:id implementation:id parameter-value ...)
   #:do {(define configurables-parent-dir
           (find-relative-path (syntax-source-directory this-syntax)
-                              this-file-parent-dir))
+                              (path-only (quote-source-file))))
         (define configurables-rel-path
           (path->string (build-path configurables-parent-dir
                                     "configurables.rkt")))}
