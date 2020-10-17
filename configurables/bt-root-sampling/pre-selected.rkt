@@ -6,11 +6,19 @@
          "../../configurations/configure-benchmark.rkt"
          "make-bt-root-sampler.rkt"
          racket/format
+         racket/match
          racket/random
          racket/runtime-path)
 
 (provide (contract-out [make-bt-root-sampler make-bt-root-sampler/c]
-                       [pre-selected-bt-root-db (parameter/c path-to-db?)]))
+                       [pre-selected-bt-root-db (parameter/c path-to-db?)]
+                       [root-missing-blame-response root-missing-blame-response/c]))
+
+;; A root that terminates in erasure (for pre-selection) may timeout in TR or Transient!
+;; In that case, the BT fails
+(define root-missing-blame-response
+  (match-lambda [(or 'timeout 'oom) 'bt-failed]
+                [else 'error]))
 
 (define-runtime-path configurables "..")
 (define pre-selected-bt-root-db (make-parameter #f))

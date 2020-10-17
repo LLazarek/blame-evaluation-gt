@@ -1,13 +1,15 @@
-#lang at-exp racket/base
+#lang at-exp racket
 
 (require "../../experiment/mutant-factory-data.rkt"
          "../../util/optional-contracts.rkt"
          "make-bt-root-sampler.rkt"
          "random-config.rkt"
-         racket/random)
+         racket/function)
 
-(provide (contract-out [make-bt-root-sampler make-bt-root-sampler/c]))
+(provide (contract-out [make-bt-root-sampler make-bt-root-sampler/c]
+                       [root-missing-blame-response root-missing-blame-response/c]))
 
+(define root-missing-blame-response (const 'resample))
 
 (define ((make-bt-root-sampler bench-info mutant) n)
   (define max-config (bench-info-max-config bench-info))

@@ -368,13 +368,15 @@
                                  mutation-index
                                  sample-number)
     [#f
+     (define this-trail
+       (blame-trail sample-number
+                    empty))
      (spawn-mutant process-q
                    module-to-mutate-name
                    mutation-index
                    config
                    (make-blame-following-will/fallback
                     (λ (current-process-q dead-proc)
-                      ;; Try sampling another config
                       (log-factory
                        info
                        "    Sample ~a (id [~a]) for ~a @ ~a failed to find blame."
@@ -382,15 +384,27 @@
                        (dead-mutant-process-id dead-proc)
                        (mutant-module (dead-mutant-process-mutant dead-proc))
                        (mutant-index (dead-mutant-process-mutant dead-proc)))
-                      (define new-sample
-                        (resample (process-Q-get-data current-process-q)))
-                      (spawn-blame-trail-root-mutant current-process-q
-                                                     mutant-program
-                                                     new-sample
-                                                     resample
-                                                     sample-number)))
-                   #:following-trail (blame-trail sample-number
-                                                  empty))]
+                      (match ((configured:root-missing-blame-response)
+                              (run-status-outcome (dead-mutant-process-result dead-proc)))
+                        ['bt-failed
+                         (terminate-and-record-blame-trail! current-process-q
+                                                            this-trail
+                                                            dead-proc)]
+                        ['resample
+                         ;; Try sampling another config
+                         (define new-sample
+                           (resample (process-Q-get-data current-process-q)))
+                         (spawn-blame-trail-root-mutant current-process-q
+                                                        mutant-program
+                                                        new-sample
+                                                        resample
+                                                        sample-number)]
+                        ['error
+                         (maybe-abort "BT root is missing blame"
+                                      (terminate-and-record-blame-trail! current-process-q
+                                                                         this-trail
+                                                                         dead-proc))])))
+                   #:following-trail this-trail)]
     [path-to-data-file
      (log-factory
       info
@@ -511,15 +525,10 @@
                            the-blame-trail
                            increased-limits?)
       dead-successor)
-    (define (record-failed-blame-trail! the-process-q)
-      (define the-blame-trail+dead-proc
-        (extend-blame-trail the-blame-trail
-                            dead-successor))
-      (define new-factory
-        (record-blame-trail! (process-Q-get-data the-process-q)
-                             the-blame-trail+dead-proc))
-      (process-Q-set-data the-process-q
-                          new-factory))
+    (define (record-this-bt-failed!)
+      (terminate-and-record-blame-trail! current-process-q
+                                         the-blame-trail
+                                         dead-successor))
     (match* {(run-status-outcome dead-succ-result) increased-limits?}
       [{(and outcome (or 'timeout 'oom)) #f}
        (log-factory info
@@ -544,7 +553,7 @@ Giving up.
 "
                     mod index blame-trail-id
                     dead-succ-id outcome)
-       (record-failed-blame-trail! current-process-q)]
+       (record-this-bt-failed!)]
       [{(or 'blamed 'type-error) _}
        (log-factory
         info
@@ -558,7 +567,7 @@ Giving up.
 
             Result: @(run-status-outcome result) on @(run-status-blamed result)
             })
-       (record-failed-blame-trail! current-process-q)]
+       (record-this-bt-failed!)]
       [{'runtime-error _}
        (log-factory
         info
@@ -572,7 +581,7 @@ Giving up.
 
             Blamed: @(run-status-blamed result)
             })
-       (record-failed-blame-trail! current-process-q)]
+       (record-this-bt-failed!)]
       [{(or 'completed 'syntax-error) _}
        (log-factory
         error
@@ -583,7 +592,7 @@ Giving up.
 
             Predecessor (id [@id]) had result @result
             })
-       (maybe-abort "Blame disappeared" (record-failed-blame-trail! current-process-q))]
+       (maybe-abort "Blame disappeared" (record-this-bt-failed!))]
       [{outcome _}
        (log-factory
         error
@@ -591,7 +600,7 @@ Giving up.
             Blame has disappeared for unexpected reasons.
             Mutant: @dead-proc
             })
-       (maybe-abort "Blame disappeared" (record-failed-blame-trail! current-process-q))])))
+       (maybe-abort "Blame disappeared" (record-this-bt-failed!))])))
 
 (define/contract (make-blame-following-will/fallback no-blame-fallback)
   (mutant-will/c . -> . mutant-will/c)
@@ -904,6 +913,25 @@ Attempting revival ~a / ~a
                            [result result]
                            [config config]))
                  (mutant-summary id result config)]))
+
+;; Adds `dead-proc` at the end of `the-blame-trail/without-dead-proc` and
+;; records the resulting trail
+(define/contract (terminate-and-record-blame-trail! the-process-q
+                                                    the-blame-trail/without-dead-proc
+                                                    dead-proc)
+  (->i ([the-process-q                      (process-Q/c factory/c)]
+        [the-blame-trail/without-dead-proc  blame-trail/c]
+        [dead-proc                          dead-mutant-process/c])
+       [result (process-Q/c factory/c)])
+
+  (define the-blame-trail+dead-proc
+    (extend-blame-trail the-blame-trail/without-dead-proc
+                        dead-proc))
+  (define new-factory
+    (record-blame-trail! (process-Q-get-data the-process-q)
+                         the-blame-trail+dead-proc))
+  (process-Q-set-data the-process-q
+                      new-factory))
 
 
 (define/contract (read-mutant-result mutant-proc)

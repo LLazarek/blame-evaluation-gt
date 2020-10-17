@@ -86,7 +86,7 @@
     #:module "trail-completion/mutated-type-error-or-blamed-at-max.rkt"))
 
 (define-configurable bt-root-sampling
-  #:provides [make-bt-root-sampler]
+  #:provides [make-bt-root-sampler root-missing-blame-response]
 
   (define-implementation random-with-replacement
     #:module "bt-root-sampling/random-with-replacement.rkt")
