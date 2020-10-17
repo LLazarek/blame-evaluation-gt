@@ -7,7 +7,8 @@
          "mutant-util.rkt")
 
 (define-runtime-paths
-  [configs-dir "../configurables"])
+  [configs-dir "../configurables"]
+  [experiment-launch-dir "../.."])
 
 (define (guess-path . parts)
   (define path (apply build-path parts))
@@ -39,6 +40,9 @@
     [(regexp #rx"(?m:config (.+)$)" (list _ path))
      #:when (path-to-existant-file? path)
      path]
+    [(regexp #rx"(?m:config (.+)$)" (list _ path))
+     #:when (path-to-existant-file? (build-path experiment-launch-dir path))
+     (build-path experiment-launch-dir path)]
     [(regexp #rx"(?m:config .+/(.+)$)" (list _ config-name))
      #:when (path-to-existant-file? (build-path configs-dir config-name))
      (build-path configs-dir config-name)]
