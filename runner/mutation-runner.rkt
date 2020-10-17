@@ -427,9 +427,10 @@
                                  (fail "test raised exception"))])
       (test-thunk (run-thunk))))
   (define p-config
-    ;; this doesn't matter for the natural blame strategy used by the test
-    ;; config
-    (hash))
+    ;; The modules must all be present in this config, but their levels don't matter
+    (hash "a.rkt" 'none
+          "b.rkt" 'none
+          "c.rkt" 'none))
   (test-begin
     #:name run-with-mutated-module/mutations
     (ignore
@@ -839,7 +840,8 @@
      (λ _ (run-with-mutated-module p2
                                    d
                                    0 ; mutation doesn't matter
-                                   p-config
+                                   (hash "d.rkt" 'none
+                                         "e.rkt" 'none)
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
