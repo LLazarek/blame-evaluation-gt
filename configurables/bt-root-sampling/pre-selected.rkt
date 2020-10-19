@@ -15,10 +15,10 @@
                        [root-missing-blame-response root-missing-blame-response/c]))
 
 ;; A root that terminates in erasure (for pre-selection) may timeout in TR or Transient!
-;; In that case, the BT fails
+;; It may also fail to blame anything in the program.
+;; In such cases, the BT fails immeditely.
 (define root-missing-blame-response
-  (match-lambda [(or 'timeout 'oom) 'bt-failed]
-                [else 'error]))
+  (const 'bt-failed))
 
 (define-runtime-path configurables "..")
 (define pre-selected-bt-root-db (make-parameter #f))
