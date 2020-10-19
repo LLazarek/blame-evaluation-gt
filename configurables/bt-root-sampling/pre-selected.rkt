@@ -6,6 +6,7 @@
          "../../configurations/configure-benchmark.rkt"
          "make-bt-root-sampler.rkt"
          racket/format
+         racket/function
          racket/match
          racket/random
          racket/runtime-path)
