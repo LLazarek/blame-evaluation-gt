@@ -52,7 +52,7 @@
 ;; file:           path-string?
 ;; id:             natural?
 ;; blame-trail-id: blame-trail-id?
-;; blame-trail:    (listof dead-mutant-process/c)
+;; blame-trail:    blame-trail/c
 ;; revival-count:  natural?
 ;; increased-limits?: boolean?
 (struct mutant-process (mutant

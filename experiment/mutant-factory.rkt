@@ -613,7 +613,7 @@ Giving up.
        => (λ (blamed/type-error-locations)
             (log-factory debug
                          "Following blame trail {~a} from [~a] via ~a..."
-                         (dead-mutant-process-id dead-proc)
+                         (blame-trail-id (dead-mutant-process-blame-trail dead-proc))
                          (dead-mutant-process-id dead-proc)
                          blamed/type-error-locations)
             (follow-blame-from-dead-process the-process-q
