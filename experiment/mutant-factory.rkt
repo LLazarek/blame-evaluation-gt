@@ -670,6 +670,10 @@ Giving up.
                          precision-config))
 
   (define mutant-id mutants-spawned)
+  (define mutant-blame-trail
+    (cond [trail-being-followed => values]
+          [test-mutant?            (blame-trail test-mutant-flag
+                                                '())]))
   (define (spawn-the-mutant)
     (define mutant-ctl
       (spawn-mutant-runner the-benchmark-configuration
@@ -683,10 +687,6 @@ Giving up.
                                               (build-path (data-output-dir)
                                                           (format "~a.rktd"
                                                                   mutant-id)))))
-    (define mutant-blame-trail
-      (cond [trail-being-followed => values]
-            [test-mutant?            (blame-trail test-mutant-flag
-                                                  '())]))
     (define mutant-proc
       (mutant-process (mutant #f module-to-mutate-name mutation-index)
                       precision-config
@@ -710,15 +710,20 @@ Giving up.
    debug
    @~a{    Mutant [@mutant-id] has config @~v[precision-config]})
 
-  (define number-of-procs-this-mutant-may-spawn
-    (if test-mutant? (sample-size) 1))
+  ;; lower priority means schedule sooner
+  (define this-mutant-priority
+    (if test-mutant?
+        ; test mutants have the lowest priority: we want to finish mutants faster
+        1
+        ; mutants progressing along a blame trail should be prioritized to finish the trail quickly
+        (- (length (blame-trail-parts mutant-blame-trail)))))
   (process-Q-enq
    (process-Q-set-data process-q
                        (copy-factory current-factory
                                      [total-mutants-spawned
                                       (add1 mutants-spawned)]))
    spawn-the-mutant
-   number-of-procs-this-mutant-may-spawn))
+   this-mutant-priority))
 
 ;; There is some common housekeeping that must be performed in every mutant
 ;; will, regardless of what kind of mutant or the details of its particular will
