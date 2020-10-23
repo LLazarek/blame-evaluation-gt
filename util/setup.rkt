@@ -19,8 +19,9 @@
     "https://github.com/LLazarek/rscript.git"
     "pfds"))
 
+(define racket-version "7.8")
 (define racket-download-url
-  "https://mirror.racket-lang.org/installers/7.7/racket-7.7-x86_64-linux-cs.sh")
+  @~a{https://mirror.racket-lang.org/installers/@|racket-version|/racket-@|racket-version|-x86_64-linux-cs.sh})
 
 (define expected-benchmark-names
   (map ~a '(suffixtree kcfa snake take5 acquire tetris synth gregor quadT quadU)))
@@ -345,7 +346,7 @@
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
   (define racket-version-ok?
-    (regexp-match? @regexp{Racket v7\.7.*\[cs\]} racket-version-str))
+    (regexp-match? @~a{Racket v@(regexp-quote racket-version) \[cs\]} racket-version-str))
 
   (displayln "Checking blgt repo ...")
   (define blgt-active-branch (get-repo-current-branch repo-path))
@@ -371,7 +372,7 @@
 
          ERROR: The installed racket has the wrong version.
          installed: @racket-version-str
-         required:  Racket v7.7 [cs]
+         required:  Racket v@racket-version [cs]
          }))
   (report-repo-status repo-path blgt-active-branch expected-blgt-branch blgt-up-to-date?)
   (report-repo-status gtp-dir gtp-active-branch expected-gtp-branch gtp-up-to-date?)
