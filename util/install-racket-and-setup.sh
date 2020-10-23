@@ -16,11 +16,12 @@ git checkout mutations
 popd
 
 printf "Installing Racket if necessary\n\n\n"
+VERSION="7.8"
 if [ -d "./racket" ]; then
     echo "$(pwd)/racket already exists; skipping installing racket"
 else
-    INSTALLER="racket-7.7-x86_64-linux-cs.sh"
-    wget "https://mirror.racket-lang.org/installers/7.7/$INSTALLER"
+    INSTALLER="racket-${VERSION}-x86_64-linux-cs.sh"
+    wget "https://mirror.racket-lang.org/installers/${VERSION}/$INSTALLER"
     chmod u+x ./$INSTALLER
     ./$INSTALLER <<EOF
 no
