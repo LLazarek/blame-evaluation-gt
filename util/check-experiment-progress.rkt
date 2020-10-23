@@ -81,19 +81,24 @@
       (substring str 0 chars)))
 
 (main
- #:arguments {[(hash-table ['watch watch-mode?])
+ #:arguments {[(hash-table ['watch watch-mode?]
+                           ['log-name log-name])
                (list benchmark-dir)]
               #:once-each
               [("-w" "--watch")
                'watch
                ("Interactively show a progress bar that updates every 5 sec.")
                #:record]
+              [("-l" "--log-name")
+               'log-name
+               ("Explicitly provide the log file name.")
+               #:collect ["path" take-latest #f]]
               #:args [benchmark-dir]}
  #:check [(path-to-existant-directory? benchmark-dir)
           @~a{Unable to find @benchmark-dir}]
 
  (define log-path
-   (guess-path benchmark-dir (~a (basename benchmark-dir) ".log")))
+   (guess-path benchmark-dir (or log-name (~a (basename benchmark-dir) ".log"))))
  (define bench (infer-benchmark log-path))
 
  (define config-path (infer-configuration log-path))
@@ -108,7 +113,7 @@
  (define all-mutants (all-mutants-for bench))
 
  (define progress-log-path
-   (guess-path benchmark-dir (~a (basename benchmark-dir) "-progress.log")))
+   (guess-path (path-replace-extension log-path "-progress.log")))
 
  (cond [watch-mode?
         (define period 5)
