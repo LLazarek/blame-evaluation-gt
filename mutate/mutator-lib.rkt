@@ -61,11 +61,13 @@
          define-id-mutator
          define-value-mutator
          define-mutator
-         define-dependent-mutator)
+         define-dependent-mutator
+         define-simple-mutator)
 
 (require racket/dict
          racket/format
          racket/match
+         syntax/parse
          syntax/parse/define
          (for-syntax racket/base)
          "logger.rkt"
@@ -221,6 +223,22 @@
         (mutated orig-v
                  counter)))
   the-mutator)
+
+;; See note about limitation of simple mutators above `make-guarded-mutator`
+(define-simple-macro (define-simple-mutator (name:id stx-name:id)
+                       {~optional {~seq #:type type}
+                                  #:defaults ([type #'(~a 'name)])}
+                       #:pattern pattern
+                       {~optional {~seq #:when guard}}
+                       body ...)
+  (define-mutator (name stx-name mutation-index counter) #:type [the-type type]
+    (syntax-parse stx-name
+      [pattern
+       {~? {~@ #:when guard}}
+       (log-mutation-type the-type)
+       (define new-stx (let () body ...))
+       (maybe-mutate stx-name new-stx mutation-index counter)]
+      [else (no-mutation stx-name mutation-index counter)])))
 
 (define-mutator (no-mutation v mutation-index counter) #:type [_ "<no-mutation>"]
   (mutated v counter))

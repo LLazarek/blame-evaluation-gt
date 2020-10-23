@@ -12,6 +12,9 @@ Basically, it's a function that takes three arguments:
 and it should return a =mutated?= (defined in =mutated.rkt=, along with several primitive operations and forms for working with =mutated?= objects).
 Any changes to the syntax that it does must happen through =maybe-mutate=, and there are a few utilities to help write and compose mutators along with that in =mutator-lib.rkt=. =mutate-util.rkt= also provides a few other utilities for implementing mutators.
 
+It's best to define mutators using the =define-mutator= macros.
+Simple rearrangement or swapping mutators defined with =define-id-mutator=, =define-value-mutator=, and =define-simple-mutator= do not even need to use the =mutated= API.
+
 Mutators can be combined to build more complex mutators with =compose-mutators=.
 
 Mutators can also signal to other mutators and =mutate-expr= that a part of their result syntax should not be mutated any further by using =mutation-guard=.
