@@ -79,7 +79,7 @@
 
 
 (define MAX-CONFIG 'types)
-(define MAX-REVIVALS 3)
+(define MAX-REVIVALS 10)
 
 (define-runtime-path benchmarks-dir-path "../../gtp-benchmarks/benchmarks/")
 
@@ -756,6 +756,15 @@ Giving up.
     (match (cons status maybe-result)
       [(or (cons 'done-error _)
            (cons 'done-ok (? eof-object?)))
+       (maybe-revive-failed-mutant process-q
+                                   mutant-proc
+                                   status
+                                   maybe-result
+                                   mutant-will)]
+      [(cons 'done-ok (struct* run-status ([outcome 'type-error])))
+       #:when (equal? (hash-ref config mod) 'none)
+       (log-factory warning
+                    @~a{Mutant has unexpected type error, attempting to revive:})
        (maybe-revive-failed-mutant process-q
                                    mutant-proc
                                    status
