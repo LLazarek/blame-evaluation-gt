@@ -44,6 +44,7 @@
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
+(define timeout-path (find-executable-path "timeout"))
 
 (define mutant-error-log (make-parameter "./mutant-errors.txt"))
 
@@ -87,6 +88,12 @@
           (match-define (list #f runner-in _ #f runner-ctl)
             (apply process*/ports
                    outfile-port #f error-log-port
+
+                   ;; workaround for runner sometimes getting stuck outside
+                   ;; sandbox without any clear explanation
+                   ;; 0 means no timeout: see `man timeout`
+                   timeout-path (~a (if timeout/s (* 1.5 timeout/s) 0))
+
                    racket-path
                    (append
                     (if log-mutation-info?
