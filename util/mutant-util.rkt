@@ -92,7 +92,8 @@
                    ;; workaround for runner sometimes getting stuck outside
                    ;; sandbox without any clear explanation
                    ;; 0 means no timeout: see `man timeout`
-                   timeout-path (~a (if timeout/s (* 1.5 timeout/s) 0))
+                   ;; -k 5 means send SIGKILL 5 sec after polite exit signal
+                   timeout-path "-k" "5" (~a (if timeout/s (* 1.5 timeout/s) 0))
 
                    racket-path
                    (append
