@@ -29,18 +29,10 @@
 (define-runtime-paths
   [store-path "../../experiment-data/experiment-manager"])
 
-(struct host (name ; hostname?
-              project-path ; string?
-              active-jobs? ; hostname? -> boolean?
-              submit-job ; hostname? benchmark-name? mode-name? -> job-id?
-              cancel-job ; job-id? -> void
-              )
-  #:transparent
-  #:methods gen:custom-write
-  {(define (write-proc v port mode)
-     ((if mode write display) (host-name v) port))})
+;; if it's not running?, it's pending
+(struct job (id running?) #:transparent)
 (define host<%> (interface (writable<%>)
-                  [active-jobs? (->m boolean?)]
+                  [get-jobs (->*m {} {boolean?} (listof (or/c absent? (list/c string? string?))))]
                   [submit-job! (->*m {string?
                                       string?}
                                      {#:mode (or/c 'check 'record)
@@ -73,13 +65,41 @@
     (define/public (system/host/string . parts)
       (system/string @~a{ssh @hostname @(apply ~a (add-between parts " "))}))
 
-    (define/public (active-jobs?)
-      (match (system/string @~a{ssh @hostname condor_q})
-        [(regexp @pregexp{(?m:^(\S+\s+){6}1)}) #t]
-        [else #f]))
+    (define/public (get-jobs [active? #t])
+      (define info (all-job-info))
+      (if (equal? active? 'both)
+          (let-values ([{active not} (partition job-running? info)]
+                       [{find-job*} (match-lambda [(job id _) (find-job id)])])
+            (values (map find-job* active)
+                    (map find-job* not)))
+          (filter-map (match-lambda [(job id (== active?)) (find-job id)]
+                                    [else #f])
+                      info)))
+    (define/private (all-job-info)
+      ;; lltodo: this should not wipe the database if the internet breaks!
+      (define condor-dump (system/host/string "condor_q"))
+      (define raw-info
+        (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
+                       condor-dump
+                       #:match-select cddr))
+      (define all-jobs
+        (for/list ([parts (in-list raw-info)])
+          (job (third parts) (string=? (first parts) "1"))))
+      (expunge-old-jobs! all-jobs)
+      all-jobs)
+
+    (define/private (expunge-old-jobs! current-job-infos)
+      (ensure-store!)
+      (define filtered
+        (for/list ([{bench+config id} (in-dict (read-data-store))]
+                   #:when (findf (match-lambda [(job (== id) _) #t]
+                                               [else #f])
+                                 current-job-infos))
+          (cons bench+config id)))
+      (write-data-store! filtered))
 
     (define/public (submit-job! benchmark
-                                config-name
+                                config-name ; without .rkt
                                 #:mode [record/check-mode 'check]
                                 #:cpus [cpus "decide"]
                                 #:name [name benchmark])
@@ -105,7 +125,7 @@
                # Set the environment
                Getenv = True
 
-               Arguments = "'@benchmark' '@config-name' '@record/check-mode' '@cpus' '@name'"
+               Arguments = "'@benchmark' '@|config-name|.rkt' '@record/check-mode' '@cpus' '@name'"
                Executable = /project/blgt/run-experiment.sh
                Error = condor-output.txt
                Output = condor-output.txt
@@ -117,20 +137,23 @@
                Queue
 
                }
-           job.sub)
-          (match (system/exit-code @~a{scp job.sub @|hostname|:@host-jobfile-path})
+           job.sub
+           #:exists 'replace)
+          (match (system/exit-code @~a{scp -q '@job.sub' @|hostname|:@host-jobfile-path})
             [0 #t]
             [else absent])))
-      (for* ([_ (in-option job-uploaded?)]
-             [id (in-option (match (system/string
-                                    @~a{ssh @hostname condor_submit -verbose @host-jobfile-path})
-                              [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id)) id]
-                              [else absent]))])
-        (save-job! id)))
+      (option-let* ([_ job-uploaded?]
+                    [id (match (system/host/string
+                                @~a{condor_submit -verbose @host-jobfile-path})
+                          [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id)) id]
+                          [else absent])])
+        (save-job! benchmark config-name id)))
 
     (define/public (cancel-job! benchmark config-name)
-      (option-let* ([id (read-job! benchmark config-name)])
-                   (void (system/string @~a{ssh @hostname condor_rm '@id'}))))
+      (option-let* ([id (read-job benchmark config-name)])
+                   (void (system/host/string @~a{condor_rm '@id'}))
+                   (write-data-store! (dict-remove (read-data-store)
+                                                   (list benchmark config-name)))))
 
     (define/private (ensure-store!)
       (make-directory* (path-only data-store))
@@ -140,10 +163,22 @@
       (ensure-store!)
       (with-output-to-file data-store #:exists 'append
         (thunk (writeln (cons (list benchmark config-name) id)))))
-    (define/private (read-job! benchmark config-name) ; -> (option/c id?)
-      (dict-ref (file->list data-store)
+    (define/private (read-job benchmark config-name) ; -> (option/c id?)
+      (dict-ref (read-data-store)
                 (list benchmark config-name)
-                absent))))
+                absent))
+    (define/private (find-job target-id) ; -> (option/c (list/c benchmark config-name))
+      (ensure-store!)
+      (try-unwrap
+       (for*/option ([{bench+config id} (in-dict (file->list data-store))]
+                     #:when (string=? id target-id))
+                    bench+config)))
+    (define/private (read-data-store)
+      (file->list data-store))
+    (define/private (write-data-store! data)
+      (display-lines-to-file (map ~s data)
+                             data-store
+                             #:exists 'replace))))
 
 (define-simple-macro (with-temp-file name body ...)
   (call-with-temp-file (λ (name) body ...)))
@@ -152,11 +187,11 @@
   (begin0 (f temp)
     (when (file-exists? temp) (delete-file temp))))
 
-(define hosts
-  (list (new condor-host%
-             [hostname "zythos"]
-             [host-project-path "./blgt"]
-             [host-jobdir-path "./proj/jobctl"])))
+(define zythos (new condor-host%
+                    [hostname "zythos"]
+                    [host-project-path "./blgt"]
+                    [host-jobdir-path "./proj/jobctl"]))
+(define hosts (list zythos))
 
 ;; host<%> -> (option/c results?)
 (define (get-results a-host)
@@ -201,44 +236,92 @@
 ;; (hash (or/c 'completed 'errored 'other) (listof (list/c string? string?))
 ;;       'incomplete                       (listof (list/c string? string? (option/c real?))))
 
-;; host<%> -> (values boolean? (option/c summary/c))
+;; host<%> -> (option/c summary/c)
 (define (summarize-experiment-status a-host)
-  (define active-jobs? (send a-host active-jobs?))
   (define (with-progress incomplete-bench)
     (match-define (list name config) incomplete-bench)
     (printf "Retrieving ~a progress ...\r" name)
     (list name config (try-unwrap (get-progress a-host name))))
   (printf "Checking ~a...\r" a-host)
-  (values active-jobs?
-          (option-let* ([results (get-results a-host)])
-                       (hash-update results
-                                    'incomplete
-                                    (λ (benches) (map with-progress benches))))))
+  (option-let* ([results (get-results a-host)])
+               (hash-update results
+                            'incomplete
+                            (λ (benches) (map with-progress benches)))))
 
-(define (stuck-jobs summary)
-  (for*/list ([maybe-benchmark (in-list (hash-ref summary 'incomplete))]
-              [benchmark (in-option maybe-benchmark)]
-              #:when (> (third benchmark) 0.99))
+(define (stuck-jobs active-jobs maybe-summary)
+  (for*/list ([summary (in-option maybe-summary)]
+              [incomplete-jobs (in-value (hash-ref summary 'incomplete))]
+              [benchmark (in-list active-jobs)]
+              [incomplete-job (in-list incomplete-jobs)]
+              #:when (match incomplete-job
+                       [(list (== (first benchmark))
+                              (== (second benchmark))
+                              (? (>/c 0.99)))
+                        #t]
+                       [else #f]))
     benchmark))
+
+(define (restart-job! a-host job-info)
+  (match-define (list benchmark config) job-info)
+  (option-let* ([_ (send a-host cancel-job! benchmark config)]
+                [_ (send a-host submit-job! benchmark config)])
+               (void)))
+
+(define (restart-stuck-jobs! a-host
+                             [active-jobs (send a-host get-jobs #t)]
+                             [maybe-summary (summarize-experiment-status a-host)])
+  (for* ([summary (in-option maybe-summary)]
+         [job-info (in-list (stuck-jobs active-jobs summary))])
+    (displayln @~a{Restarting stuck job: @job-info})
+    (restart-job! a-host job-info)))
+
+(define needed-benchmarks/14
+  '("dungeon"
+    "jpeg"
+    "zordoz"
+    "lnm"
+    "suffixtree"
+    "kcfa"
+    "snake"
+    "take5"
+    "acquire"
+    "tetris"
+    "synth"
+    "gregor"
+    "quadT"
+    "quadU"))
+(define needed-benchmarks/10
+  (drop needed-benchmarks/14 4))
 
 (define (download-completed-benchmarks! a-host summary)
   (raise-user-error 'download-completed-benchmarks! "Not implemented"))
 
+
 (define (string->value s)
   (with-input-from-string s read))
+(define (string->benchmark-spec s)
+  (match (string->value s)
+    [(list host-sym config-name-sym benchmark-syms ...)
+     (list (host-by-name (~a host-sym))
+           (~a config-name-sym)
+           (map ~a benchmark-syms))]
+    [else (raise-user-error 'experiment-manager
+                            @~a{Bad benchmark spec: @~v[s]})]))
 (define (host-by-name name)
-  (match (findf (λ (h) (string=? name (host-name h))) hosts)
+  (match (findf (λ (h) (string=? name (get-field hostname h))) hosts)
     [#f (raise-user-error 'experiment-manager @~a{No host known with name @name})]
     [host host]))
-(define ((make-map f) l) (map f l))
 (define-simple-macro (pick-values f e)
   (call-with-values (thunk e)
                     (λ vals (f vals))))
+(define ((mapper f) l) (map f l))
 
 (main
  #:arguments {[(hash-table ['status? status?]
-                           ['download (app (make-map host-by-name) download-targets)]
-                           ['launch (app (make-map string->value) launch-targets)])
+                           ['download (app (mapper host-by-name) download-targets)]
+                           ['launch (app (mapper string->benchmark-spec) launch-targets)]
+                           ['cancel (app (mapper string->benchmark-spec) cancel-targets)]
+                           ['watch-for-stuck-jobs watch-for-stuck-jobs?])
                args]
               #:once-each
               [("-s" "--status")
@@ -253,17 +336,49 @@
               [("-l" "--launch")
                'launch
                ("Launch the specified benchmarks on a host for a mode.")
-               #:collect ["(host mode benchmark ...)" cons empty]]}
+               #:collect ["(host mode benchmark ...)" cons empty]]
+              [("-c" "--cancel")
+               'cancel
+               ("Cancel the specified benchmarks on a host for a mode.")
+               #:collect ["(host mode benchmark ...)" cons empty]]
+              [("-w" "--watch-for-stuck-jobs")
+               'watch-for-stuck-jobs
+               "Watch for stuck jobs on all hosts and restart them as they get stuck."
+               #:record]}
 
+ (define (for-each-target targets action name)
+   (for ([target (in-list targets)])
+     (match-define (list a-host config-name benchmarks) target)
+     (for ([benchmark (in-list benchmarks)])
+       (if (absent? (action a-host benchmark config-name))
+           (displayln @~a{Failed @name @(list a-host config-name benchmark)})
+           (displayln @~a{Successful @name @(list a-host config-name benchmark)})))))
  (cond [status?
         (for ([a-host (in-list hosts)])
-          (define-values {active-jobs? maybe-summary}
+          (define maybe-summary
             (summarize-experiment-status a-host))
           (displayln @~a{---------- @a-host ----------})
-          (displayln @~a{Active: @(if active-jobs? 'yes 'no)})
+          (define-values {active-jobs pending-jobs} (send a-host get-jobs 'both))
+          (displayln @~a{Active: @active-jobs})
+          (displayln @~a{Pending: @pending-jobs})
           (pretty-display (try-unwrap maybe-summary))
           (newline))]
-       [(not (empty? download-targets))
+       [(not (empty? launch-targets))
+        (for-each-target launch-targets
+                         (λ (a-host benchmark config-name)
+                           (send a-host submit-job! benchmark config-name))
+                         "submit")]
+       [(not (empty? cancel-targets))
+        (for-each-target cancel-targets
+                         (λ (a-host benchmark config-name)
+                           (send a-host cancel-job! benchmark config-name))
+                         "cancel")]
+       [watch-for-stuck-jobs?
+        (let loop ()
+          (for-each restart-stuck-jobs! hosts)
+          (sleep (* 5 60))
+          (loop))]
+       #;[(not (empty? download-targets))
         (for ([a-host (in-list download-targets)])
-          (option-let* ([summary (pick-values second (summarize-experiment-status a-host))])
+          (option-let* ([summary (summarize-experiment-status a-host)])
                        (download-completed-benchmarks! a-host summary)))]))

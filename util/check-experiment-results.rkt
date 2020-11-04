@@ -47,7 +47,7 @@
               (thunk
                (match (regexp-match #px"Running experiment with config [^ ]+/([^/]+).rkt"
                                     (current-input-port))
-                 [(list _ config-name) config-name]
+                 [(list _ config-name) (~a config-name)]
                  [else '?]))))
           (values log-path status ended-with-err? config)]
          [else (values #f '? '? '?)]))
