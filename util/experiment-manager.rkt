@@ -28,7 +28,8 @@
 
 
 (define-runtime-paths
-  [store-path "../../experiment-data/experiment-manager"])
+  [store-path "../../experiment-data/experiment-manager"]
+  [data-path "../../experiment-data/results/code-mutations"])
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -66,7 +67,22 @@
     (define/public (system/host/string . parts)
       ;; lltodo: implement a persistent connection here to prevent being blocked
       ;; by zythos for opening too many connections too quickly
-      (system/string @~a{ssh @hostname @(apply ~a (add-between parts " "))}))
+      (system/string @~a{ssh @hostname "@(apply ~a (add-between parts " "))"}))
+
+    (define/public (scp #:from-host [from-host-path #f]
+                        #:to-local [to-local-path #f]
+                        #:from-local [from-local-path #f]
+                        #:to-host [to-host-path #f])
+      (system/exit-code
+       @~a{scp -q @(match* {from-host-path
+                            to-local-path
+                            from-local-path
+                            to-host-path}
+                     [{from-remote to-local #f #f}
+                      @~a{@|hostname|:'@from-remote' '@to-local'}]
+                     [{#f #f from-local to-remote}
+                      @~a{'@from-local' @|hostname|:'@to-remote'}]
+                     [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))
 
     (define/public (get-jobs [active? #t])
       (define info (all-job-info))
@@ -142,7 +158,7 @@
                }
            job.sub
            #:exists 'replace)
-          (match (system/exit-code @~a{scp -q '@job.sub' @|hostname|:@host-jobfile-path})
+          (match (scp #:from-local job.sub #:to-host host-jobfile-path)
             [0 #t]
             [else absent])))
       (option-let* ([_ job-uploaded?]
@@ -297,8 +313,38 @@
   (drop needed-benchmarks/14 4))
 
 (define (download-completed-benchmarks! a-host summary)
-  ;; lltodo: this
-  (raise-user-error 'download-completed-benchmarks! "Not implemented"))
+  (define completed (hash-ref summary 'completed))
+  (match completed
+    [(list (list benchmarks config-names) ..1)
+     #:when (and (= (set-count (apply set config-names)) 1)
+                 (or (set=? benchmarks needed-benchmarks/10)
+                     (user-prompt!
+                      @~a{
+                          Not all benchmarks are completed on @a-host
+                          @(pretty-format summary)
+                          Missing: @(set-subtract needed-benchmarks/10 completed)
+                          Do you want to download those that are complete anyway? 
+                          })))
+     (define config-name (first config-names))
+     (define projdir (get-field host-project-path a-host))
+     (void (send a-host system/host/string @~a{
+                                               cd @projdir && @;
+                                               ./pack.sh experiment-output @config-name @;
+                                               }))
+     (define archive-name (~a config-name ".tar.gz"))
+     (match (send a-host scp
+                  #:from-host (build-path projdir archive-name)
+                  #:to-local data-path)
+       [0
+        (displayln @~a{Data from @a-host downloaded at @(build-path data-path archive-name)})
+        (present (void))]
+       [else
+        (displayln @~a{Something went wrong downloading data for @a-host})
+        absent])]
+    [else
+     (displayln @~a{Aborting download of inconsistent results:})
+     (pretty-display summary)
+     absent]))
 
 
 (define (string->value s)
