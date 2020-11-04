@@ -1,6 +1,7 @@
 #lang at-exp rscript
 
-(require syntax/parse/define)
+(require syntax/parse/define
+         racket/date)
 
 (struct present (value) #:transparent)
 (define-values {absent absent?}
@@ -63,6 +64,8 @@
     (init-field [data-store (build-path store-path (~a "condor-" hostname ".rktd"))])
 
     (define/public (system/host/string . parts)
+      ;; lltodo: implement a persistent connection here to prevent being blocked
+      ;; by zythos for opening too many connections too quickly
       (system/string @~a{ssh @hostname @(apply ~a (add-between parts " "))}))
 
     (define/public (get-jobs [active? #t])
@@ -272,7 +275,7 @@
                              [maybe-summary (summarize-experiment-status a-host)])
   (for* ([summary (in-option maybe-summary)]
          [job-info (in-list (stuck-jobs active-jobs summary))])
-    (displayln @~a{Restarting stuck job: @job-info})
+    (displayln @~a{@(date->string (current-date) #t) Restarting stuck job: @job-info})
     (restart-job! a-host job-info)))
 
 (define needed-benchmarks/14
@@ -294,6 +297,7 @@
   (drop needed-benchmarks/14 4))
 
 (define (download-completed-benchmarks! a-host summary)
+  ;; lltodo: this
   (raise-user-error 'download-completed-benchmarks! "Not implemented"))
 
 
@@ -376,9 +380,10 @@
        [watch-for-stuck-jobs?
         (let loop ()
           (for-each restart-stuck-jobs! hosts)
+          (printf "Sleeping                    \r")
           (sleep (* 5 60))
           (loop))]
-       #;[(not (empty? download-targets))
+       [(not (empty? download-targets))
         (for ([a-host (in-list download-targets)])
           (option-let* ([summary (summarize-experiment-status a-host)])
                        (download-completed-benchmarks! a-host summary)))]))
