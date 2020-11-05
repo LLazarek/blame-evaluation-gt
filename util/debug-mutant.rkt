@@ -24,7 +24,10 @@
 
 (define (read-config identifier the-benchmark)
   (match identifier
-    [(? hash? h) h]
+    [(hash-table [(? symbol?) _] ...)
+     (for/hash ([{k v} (in-hash identifier)])
+       (values (~a k) v))]
+    [(hash-table [(? string?) _] ...) identifier]
     [(and (regexp @~a{^#hash})
           hash-string)
      (call-with-input-string hash-string read)]
