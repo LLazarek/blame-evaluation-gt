@@ -399,7 +399,12 @@
  (define (for-each-target targets action name)
    (for ([target (in-list targets)])
      (match-define (list a-host config-name benchmarks) target)
-     (for ([benchmark (in-list benchmarks)])
+     (define target-benchmarks (match benchmarks
+                                 ['("<all>") needed-benchmarks/10]
+                                 [else benchmarks]))
+     (for ([benchmark (in-list target-benchmarks)]
+           [i (in-naturals)])
+       (when (= i 5) (sleep (* 6 60)))
        (if (absent? (action a-host benchmark config-name))
            (displayln @~a{Failed @name @(list a-host config-name benchmark)})
            (displayln @~a{Successful @name @(list a-host config-name benchmark)})))))
@@ -427,7 +432,7 @@
         (let loop ()
           (for-each restart-stuck-jobs! hosts)
           (printf "Sleeping                    \r")
-          (sleep (* 5 60))
+          (sleep (* 15 60))
           (loop))]
        [(not (empty? download-targets))
         (for ([a-host (in-list download-targets)])
