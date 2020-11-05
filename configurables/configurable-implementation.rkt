@@ -77,10 +77,15 @@
 (define current-configuration-path/private (make-parameter #f))
 (define (current-configuration-path) (current-configuration-path/private))
 
+;; lltodo: configs should be written in a #lang that puts the module body inside this thunk
+;; for now, every config will be manually written with the thunk
 (define (install-configuration! path)
   (define path-string (~a path))
   (current-configuration-path/private path-string)
-  (dynamic-require `(file ,path-string) #f))
+  ;; All configuration is done by a function instead of just at the module top
+  ;; level to allow configs to be installed more than once.
+  ;; E.g. this should work: install A, install B, install A
+  ((dynamic-require `(file ,path-string) 'install!)))
 
 (define (call-with-configuration configuration-path
                                  thunk)
