@@ -1077,7 +1077,7 @@ Mutant: [~a] ~a @ ~a with config:
       `(record ,record!)}
      (record! mutant config outcome)]
 
-    [{(struct* run-status ([outcome real-outcome]))
+    [{(struct* run-status ([outcome (and real-outcome (not (or 'timeout 'oom)))]))
       `(check ,(app get-outcome (and expected-outcome (or 'type-error 'runtime-error))))}
      #:when (not (equal? real-outcome expected-outcome))
      (maybe-abort
