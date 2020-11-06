@@ -76,14 +76,10 @@ produce a bug.
 Usually, the outcome of mutating a program
 once, dubbed a mutant, can be distinguished from the original program with a test case.
 The better the test suite of a program, the more mutants it can ``kill.''
-Thus a big part of research on mutation analysis goes into designing
-operations that perform mutations, dubbed mutators, that create mutants
-that are hard to ``kill.'' Unlike the standard mutators, which \citet{lksfd-popl-2020}
-use, too, the mutators we need to evaluate the rational programmer have to be
-fine-tuned to generate shallow errors. Typed Racket's type system detects
-typos not logical mistakes, and mutators suitable for our purposes
-should target the former rather than the latter.
+Mutants that are hard to ``kill'' usually correspond to subtle programming errors, and mutation frameworks typically come with standard mutators carefully designed to create such mutants.
 
+However, Typed Racket's gradual type system detects shallow errors, unlike those introduced by standard mutators.
+Thus, we need different mutators to evaluate the rational programmer, ones which are fine-tuned to generate shallow errors.
 The table in figure~\ref{table:mutation-ops} summarizes our mutators.
 For each one, the table provides a short description and an example
 mutation it performs. Each mutator is inspired by the more-than-a-decade
@@ -120,6 +116,18 @@ aim to confuse occurrence typing.
     & \texttt{(begin x y z)} $\rightarrow$ \texttt{(begin x y)} \\
 \hline
 
+   \texttt{position}
+ & Swaps two subexpressions.
+  &  \texttt{(f a 42 "b" 0)} $\rightarrow$\texttt{(f a 42 0 "b")} \\
+\hline
+
+     \texttt{list}
+    & Replaces \texttt{append} with \texttt{cons}.
+    &  \begin{tabular}[t]{@{}l}
+      \texttt{append} $\rightarrow$ \texttt{cons}
+    \end{tabular}\\
+\hline
+
     \texttt{top-level-id}
  & Swaps two identifiers defined in the same module.
  &\texttt{(f x 42)} $\rightarrow$ \texttt{(g x 42)}\\
@@ -140,18 +148,6 @@ aim to confuse occurrence typing.
     & \begin{tabular}[t]{@{}l} \texttt{(get-field o f)} $\rightarrow$ \\
         \texttt{(get-field o g)}
       \end{tabular}\\
-\hline
-
-   \texttt{position}
- & Swaps two subexpressions.
-  &  \texttt{(f a 42 "b" 0)} $\rightarrow$\texttt{(f a 42 0 "b")} \\
-\hline
-
-     \texttt{list}
-    & Replaces \texttt{append} with \texttt{cons}.
-    &  \begin{tabular}[t]{@{}l}
-      \texttt{append} $\rightarrow$ \texttt{cons}
-    \end{tabular}\\
 \hline
 
      \texttt{class:init}
@@ -220,7 +216,7 @@ aim to confuse occurrence typing.
 \end{figure}
 
 
-\subsection{Do these mutators give us interesting debugging scenarios?}
+\subsection{Are these mutators good enough?}
 \begin{itemize}
 \item do these mutators work?
 \begin{itemize}
@@ -238,98 +234,50 @@ aim to confuse occurrence typing.
 \end{itemize}
 \end{itemize}
 
-Having selected a set of mutators based on our experience, we next need to see if the mutators do in fact produce interesting debugging scenarios in our programs.
-We define an interesting debugging scenario as a mutation that
+Of course, mutators that introduce these kinds of shallow errors directly into the benchmarks do not produce bugs that are interesting from the perspective of the rational programmer.
+The benchmarks are fully typed, so Typed Racket's type checker locates them immediately.
+For that reason, we apply the mutators to versions of the benchmarks with some components stripped of type annotations (dubbed \emph{configurations}).
+Without the annotations, the type checker may not detect the errors in these mutant configurations.
+Instead, Typed Racket's gradual type system may detect the errors dynamically.
+Mutant configurations that result in dynamic errors are the ideal ground to exercise the rational programmer's ability to locate errors.
+
+Specifically, we define an \emph{interesting debugging scenario} as a mutant configuration that
 \begin{enumerate}
-\item can be caught by the type checker if the program is fully typed,
-\item otherwise produces a dynamic error under Erasure, and
-\item the stacktrace of the dynamic error contains at least three distinct modules from the program.
+\item would be rejected by the type checker if we restored the missing type annotations,
+\item produces a dynamic error under Erasure as-is, and
+\item the stacktrace of the error mentions at least three distinct components.
 \end{enumerate}
-The first criterion reflects the fact that a gradual type system can only catch bugs that would have been caught by a type checker.
-The second criterion ensures that the bug is detectable by all three semantics.
-It is based on~\citet{gfd-oopsla-2019}'s proof that a dynamic type error in Erasure implies a dynamic type error in both Transient and Natural.
-The final criterion conservatively approximates scenarios with the opportunity for interactions between typed and untyped modules. % I say opportunity because it depends on the config
-In particular, it takes at least two modules to have typed/untyped module interactions (one of each kind), and having two modules on the stack ensures that the error arose in the interaction of at least those two modules.
-The third module comes in because every one of our programs comes with a driver module which is usually uninteresting but should be present in every stacktrace.
-With this definition in hand, the rest of this section will analyze how well our mutators produce interesting debugging scenarios.
 
-Beginning with the first criterion of the definition, we analyze how well our mutators produce type errors.
+The second and third criteria require a little more explanation.
+The second criterion requires that the error is detectable under Erasure to ensure that it is detectable by all three semantics.
+This is a direct consequence of~\citet{gfd-oopsla-2019}'s theorem that a dynamic type error under Erasure implies a dynamic type error under both Transient and Natural.
+It is worth noting that this criterion excludes from consideration all scenarios where Natural or Transient can detect the bug but Erasure cannot, and thus it favors Erasure.
+However, our goal here is to evaluate blame across these three semantics, and thus we focus on systems where all of them exhibit blame.
 
 
+The third criterion aims to capture debugging scenarios with a specific kind of dynamic error: one produced by the interactions between typed and untyped components.
+In those cases, the rational programmer may need to examine several components to locate the source of the bad interaction.
+In technical terms, we conservatively approximate these scenarios by analyzing the stacktrace of the error.
+If the stack trace mentions at least two components, then this is evidence of interaction between components.
+We require the third component because our benchmarks come with a driver component which is present in every stacktrace.
 
-%% Cut from above
-An effective set of mutators for type errors should be able to generate
-a large number of ill-typed programs. Hence, to validate that our experience
-with Typed Racket translates to effective mutators, we analyze the
- mutants of our ten benchmarks. Figure~\ref{fig:mutators-static-hit} shows
- the results. For each benchmark, our mutators generate between 156 and
- 18165 ill-typed mutants. Most importantly the collective success rate of
- the mutators  per benchmark, i.e., the percentage of ill-typed mutants
- over the number of mutants, ranges between 53\% (\texttt{tetris})
- and 95\% (\texttt{kCFA}). Finally, the figure depicts the individual success rate
- of mutators per benchmark which reveals that there is at
- least one benchmark where each mutator performs well
- (>90\%).
 
 \begin{figure}
   \centering
-  \includegraphics[width=\textwidth]{./plots/code-hit-ratios}
-  \caption{Success rate of mutators (the percentage of ill-typed mutants
-  over the number of mutants)}
-  \label{fig:mutators-static-hit}
+  \includegraphics[width=\textwidth]{./plots/mutant-breakdown}
+  \caption{Interesting debugging scenarios produced by our mutators. Counts are cut off at 50.}
+  \label{fig:mutant-breakdown}
 \end{figure}
 
 
+With this definition in hand, we analyze how effectively our mutators produce interesting debugging scenarios from our benchmarks.
+Figure~\ref{fig:mutant-breakdown} shows the number of distinct interesting debugging scenarios produced by our mutators for each benchmark.
+The columns correspond to our benchmarks, and each rows show the count of interesting debugging scenarios produced by one mutator from figure~\ref{table:mutation-ops}.
+The counts are cut of at 50, so any bar reaching the right side of the plot means 50 or more scenarios.
 
-%% ll: Is this still necessary?
-As a
-final remark in this section, with the data from
-figure~\ref{fig:mutators-runtime-hit}, we verify  that in each of the three semantics
-we target, between 25\% and
-90\% of the ill-typed mutants each mutator generates give rise to at least one interesting debugging scenario.
-
-
-\subsection{What are interesting debugging scenarios?}
-So far we have established that our mutators and~\citet{gtnffvf-jfp-2019}'s
-benchmarks are sufficient to create a large number of realistic ill-typed Typed Racket
-programs. However, in an ill-typed program with correct types, like
-in our case, it is trivial to figure out which component contains the bug.
-It is the component that doesn't type check. Thus the ill-typed mutants
-do not offer an interesting setting to try out the debugging abilities of
-rational programmers. That said, we can derive interesting debugging
-scenarios by removing type specifications from some of the components of
-the benchmarks. The resulting mix-typed programs may be well-typed and when
-run may raise a type error. Section~\ref{sec:rational} explains how we can
-explore the space of debugging scenarios in a principled manner starting from
-an interesting scenario.
-In the rest of this section we describe how we select interesting scenarios.
-We break this decision into three basic factors, each of which specify an element defining our selection of interesting scenarios.
-
-First, not all debugging scenarios are suitable for evaluating blame across all three semantics.
-For instance, there exist scenarios where Natural's checks discover a problem but Transient and Erasure do not.
-Since Transient and Erasure provide no debugging information (and in particular no blame) in such cases, we have nothing to evaluate.
-As alluded to in the previous paragraph, scenarios where the type checker detects the problem statically are also uninteresting.
-Hence, we select only scenarios which are interesting in all three semantics.
-Based on~\citet{gfd-oopsla-2019}'s proof that a dynamic type error in erasure implies a dynamic type error in both Transient and Natural, for any scenario that Erasure detects the problem, both Transient and Natural should detect it as well.
-We can therefore define scenarios that raise a dynamic type error in Erasure as interesting, and all such scenarios should raise dynamic type errors in Transient and Natural, too.
-
-The second factor is that we would like to be able to compare the behavior of blame between each of our three semantics.
-In order to do so, we must evaluate each of the semantics on the same set of scenarios;
-this allows us to compare for any given scenario how Natural compares to Erasure, for instance.
-Hence, we pre-select a sample of scenarios which serve as the starting points to evaluate all three semantics.
-
-Finally, the third factor is that we only want to consider debugging scenarios in which the bug has effects that cross component boundaries.
-In the context of migratory typing, dynamic type enforcement occurs when values cross component boundaries.
-However, a bug may be caught by the runtime before any values it influences flow out of the containing component -- for instance, if the bug is that a direct argument to \texttt{+} becomes a string.
-We consider such scenarios trivial, becase typing the component in which the problem manifests immediately identifies that same component as the buggy one.
-In an effort to avoid these trivial scenarios, we further restrict our definition of interesting debugging scenarios to be those in which the stack trace from Erasure identifies a component other than the buggy one.
-
-Thus we have defined the set of interesting debugging scenarios as those for which Erasure raises a dynamic type error in some component other than the buggy one.
-
-\begin{figure}
-  \centering
-  \includegraphics[width=\textwidth]{./plots/code-dynamic-error}
-  \caption{}
-  \label{fig:mutators-runtime-hit}
-\end{figure}
-
+Figure~\ref{fig:mutant-breakdown} illustrates that our mutators do indeed produce a large number of interesting debugging scenarios for all of our benchmarks.
+All of the mutators together produce at least 40 interesting scenarios for every benchmark, and those scenarios are produced by at least four different mutators for each benchmark.
+Thus our mutators produce a large and diverse population of scenarios for every benchmark.
+Furthermore, every mutator contributes scenarios to at least one benchmark.
+Some mutators clearly only target one or two of them, though, and in particular the class-focused mutators are primarily effective in \texttt{take5}.
+This reflects that among our benchmarks \texttt{take5} makes the most extensive use of object-oriented features, while the other features targeted by the rest of the mutators are used more broadly.
