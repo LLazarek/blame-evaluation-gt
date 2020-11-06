@@ -13,6 +13,8 @@
      (values 'complete
              #t)]
     ;; An error was thrown that crashed the experiment
+    ;; lltodo: this is wrong. The experiment can get stuck, and the last log just happened to
+    ;; be multiple lines.
     [else
      (values 'complete
              #t)]))

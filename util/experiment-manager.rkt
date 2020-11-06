@@ -252,8 +252,8 @@
      absent]))
 
 ;; summary/c :=
-;; (hash (or/c 'completed 'errored 'other) (listof (list/c string? string?))
-;;       'incomplete                       (listof (list/c string? string? (option/c real?))))
+;; (hash 'completed                         (listof (list/c string? string?))
+;;       (or/c 'incomplete 'errored 'other) (listof (list/c string? string? (option/c real?))))
 
 ;; host<%> -> (option/c summary/c)
 (define (summarize-experiment-status a-host)
@@ -262,14 +262,21 @@
     (printf "Retrieving ~a progress ...\r" name)
     (list name config (try-unwrap (get-progress a-host name))))
   (printf "Checking ~a...\r" a-host)
-  (option-let* ([results (get-results a-host)])
-               (hash-update results
-                            'incomplete
-                            (λ (benches) (map with-progress benches)))))
+  (option-let*
+   ([results (get-results a-host)])
+   (for/fold ([results+progress results])
+             ([result-kind (in-list '(incomplete errored other))])
+     (hash-update results+progress
+                  result-kind
+                  (λ (benches) (map with-progress benches))))))
 
 (define (stuck-jobs active-jobs maybe-summary)
   (for*/list ([summary (in-option maybe-summary)]
-              [incomplete-jobs (in-value (hash-ref summary 'incomplete))]
+              [incomplete-jobs (in-value (append (hash-ref summary 'incomplete)
+                                                 ;; lltodo: this is to handle a
+                                                 ;; bug in
+                                                 ;; check-experiment-progress.rkt
+                                                 (hash-ref summary 'errored)))]
               [benchmark (in-list active-jobs)]
               [incomplete-job (in-list incomplete-jobs)]
               #:when (match incomplete-job
@@ -312,20 +319,36 @@
 (define needed-benchmarks/10
   (drop needed-benchmarks/14 4))
 
-(define (download-completed-benchmarks! a-host summary)
+(define (summary-empty? summary)
+  (match summary
+    [(hash-table [_ '()] ...) #t]
+    [else #f]))
+(define (summary-has-errors? summary)
+  (match summary
+    [(hash-table ['completed _]
+                 [(or 'errored 'incomplete 'other) '()] ...)
+     #f]
+    [else #t]))
+(define (config/mode-complete? summary)
   (define completed (hash-ref summary 'completed))
   (match completed
     [(list (list benchmarks config-names) ..1)
-     #:when (and (= (set-count (apply set config-names)) 1)
-                 (or (set=? benchmarks needed-benchmarks/10)
-                     (user-prompt!
-                      @~a{
-                          Not all benchmarks are completed on @a-host
-                          @(pretty-format summary)
-                          Missing: @(set-subtract needed-benchmarks/10 completed)
-                          Do you want to download those that are complete anyway? 
-                          })))
-     (define config-name (first config-names))
+     (and (= (set-count (apply set config-names)) 1)
+          (set=? benchmarks needed-benchmarks/10))]
+    [else
+     #f]))
+(define (download-completed-benchmarks! a-host summary)
+  (define completed (hash-ref summary 'completed))
+  (match summary
+    [(hash-table ['completed (list (list _ config-name) _ ...)]
+                 [_ '()] ...)
+     #:when (or (config/mode-complete? summary)
+                (user-prompt!
+                 @~a{
+                     Not all benchmarks are completed on @a-host
+                     @(pretty-format summary)
+                     Do you want to download the results anyway? 
+                     }))
      (define projdir (get-field host-project-path a-host))
      (void (send a-host system/host/string @~a{
                                                cd @projdir && @;
@@ -347,16 +370,68 @@
      absent]))
 
 
+;; host? (host? (listof jobinfo?) summary? -> any) -> (or/c 'complete 'empty 'error)
+(define (wait-for-current-jobs-to-finish host [periodic-action! void])
+  (displayln @~a{Waiting for current jobs to finish on @host ...})
+  (let loop ()
+    (option-let*
+     ([summary (summarize-experiment-status host)])
+
+     (define-values {active-jobs pending-jobs} (send host get-jobs 'both))
+     (periodic-action! host active-jobs summary)
+     (define no-jobs? (and (empty? active-jobs) (empty? pending-jobs)))
+     (cond [(and no-jobs? (config/mode-complete? summary))
+            'complete]
+           [(and no-jobs? (summary-empty? summary))
+            'empty]
+           [(and no-jobs? (summary-has-errors? summary))
+            (notify-phone! @~a{@host has errors})
+            (if (user-prompt! @~a{
+                                  Found errors on @host, summary:
+                                  @(pretty-format summary)
+                                  Resume waiting for finish? (no means abort): 
+                                  })
+                (loop)
+                'error)]
+           [else
+            (printf "Sleeping                    \r")
+            (sleep (* 15 60))
+            (loop)]))))
+
+(define (help!:continue? notification prompt)
+  (notify-phone! notification)
+  (user-prompt! prompt))
+
+(define (ensure-host-empty! host)
+  (let loop ()
+    (unless (equal? (try-unwrap (wait-for-current-jobs-to-finish host restart-stuck-jobs!))
+                    'empty)
+      (unless (help!:continue?
+               @~a{Host @host was not left in a clean state, stuck}
+               @~a{
+                   Unexpected dirty state on @host, summary:
+                   @(pretty-format (summarize-experiment-status host))
+                   Is it fixed now? (Say no to abort)
+                   })
+        (displayln "Aborting.")
+        (exit 1))
+      (loop))))
+
+(define (notify-phone! msg)
+  (system @~a{fish -c "notify-phone '@msg'"}))
+
 (define (string->value s)
   (with-input-from-string s read))
-(define (string->benchmark-spec s)
-  (match (string->value s)
+(define (list->benchmark-spec l)
+  (match l
     [(list host-sym config-name-sym benchmark-syms ...)
      (list (host-by-name (~a host-sym))
            (~a config-name-sym)
            (map ~a benchmark-syms))]
     [else (raise-user-error 'experiment-manager
-                            @~a{Bad benchmark spec: @~v[s]})]))
+                            @~a{Bad benchmark spec: @~v[l]})]))
+(define (string->benchmark-spec s)
+  (list->benchmark-spec (string->value s)))
 (define (host-by-name name)
   (match (findf (λ (h) (string=? name (get-field hostname h))) hosts)
     [#f (raise-user-error 'experiment-manager @~a{No host known with name @name})]
@@ -371,13 +446,19 @@
                            ['download (app (mapper host-by-name) download-targets)]
                            ['launch (app (mapper string->benchmark-spec) launch-targets)]
                            ['cancel (app (mapper string->benchmark-spec) cancel-targets)]
-                           ['watch-for-stuck-jobs watch-for-stuck-jobs?])
+                           ['watch-for-stuck-jobs watch-for-stuck-jobs?]
+                           ['queue Q-path])
                args]
               #:once-each
               [("-s" "--status")
                'status?
                "Check the experiment status on all active hosts."
                #:record]
+              [("-q" "--queue")
+               'queue
+               ("Oversee the execution of a queue of jobs, downloading the results after each one."
+                "The queue is specified in the given file.")
+               #:collect ["spec path" take-latest #f]]
               #:multi
               [("-d" "--download-results")
                'download
@@ -395,6 +476,8 @@
                'watch-for-stuck-jobs
                "Watch for stuck jobs on all hosts and restart them as they get stuck."
                #:record]}
+ #:check [(or (not Q-path) (path-to-existant-file? Q-path))
+          @~a{Unable to find queue spec at @Q-path}]
 
  (define (for-each-target targets action name)
    (for ([target (in-list targets)])
@@ -437,4 +520,42 @@
        [(not (empty? download-targets))
         (for ([a-host (in-list download-targets)])
           (option-let* ([summary (summarize-experiment-status a-host)])
-                       (download-completed-benchmarks! a-host summary)))]))
+                       (download-completed-benchmarks! a-host summary)))]
+       [Q-path
+        (define progress-path (build-path (path-only Q-path)
+                                          (~a ".progress-" (file-name-from-path Q-path))))
+        (unless (file-exists? progress-path)
+          (copy-file Q-path progress-path))
+        (define queued-targets (file->list progress-path))
+        (define (record-remaining-targets! remaining-targets)
+          (display-lines-to-file (map ~s remaining-targets)
+                                 progress-path
+                                 #:exists 'replace))
+        (let launch-next-target ([remaining-targets queued-targets])
+          (match remaining-targets
+            [(list* launch-spec-list new-remaining-targets)
+             (define launch-spec (list->benchmark-spec launch-spec-list))
+             (define host (first launch-spec))
+             (ensure-host-empty! host)
+             (for-each-target (list launch-spec)
+                              (λ (a-host benchmark config-name)
+                                (send a-host submit-job! benchmark config-name))
+                              "submit")
+             (match (try-unwrap (wait-for-current-jobs-to-finish host restart-stuck-jobs!))
+               ['complete
+                (option-let*
+                 ([complete-summary (summarize-experiment-status host)]
+                  [_ (download-completed-benchmarks! host complete-summary)])
+                 (record-remaining-targets! new-remaining-targets)
+                 (launch-next-target new-remaining-targets))]
+               [else
+                #:when (help!:continue?
+                        @~a{Unexpected results on @host}
+                        @~a{
+                            Unexpected results on @host while waiting on @launch-spec-list, summary:
+                            @(pretty-format (summarize-experiment-status host))
+                            Try again?
+                            })
+                (launch-next-target remaining-targets)]
+               [else (void)])]
+            ['() (void)]))]))
