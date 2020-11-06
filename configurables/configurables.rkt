@@ -36,9 +36,14 @@
     #:module "blame-following/natural-blame.rkt")
 
   (define-implementation transient-oldest
-    #:module "blame-following/transient-oldest.rkt")
+    #:module "blame-following/transient-blame.rkt"
+    #:fixed-parameters ([pick-transient-blamed (λ (bounds) (take-right bounds 1))]))
+  (define-implementation transient-newest
+    #:module "blame-following/transient-blame.rkt"
+    #:fixed-parameters ([pick-transient-blamed (λ (bounds) (take bounds 1))]))
   (define-implementation transient-all
-    #:module "blame-following/transient-all.rkt")
+    #:module "blame-following/transient-blame.rkt"
+    #:fixed-parameters ([pick-transient-blamed values]))
 
   (define-implementation stack
     #:module "blame-following/stack.rkt"))
@@ -48,7 +53,7 @@
 
   (define-implementation top
     #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
-    #:fixed-parameters ([pick-locations (λ (all) (if (empty? all) all (take all 1)))]))
+    #:fixed-parameters ([pick-locations (λ (all) (take all 1))]))
   (define-implementation all
     #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
     #:fixed-parameters ([pick-locations values])))

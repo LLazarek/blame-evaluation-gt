@@ -61,7 +61,9 @@
                        #:when (and ctx-mod-name
                                    (mutatable-mod-in-program? ctx-mod-name)))
              ctx-mod-name))
-         ((pick-locations) stacktrace-locations)]))
+         (if (empty? stacktrace-locations)
+             empty
+             ((pick-locations) stacktrace-locations))]))
     (match mods-with-error
       [(? list?) mods-with-error]
       [#f
