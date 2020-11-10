@@ -26,7 +26,7 @@
                                mutation-index)
   (λ (mod-path)
     (define path (second mod-path))
-    (define bench (first (benchmark-mod-relative-path-parts mod-path)))
+    (define bench (first (benchmark-mod-relative-path-parts path)))
     (define resolved-db-path (build-path configurables
                                          (pre-computed-results-db)))
     (define db (db:get resolved-db-path))
@@ -46,4 +46,28 @@
             No pre-computed result found in db @(pre-computed-results-db) @;
             for @bench mutant @module-to-mutate @"@" @mutation-index
             })])))
+
+(module+ test
+  (require ruinit
+           racket/runtime-path)
+  (define-test-env {setup! cleanup!}
+    #:directories ([test-tmp "./test-tmp"])
+    #:files ())
+  (test-begin
+    #:name make-benchmark-runner
+    #:before (setup!)
+    #:after (cleanup!)
+    (ignore
+     (define db-path (build-path test-tmp "db.rktdb"))
+     (db:new! db-path)
+     (define empty-db (db:get db-path))
+     (db:write! empty-db (hash "a-benchmark" (hash (mutant #f "a-module.rkt" 42) 'a-result))))
+    (parameterize ([pre-computed-results-db (find-relative-path (simple-form-path "..")
+                                                                (simple-form-path db-path))])
+      (test-exn (λ (x) (equal? x 'a-result))
+                ((make-benchmark-runner #f "a-module.rkt" 42)
+                 '(file "foo/bar/a-benchmark/untyped/main.rkt")))
+      (test-exn exn:fail:user?
+                ((make-benchmark-runner #f "a-module.rkt" 0)
+                    '(file "foo/bar/a-benchmark/untyped/main.rkt"))))))
 
