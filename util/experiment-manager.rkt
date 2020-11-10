@@ -8,6 +8,8 @@
   (let ()
     (struct absent ())
     (values (absent) absent?)))
+(define (option/c inner/c)
+  (or/c absent? (struct/c present inner/c) inner/c))
 
 (define (in-option o)
   (in-list (match o
@@ -34,7 +36,12 @@
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
 (define host<%> (interface (writable<%>)
-                  [get-jobs (->*m {} {boolean?} (listof (or/c absent? (list/c string? string?))))]
+                  [get-jobs
+                   (let ([job-descr/c (listof (option/c (list/c string? string?)))])
+                     (->*m {} {(or/c boolean? 'both)}
+                           (option/c
+                            (or/c job-descr/c
+                                  (list/c job-descr/c job-descr/c)))))]
                   [submit-job! (->*m {string?
                                       string?}
                                      {#:mode (or/c 'check 'record)
@@ -85,27 +92,31 @@
                      [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))
 
     (define/public (get-jobs [active? #t])
-      (define info (all-job-info))
-      (if (equal? active? 'both)
-          (let-values ([{active not} (partition job-running? info)]
-                       [{find-job*} (match-lambda [(job id _) (find-job id)])])
-            (values (map find-job* active)
-                    (map find-job* not)))
-          (filter-map (match-lambda [(job id (== active?)) (find-job id)]
-                                    [else #f])
-                      info)))
+      (option-let*
+       ([info (all-job-info)])
+       (if (equal? active? 'both)
+           (let-values ([{active not} (partition job-running? info)]
+                        [{find-job*} (match-lambda [(job id _) (find-job id)])])
+             (list (map find-job* active)
+                   (map find-job* not)))
+           (filter-map (match-lambda [(job id (== active?)) (find-job id)]
+                                     [else #f])
+                       info))))
     (define/private (all-job-info)
-      ;; lltodo: this should not wipe the database if the internet breaks!
       (define condor-dump (system/host/string "condor_q"))
-      (define raw-info
-        (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
-                       condor-dump
-                       #:match-select cddr))
-      (define all-jobs
-        (for/list ([parts (in-list raw-info)])
-          (job (third parts) (string=? (first parts) "1"))))
-      (expunge-old-jobs! all-jobs)
-      all-jobs)
+      (match condor-dump
+        [(regexp "-- Schedd: peroni.cs.northwestern.edu")
+         (define raw-info
+           (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
+                          condor-dump
+                          #:match-select cddr))
+         (define all-jobs
+           (for/list ([parts (in-list raw-info)])
+             (job (third parts) (string=? (first parts) "1"))))
+         (expunge-old-jobs! all-jobs)
+         (present all-jobs)]
+        [else
+         absent]))
 
     (define/private (expunge-old-jobs! current-job-infos)
       (ensure-store!)
@@ -294,9 +305,10 @@
                (void)))
 
 (define (restart-stuck-jobs! a-host
-                             [active-jobs (send a-host get-jobs #t)]
+                             [maybe-active-jobs (send a-host get-jobs #t)]
                              [maybe-summary (summarize-experiment-status a-host)])
   (for* ([summary (in-option maybe-summary)]
+         [active-jobs (in-option maybe-active-jobs)]
          [job-info (in-list (stuck-jobs active-jobs summary))])
     (displayln @~a{@(date->string (current-date) #t) Restarting stuck job: @job-info})
     (restart-job! a-host job-info)))
@@ -326,7 +338,7 @@
 (define (summary-has-errors? summary)
   (match summary
     [(hash-table ['completed _]
-                 [(or 'errored 'incomplete 'other) '()] ...)
+                 [(or 'errored 'other) '()] ...)
      #f]
     [else #t]))
 (define (config/mode-complete? summary)
@@ -375,9 +387,10 @@
   (displayln @~a{Waiting for current jobs to finish on @host ...})
   (let loop ()
     (option-let*
-     ([summary (summarize-experiment-status host)])
+     ([summary (summarize-experiment-status host)]
+      [jobs (send host get-jobs 'both)])
 
-     (define-values {active-jobs pending-jobs} (send host get-jobs 'both))
+     (match-define (list active-jobs pending-jobs) jobs)
      (periodic-action! host active-jobs summary)
      (define no-jobs? (and (empty? active-jobs) (empty? pending-jobs)))
      (cond [(and no-jobs? (config/mode-complete? summary))
@@ -496,9 +509,11 @@
           (define maybe-summary
             (summarize-experiment-status a-host))
           (displayln @~a{---------- @a-host ----------})
-          (define-values {active-jobs pending-jobs} (send a-host get-jobs 'both))
-          (displayln @~a{Active: @active-jobs})
-          (displayln @~a{Pending: @pending-jobs})
+          (match (try-unwrap (send a-host get-jobs 'both))
+            [(list active-jobs pending-jobs)
+             (displayln @~a{Active: @active-jobs})
+             (displayln @~a{Pending: @pending-jobs})]
+            [else (void)])
           (pretty-display (try-unwrap maybe-summary))
           (newline))]
        [(not (empty? launch-targets))
@@ -532,6 +547,12 @@
                                  progress-path
                                  #:exists 'replace))
         (let launch-next-target ([remaining-targets queued-targets])
+          ;; lltodo:
+          ;; 1. Remove the target from the queue before starting it
+          ;; 2. Keep the Q on disk and read/write to it as needed
+          ;;    This allows me to extend/truncate the Q as it's running,
+          ;;    and it allows multiple parallel managers operating on the same Q
+          ;;    (though realistically I'd probably not want that: better to have two diff Qs)
           (match remaining-targets
             [(list* launch-spec-list new-remaining-targets)
              (define launch-spec (list->benchmark-spec launch-spec-list))
