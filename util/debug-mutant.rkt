@@ -54,7 +54,7 @@
                       #:run? [run? #f]
                       #:run-process? [run-via-process? #f]
                       #:run-process-async? [run-via-process-async? #f]
-                      #:write-modules-to [dump-dir-path-or-name #f]
+                      #:write-modules-to [dump-dir-path #f]
                       #:suppress-output? [suppress-output? (not interactive?)]
                       #:config [config-name "TR"])
   (define experiment-config (build-path config-dir (~a config-name ".rkt")))
@@ -89,6 +89,16 @@
          Program: @the-program
          Module: @the-module-to-mutate
          }))
+
+  (define dump-dir-path*
+    (match dump-dir-path
+      [#f #f]
+      [else
+       (make-directory* dump-dir-path)
+       (define dump-dir-path-or-name* (build-path dump-dir-path "unified"))
+       (copy-directory/files (build-path bench-path "base")
+                             (build-path dump-dir-path "base"))
+       dump-dir-path-or-name*]))
 
   (when diff-mutant?
     (define diff (diff-mutation the-module-to-mutate index the-program))
@@ -150,7 +160,7 @@
              index
              outfile
              experiment-config
-             #:write-modules-to dump-dir-path-or-name
+             #:write-modules-to dump-dir-path*
              #:force-module-write? #t)))
         (define (cleanup-and-get-results)
           (begin0 (match (ctl 'status)
@@ -186,7 +196,7 @@
                        #:timeout/s (* 2 60)
                        #:memory/gb 3
                        #:modules-base-path (find-program-base-path the-program)
-                       #:write-modules-to dump-dir-path-or-name
+                       #:write-modules-to dump-dir-path*
                        #:on-module-exists 'replace
                        #:suppress-output? suppress-output?)]
                      [run-via-process?
