@@ -31,7 +31,8 @@
 
 (define-runtime-paths
   [store-path "../../experiment-data/experiment-manager"]
-  [data-path "../../experiment-data/results/code-mutations"])
+  [data-path "../../experiment-data/results/code-mutations"]
+  [dbs-path "../../experiment-data/dbs/code-mutations.tar.gz"])
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -71,10 +72,15 @@
                    host-data-path)
     (init-field [data-store (build-path store-path (~a "condor-" hostname ".rktd"))])
 
-    (define/public (system/host/string . parts)
+    (define/public (system/host #:interactive? [interactive? #f] . parts)
       ;; lltodo: implement a persistent connection here to prevent being blocked
       ;; by zythos for opening too many connections too quickly
-      (system/string @~a{ssh @hostname "@(apply ~a (add-between parts " "))"}))
+      (system @~a{ssh @(if interactive? "-t" "") @hostname "@(apply ~a (add-between parts " "))"}))
+    (define/public (system/host/string #:interactive? [interactive? #f] . parts)
+      (define out-str (open-output-string))
+      (parameterize ([current-output-port out-str]
+                     [current-error-port out-str])
+        (send this system/host #:interactive? interactive? . parts)))
 
     (define/public (scp #:from-host [from-host-path #f]
                         #:to-local [to-local-path #f]
@@ -181,7 +187,7 @@
 
     (define/public (cancel-job! benchmark config-name)
       (option-let* ([id (read-job benchmark config-name)])
-                   (void (system/host/string @~a{condor_rm '@id'}))
+                   (void (system/host @~a{condor_rm '@id'}))
                    (write-data-store! (dict-remove (read-data-store)
                                                    (list benchmark config-name)))))
 
@@ -362,10 +368,10 @@
                      Do you want to download the results anyway? 
                      }))
      (define projdir (get-field host-project-path a-host))
-     (void (send a-host system/host/string @~a{
-                                               cd @projdir && @;
-                                               ./pack.sh experiment-output @config-name @;
-                                               }))
+     (void (send a-host system/host @~a{
+                                        cd @projdir && @;
+                                        ./pack.sh experiment-output @config-name @;
+                                        }))
      (define archive-name (~a config-name ".tar.gz"))
      (match (send a-host scp
                   #:from-host (build-path projdir archive-name)
@@ -430,6 +436,61 @@
         (exit 1))
       (loop))))
 
+(define (update-host! a-host)
+  (define host-dbs-dir
+    (build-path (get-field host-project-path a-host)
+                "blame-evaluation-gt"
+                "dbs"))
+  (define archive-name (basename dbs-path))
+  (define unpacked-db-dir-name
+    (for/fold ([name archive-name])
+              ([_ (in-range 2)])
+      (path-replace-extension name "")))
+  (define host-unpacked-db-dir-path
+    (build-path host-dbs-dir unpacked-db-dir-name))
+  (define host-repo-path
+    (build-path (get-field host-project-path a-host)
+                "blame-evaluation-gt"))
+  (define host-project-raco.rkt-path
+    (build-path (get-field host-utilities-path a-host)
+                "project-raco.rkt"))
+  (define host-setup.rkt-path
+    (build-path (get-field host-utilities-path a-host)
+                "setup.rkt"))
+  (displayln "Uploading latest dbs...")
+  (unless (zero? (send a-host scp
+                       #:from-local dbs-path
+                       #:to-host (~a (build-path host-dbs-dir archive-name))))
+    (raise-user-error 'update-host!
+                      @~a{Failed to upload db archive to @a-host}))
+  (displayln "Done.")
+  (for ([msg (in-list '("Unpacking dbs..."
+                        "Updating implementation..."
+                        "Recompiling and checking status..."))]
+        [cmd (in-list (list @~a{
+                                rm -r '@host-unpacked-db-dir-path' && @;
+                                cd '@host-dbs-dir' && @;
+                                tar -xzvf '@archive-name' && @;
+                                echo "Done."
+                                }
+                            @~a{
+                                cd '@host-repo-path' && @;
+                                git pull && @;
+                                echo "Done."
+                                }
+                            @~a{
+                                @(get-field host-racket-path a-host) '@host-project-raco.rkt-path' -Cc && @;
+                                @(get-field host-racket-path a-host) '@host-setup.rkt-path' -v && @;
+                                echo "Done."
+                                }))])
+    (displayln msg)
+    (unless (send a-host
+                  system/host
+                  cmd
+                  #:interactive? #t)
+      (raise-user-error 'update-host!
+                        "Update failed."))))
+
 (define (notify-phone! msg)
   (system @~a{fish -c "notify-phone '@msg'"}))
 
@@ -460,7 +521,8 @@
                            ['launch (app (mapper string->benchmark-spec) launch-targets)]
                            ['cancel (app (mapper string->benchmark-spec) cancel-targets)]
                            ['watch-for-stuck-jobs watch-for-stuck-jobs?]
-                           ['queue Q-path])
+                           ['queue Q-path]
+                           ['update (app (mapper host-by-name) update-targets)])
                args]
               #:once-each
               [("-s" "--status")
@@ -488,7 +550,11 @@
               [("-w" "--watch-for-stuck-jobs")
                'watch-for-stuck-jobs
                "Watch for stuck jobs on all hosts and restart them as they get stuck."
-               #:record]}
+               #:record]
+              [("-u" "--update")
+               'update
+               "Update the given hosts implementation of the experiment."
+               #:collect ["host" cons empty]]}
  #:check [(or (not Q-path) (path-to-existant-file? Q-path))
           @~a{Unable to find queue spec at @Q-path}]
 
@@ -579,4 +645,7 @@
                             })
                 (launch-next-target remaining-targets)]
                [else (void)])]
-            ['() (void)]))]))
+            ['() (void)]))]
+       [(not (empty? update-targets))
+        (for ([a-host (in-list update-targets)])
+          (update-host! a-host))]))
