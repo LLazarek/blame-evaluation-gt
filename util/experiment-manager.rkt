@@ -80,7 +80,8 @@
       (define out-str (open-output-string))
       (parameterize ([current-output-port out-str]
                      [current-error-port out-str])
-        (send this system/host #:interactive? interactive? . parts)))
+        (send this system/host #:interactive? interactive? . parts))
+      (get-output-string out-str))
 
     (define/public (scp #:from-host [from-host-path #f]
                         #:to-local [to-local-path #f]
@@ -344,6 +345,7 @@
 (define (summary-has-errors? summary)
   (match summary
     [(hash-table ['completed _]
+                 ['incomplete _]
                  [(or 'errored 'other) '()] ...)
      #f]
     [else #t]))
@@ -603,24 +605,18 @@
           (option-let* ([summary (summarize-experiment-status a-host)])
                        (download-completed-benchmarks! a-host summary)))]
        [Q-path
-        (define progress-path (build-path (path-only Q-path)
-                                          (~a ".progress-" (file-name-from-path Q-path))))
-        (unless (file-exists? progress-path)
-          (copy-file Q-path progress-path))
-        (define queued-targets (file->list progress-path))
-        (define (record-remaining-targets! remaining-targets)
-          (display-lines-to-file (map ~s remaining-targets)
-                                 progress-path
-                                 #:exists 'replace))
-        (let launch-next-target ([remaining-targets queued-targets])
-          ;; lltodo:
-          ;; 1. Remove the target from the queue before starting it
-          ;; 2. Keep the Q on disk and read/write to it as needed
-          ;;    This allows me to extend/truncate the Q as it's running,
-          ;;    and it allows multiple parallel managers operating on the same Q
-          ;;    (though realistically I'd probably not want that: better to have two diff Qs)
-          (match remaining-targets
-            [(list* launch-spec-list new-remaining-targets)
+        (define (dequeue-target!)
+          (match (file->list Q-path)
+            [(list* front remaining)
+             (display-lines-to-file (map ~s remaining)
+                                    Q-path
+                                    #:exists 'replace)
+             front]
+            [else #f]))
+        (let launch-next-target ([retry #f])
+          (match (or retry (dequeue-target!))
+            [#f (void)]
+            [launch-spec-list
              (define launch-spec (list->benchmark-spec launch-spec-list))
              (define host (first launch-spec))
              (ensure-host-empty! host)
@@ -633,19 +629,17 @@
                 (option-let*
                  ([complete-summary (summarize-experiment-status host)]
                   [_ (download-completed-benchmarks! host complete-summary)])
-                 (record-remaining-targets! new-remaining-targets)
-                 (launch-next-target new-remaining-targets))]
+                 (launch-next-target #f))]
                [else
                 #:when (help!:continue?
                         @~a{Unexpected results on @host}
                         @~a{
                             Unexpected results on @host while waiting on @launch-spec-list, summary:
                             @(pretty-format (summarize-experiment-status host))
-                            Try again?
+                            Retry this item?
                             })
-                (launch-next-target remaining-targets)]
-               [else (void)])]
-            ['() (void)]))]
+                (launch-next-target launch-spec-list)]
+               [else (void)])]))]
        [(not (empty? update-targets))
         (for ([a-host (in-list update-targets)])
           (update-host! a-host))]))
