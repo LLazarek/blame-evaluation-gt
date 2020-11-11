@@ -144,28 +144,32 @@
   (test-begin
     #:name unification
     (test-equal? (unify-module-for-running (mod "/foo/bar/a-bench/untyped/main.rkt"
-                                                #'(a b c)))
+                                                #'(module main racket
+                                                    (#%module-begin a b c))))
                  (mod (build-path
                        "/foo/bar/a-bench"
                        unification-directory-name
                        "main.rkt")
                       #'(a b c)))
     (test-equal? (unify-module-for-running (mod "/foo/untyped/bar/a-bench/untyped/main.rkt"
-                                                #'(a b c)))
+                                                #'(module main racket
+                                                    (#%module-begin a b c))))
                  (mod (build-path
                        "/foo/untyped/bar/a-bench"
                        unification-directory-name
                        "main.rkt")
                       #'(a b c)))
     (test-equal? (unify-module-for-running (mod "/foo/untyped/bar/a-bench/base/main.rkt"
-                                                #'(a b c)))
+                                                #'(module main racket
+                                                    (#%module-begin a b c))))
                  (mod (build-path
                        "/foo/untyped/bar/a-bench"
                        "base"
                        "main.rkt")
                       #'(a b c)))
     (test-equal? (unify-module-for-running (mod "/foo/untyped/bar/a-bench/both/main.rkt"
-                                                #'(a b c)))
+                                                #'(module main racket
+                                                    (#%module-begin a b c))))
                  (mod (build-path
                        "/foo/untyped/bar/a-bench"
                        unification-directory-name
@@ -176,34 +180,42 @@
     (test-equal? (unify-program-for-running
                   (program
                    (mod "/foo/untyped/bar/a-bench/untyped/main.rkt"
-                        #'(a))
+                        #'(module main racket
+                            (#%module-begin a b c)))
                    (list (mod "/foo/untyped/bar/a-bench/typed/helper.rkt"
-                              #'(b))
+                              #'(module main racket
+                                  (#%module-begin a b c)))
                          (mod "/foo/untyped/bar/a-bench/base/adapter.rkt"
-                              #'(b))
+                              #'(module main racket
+                                  (#%module-begin a b c)))
                          (mod "/foo/untyped/bar/a-bench/both/lib.rkt"
-                              #'(c)))))
+                              #'(module main racket
+                                  (#%module-begin a b c))))))
                  (program
                   (mod (build-path
                         "/foo/untyped/bar/a-bench"
                         unification-directory-name
                         "main.rkt")
-                       #'(a))
+                       #'(module main racket
+                           (#%module-begin a b c)))
                   (list (mod (build-path
                               "/foo/untyped/bar/a-bench"
                               unification-directory-name
                               "helper.rkt")
-                             #'(b))
+                             #'(module main racket
+                                 (#%module-begin a b c)))
                         (mod (build-path
                               "/foo/untyped/bar/a-bench"
                               "base"
                               "adapter.rkt")
-                             #'(b))
+                             #'(module main racket
+                                 (#%module-begin a b c)))
                         (mod (build-path
                               "/foo/untyped/bar/a-bench"
                               unification-directory-name
                               "lib.rkt")
-                             #'(c))))))
+                             #'(module main racket
+                                 (#%module-begin a b c)))))))
 
   (test-begin
     #:name unified-benchmark/c
@@ -211,13 +223,17 @@
               (contract unified-benchmark/c
                         (program
                          (mod "/foo/untyped/bar/a-bench/untyped/main.rkt"
-                              #'(a))
+                              #'(module main racket
+                                  (#%module-begin a b c)))
                          (list (mod "/foo/untyped/bar/a-bench/typed/helper.rkt"
-                                    #'(b))
+                                    #'(module main racket
+                                        (#%module-begin a b c)))
                                (mod "/foo/untyped/bar/a-bench/base/adapter.rkt"
-                                    #'(b))
+                                    #'(module main racket
+                                        (#%module-begin a b c)))
                                (mod "/foo/untyped/bar/a-bench/both/lib.rkt"
-                                    #'(c))))
+                                    #'(module main racket
+                                        (#%module-begin a b c)))))
                         'pos 'neg))
     (contract unified-benchmark/c
               (program
@@ -225,22 +241,26 @@
                      "/foo/untyped/bar/a-bench"
                      unification-directory-name
                      "main.rkt")
-                    #'(a))
+                    #'(module main racket
+                        (#%module-begin a b c)))
                (list (mod (build-path
                            "/foo/untyped/bar/a-bench"
                            unification-directory-name
                            "helper.rkt")
-                          #'(b))
+                          #'(module main racket
+                              (#%module-begin a b c)))
                      (mod (build-path
                            "/foo/untyped/bar/a-bench"
                            "base"
                            "adapter.rkt")
-                          #'(b))
+                          #'(module main racket
+                              (#%module-begin a b c)))
                      (mod (build-path
                            "/foo/untyped/bar/a-bench"
                            unification-directory-name
                            "lib.rkt")
-                          #'(c))))
+                          #'(module main racket
+                              (#%module-begin a b c)))))
               'pos 'neg)
     (contract unified-benchmark/c
               (program
@@ -248,15 +268,18 @@
                      "/proj/blgt/gtp-benchmarks/benchmarks/kcfa"
                      unification-directory-name
                      "main.rkt")
-                    #'(a))
+                    #'(module main racket
+                        (#%module-begin a b c)))
                (list (mod (build-path
                            "/proj/blgt/gtp-benchmarks/benchmarks/kcfa"
                            unification-directory-name
                            "benv-adapted.rkt")
-                          #'(a))))
+                          #'(module main racket
+                              (#%module-begin a b c)))))
               'pos 'neg)
 
     (contract (listof (unified-mod/c #:base-or-both-ok? #t))
               (list (mod (simple-form-path "../../gtp-benchmarks/benchmarks/kcfa/both/benv-adapted.rkt")
-                         #'()))
+                         #'(module main racket
+                             (#%module-begin a b c))))
               'pos 'neg)))
