@@ -6,6 +6,7 @@
          "../../configurations/configure-benchmark.rkt"
          "../../util/program.rkt"
          "../../runner/mutation-runner.rkt"
+         "../../runner/unify-program.rkt"
          "../../util/mutant-util.rkt"
          "../../util/path-utils.rkt")
 
@@ -14,13 +15,6 @@
 
 (define-runtime-paths
   [configurables-dir ".."])
-
-(define (make-untyped-program-for the-bench untyped-config)
-  (define bench-configured-untyped
-    (configure-benchmark the-bench
-                         untyped-config))
-  (make-program (benchmark-configuration-main bench-configured-untyped)
-                (benchmark-configuration-others bench-configured-untyped)))
 
 (main
  #:arguments {[(hash-table ['out-db results-db]
@@ -51,36 +45,43 @@
 
  (install-configuration! config-path)
 
- (define results
-   (for/hash ([bench-path (in-list bench-paths)])
-     (define the-bench (read-benchmark bench-path))
-     (define bench-name (benchmark->name the-bench))
-     (define untyped-config
-       (for/hash ([{mod _} (in-hash (make-max-bench-config the-bench))])
-         (values mod 'none)))
-     (define bench-untyped-program
-       (make-untyped-program-for the-bench untyped-config))
-     (define select-mutants (configured:select-mutants))
-
-     (displayln @~a{Computing result of @bench-name ...})
-     (define mutant-results-hash
-       (for*/hash ([mod-name (in-list (benchmark->mutatable-modules the-bench))]
-                   [index (select-mutants mod-name the-bench)])
-         (display @~a{@mod-name @"@" @index                              @"\r"})
-         (define mod
-           (findf (compose1 (path-ends-with mod-name) mod-path)
-                  (program->mods bench-untyped-program)))
-         (values (mutant #f mod-name index)
-                 (run-with-mutated-module bench-untyped-program
-                                          mod
-                                          index
-                                          untyped-config
-                                          #:timeout/s (default-timeout/s)
-                                          #:memory/gb (default-memory-limit/gb)))))
-     (values bench-name
-             mutant-results-hash)))
-
  (unless (db:path-to-db? results-db)
    (db:new! results-db))
  (define db (db:get results-db))
- (void (db:write! db results)))
+
+ (for ([bench-path (in-list bench-paths)])
+   (define the-benchmark (read-benchmark bench-path))
+   (define bench-name (benchmark->name the-benchmark))
+   (define config
+     (for/hash ([{mod _} (in-hash (make-max-bench-config the-benchmark))])
+       (values mod 'none)))
+   (match-define (and the-benchmark-configuration
+                      (struct* benchmark-configuration
+                               ([main main-path]
+                                [others others-paths])))
+     (configure-benchmark the-benchmark config))
+   (define select-mutants (configured:select-mutants))
+
+   (displayln @~a{Computing result of @bench-name ...})
+   (define mutant-results-hash
+     (for*/hash ([mod-name (in-list (benchmark->mutatable-modules the-benchmark))]
+                 [index (select-mutants mod-name the-benchmark)])
+       (display @~a{@mod-name @"@" @index                              @"\r"})
+       (define module-to-mutate-path
+         (pick-file-by-name (list* main-path others-paths)
+                            mod-name))
+       (define the-program (make-unified-program main-path
+                                                 others-paths))
+       (define the-program-mods (program->mods the-program))
+       (define the-module-to-mutate
+         (find-unified-module-to-mutate module-to-mutate-path
+                                        the-program-mods))
+       (values (mutant #f mod-name index)
+               (run-with-mutated-module the-program
+                                        the-module-to-mutate
+                                        index
+                                        config
+                                        #:timeout/s (default-timeout/s)
+                                        #:memory/gb (default-memory-limit/gb)
+                                        #:suppress-output? #f))))
+   (db:set! db bench-name mutant-results-hash)))

@@ -94,6 +94,7 @@
     (match dump-dir-path
       [#f #f]
       [else
+       (when (directory-exists? dump-dir-path) (delete-directory/files dump-dir-path))
        (make-directory* dump-dir-path)
        (define dump-dir-path-or-name* (build-path dump-dir-path "unified"))
        (copy-directory/files (build-path bench-path "base")
