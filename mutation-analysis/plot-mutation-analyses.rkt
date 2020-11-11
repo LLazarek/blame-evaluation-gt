@@ -14,7 +14,8 @@
 
 (define current-mutation-types (make-parameter #f))
 
-(define PLOT-WIDTH 500)
+(define PLOT-WIDTH 300)
+(define SUCCESS-COUNTS-LIMIT 50)
 
 (struct annotated (data points) #:prefab)
 (struct serializable-point-label (point label size color) #:prefab)
@@ -170,7 +171,7 @@
                            #:extra extra-renderer-trees
                            ))
 
-(define labels-width 190)
+(define labels-width 100)
 #;(define plot-bars-pict
         (simple-inferred-plotter (curry discrete-histogram
                                         #:add-ticks? #t)
@@ -178,14 +179,16 @@
 
 (define (plot-benchmark-table all-data
                               plot-type
-                              columns)
+                              columns
+                              title
+                              #:x-max [x-max 1])
   (define label-offset
     (inexact->exact
      (round
       (let ([x (length (current-mutation-types))])
-        #;(+ (* -8.33333333333 x)
-             138.333333333)
-        (+ 18
+        (+ (* -8.33333333333 x)
+             133.333333333)
+        #;(+ 18
            (* (exp 8.358)
               (expt x -1.905))))))
     #;(match (length (current-mutation-types))
@@ -208,21 +211,17 @@
                             #:title benchmark
                             #:y-label #f
                             #:x-label #f
-                            #:x-max 1)
+                            #:x-max x-max)
             (if draw-labels? (blank 0) (blank 0 label-offset)))))
        pict)))
   (fill-background
    (vc-append
     10
-    (text (match plot-type
-            ['total-counts "Proportion of all mutants created by operator"]
-            ['success-ratios "Ratio of mutants causing type errors, per operator"])
-          '(bold)
-          30)
+    (text title '(bold) 20)
     (table/fill-missing picts
                         #:columns columns
                         #:column-spacing 10
-                        #:row-spacing 0))))
+                        #:row-spacing 20))))
 
 ;; (listof real?) (listof (list/c real? color/c)) -> (listof color/c)
 (define (cutoff-bucket-colors numbers bucket-colors)
@@ -231,6 +230,25 @@
                 (and (< n (first bucket))
                      (second bucket))))
   (map color-for numbers))
+
+(define (rename-mutator mutator-name)
+  (hash-ref (hash "constant-swap" "constant"
+                  "begin-result-deletion" "deletion"
+                  "top-level-id-swap" "top-level-id"
+                  "imported-id-swap" "imported-id"
+                  "method-id-swap" "method-id"
+                  "field-id-swap" "field-id"
+                  "position-swap" "position"
+                  "nested-list-construction-swap" "list"
+                  "class:initializer-swap" "class:init"
+                  "class:publicity" "class:public"
+                  "class:super-new" "class:super"
+                  "class:parent-swap" "class:parent"
+                  "arithmetic-op-swap" "arithmetic"
+                  "boolean-op-swap" "boolean"
+                  "negate-conditional" "negate-cond"
+                  "force-conditional" "force-cond")
+            mutator-name))
 
 (main
  #:arguments {[flags log-files]
@@ -255,6 +273,7 @@
                ("Which type of plot to produce for the data. Options below; default is population."
                 "  population : plot the breakdown of entire mutant population by mutators"
                 "  success-ratios : plot the ratio of successful mutants produced by each mutator"
+                "  success-counts : plot the count of successful mutants produced by each mutator"
                 "  successful-population-count : plot the number of successful mutants produced by each mutator, aggregating over benchmarks; this opens an interactive window rather than producing a plot image"
                 "  successful-population-heatmap : plot a heatmap-like stacked bar chart color-coding the number of successful mutants produced by each mutator, aggregating over benchmarks")
                #:collect {"type" take-latest "population"}]
@@ -283,6 +302,7 @@
    (match (hash-ref flags 'plot-type)
      ["population" 'total-counts]
      ["success-ratios" 'success-ratios]
+     ["success-counts" 'success-counts]
      ["successful-population-count" 'successful-population-count]
      ["successful-population-heatmap" 'successful-population-heatmap]))
  (define columns (string->number (hash-ref flags 'cols)))
@@ -294,7 +314,9 @@
       (define data
         (match* {log-files (hash-ref flags 'summaries-db)}
           [{'() (and (not #f) db-path)}
-           (unless (member plot-type '(successful-population-count successful-population-heatmap))
+           (unless (member plot-type '(successful-population-count
+                                       successful-population-heatmap
+                                       success-counts))
              (raise-user-error 'plot-mutation-analyses
                                "-d can only be used with plot types successful-population-*"))
            (read-data-from-summaries db-path)]
@@ -308,6 +330,51 @@
         (write-to-file data maybe-save-path))
       data]))
  (match plot-type
+   ['success-counts
+    (define ((add-to-list v) l) (cons v l))
+    (define breakdown-by-benchmark
+      (for*/fold ([breakdown-by-benchmark (hash)])
+                 ([{mutator mutator-counts-by-benchmark} (in-dict all-data)]
+                  [{benchmark count} (in-dict (first mutator-counts-by-benchmark))])
+        (hash-update breakdown-by-benchmark
+                     benchmark
+                     (add-to-list (cons mutator (first count)))
+                     empty)))
+    (define (sort+rename-mutators mutator-counts)
+      (define ordering '("constant"
+                         "deletion"
+                         "position"
+                         "list"
+                         "top-level-id"
+                         "imported-id"
+                         "method-id"
+                         "field-id"
+                         "class:init"
+                         "class:parent"
+                         "class:public"
+                         "class:super"
+                         "arithmetic"
+                         "boolean"
+                         "negate-cond"
+                         "force-cond"))
+      (define renamed (dict-map mutator-counts
+                                (λ (orig-name count)
+                                  (cons (rename-mutator orig-name) count))))
+      (sort renamed
+            >
+            #:key (match-lambda [(cons name _) (index-of ordering name)])
+            #:cache-keys? #t))
+    (define sorted+renamed+annotations
+      (for/hash ([{benchmark mutator-counts} (in-hash breakdown-by-benchmark)])
+        (define sorted+renamed (sort+rename-mutators mutator-counts))
+        (values benchmark (annotated sorted+renamed empty))))
+    (pict->png!
+     (plot-benchmark-table sorted+renamed+annotations
+                           #f
+                           columns
+                           "Mutants with interesting debugging scenarios, per operator"
+                           #:x-max 50)
+     (hash-ref flags 'outfile))]
    ['successful-population-count
     (plot-new-window? #t)
     (stacked-histogram-colors
@@ -410,7 +477,14 @@
     (pict->png!
      (plot-benchmark-table all-data
                            plot-type
-                           columns)
+                           columns
+                           (match plot-type
+                             ['total-counts
+                              "Proportion of all mutants created by operator"]
+                             ['success-ratios
+                              "Ratio of mutants causing type errors, per operator"]
+                             ['success-counts
+                              "Mutants with interesting debugging scenarios, per operator"]))
      (hash-ref flags 'outfile))]))
 
 (module test racket)
