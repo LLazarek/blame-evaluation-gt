@@ -1,13 +1,6 @@
-%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
-\documentclass[acmsmall,screen,anonymous,nonacm]{acmart}\settopmatter{printfolios=true,printccs=true,printacmref=true}
-%% For double-blind review submission, w/ CCS and ACM Reference
-%%\documentclass[acmsmall,review,anonymous]{acmart}\settopmatter{printfolios=true}
-%% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
-%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
-%% For single-blind review submission, w/ CCS and ACM Reference
-%\documentclass[acmsmall,review]{acmart}\settopmatter{printfolios=true}
-%% For final camera-ready submission, w/ required CCS and ACM Reference
-%\documentclass[acmsmall]{acmart}\settopmatter{}
+\documentclass[sigplan,10pt,review,anonymous]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Note: Authors migrating a paper from PACMPL format to traditional
@@ -53,40 +46,20 @@
 
 \input{def.tex}
 
-%% Journal information
-%% Supplied to authors by publisher for camera-ready submission;
-%% use defaults for review submission.
+\acmConference[]{}{}{}
+\acmYear{}
+\acmISBN{} % \acmISBN{978-x-xxxx-xxxx-x/YY/MM}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
 \startPage{1}
 
 %% Copyright information
 %% Supplied to authors (based on authors' rights management selection;
 %% see authors.acm.org) by publisher for camera-ready submission;
 %% use 'none' for review submission.
-%% \setcopyright{none}
-%\setcopyright{acmcopyright}
-%\setcopyright{acmlicensed}
-%\setcopyright{rightsretained}
-%\copyrightyear{2018}           %% If different from \acmYear
+\setcopyright{none}
 
 %% Bibliography style
 \bibliographystyle{ACM-Reference-Format}
-%% Citation style
-%% Note: author/year citations are required for papers published as an
-%% issue of PACMPL.
-\citestyle{acmauthoryear}   %% For author/year citations
-
-%%%
-\setcopyright{none}
-\acmPrice{1}
-\acmDOI{}
-\acmYear{}
-\copyrightyear{}
-\acmJournal{pacmpl}
-\acmVolume{1}
-\acmNumber{1}
-\acmArticle{1}
-\acmMonth{1}
-
 
 \begin{document}
 

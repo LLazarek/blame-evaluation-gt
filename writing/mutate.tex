@@ -23,7 +23,7 @@ The table in figure~\ref{table:benchmark-descriptions} shows our selection
 together with a short description for each benchmark.
 
 
-\begin{figure}
+\begin{figure*}
 \begin{tabular}{p{2cm} | p{10cm} }
   {\bf  name} & {\bf description (author)}  \\
 
@@ -65,7 +65,7 @@ together with a short description for each benchmark.
 \end{tabular}
   \caption{Benchmarks summary.}
   \label{table:benchmark-descriptions}
-\end{figure}
+\end{figure*}
 
 Of course, the gradual typing benchmarks have no mistakes for the rational
 programmer to debug. Therefore, we follow
@@ -99,7 +99,7 @@ advantage of Typed Racket's ``truthiness.'' Finally, \texttt{negate-cond} and \t
 aim to confuse occurrence typing.
 
 
-\begin{figure}
+\begin{figure*}
   \begin{tabular}{p{2.1cm} | p{5cm}  | p{5.5cm} }
     {\bf name} & {\bf description} & {\bf example} \\
 
@@ -213,26 +213,10 @@ aim to confuse occurrence typing.
 \end{tabular}
   \caption{Summary of mutators.}
   \label{table:mutation-ops}
-\end{figure}
+\end{figure*}
 
 
 \subsection{Are these mutators good enough?}
-\begin{itemize}
-\item do these mutators work?
-\begin{itemize}
-\item now we need to see if these mutators actually produce interesting errors
-\begin{itemize}
-\item define interesting errors: type error + dynamic err w/ 3 modules on stack in a mixed configuration
-\item this section will show if they do this on our benchmarks
-\end{itemize}
-\item do they actually produce interesting errors? -- for this need plot that's inverted version dyn-err-heatmap + total of mutants per benchmark
-\item do we need all of the mutators?
-\begin{itemize}
-\item each one produces type errors + interesting scenarios
-\item we conjecture they represent different kinds of mistakes
-\end{itemize}
-\end{itemize}
-\end{itemize}
 
 Of course, mutators that introduce these kinds of shallow errors directly into the benchmarks do not produce bugs that are interesting from the perspective of the rational programmer.
 The benchmarks are fully typed, so Typed Racket's type checker locates them immediately.
@@ -262,12 +246,12 @@ If the stack trace mentions at least two components, then this is evidence of in
 We require the third component because our benchmarks come with a driver component which is present in every stacktrace.
 
 
-\begin{figure}
+\begin{figure*}
   \centering
-  \includegraphics[width=\textwidth]{./plots/mutant-breakdown}
+  \includegraphics[scale=0.35]{./plots/mutant-breakdown}
   \caption{Interesting debugging scenarios produced by our mutators. Counts are cut off at 50.}
   \label{fig:mutant-breakdown}
-\end{figure}
+\end{figure*}
 
 
 With this definition in hand, we analyze how effectively our mutators produce interesting debugging scenarios from our benchmarks.
