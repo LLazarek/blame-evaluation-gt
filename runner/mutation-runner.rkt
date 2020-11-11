@@ -17,6 +17,7 @@
          "../mutate/mutate-program.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt"
+         "../util/read-module.rkt"
          "../configurations/config.rkt"
          "sandbox-runner.rkt"
          "../util/program.rkt"
@@ -132,7 +133,7 @@
        ;; ll: see above...
        (set-box! mutated-id-box mutated-id)
 
-       mutated-stx]
+       (replace-stx-location mutated-stx path)]
       [(mod _ stx)
        (maybe-write-module! a-mod)
        stx]))
@@ -519,10 +520,6 @@
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
                                                [blamed '("main.rkt")]))))))
 
-  (define (replace-stx-location stx new-file-name)
-    (define-values {read-port write-port} (make-pipe))
-    (pretty-write (syntax->datum stx) write-port)
-    (read-module/port read-port #:source new-file-name))
   (define (mod/loc path stx)
     (mod path
          (replace-stx-location stx path)))
@@ -567,6 +564,7 @@
      (define c (mod/loc "./test-mods/c.rkt"
                         #'(module c typed/racket
                             (#%module-begin
+                             (provide x)
                              (: x One)
                              (define x 1)
                              (displayln (list 'x x))))))
@@ -598,7 +596,40 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")]))))))
+                                               [blamed '("a.rkt")])))))
+
+    (ignore (define mutator-that-changes-source-locations
+              (λ (a-mod index #:in program)
+                (values (syntax-parse (mod-stx a-mod)
+                          [(mod-stuff
+                            ...
+                            (top-level-stuff
+                             ...
+                             (def c-id (the-first d-id))
+                             disp1
+                             disp2))
+                           (datum->syntax
+                            #'hello
+                            (syntax->datum
+                             #'(mod-stuff
+                                ...
+                                (top-level-stuff
+                                 ...
+                                 (def c-id (x d-id))
+                                 disp1
+                                 disp2))))])
+                        'x))))
+    (test/no-error
+     (λ _ (run-with-mutated-module p
+                                   b
+                                   0
+                                   p-config
+                                   #:timeout/s 60
+                                   #:memory/gb 1
+                                   #:mutator mutator-that-changes-source-locations
+                                   #:suppress-output? #f))
+     (λ (r) (test-match r (struct* run-status ([outcome 'type-error]
+                                               [blamed '("b.rkt")]))))))
 
 
   (define-test-env {setup-test-env! cleanup-test-env!}

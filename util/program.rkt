@@ -30,7 +30,10 @@
      (match (mod-path m)
        [(? string? s) (string-length s)]
        [(? path? p) (string-length (path->string p))]
-       [else 0]))})
+       [else 0]))}
+  #:methods gen:custom-write
+  {(define (write-proc mod port mode)
+     (display @~a{#<mod: @~s[(mod-path mod)] #<syntax from @~s[(syntax-source (mod-stx mod))]>>} port))})
 (struct program (main others)
   #:transparent)
 

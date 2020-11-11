@@ -2,7 +2,8 @@
 
 (require "../util/program.rkt"
          "../util/path-utils.rkt"
-         "../util/ctc-utils.rkt")
+         "../util/ctc-utils.rkt"
+         "../util/read-module.rkt")
 
 (provide (contract-out
           [unified-benchmark/c contract?]
@@ -88,7 +89,7 @@
   (program (unify-module-for-running raw-main)
            (map unify-module-for-running raw-others)))
 
-(define (unify-module-for-running a-mod)
+(define (unified-path-for a-mod)
   (define relocated-path-parts
     (match (explode-path/string (mod-path a-mod))
       [(list before ... (or "untyped" "typed" "both") name)
@@ -101,8 +102,13 @@
         'unify-module-for-running
         "a module from a benchmark (ie conforming to standard benchmark structure)"
         a-mod)]))
-  (mod (apply build-path relocated-path-parts)
-       (mod-stx a-mod)))
+  (apply build-path relocated-path-parts))
+
+(define (unify-module-for-running a-mod)
+  (define unified-path (unified-path-for a-mod))
+  (define stx (mod-stx a-mod))
+  (mod unified-path
+       (replace-stx-location stx unified-path)))
 
 
 (define (unified-module-path-of? orig-mod-path maybe-unified-mod-path)

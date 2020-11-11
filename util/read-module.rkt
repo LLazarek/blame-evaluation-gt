@@ -1,9 +1,11 @@
 #lang at-exp racket/base
 
 (provide read-module
-         read-module/port)
+         read-module/port
+         replace-stx-location)
 
-(require syntax/modread)
+(require syntax/modread
+         racket/pretty)
 
 (define (read-module path)
   (call-with-input-file path
@@ -17,6 +19,11 @@
        (port-count-lines! input-port)
        (read-syntax source input-port)))
    'ignored source))
+
+(define (replace-stx-location stx new-file-name)
+  (define-values {read-port write-port} (make-pipe))
+  (pretty-write (syntax->datum stx) write-port)
+  (read-module/port read-port #:source new-file-name))
 
 (module+ test
   (require racket
