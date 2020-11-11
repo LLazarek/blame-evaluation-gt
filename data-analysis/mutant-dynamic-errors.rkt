@@ -88,7 +88,7 @@
  (define mutant-mutators
    (read-mutants-by-mutator (mutation-analysis-summaries-db)))
 
- (define data (read-data data-dir mutant-mutators))
+ (define data (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators))
 
  (define all-mutator-names (mutator-names data))
 

@@ -10,6 +10,7 @@
          "../experiment/blame-trail-data.rkt"
          (prefix-in db: "../db/db.rkt")
          "../configurables/configurables.rkt"
+         "../runner/mutation-runner-data.rkt"
 
          "read-data.rkt")
 
@@ -19,66 +20,37 @@
        (set=? (hash-keys h)
               (configured:active-mutator-names))))
 
-(define/contract (bt-length-distribution-plot-for key data
-                                                  #:normalize? normalize?
-                                                  #:dump-to [dump-port #f])
-  ({string?
-   (hash/c string? (listof blame-trail?))
-   #:normalize? boolean?}
-   {#:dump-to (or/c output-port? #f)}
-   . ->* .
-   pict?)
-
-  (define (trail-length trail)
-    (define base-trail-length
-      (sub1 (length (blame-trail-mutant-summaries trail))))
-    (cond [(and normalize?
-                (> base-trail-length 0))
-           (define ordered-configs
-             (sort (blame-trail-mutant-summaries trail)
-                   <
-                   #:key mutant-summary-id))
-           (define first-mutant-config
-             (mutant-summary-config (first ordered-configs)))
-           (define last-mutant-config
-             (mutant-summary-config (last ordered-configs)))
-           (define number-of-components-typed
-             (for/sum ([{mod level} (in-hash first-mutant-config)]
-                       #:when (not (equal? (hash-ref last-mutant-config mod)
-                                           level)))
-               1))
-           number-of-components-typed]
-          [else base-trail-length]))
-
-  (define trails (hash-ref data key))
-  (define trail-lengths
-    (map trail-length trails))
-  (when dump-port
-    (define grouped-by-length (group-by trail-length trails))
-    (pretty-write (for/hash ([group (in-list grouped-by-length)])
-                    (define a-trail (first group))
-                    (values (trail-length a-trail)
-                            group))
-                  dump-port))
-  (define grouped-lengths
-    (group-by identity trail-lengths))
-  (define counts
-    (for/list ([group (in-list grouped-lengths)])
-      (list (first group) (/ (length group) (length trails)))))
-  (define counts/0-if-empty
-    (if (empty? counts)
-        '((0 0))
-        counts))
-  (define counts/0-if-empty/sorted
-    (sort counts/0-if-empty < #:key first))
-  (plot-pict (discrete-histogram counts/0-if-empty/sorted)
-             #:x-min 0
-             #:y-min 0
+(define (bt-violation-distribution-plot-for key
+                                            blame-trail-map
+                                            #:dump-to [dump-to #f])
+  (define trails (hash-ref blame-trail-map key))
+  (define total-trail-count (length trails))
+  (define-values {bt-satisfied bt-failed} (partition bt-satisfied? trails))
+  (when (output-port? dump-to)
+    (pretty-write (hash 'satisfied bt-satisfied
+                        'failed bt-failed)
+                  dump-to))
+  (define bt-satisfied-count (length bt-satisfied))
+  (define bt-satisfied-% (if (zero? total-trail-count) 0 (/ bt-satisfied-count total-trail-count)))
+  (plot-pict (discrete-histogram (list (list "✓" bt-satisfied-%)
+                                       (list "✗" (- 1 bt-satisfied-%))))
              #:y-max 1
-             #:x-label (~a "Blame trail length"
-                           (if normalize? " (normalized)" ""))
-             #:y-label (~a "Percent (out of " (length trails) ")")
+             #:x-label "Trail satisfies BT?"
+             #:y-label (~a "Percent (out of " total-trail-count ")")
              #:title key))
+
+(define (bt-satisfied? bt)
+  (define end-mutant-summary (first (blame-trail-mutant-summaries bt)))
+  (match end-mutant-summary
+    [(mutant-summary _
+                     (struct* run-status ([mutated-module mutated-mod-name]
+                                          [outcome 'type-error]
+                                          [blamed blamed]))
+                     config)
+     (and (equal? (hash-ref config mutated-mod-name) 'types)
+          (list? blamed)
+          (member mutated-mod-name blamed))]
+    [else #f]))
 
 (define (add-missing-active-mutators blame-trails-by-mutator/across-all-benchmarks)
   (for/fold ([data+missing blame-trails-by-mutator/across-all-benchmarks])
@@ -149,18 +121,15 @@
 
  (define dump-port (and dump-path
                         (open-output-file dump-path #:exists 'replace)))
- (match-define (list distributions/normalized
-                     distributions/unnormalized)
+ (define distributions
    (match breakdown-dimension
      ["mutator"
-      (for/list ([normalized? (in-list '(#t #f))])
-        (for/hash ([mutator (in-list all-mutator-names)])
-          (when dump-port (newline dump-port) (displayln mutator dump-port))
-          (values mutator
-                  (bt-length-distribution-plot-for mutator
-                                                   blame-trails-by-mutator/across-all-benchmarks
-                                                   #:normalize? normalized?
-                                                   #:dump-to dump-port))))]
+      (for/hash ([mutator (in-list all-mutator-names)])
+        (when dump-port (newline dump-port) (displayln mutator dump-port))
+        (values mutator
+                (bt-violation-distribution-plot-for mutator
+                                                    blame-trails-by-mutator/across-all-benchmarks
+                                                    #:dump-to dump-port)))]
      ["benchmark"
       (define ((add-to-list v) l) (cons v l))
       (define blame-trails-by-benchmark/across-all-mutators
@@ -172,14 +141,13 @@
                        benchmark
                        (add-to-list bt)
                        empty)))
-      (for/list ([normalized? (in-list '(#t #f))])
-        (for/hash ([benchmark (in-hash-keys blame-trails-by-benchmark/across-all-mutators)])
-          (when dump-port (newline dump-port) (displayln benchmark dump-port))
-          (values benchmark
-                  (bt-length-distribution-plot-for benchmark
-                                                   blame-trails-by-benchmark/across-all-mutators
-                                                   #:normalize? normalized?
-                                                   #:dump-to dump-port))))]))
+      (for/hash ([benchmark (in-hash-keys blame-trails-by-benchmark/across-all-mutators)])
+        (when dump-port (newline dump-port) (displayln benchmark dump-port))
+        (values benchmark
+                (bt-violation-distribution-plot-for benchmark
+                                                    blame-trails-by-benchmark/across-all-mutators
+                                                    #:dump-to dump-port)))]))
+ (when dump-port (close-output-port dump-port))
 
  (make-directory* out-dir)
  (define (write-distributions-image! distributions name)
@@ -196,7 +164,4 @@
                 all-together))
    (pict->png! all-together+title (build-path out-dir (~a name '- breakdown-dimension ".png"))))
 
- (write-distributions-image! distributions/normalized
-                             (~a name '- "normalized"))
- (write-distributions-image! distributions/unnormalized
-                             (~a name '- "unnormalized")))
+ (write-distributions-image! distributions name))

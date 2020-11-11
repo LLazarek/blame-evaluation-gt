@@ -1,13 +1,13 @@
 #lang at-exp rscript
 
 (require "../configurables/mutant-sampling/use-pre-selected-samples.rkt"
+         "../configurables/bt-root-sampling/pre-selected.rkt"
          (prefix-in db: "../db/db.rkt")
          "read-data.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../util/debug-mutant.rkt"
          "../runner/mutation-runner.rkt")
 
-;; returns a string if difference, else #f
 (define (check-mutants bench-name bench-data expected-samples log-path)
   (define expected-mutants
     (for*/list ([{mod-name indices} (in-hash expected-samples)]
@@ -38,6 +38,27 @@
                                  log-path)
          (newline)
          (newline)]))
+
+(define (check-blame-trails bench-name bench-data expected-bt-samples)
+  (define expected-mutants (hash-keys expected-bt-samples))
+  (define expected-bt-count
+    (for/sum ([{mutant root-configs} (in-hash expected-bt-samples)])
+      (length root-configs)))
+  (define (expected-mutant? m)
+    (and (string=? (mutant-benchmark m) bench-name)
+         (member (struct-copy mutant m [benchmark #f])
+                 expected-mutants)))
+  (define actual-bt-count
+    (count
+     (compose1 expected-mutant? blame-trail-mutant-id)
+     (flatten (hash-values bench-data))))
+  (unless (= actual-bt-count expected-bt-count)
+    (displayln
+     @~a{
+         @bench-name Has missing blame trails.
+         There are @expected-bt-count bt roots in the db, but only @actual-bt-count bts in the data.
+
+         })))
 
 (define (missing-mutant-reasons mutants log-path)
   (define pattern "Mutant.+has no type error. discarding")
@@ -86,7 +107,7 @@
     "quadU"))
 
 (define-runtime-paths
-  [me "check-for-missing-mutants.rkt"])
+  [me "check-for-missing-mutants-or-trails.rkt"])
 (main
  #:arguments {[(hash-table ['interactive? interactive?]
                            ['parallel?    parallel?]
@@ -94,19 +115,26 @@
                dirs-to-check]
               #:once-each
               [("-s" "--samples-db")
-               'samples-db
-               ("Samples db to check against."
-                @~a{Default: @(pre-selected-mutant-samples-db)})
+               'mutant-samples-db
+               ("Mutant samples db to check against.")
                #:collect ["path"
                           (set-parameter pre-selected-mutant-samples-db)
-                          (pre-selected-mutant-samples-db)]]
+                          #f]
+               #:mandatory]
               [("-S" "--summaries-db")
                'summaries-db
-               ("Summaries db to check against."
-                @~a{Default: @(mutation-analysis-summaries-db)})
+               ("Summaries db to check against.")
                #:collect ["path"
                           (set-parameter mutation-analysis-summaries-db)
-                          (mutation-analysis-summaries-db)]]
+                          #f]
+               #:mandatory]
+              [("-r" "--bt-root-samples-db")
+               'bt-root-db
+               ("BT root sample db to check against.")
+               #:collect ["path"
+                          (set-parameter pre-selected-bt-root-db)
+                          #f]
+               #:mandatory]
               [("-i" "--interactive")
                'interactive?
                ("Display which benchmarks are being checked while running."
@@ -131,6 +159,8 @@
                               (pre-selected-mutant-samples-db)
                               "-S"
                               (mutation-analysis-summaries-db)
+                              "-r"
+                              (pre-selected-bt-root-db)
                               dir))
             (close-output-port stdin)
             (list stdout ctl)))
@@ -152,15 +182,20 @@
         (file-stream-buffer-mode (current-output-port) 'line)
 
         (define mutants-by-mutator (read-mutants-by-mutator (mutation-analysis-summaries-db)))
-        (define samples-db (db:get (pre-selected-mutant-samples-db)))
+        (define mutant-samples-db (db:get (pre-selected-mutant-samples-db)))
+        (define root-samples-db (db:get (pre-selected-bt-root-db)))
         (for ([dir-to-check (in-list dirs-to-check)])
           (displayln (~a "⟶ " dir-to-check))
           (for ([bench-name (in-list benchmarks-to-check)])
             (when interactive?
               (display @~a{Checking @bench-name                     @"\r"}))
-            (define bench-samples (db:read samples-db bench-name))
-            (define bench-data (read-data dir-to-check mutants-by-mutator))
+            (define bench-mutant-samples (db:read mutant-samples-db bench-name))
+            (define bench-bt-root-samples (db:read root-samples-db bench-name))
+            (define bench-data (read-blame-trails-by-mutator/across-all-benchmarks dir-to-check mutants-by-mutator))
             (check-mutants bench-name
                            bench-data
-                           bench-samples
-                           (build-path dir-to-check bench-name (~a bench-name ".log")))))]))
+                           bench-mutant-samples
+                           (build-path dir-to-check bench-name (~a bench-name ".log")))
+            (check-blame-trails bench-name
+                                bench-data
+                                bench-bt-root-samples)))]))
