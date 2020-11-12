@@ -210,7 +210,7 @@
   (parameterize ([current-directory parent])
     (shell* "git"
             "clone"
-            "https://github.com/bennn/gtp-benchmarks.git"))
+            "https://github.com/llazarek/gtp-benchmarks.git"))
   (parameterize ([current-directory gtp-dir])
     (shell* "git"
             "checkout"
