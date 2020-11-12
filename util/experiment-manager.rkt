@@ -493,6 +493,102 @@
       (raise-user-error 'update-host!
                         "Update failed."))))
 
+(define (format-status a-host
+                       [summary* (summarize-experiment-status a-host)]
+                       [active+pending-jobs* (try-unwrap (send a-host get-jobs 'both))])
+  (option-let*
+   ([summary summary*]
+    [active+pending-jobs active+pending-jobs*])
+
+   (with-output-to-string
+     (thunk
+      (match-define (list active-job-ids pending-job-ids) active+pending-jobs)
+      ;; listof(job-id, active?, progress, errorflag?)
+      (define all-job-ids
+        (set-union active-job-ids
+                   pending-job-ids
+                   (for*/list ([{_ jobs} (in-hash summary)]
+                               [job-id* (in-list jobs)])
+                     (match job-id*
+                       [(list* bench mode _) (list bench mode)]))))
+      (define all-job-info
+        (for/list ([job-id (in-list all-job-ids)])
+          (define active? (member job-id active-job-ids))
+          (define pending? (member job-id pending-job-ids))
+          (define status (cond [active?  "R"]
+                               [pending? "W"]
+                               [else     "-"]))
+          (match-define (list bench mode) job-id)
+          (define-values {progress check-for-errors?}
+            (match summary
+              [(hash-table ['completed (list-no-order (== job-id) _ ...)]
+                           _ ...)
+               (values 1 #f)]
+              [(hash-table [(and (or 'errored 'incomplete) category)
+                            (list-no-order (list bench mode %) _ ...)]
+                           _ ...)
+               (values % (equal? category 'errored))]
+              [(hash-table ['other (list-no-order (== job-id) _ ...)]
+                           _ ...)
+               (values 0 #t)]
+              [else (values 0 #f)]))
+          (list job-id status progress check-for-errors?)))
+      (define (render-jobs jobs)
+        (for ([job (in-list jobs)]
+              [i (in-naturals)])
+          (define prefix (if (zero? i) "" "\n         "))
+          (match-define (list job-id status progress check-for-errors?) job)
+          (display (~a prefix
+                       (fixed-width-format job-id 25)
+                       "  "
+                       (match* {status progress}
+                         [{"-" 1} "✓"]
+                         [{"-" _} "?"]
+                         [{"R" _} "R"]
+                         [{"W" _} "W"])
+                       "  "
+                       (render-progress progress status)
+                       "  "
+                       (if check-for-errors? "⚠" " ")))))
+      (define (render-progress % status)
+        (define bar-char (match status
+                           ["R" #\▬]
+                           [else #\▭]))
+        (define end-char (match status
+                           ["R" #\▶]
+                           [else #\▭]))
+        (define bar-size 20)
+        (define progress-chars (inexact->exact
+                                (round (* % bar-size))))
+        (~a "▕"
+            (fixed-width-format
+             (match progress-chars
+               [0 ""]
+               [else (~a (make-string (sub1 progress-chars) bar-char) end-char)])
+             bar-size)
+            "▏"
+            (if (= % 1)
+                ""
+                (~a (~r (* % 100) #:precision 1 #:min-width 4) "%"))))
+      (define (fixed-width-format v width)
+        (define content (~a v))
+        (~a content (make-string (- width (string-length content)) #\space)))
+      (display "Active   ")
+      (render-jobs (filter (match-lambda [(list _ "R" _ _) #t]
+                                         [else #f])
+                           all-job-info))
+      (newline)
+      (display "Pending  ")
+      (render-jobs (filter (match-lambda [(list _ "W" _ _) #t]
+                                         [else #f])
+                           all-job-info))
+      (newline)
+      (display "Inactive ")
+      (render-jobs (filter (match-lambda [(list _ "-" _ _) #t]
+                                         [else #f])
+                           all-job-info))
+      (newline)))))
+
 (define (notify-phone! msg)
   (system @~a{fish -c "notify-phone '@msg'"}))
 
@@ -524,6 +620,7 @@
                            ['cancel (app (mapper string->benchmark-spec) cancel-targets)]
                            ['watch-for-stuck-jobs watch-for-stuck-jobs?]
                            ['queue Q-path]
+                           ['resume-queue resume-Q/host]
                            ['update (app (mapper host-by-name) update-targets)])
                args]
               #:once-each
@@ -536,6 +633,12 @@
                ("Oversee the execution of a queue of jobs, downloading the results after each one."
                 "The queue is specified in the given file.")
                #:collect ["spec path" take-latest #f]]
+              [("-r" "--resume")
+               'resume-queue
+               ("Resume overseeing the queue specified by -q, which see."
+                "Only has an effect with -q.")
+               #:collect ["host" take-latest #f]
+               #:conflicts (λ (flags) (not (member 'queue flags)))]
               #:multi
               [("-d" "--download-results")
                'download
@@ -574,16 +677,8 @@
            (displayln @~a{Successful @name @(list a-host config-name benchmark)})))))
  (cond [status?
         (for ([a-host (in-list hosts)])
-          (define maybe-summary
-            (summarize-experiment-status a-host))
           (displayln @~a{---------- @a-host ----------})
-          (match (try-unwrap (send a-host get-jobs 'both))
-            [(list active-jobs pending-jobs)
-             (displayln @~a{Active: @active-jobs})
-             (displayln @~a{Pending: @pending-jobs})]
-            [else (void)])
-          (pretty-display (try-unwrap maybe-summary))
-          (newline))]
+          (displayln (try-unwrap (format-status a-host))))]
        [(not (empty? launch-targets))
         (for-each-target launch-targets
                          (λ (a-host benchmark config-name)
@@ -613,6 +708,39 @@
                                     #:exists 'replace)
              front]
             [else #f]))
+        (define (wait-for-jobs-to-finish+download-results host waiting-job)
+          (match (try-unwrap (wait-for-current-jobs-to-finish host restart-stuck-jobs!))
+            ['complete
+             (option-let*
+              ([complete-summary (summarize-experiment-status host)]
+               [_ (download-completed-benchmarks! host complete-summary)])
+              'ok)]
+            [else
+             #:when (help!:continue?
+                     @~a{Unexpected results on @host}
+                     @~a{
+                         Unexpected results on @host while waiting on @waiting-job
+                         Current status:
+                         @(try-unwrap (format-status host))
+                         Retry this item?
+                         })
+             'retry-job]
+            [else 'stop]))
+        (when resume-Q/host
+          (define host (host-by-name resume-Q/host))
+          (define status (try-unwrap
+                          (wait-for-jobs-to-finish+download-results host
+                                                                    (~a "resuming " Q-path))))
+          (unless (or (equal? status 'ok)
+                      (help!:continue?
+                       @~a{Unexpected results on @host}
+                       @~a{
+                           Unexpected results on @host while resuming @Q-path, summary:
+                           @(try-unwrap (format-status host))
+                           Continue with the rest of the Q? (no means abort)
+                           }))
+            (displayln "Aborting")
+            (exit 1)))
         (let launch-next-target ([retry #f])
           (match (or retry (dequeue-target!))
             [#f (void)]
@@ -624,22 +752,12 @@
                               (λ (a-host benchmark config-name)
                                 (send a-host submit-job! benchmark config-name))
                               "submit")
-             (match (try-unwrap (wait-for-current-jobs-to-finish host restart-stuck-jobs!))
-               ['complete
-                (option-let*
-                 ([complete-summary (summarize-experiment-status host)]
-                  [_ (download-completed-benchmarks! host complete-summary)])
-                 (launch-next-target #f))]
+             (match (try-unwrap (wait-for-jobs-to-finish+download-results host launch-spec-list))
+               ['ok (launch-next-target #f)]
+               ['retry-job (launch-next-target launch-spec-list)]
                [else
-                #:when (help!:continue?
-                        @~a{Unexpected results on @host}
-                        @~a{
-                            Unexpected results on @host while waiting on @launch-spec-list, summary:
-                            @(pretty-format (summarize-experiment-status host))
-                            Retry this item?
-                            })
-                (launch-next-target launch-spec-list)]
-               [else (void)])]))]
+                (displayln "Aborting queue.")
+                (void)])]))]
        [(not (empty? update-targets))
         (for ([a-host (in-list update-targets)])
           (update-host! a-host))]))
