@@ -349,44 +349,62 @@
                  [(or 'errored 'other) '()] ...)
      #f]
     [else #t]))
+(define (missing-completed-benchmarks summary)
+  (define completed (hash-ref summary 'completed))
+  (define completed-benchmarks (map first completed))
+  (set-subtract needed-benchmarks/10 completed-benchmarks))
 (define (config/mode-complete? summary)
   (define completed (hash-ref summary 'completed))
   (match completed
-    [(list (list benchmarks config-names) ..1)
+    [(list (list _ config-names) ..1)
      (and (= (set-count (apply set config-names)) 1)
-          (set=? benchmarks needed-benchmarks/10))]
-    [else
-     #f]))
+          (empty? (missing-completed-benchmarks summary)))]
+    [else #f]))
 (define (download-completed-benchmarks! a-host summary)
-  (define completed (hash-ref summary 'completed))
+  (define (download-results! archive-name)
+    (when (string=? archive-name "")
+      (raise-user-error 'download-completed-benchmarks!
+                        "Can't download results with empty archive name"))
+    (define projdir (get-field host-project-path a-host))
+    (void (send a-host system/host @~a{
+                                       cd @projdir && @;
+                                       ./pack.sh experiment-output @archive-name @;
+                                       }))
+    (define archive-name+ext (~a archive-name ".tar.gz"))
+    (match (send a-host scp
+                 #:from-host (build-path projdir archive-name+ext)
+                 #:to-local data-path)
+      [0
+       (displayln @~a{Data from @a-host downloaded at @(build-path data-path archive-name+ext)})
+       (present (void))]
+      [else
+       (displayln @~a{Something went wrong downloading data for @a-host})
+       absent]))
   (match summary
-    [(hash-table ['completed (list (list _ config-name) _ ...)]
+    [(hash-table ['completed (list (list* _ config-name) _ ...)]
                  [_ '()] ...)
      #:when (or (config/mode-complete? summary)
                 (user-prompt!
                  @~a{
                      Not all benchmarks are completed on @a-host
-                     @(pretty-format summary)
+                     @(try-unwrap (format-status a-host summary))
+                     Missing: @(missing-completed-benchmarks summary)
                      Do you want to download the results anyway? 
                      }))
-     (define projdir (get-field host-project-path a-host))
-     (void (send a-host system/host @~a{
-                                        cd @projdir && @;
-                                        ./pack.sh experiment-output @config-name @;
-                                        }))
-     (define archive-name (~a config-name ".tar.gz"))
-     (match (send a-host scp
-                  #:from-host (build-path projdir archive-name)
-                  #:to-local data-path)
-       [0
-        (displayln @~a{Data from @a-host downloaded at @(build-path data-path archive-name)})
-        (present (void))]
-       [else
-        (displayln @~a{Something went wrong downloading data for @a-host})
-        absent])]
+     (download-results! config-name)]
+    [else
+     #:when (user-prompt!
+             @~a{
+                 @a-host results are not all successfully completed:
+                 @(try-unwrap (format-status a-host summary))
+                 Missing: @(missing-completed-benchmarks summary)
+                 Do you want to download the results anyway? 
+                 })
+     (displayln "Enter the desired archive name (no extension):")
+     (download-results! (read-line))]
     [else
      (displayln @~a{Aborting download of inconsistent results:})
-     (pretty-display summary)
+     (displayln (try-unwrap (format-status a-host summary)))
      absent]))
 
 
@@ -572,7 +590,7 @@
                 (~a (~r (* % 100) #:precision 1 #:min-width 4) "%"))))
       (define (fixed-width-format v width)
         (define content (~a v))
-        (~a content (make-string (- width (string-length content)) #\space)))
+        (~a content (make-string (max 0 (- width (string-length content))) #\space)))
       (display "Active   ")
       (render-jobs (filter (match-lambda [(list _ "R" _ _) #t]
                                          [else #f])
