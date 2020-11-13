@@ -23,7 +23,6 @@
          "../util/program.rkt"
          "instrumented-runner.rkt"
          "error-extractors/extract-type-error-source.rkt"
-         "error-extractors/extract-runtime-error-location.rkt"
          (prefix-in racket-contracts:
                     "../configurables/blame-following/natural-blame.rkt"))
 
@@ -246,6 +245,7 @@
                                  module-to-mutate
                                  mutation-index)))
     (define make-extract-blamed (configured:make-extract-blamed))
+    (define make-extract-runtime-error-location (configured:make-extract-runtime-error-location))
     (define extract-blamed
       (make-extract-blamed a-program
                            program-config

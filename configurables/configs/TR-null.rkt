@@ -8,7 +8,7 @@
   (configure! mutation                 type-mistakes-in-code)
   (configure! mutant-sampling          use-pre-selected-samples "../dbs/code-mutations/mutant-samples.rktdb")
   (configure! blame-following          null)
-  (configure! stack-location-selection top)
+  (configure! stack-location-selection null)
   (configure! module-instrumentation   none)
   (configure! benchmark-runner         run-it)
   (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
