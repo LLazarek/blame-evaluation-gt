@@ -20,9 +20,9 @@
        (set=? (hash-keys h)
               (configured:active-mutator-names))))
 
-(define (bt-violation-distribution-plot-for key
-                                            blame-trail-map
-                                            #:dump-to [dump-to #f])
+(define (raw-bt-violation-distribution-plot-for key
+                                                blame-trail-map
+                                                #:dump-to [dump-to #f])
   (define trails (hash-ref blame-trail-map key))
   (define total-trail-count (length trails))
   (define-values {bt-satisfied bt-failed} (partition bt-satisfied? trails))
@@ -38,6 +38,52 @@
              #:x-label "Trail satisfies BT?"
              #:y-label (~a "Percent (out of " total-trail-count ")")
              #:title key))
+
+(define (blame-reliability-plot-for key
+                                    blame-trail-map
+                                    #:dump-to [dump-to #f])
+  (define breakdown (blame-reliability-breakdown-for key blame-trail-map))
+  (define total-mutant-count (for/sum ([mutant-trails (hash-values breakdown)])
+                               (length mutant-trails)))
+  (when (output-port? dump-to)
+    (pretty-write breakdown dump-to))
+  (plot-pict (stacked-histogram
+              (list
+               (list key
+                     (for/list ([category (in-list '("always" "sometimes" "never"))])
+                       (define trail-count (length (hash-ref breakdown category)))
+                       (/ trail-count total-mutant-count))))
+              #:colors '("green" "yellow" "red"))
+             #:y-max 1
+             ;; #:x-label "Mutants"
+             #:y-label (~a "Percent (out of " total-mutant-count " mutants)")))
+
+;; string? (hash/c string? (listof blame-trail?))
+;; ->
+;; (hash/c "always"    (listof blame-trail?)
+;;         "sometimes" ^
+;;         "never"     ^)
+(define (blame-reliability-breakdown-for key
+                                         blame-trail-map)
+  (define trails (hash-ref blame-trail-map key))
+  (define total-trail-count (length trails))
+  (define trails-grouped-by-mutant (group-by blame-trail-mutant-id trails))
+
+  (define (categorize-trail-set-reliability trail-set)
+    (define bt-success-count (count bt-satisfied? trail-set))
+    (match* {bt-success-count (length trail-set)}
+      [{     0  (not 0)} "never"]
+      [{(not 0)      0}  "always"]
+      [{(not 0) (not 0)} "sometimes"]))
+
+  (for/fold ([breakdown (hash "always" empty
+                              "sometimes" empty
+                              "never" empty)])
+            ([mutant-trails (in-list trails-grouped-by-mutant)])
+    (define mutant-category (categorize-trail-set-reliability mutant-trails))
+    (hash-update breakdown
+                 mutant-category
+                 (add-to-list mutant-trails))))
 
 (define (bt-satisfied? bt)
   (define end-mutant-summary (first (blame-trail-mutant-summaries bt)))
@@ -59,6 +105,7 @@
                  mutator-name
                  values
                  empty)))
+(define ((add-to-list v) l) (cons v l))
 
 (main
  #:arguments {[(hash-table ['data-dir data-dir]
@@ -66,7 +113,8 @@
                            ['name     name]
                            ['config   config-path]
                            ['dump-path dump-path]
-                           ['by breakdown-dimension])
+                           ['by breakdown-dimension]
+                           ['raw-counts? raw-counts?])
                args]
               #:once-each
               [("-d" "--data-dir")
@@ -104,7 +152,12 @@
               [("-b" "--by")
                'by
                "Break down the data by either mutator or benchmark. Default: mutator"
-               #:collect ["mutator or benchmark" take-latest "mutator"]]}
+               #:collect ["mutator or benchmark" take-latest "mutator"]]
+              [("-r" "--raw-counts")
+               'raw-counts?
+               ("Plot raw counts of blame trail violations instead of the statistically-meaningful"
+                "Always/Sometimes/Never categorizations of mutants.")
+               #:record]}
  #:check [(member breakdown-dimension '("mutator" "benchmark"))
           @~a{Invalid argument to --by: @breakdown-dimension}]
 
@@ -126,12 +179,16 @@
      ["mutator"
       (for/hash ([mutator (in-list all-mutator-names)])
         (when dump-port (newline dump-port) (displayln mutator dump-port))
-        (values mutator
-                (bt-violation-distribution-plot-for mutator
-                                                    blame-trails-by-mutator/across-all-benchmarks
-                                                    #:dump-to dump-port)))]
+        (define plot
+          (if raw-counts?
+              (raw-bt-violation-distribution-plot-for mutator
+                                                      blame-trails-by-mutator/across-all-benchmarks
+                                                      #:dump-to dump-port)
+              (blame-reliability-plot-for mutator
+                                          blame-trails-by-mutator/across-all-benchmarks
+                                          #:dump-to dump-port)))
+        (values mutator plot))]
      ["benchmark"
-      (define ((add-to-list v) l) (cons v l))
       (define blame-trails-by-benchmark/across-all-mutators
         (for*/fold ([bts-by-benchmark (hash)])
                    ([{mutator bts} (in-hash blame-trails-by-mutator/across-all-benchmarks)]
@@ -143,10 +200,15 @@
                        empty)))
       (for/hash ([benchmark (in-hash-keys blame-trails-by-benchmark/across-all-mutators)])
         (when dump-port (newline dump-port) (displayln benchmark dump-port))
-        (values benchmark
-                (bt-violation-distribution-plot-for benchmark
-                                                    blame-trails-by-benchmark/across-all-mutators
-                                                    #:dump-to dump-port)))]))
+        (define plot
+          (if raw-counts?
+              (raw-bt-violation-distribution-plot-for benchmark
+                                                      blame-trails-by-benchmark/across-all-mutators
+                                                      #:dump-to dump-port)
+              (blame-reliability-plot-for benchmark
+                                          blame-trails-by-benchmark/across-all-mutators
+                                          #:dump-to dump-port)))
+        (values benchmark plot))]))
  (when dump-port (close-output-port dump-port))
 
  (make-directory* out-dir)
