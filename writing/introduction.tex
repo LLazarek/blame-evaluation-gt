@@ -17,14 +17,14 @@ Systems such as Flow,\footnote{\url{https://flow.org}}
 Hack,\footnote{\url{https://hacklang.org}} or
 TypeScript\footnote{\url{https://www.typescriptlang.org}} exploit types for IDE actions and for finding typos in
 code. Then their compilers remove types and rely on the built-in safety checks of
-the underlying programming language to catch any problems. 
+the underlying language to catch any problems. 
 Recently, \citet{cc-snapl-19} have turned this implicitly expressed
 skepticism into an explicit statement and challenge.
 
 This contrast between theoretical research and industrial applications of gradual typing raises the question 
 \begin{quote}
  \it
- whether blame assignment adds any value to a gradually typed language, \\
+ whether blame assignment adds any value to a gradually typed language,
  especially for the benefit of the working programmer.
 \end{quote}
 Given the long standing academic interest in blame  and its complete absence in
@@ -34,7 +34,7 @@ possible answers.  Instead, when language designers decide to look into the
 question, they seem to answer it one way or another without any scientific
 justification. As a matter of fact, the research community simply does not have a
 method for evaluating blame, and given the question's practical
-relevance, this a significant problem.
+relevance, this is a significant problem.
 
 This paper's first contribution is an automated method for evaluating the
 effectiveness of blame assignment strategies in the gradual typing world.
@@ -58,8 +58,8 @@ steps it takes to discover the mistake in this manner is a measure of the effect
 of the blame assignment strategy of the language.
 
 The paper's second contribution is a set of results from applying the evaluation
-method to three distinct blame assignment strategies and approximately 20,000
-cases\mf{Replace with real number} (section~\ref{sec:results}): Vitousek et
+method to three distinct blame assignment strategies and approximately
+65000 cases (section~\ref{sec:results}): Vitousek et
 al.'s strategy of tracking typed/untyped boundaries in Reticulated;
 Tobin-Hochstadt et al.'s use of higher-order contract system~\cite{ff-icfp-2002,
 mf-toplas-2009}; and the approach of industrial systems that forego blame

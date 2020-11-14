@@ -82,11 +82,12 @@ Mutants that are hard to ``kill'' usually correspond to subtle programming
 errors, and mutation frameworks typically come with standard mutators
 carefully designed to create such mutants.
 
-However,  unlike the deep errors introduced by standard mutators, 
-gradual type systems detect shallow errors.  Thus, in order to
-evaluate the rational programmer in the context of gradual typing, 
+However,  unlike the hard-to-kill mistakes introduced by standard mutators, 
+gradual type systems flag mere typos.  Thus, in order to
+exercise the rational programmer in the context of gradual typing, 
 we need to develop alternative mutators
-that are fine-tuned to generate shallow errors.  Our inspiration is our
+that are fine-tuned to produce type-level mistakes gradual type systems 
+can detect. Our inspiration is our
 more-than-a-decade long experience of making type-level mistakes in Typed
 Racket. Some of these mistakes often take non-trivial effort to debug and
 have become the seed for our mutators, which we summarize in
@@ -101,10 +102,10 @@ Specifically, \texttt{arithmetic} may replace a \texttt{+} with a \texttt{-}
 in an attempt to change the type of the result of the arithmetic
 operation. In Typed Racket, \texttt{+}'s result is a
 \texttt{Positive-Integer} when all arguments are
-\texttt{Positive-Integer}. However, the result of \texttt{-} is
+positive integers. However, the result of \texttt{-} is
 \texttt{Integer}. In the same spirit, \texttt{boolean} aims to take
 advantage of Typed Racket's ``truthiness.'' Finally, \texttt{negate-cond} and \texttt{force-cond}
-aim to confuse occurrence typing.
+attempt to confuse occurrence typing.
 
 
 \begin{figure*}
@@ -226,47 +227,48 @@ aim to confuse occurrence typing.
 
 \subsection{Are these mutators any good?}
 
-The astute reader must have observed that mutators that cause interesting
+The astute reader must have observed that mutators that produce 
 type-level mistakes do not necessarily turn our benchmarks into
 interesting debugging scenarios for the rational programmer.  The
-benchmarks are fully typed, and type checking flags each impedance at
+benchmarks are fully typed, and type checking detects each mistake at
 compile time.  Hence, we apply the mutators to versions, dubbed
-\dubbed{configurations}, of the benchmarks where some components are
+\dubbed{scenarios}, of the benchmarks where some components are
 stripped of their type annotation.  Without the annotations, the type
-checker may not detect an impedance and, instead, the type-level checks
-of the gradual type system signal a run time error.  Mutant configurations
+checker may not detect a mistake at compile time and, instead, the run
+time checks
+of the gradual type system signal an error.  Scenarios
 with type-level mistakes that result in run time errors are the ideal
 ground to exercise the rational programmer's ability to locate errors.
 
 Specifically, we define an \emph{interesting debugging scenario} as a
-mutant configuration that
+scenario that
 \begin{enumerate} 
-  \item is rejected by the type checker when we restore any missing type annotations, 
+  \item is rejected by the type checker when we restore all its missing type annotations, 
   \item produces a run time error under Erasure as-is, and 
   \item the stack trace of the error mentions at least three distinct components.  
 \end{enumerate}
 
 The first criterion simply validates that the debugging scenario concerns
-a type-level mistake. However, The second and third criteria require a
-little more explanation.  The second one stipulates that the mistake is
+a type-level mistake. However, The second and third criteria require 
+more explanation.  The second one stipulates that the mistake is
 detectable under Erasure to ensure that it is detectable by all three
 semantics.  This is a direct consequence of~\citet{gfd-oopsla-2019}'s
-theorem that a run time type error under Erasure implies a run time type
+theorem that a run time error under Erasure implies a run time
 error under both Transient and Natural.  It is worth noting that this
-criterion excludes from consideration all scenarios where Natural or
-Transient can detect an impedance but Erasure cannot, and thus it favors
+criterion excludes from consideration the very interesting scenarios where Natural or
+Transient can detect a mistake but Erasure cannot, and thus it favors
 Erasure.  However, our goal here is to test the rational programmer across
 these three semantics, and thus we opt for a setting where all of them
-notice the impedance.
+notice the mistake.
 
 
 The third criterion aims to capture debugging scenarios with a specific
 kind of run time error: one produced by the interaction of a buggy
 component with the rest of the program.  In those cases, the rational programmer
 may need to examine several components to locate the source of the faulty interaction.
-In technical terms, we conservatively mark these scenarios by
+In technical terms, we mark these scenarios by
 analyzing the stack trace of a run time error.  If the stack trace mentions at
-least two distinct components, then this is evidence of interaction between
+least two distinct components, then this is accurate evidence of interaction between
 components.  We require a third component because our benchmarks come
 with a driver component which is present in the stack trace of all run
 time errors.
@@ -281,20 +283,20 @@ time errors.
 
 
 With this definition in hand, we analyze how effective our mutators
-are to turn the benchmarks into interesting debugging scenarios.
+are for turning the benchmarks into interesting debugging scenarios.
 Indeed the mutators produce at least 72192 interesting debugging scenarios
 across all mutants --- there are potentially many more but this is how
 many we examined. 
 Figure~\ref{fig:mutant-breakdown} breaks down the interesting
-debugging scenarios produced  for each benchmark bu mutator 
+debugging scenarios produced  for each benchmark by mutator 
 but counts are cut off at 50. The mutators produce at least 40 interesting
 scenarios for every benchmark, and these scenarios originate from at
 least four different mutators per benchmark.  Thus the mutators result in 
-a large and diverse population of scenarios for every benchmark.
+a sizeable and diverse population of scenarios for every benchmark.
 Furthermore, every mutator contributes scenarios to at least one
-benchmark and some mutators clearly only target one or two of them, which
+benchmark. Especially some mutators  target specific features of
+benchmarks, which
 justifies their inclusion. For
-instance the class-focused mutators are primarily effective in
+instance the class-focused mutators are effective in \texttt{take5}
 which jives with the fact that \texttt{take5} is the benchmark with 
-the most extensive use of object-oriented features, while the other
-features targeted by the rest of the mutators are used more broadly.
+the most extensive use of object-oriented features.

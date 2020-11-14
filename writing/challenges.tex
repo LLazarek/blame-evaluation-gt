@@ -1,5 +1,5 @@
 
-\section{Why is it hard to evaluate the value of blame?}
+\section{Why is it hard to evaluate blame?}
 \label{sec:challenges}
 
 The most serious challenge for evaluating blame concerns 
@@ -14,7 +14,7 @@ this rational programmer as an algorithm.  As indicated in the introduction, in
 the context of gradual typing, the rational programmer translates the
 Wadler-Findler slogan into a debugging method, searching for the source of the
 impedance mismatch in an incremental fashion. Measuring this simulated
-programmer's behavior on a large number of inputs then yields relevant 
+programmer's behavior on a large number of inputs yields relevant 
 data, similar to collecting empirical data in a human-focused discipline. 
 
 A derivative challenge is the problem of simulating the programmer's
@@ -33,7 +33,7 @@ use mutation analysis~\cite{lipton1971fault, demillo1978hints,
 jia2011analysis} to create mistakes in a synthetic manner. This process
 yields a large number of buggy programs whose mixed-typed versions are
 suitable subjects for our experiment.  The mutation analysis of Lazarek et
-al, is, however, completely useless for creating impedance mismatches.
+al, is, however, useless for creating impedance mismatches.
 
 While mutation analysis traditionally aims to inject bugs that challenge
 extensive test suites, the ones yielding ill-typed mutants are usually deemed
@@ -57,7 +57,7 @@ conclusions about whether the value of blame changes from one system to
 another. For instance, the case study presented here builds on
 Greenman and Felleisen's transient variant for functional Typed
 Racket~\cite{gf-icfp-2018} to obtain a transient semantics that is
-comparable with Typed Racket's default natural one. The revised transient
+comparable with Typed Racket's default natural one. This transient
 variant accommodates many more linguistic features and library calls
 in a way that is faithful to the transient
 semantics~\cite{vss-popl-2017}.
