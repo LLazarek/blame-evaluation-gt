@@ -427,7 +427,7 @@
             (notify-phone! @~a{@host has errors})
             (if (user-prompt! @~a{
                                   Found errors on @host, summary:
-                                  @(pretty-format summary)
+                                  @(try-unwrap (format-status host summary))
                                   Resume waiting for finish? (no means abort): 
                                   })
                 (loop)
@@ -543,7 +543,7 @@
                            _ ...)
                (values 1 #f)]
               [(hash-table [(and (or 'errored 'incomplete) category)
-                            (list-no-order (list bench mode %) _ ...)]
+                            (list-no-order (list (== bench) (== mode) %) _ ...)]
                            _ ...)
                (values % (equal? category 'errored))]
               [(hash-table ['other (list-no-order (== job-id) _ ...)]
