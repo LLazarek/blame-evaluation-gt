@@ -12,9 +12,9 @@ evaluate the effectiveness of a rational programmer. The components of
 an ill-typed program, such as one of  our ill-typed mutants, 
 create a \emph{debugging scenario space}, a lattice like
 the one introduced by ~\citet{tfgnvf-popl-2016} for performance
-evaluations. As we discuss briefly at the end of ~\ref{sec:mutate}, 
+evaluations. As we discuss briefly at the end of section ~\ref{sec:mutate}, 
 this space consists of variants of the program, dubbed
-\emph{scenarios}, that differ in their type specifications. In the
+\emph{scenarios}, that differ in their type annotations. In the
 setting of migratory typing,\footnote{The method can be adapted to
 so-called true gradual typing systems~\cite{svcb-snapl-2015} in a
 straightforward manner.} each scenario differs from another in which
@@ -80,7 +80,7 @@ $\blame{\system, \conf}$ denotes the component that $\conf$ blames.
 
 When the buggy untyped component of a program is replaced by the typed counterpart,
 the type checker fails if this component causes the impedance mismatch. Hence, a
-trail that end at an ill-typed scenarios successfully pinpoints the location of
+trail that ensd at an ill-typed scenarios successfully pinpoints the location of
 bugs. 
 \begin{quote}
 \it A natural blame trail $\conf_0,...\conf_n$ in a lattice $\lattice{\system}$ is
@@ -141,8 +141,6 @@ migration.
   successful.
 \end{quote}
 
-Even if the success of the natural rational programmer is not by pure chance, it
-could well be because the natural semantics perform runtime type checks at the same
 
 %% -----------------------------------------------------------------------------
 \subsection{Modes of the Erasure Rational Programmer} \label{sub:erasure}
@@ -260,10 +258,8 @@ In detail we answer $Q_1$ for an ill-typed mutant from
 section~\ref{sec:mutate} by creating trails for each natural blame,
 natural exception and natural random trail in the scenario lattice of the mutant. A
 log reports on success and failure endings.  The first step is to construct the
-mutant's scenario lattice and determine the scenario that can detect the fault in
-the program. This can happen either because Typed Racket's type checker outright
-rejects the scenario or because natural Typed Racket's runtime performs a type check
-that fails. In either case, each of these scenarios is the root of a trail. Our test
+mutant's scenario lattice and select an interesting debugging scenario
+as we discuss in section~\red{sec:mutate} to be the root of a trail. Our test
 bed extends these trails according to the natural-blame programmer.  If no scenarios
 can be added to the trail---a trail may the top of the finite lattice---we check if
 the last scenario of the trail type checks or not. If it does, this natural-blame
