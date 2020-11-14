@@ -180,7 +180,7 @@
 (define (plot-benchmark-table all-data
                               plot-type
                               columns
-                              title
+                              #:title [title #f]
                               #:x-max [x-max 1])
   (define label-offset
     (inexact->exact
@@ -214,14 +214,14 @@
                             #:x-max x-max)
             (if draw-labels? (blank 0) (blank 0 label-offset)))))
        pict)))
+  (define table (table/fill-missing picts
+                                    #:columns columns
+                                    #:column-spacing 10
+                                    #:row-spacing 20))
   (fill-background
-   (vc-append
-    10
-    (text title '(bold) 20)
-    (table/fill-missing picts
-                        #:columns columns
-                        #:column-spacing 10
-                        #:row-spacing 20))))
+   (if title
+       (vc-append 10 (text title '(bold) 20) table)
+       table)))
 
 ;; (listof real?) (listof (list/c real? color/c)) -> (listof color/c)
 (define (cutoff-bucket-colors numbers bucket-colors)
@@ -372,7 +372,7 @@
      (plot-benchmark-table sorted+renamed+annotations
                            #f
                            columns
-                           "Mutants with interesting debugging scenarios, per operator"
+                           ;; #:title "Mutants with interesting debugging scenarios, per operator"
                            #:x-max 50)
      (hash-ref flags 'outfile))]
    ['successful-population-count
@@ -478,6 +478,7 @@
      (plot-benchmark-table all-data
                            plot-type
                            columns
+                           #:title
                            (match plot-type
                              ['total-counts
                               "Proportion of all mutants created by operator"]
