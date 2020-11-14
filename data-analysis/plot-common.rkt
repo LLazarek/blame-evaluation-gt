@@ -1,0 +1,111 @@
+#lang at-exp rscript
+
+(provide (contract-out
+          [make-distributions-table
+           ({({string?
+               (hash/c string? (listof blame-trail?))}
+              {#:dump-to (or/c output-port? #f)}
+              . ->* .
+              pict?)
+             #:breakdown-by (or/c "mutator" "benchmark")
+             #:summaries-db db:path-to-db?
+             #:data-directory path-to-existant-file?}
+            {#:dump-to-file boolean?}
+            . ->* .
+            pict?)]
+          [satisfies-BT-hypothesis? (blame-trail? . -> . boolean?)])
+         pict?
+         add-to-list)
+
+(require plot
+         plot-util
+         plot-util/quick/infer
+         (except-in pict-util line)
+         (only-in pict vc-append text)
+         pict-util/file
+         "../mutation-analysis/mutation-analysis-summaries.rkt"
+         "../experiment/blame-trail-data.rkt"
+         (prefix-in db: "../db/db.rkt")
+         "../configurables/configurables.rkt"
+         "../runner/mutation-runner-data.rkt"
+
+         "read-data.rkt")
+
+(define pict? any/c)
+
+(define (make-distributions-table make-distribution-plot
+                                  #:breakdown-by breakdown-dimension
+                                  #:summaries-db mutation-analysis-summaries-db
+                                  #:data-directory data-dir
+                                  #:dump-to-file [dump-path #f])
+  (define mutant-mutators
+    (read-mutants-by-mutator (mutation-analysis-summaries-db)))
+
+  (define blame-trails-by-mutator/across-all-benchmarks
+    (add-missing-active-mutators
+     (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
+
+  (define all-mutator-names (mutator-names blame-trails-by-mutator/across-all-benchmarks))
+
+  (define dump-port (and dump-path
+                         (open-output-file dump-path #:exists 'replace)))
+  (define distributions
+    (match breakdown-dimension
+      ["mutator"
+       (for/hash ([mutator (in-list all-mutator-names)])
+         (when dump-port (newline dump-port) (displayln mutator dump-port))
+         (define plot
+           (make-distribution-plot mutator
+                                   blame-trails-by-mutator/across-all-benchmarks
+                                   #:dump-to dump-port))
+         (values mutator plot))]
+      ["benchmark"
+       (define blame-trails-by-benchmark/across-all-mutators
+         (for*/fold ([bts-by-benchmark (hash)])
+                    ([{mutator bts} (in-hash blame-trails-by-mutator/across-all-benchmarks)]
+                     [bt (in-list bts)])
+           (define benchmark (mutant-benchmark (blame-trail-mutant-id bt)))
+           (hash-update bts-by-benchmark
+                        benchmark
+                        (add-to-list bt)
+                        empty)))
+       (for/hash ([benchmark (in-hash-keys blame-trails-by-benchmark/across-all-mutators)])
+         (when dump-port (newline dump-port) (displayln benchmark dump-port))
+         (define plot
+           (make-distribution-plot benchmark
+                                   blame-trails-by-benchmark/across-all-mutators
+                                   #:dump-to dump-port))
+         (values benchmark plot))]))
+  (when dump-port (close-output-port dump-port))
+
+  (define distributions/sorted
+    (map cdr (sort (hash->list distributions) string<? #:key car)))
+  (table/fill-missing distributions/sorted
+                      #:columns 3
+                      #:column-spacing 5
+                      #:row-spacing 5))
+
+(define (add-missing-active-mutators blame-trails-by-mutator/across-all-benchmarks)
+  (for/fold ([data+missing blame-trails-by-mutator/across-all-benchmarks])
+            ([mutator-name (in-list (configured:active-mutator-names))])
+    (hash-update data+missing
+                 mutator-name
+                 values
+                 empty)))
+
+(define (satisfies-BT-hypothesis? bt)
+  (define end-mutant-summary (first (blame-trail-mutant-summaries bt)))
+  (match end-mutant-summary
+    [(mutant-summary _
+                     (struct* run-status ([mutated-module mutated-mod-name]
+                                          [outcome 'type-error]
+                                          [blamed blamed]))
+                     config)
+     (and (equal? (hash-ref config mutated-mod-name) 'types)
+          (list? blamed)
+          (member mutated-mod-name blamed))
+     #;#t]
+    [else #f]))
+
+(define ((add-to-list v) l) (cons v l))
+

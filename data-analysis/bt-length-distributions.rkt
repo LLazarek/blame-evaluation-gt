@@ -8,16 +8,10 @@
          pict-util/file
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../experiment/blame-trail-data.rkt"
-         (prefix-in db: "../db/db.rkt")
          "../configurables/configurables.rkt"
 
+         "plot-common.rkt"
          "read-data.rkt")
-
-(define pict? any/c)
-(define (hash-with-all-active-mutator-names? h)
-  (and (hash? h)
-       (set=? (hash-keys h)
-              (configured:active-mutator-names))))
 
 (define/contract (bt-length-distribution-plot-for key data
                                                   #:normalize? normalize?
@@ -80,14 +74,6 @@
              #:y-label (~a "Percent (out of " (length trails) ")")
              #:title key))
 
-(define (add-missing-active-mutators blame-trails-by-mutator/across-all-benchmarks)
-  (for/fold ([data+missing blame-trails-by-mutator/across-all-benchmarks])
-            ([mutator-name (in-list (configured:active-mutator-names))])
-    (hash-update data+missing
-                 mutator-name
-                 values
-                 empty)))
-
 (main
  #:arguments {[(hash-table ['data-dir data-dir]
                            ['out-dir  out-dir]
@@ -138,63 +124,26 @@
 
  (install-configuration! config-path)
 
- (define mutant-mutators
-   (read-mutants-by-mutator (mutation-analysis-summaries-db)))
-
- (define blame-trails-by-mutator/across-all-benchmarks
-   (add-missing-active-mutators
-    (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
-
- (define all-mutator-names (mutator-names blame-trails-by-mutator/across-all-benchmarks))
-
- (define dump-port (and dump-path
-                        (open-output-file dump-path #:exists 'replace)))
  (match-define (list distributions/normalized
                      distributions/unnormalized)
-   (match breakdown-dimension
-     ["mutator"
-      (for/list ([normalized? (in-list '(#t #f))])
-        (for/hash ([mutator (in-list all-mutator-names)])
-          (when dump-port (newline dump-port) (displayln mutator dump-port))
-          (values mutator
-                  (bt-length-distribution-plot-for mutator
-                                                   blame-trails-by-mutator/across-all-benchmarks
-                                                   #:normalize? normalized?
-                                                   #:dump-to dump-port))))]
-     ["benchmark"
-      (define ((add-to-list v) l) (cons v l))
-      (define blame-trails-by-benchmark/across-all-mutators
-        (for*/fold ([bts-by-benchmark (hash)])
-                   ([{mutator bts} (in-hash blame-trails-by-mutator/across-all-benchmarks)]
-                    [bt (in-list bts)])
-          (define benchmark (mutant-benchmark (blame-trail-mutant-id bt)))
-          (hash-update bts-by-benchmark
-                       benchmark
-                       (add-to-list bt)
-                       empty)))
-      (for/list ([normalized? (in-list '(#t #f))])
-        (for/hash ([benchmark (in-hash-keys blame-trails-by-benchmark/across-all-mutators)])
-          (when dump-port (newline dump-port) (displayln benchmark dump-port))
-          (values benchmark
-                  (bt-length-distribution-plot-for benchmark
-                                                   blame-trails-by-benchmark/across-all-mutators
-                                                   #:normalize? normalized?
-                                                   #:dump-to dump-port))))]))
+   (for/list ([normalized? (in-list '(#t #f))])
+     (make-distributions-table (λ (key data #:dump-to dump-to)
+                                 (bt-length-distribution-plot-for key
+                                                                  data
+                                                                  #:normalize? normalized?
+                                                                  #:dump-to dump-to))
+                               #:breakdown-by breakdown-dimension
+                               #:summaries-db (mutation-analysis-summaries-db)
+                               #:data-directory data-dir
+                               #:dump-to-file dump-path)))
 
  (make-directory* out-dir)
  (define (write-distributions-image! distributions name)
-   (define distributions/sorted
-     (map cdr (sort (hash->list distributions) string<? #:key car)))
-   (define all-together
-     (table/fill-missing distributions/sorted
-                         #:columns 3
-                         #:column-spacing 5
-                         #:row-spacing 5))
-   (define all-together+title
+   (define with-title
      (vc-append 20
                 (text name)
-                all-together))
-   (pict->png! all-together+title (build-path out-dir (~a name '- breakdown-dimension ".png"))))
+                distributions))
+   (pict->png! with-title (build-path out-dir (~a name '- breakdown-dimension ".png"))))
 
  (write-distributions-image! distributions/normalized
                              (~a name '- "normalized"))
