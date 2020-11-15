@@ -9,11 +9,21 @@
               pict?)
              #:breakdown-by (or/c "mutator" "benchmark")
              #:summaries-db db:path-to-db?
-             #:data-directory path-to-existant-file?}
-            {#:dump-to-file boolean?}
+             #:data-directory path-to-existant-directory?}
+            {#:dump-to-file (or/c path-string? boolean?)}
             . ->* .
             pict?)]
-          [satisfies-BT-hypothesis? (blame-trail? . -> . boolean?)])
+          [blame-reliability-breakdown-for
+           (string?
+            (hash/c string? (listof blame-trail?))
+            . -> .
+            (hash/c (or/c "always" "sometimes" "never")
+                    (listof listof-blame-trails-for-same-mutant?)))]
+          [satisfies-BT-hypothesis? (blame-trail? . -> . boolean?)]
+          [add-missing-active-mutators
+           ((hash/c mutator-name? (listof blame-trail?))
+            . -> .
+            (hash/c mutator-name? (listof blame-trail?)))])
          pict?
          add-to-list)
 
@@ -32,6 +42,7 @@
          "read-data.rkt")
 
 (define pict? any/c)
+(define mutator-name? string?)
 
 (define (make-distributions-table make-distribution-plot
                                   #:breakdown-by breakdown-dimension
@@ -39,7 +50,7 @@
                                   #:data-directory data-dir
                                   #:dump-to-file [dump-path #f])
   (define mutant-mutators
-    (read-mutants-by-mutator (mutation-analysis-summaries-db)))
+    (read-mutants-by-mutator mutation-analysis-summaries-db))
 
   (define blame-trails-by-mutator/across-all-benchmarks
     (add-missing-active-mutators
@@ -109,3 +120,39 @@
 
 (define ((add-to-list v) l) (cons v l))
 
+;; string? (hash/c string? (listof blame-trail?))
+;; ->
+;; (hash/c "always"    (listof (listof blame-trail?))
+;;         "sometimes" ^
+;;         "never"     ^)
+(define (blame-reliability-breakdown-for key
+                                         blame-trail-map)
+  (define trails (hash-ref blame-trail-map key))
+  (define total-trail-count (length trails))
+  (define trails-grouped-by-mutant (group-by blame-trail-mutant-id trails))
+
+  (define (categorize-trail-set-reliability trail-set)
+    (define bt-success-count (count satisfies-BT-hypothesis? trail-set))
+    (match* {bt-success-count (length trail-set)}
+      [{     0  (not 0)}                 "never"]
+      [{s       n      } #:when (= s n)  "always"]
+      [{(not 0) (not 0)}                 "sometimes"]))
+
+  (for/fold ([breakdown (hash "always" empty
+                              "sometimes" empty
+                              "never" empty)])
+            ([mutant-trails (in-list trails-grouped-by-mutant)])
+    (define mutant-category (categorize-trail-set-reliability mutant-trails))
+    (hash-update breakdown
+                 mutant-category
+                 (add-to-list mutant-trails))))
+
+(define (listof-blame-trails-for-same-mutant? l)
+  (and (list? l)
+       (andmap blame-trail? l)
+       (cond [(empty? l) #t]
+             [else
+              (define mutant (blame-trail-mutant-id (first l)))
+              (for/and ([bt (in-list l)])
+                (equal? (blame-trail-mutant-id bt)
+                        mutant))])))

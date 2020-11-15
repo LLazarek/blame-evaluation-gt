@@ -52,34 +52,6 @@
              ;; #:x-label "Mutants"
              #:y-label (~a "Percent (out of " total-mutant-count " mutants)")))
 
-;; string? (hash/c string? (listof blame-trail?))
-;; ->
-;; (hash/c "always"    (listof blame-trail?)
-;;         "sometimes" ^
-;;         "never"     ^)
-(define (blame-reliability-breakdown-for key
-                                         blame-trail-map)
-  (define trails (hash-ref blame-trail-map key))
-  (define total-trail-count (length trails))
-  (define trails-grouped-by-mutant (group-by blame-trail-mutant-id trails))
-
-  (define (categorize-trail-set-reliability trail-set)
-    (define bt-success-count (count satisfies-BT-hypothesis? trail-set))
-    (displayln @~a{@(blame-trail-mutant-id (first trail-set)) = @bt-success-count / @(length trail-set)})
-    (match* {bt-success-count (length trail-set)}
-      [{     0  (not 0)}                 "never"]
-      [{s       n      } #:when (= s n)  "always"]
-      [{(not 0) (not 0)}                 "sometimes"]))
-
-  (for/fold ([breakdown (hash "always" empty
-                              "sometimes" empty
-                              "never" empty)])
-            ([mutant-trails (in-list trails-grouped-by-mutant)])
-    (define mutant-category (categorize-trail-set-reliability mutant-trails))
-    (hash-update breakdown
-                 mutant-category
-                 (add-to-list mutant-trails))))
-
 (main
  #:arguments {[(hash-table ['data-dir data-dir]
                            ['out-dir  out-dir]
@@ -93,7 +65,7 @@
               [("-d" "--data-dir")
                'data-dir
                ("Path to the directory containing data sub-directories for each"
-                "mode.")
+                "benchmark of a given mode.")
                #:collect ["path" take-latest #f]
                #:mandatory]
               [("-s" "--mutant-summaries")
@@ -139,7 +111,7 @@
  (define table
    (make-distributions-table (if raw-counts?
                                  raw-bt-violation-distribution-plot-for
-                                 blame-reliability-breakdown-for)
+                                 blame-reliability-plot-for)
                              #:breakdown-by breakdown-dimension
                              #:summaries-db (mutation-analysis-summaries-db)
                              #:data-directory data-dir

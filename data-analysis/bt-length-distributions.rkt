@@ -86,7 +86,7 @@
               [("-d" "--data-dir")
                'data-dir
                ("Path to the directory containing data sub-directories for each"
-                "mode.")
+                "benchmark of a given mode.")
                #:collect ["path" take-latest #f]
                #:mandatory]
               [("-s" "--mutant-summaries")
@@ -127,7 +127,7 @@
  (match-define (list distributions/normalized
                      distributions/unnormalized)
    (for/list ([normalized? (in-list '(#t #f))])
-     (make-distributions-table (λ (key data #:dump-to dump-to)
+     (make-distributions-table (λ (key data #:dump-to [dump-to #f])
                                  (bt-length-distribution-plot-for key
                                                                   data
                                                                   #:normalize? normalized?
