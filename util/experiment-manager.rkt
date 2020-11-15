@@ -3,30 +3,30 @@
 (require syntax/parse/define
          racket/date)
 
-(struct present (value) #:transparent)
 (define-values {absent absent?}
   (let ()
     (struct absent ())
     (values (absent) absent?)))
 (define (option/c inner/c)
-  (or/c absent? (struct/c present inner/c) inner/c))
+  (or/c absent? inner/c))
 
 (define (in-option o)
   (in-list (match o
-             [(present v) (list v)]
              [(? absent?) empty]
              [else (list o)])))
 (define-simple-macro (for*/option clauses body ...)
   (let/ec return
     (for* clauses
-      (return (present (let () body ...))))
+      (return (let () body ...)))
     absent))
-(define-simple-macro (option-let* ([name maybe-option] ...) body ...)
-  (for*/option ([name (in-option maybe-option)] ...) body ...))
-(define (try-unwrap o)
-  (match o
-    [(present v) (try-unwrap v)]
-    [else o]))
+(define-simple-macro (option-let* ([name maybe-option] more ...) body ...)
+  #:with result-expr (if (null? (attribute more))
+                         #'(let () body ...)
+                         #'(option-let* (more ...) body ...))
+  (let ([name maybe-option])
+    (if (absent? name)
+        absent
+        result-expr)))
 
 
 (define-runtime-paths
@@ -141,7 +141,7 @@
            (for/list ([parts (in-list raw-info)])
              (job (third parts) (string=? (first parts) "1"))))
          (expunge-old-jobs! all-jobs)
-         (present all-jobs)]
+         all-jobs]
         [else
          absent]))
 
@@ -222,10 +222,9 @@
                 absent))
     (define/private (find-job target-id) ; -> (option/c (list/c benchmark config-name))
       (ensure-store!)
-      (try-unwrap
-       (for*/option ([{bench+config id} (in-dict (file->list data-store-path))]
-                     #:when (string=? id target-id))
-                    bench+config)))
+      (for*/option ([{bench+config id} (in-dict (file->list data-store-path))]
+                    #:when (string=? id target-id))
+                   bench+config))
 
     (define/private (ensure-store!)
       (make-directory* (path-only data-store-path))
@@ -238,9 +237,7 @@
                              data-store-path
                              #:exists 'replace))))
 (define (bool->option v)
-  (if v
-      (present v)
-      absent))
+  (or v absent))
 (define direct-access-host%
   (class* host% (writable<%> host<%>)
     (super-new)
@@ -263,8 +260,8 @@
        ([active (match (system/host/string "ps -ef | grep run-experiment.sh")
                   [(regexp @pregexp{(?m:^\S+\s+(\d+)\s+(\S+\s+){5}/bin/bash .*run-experiment.sh (\S+) (\S+).rkt)}
                            (list _ pid _ benchmark config-name))
-                   (present (list (list* benchmark config-name (if with-pid? (list pid) empty))))]
-                  [(regexp #px"^llazarek") (present empty)]
+                   (list (list* benchmark config-name (if with-pid? (list pid) empty)))]
+                  [(regexp #px"^llazarek") empty]
                   [else absent])])
 
        (match active?
@@ -339,7 +336,7 @@
         (unless (session-exists? run-screen-name) (launch-screen! run-screen-name)))
       (define management-ok?
         (unless (session-exists? management-screen-name) (launch-screen! management-screen-name)))
-      (cond [(and run-ok? management-ok?) (present (void))]
+      (cond [(and run-ok? management-ok?) (void)]
             [else
              (displayln @~a{Failed to obtain necessary screen sessions})
              absent]))
@@ -358,7 +355,7 @@
           (match-define (list benchmark config-name) id)
           (with-data-store-lock
             (thunk
-             (match (try-unwrap (get-jobs #t))
+             (match (get-jobs #t)
                [(list running-job-id)
                 #:when (equal? running-job-id id)
                 (cancel-currently-running-job!)]
@@ -373,7 +370,7 @@
             (thunk (displayln @~a{Failed to cancel job @id, couldn't get data store lock}))))
 
         (define (current-job-done?)
-          (empty? (try-unwrap (get-jobs #t))))
+          (empty? (get-jobs #t)))
 
         (define (queue-empty?)
           (empty? (read-data-store)))
@@ -447,7 +444,7 @@
           (get-field host-data-path a-host)))
   (match info-str
     [(regexp "^#hash")
-     (present (call-with-input-string info-str read))]
+     (call-with-input-string info-str read)]
     [else
      (eprintf @~a{
                   Unable to get experiment results summary for host @a-host, @;
@@ -479,7 +476,7 @@
           (build-path (get-field host-data-path a-host) benchmark)))
   (match progress-str
     [(regexp (pregexp @~a{[^@"\n"]+@"\n"([\d.]+)}) (list _ (app string->number %)))
-     (present %)]
+     %]
     [other
      (eprintf @~a{
                   Unable to get experiment progress for @benchmark on host @a-host, @;
@@ -497,7 +494,7 @@
   (define (with-progress incomplete-bench)
     (match-define (list name config) incomplete-bench)
     (printf "Retrieving ~a progress ...\r" name)
-    (list name config (try-unwrap (get-progress a-host name))))
+    (list name config (get-progress a-host name)))
   (printf "Checking ~a...\r" a-host)
   (option-let*
    ([results (get-results a-host)])
@@ -517,7 +514,7 @@
               [maybe-benchmark (in-list active-jobs)]
               [benchmark (in-option maybe-benchmark)]
               [incomplete-job (in-list incomplete-jobs)]
-              #:when (match (try-unwrap incomplete-job)
+              #:when (match incomplete-job
                        [(list (== (first benchmark))
                               (== (second benchmark))
                               (? (>/c 0.99)))
@@ -596,7 +593,7 @@
                  #:to-local data-path)
       [0
        (displayln @~a{Data from @a-host downloaded at @(build-path data-path archive-name+ext)})
-       (present (void))]
+       (void)]
       [else
        (displayln @~a{Something went wrong downloading data for @a-host})
        absent]))
@@ -607,7 +604,7 @@
                 (user-prompt!
                  @~a{
                      Not all benchmarks are completed on @a-host
-                     @(try-unwrap (format-status a-host summary))
+                     @(format-status a-host summary)
                      Missing: @(missing-completed-benchmarks summary)
                      Do you want to download the results anyway? 
                      }))
@@ -616,7 +613,7 @@
      #:when (user-prompt!
              @~a{
                  @a-host results are not all successfully completed:
-                 @(try-unwrap (format-status a-host summary))
+                 @(format-status a-host summary)
                  Missing: @(missing-completed-benchmarks summary)
                  Do you want to download the results anyway? 
                  })
@@ -624,7 +621,7 @@
      (download-results! (read-line))]
     [else
      (displayln @~a{Aborting download of inconsistent results:})
-     (displayln (try-unwrap (format-status a-host summary)))
+     (displayln (format-status a-host summary))
      absent]))
 
 
@@ -649,7 +646,7 @@
             (notify-phone! @~a{@host has errors})
             (if (user-prompt! @~a{
                                   Found errors on @host, summary:
-                                  @(try-unwrap (format-status host summary))
+                                  @(format-status host summary)
                                   Resume waiting for finish? (no means abort): 
                                   })
                 (loop)
@@ -667,7 +664,7 @@
 
 (define (ensure-host-empty! host)
   (let loop ()
-    (unless (equal? (try-unwrap (wait-for-current-jobs-to-finish host restart-stuck-jobs!))
+    (unless (equal? (wait-for-current-jobs-to-finish host restart-stuck-jobs!)
                     'empty)
       (unless (help!:continue?
                @~a{Host @host was not left in a clean state, stuck}
@@ -920,7 +917,7 @@
  (cond [status?
         (for ([a-host (in-list hosts)])
           (displayln @~a{---------- @a-host ----------})
-          (displayln (try-unwrap (format-status a-host))))]
+          (displayln (format-status a-host)))]
        [(not (empty? launch-targets))
         (for-each-target launch-targets
                          (λ (a-host benchmark config-name)
@@ -951,7 +948,7 @@
              front]
             [else #f]))
         (define (wait-for-jobs-to-finish+download-results host waiting-job)
-          (match (try-unwrap (wait-for-current-jobs-to-finish host restart-stuck-jobs!))
+          (match (wait-for-current-jobs-to-finish host restart-stuck-jobs!)
             ['complete
              (option-let*
               ([complete-summary (summarize-experiment-status host)]
@@ -963,22 +960,21 @@
                      @~a{
                          Unexpected results on @host while waiting on @waiting-job
                          Current status:
-                         @(try-unwrap (format-status host))
+                         @(format-status host)
                          Retry this item?
                          })
              'retry-job]
             [else 'stop]))
         (when resume-Q/host
           (define host (host-by-name resume-Q/host))
-          (define status (try-unwrap
-                          (wait-for-jobs-to-finish+download-results host
-                                                                    (~a "resuming " Q-path))))
+          (define status (wait-for-jobs-to-finish+download-results host
+                                                                   (~a "resuming " Q-path)))
           (unless (or (equal? status 'ok)
                       (help!:continue?
                        @~a{Unexpected results on @host}
                        @~a{
                            Unexpected results on @host while resuming @Q-path, summary:
-                           @(try-unwrap (format-status host))
+                           @(format-status host)
                            Continue with the rest of the Q? (no means abort)
                            }))
             (displayln "Aborting")
@@ -994,7 +990,7 @@
                               (λ (a-host benchmark config-name)
                                 (send a-host submit-job! benchmark config-name))
                               "submit")
-             (match (try-unwrap (wait-for-jobs-to-finish+download-results host launch-spec-list))
+             (match (wait-for-jobs-to-finish+download-results host launch-spec-list)
                ['ok (launch-next-target #f)]
                ['retry-job (launch-next-target launch-spec-list)]
                [else
