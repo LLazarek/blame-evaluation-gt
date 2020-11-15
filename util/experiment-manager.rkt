@@ -629,7 +629,9 @@
 
 
 ;; host? (host? (listof jobinfo?) summary? -> any) -> (or/c 'complete 'empty 'error)
-(define (wait-for-current-jobs-to-finish host [periodic-action! void])
+(define (wait-for-current-jobs-to-finish host
+                                         [periodic-action! void]
+                                         #:period [sleep-period 15])
   (displayln @~a{Waiting for current jobs to finish on @host ...})
   (let loop ()
     (option-let*
@@ -653,8 +655,10 @@
                 (loop)
                 'error)]
            [else
-            (printf "Sleeping                    \r")
-            (sleep (* 15 60))
+            (printf "~a Sleeping for ~a min                   \r"
+                    (date->string (current-date) #t)
+                    sleep-period)
+            (sleep (* sleep-period 60))
             (loop)]))))
 
 (define (help!:continue? notification prompt)
