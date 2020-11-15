@@ -50,7 +50,8 @@
               #:colors '("green" "yellow" "red"))
              #:y-max 1
              ;; #:x-label "Mutants"
-             #:y-label (~a "Percent (out of " total-mutant-count " mutants)")))
+             #:y-label (~a "Percent (out of " total-mutant-count " mutants)")
+             #:x-label #f))
 
 (main
  #:arguments {[(hash-table ['data-dir data-dir]
