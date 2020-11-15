@@ -36,10 +36,24 @@
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
+(define job-info? (or/c (list/c string? string?)
+                        (list/c string? string? real?)))
 (define host<%> (interface (writable<%>)
+                  ;; provided by host%
+                  [system/host (unconstrained-domain-> boolean?)]
+                  [system/host/string (unconstrained-domain-> string?)]
+                  [scp (->*m {}
+                             {#:from-host (or/c path-string? #f)
+                              #:to-local (or/c path-string? #f)
+                              #:from-local (or/c path-string? #f)
+                              #:to-host (or/c path-string? #f)}
+                             natural?)]
+
+                  ;; must be implemented
                   [get-jobs
                    (let ([job-descr/c (listof (option/c (list/c string? string?)))])
-                     (->*m {} {(or/c boolean? 'both)}
+                     (->*m {}
+                           {(or/c boolean? 'both)}
                            (option/c
                             (or/c job-descr/c
                                   (list/c job-descr/c job-descr/c)))))]
@@ -49,54 +63,60 @@
                                       #:cpus (or/c "decide" natural?)
                                       #:name string?}
                                      any)]
-                  [cancel-job! (->m string? string? any)]
-                  [system/host/string (unconstrained-domain-> string?)]))
+                  [cancel-job! (->m string? string? any)]))
 (define host% (class object%
                 (super-new)
-                (init-field hostname host-project-path host-jobdir-path)
-                (field [host-jobfile-path (build-path host-jobdir-path "job.sub")]
+                (init-field hostname
+                            host-project-path)
+                (field [data-store-path (build-path store-path (~a hostname ".rktd"))]
                        [host-racket-path (build-path host-project-path "racket" "bin" "racket")]
                        [host-utilities-path (build-path host-project-path "blame-evaluation-gt" "util")]
                        [host-data-path (build-path host-project-path "experiment-output")])
                 (define/public (custom-write port) (write hostname port))
-                (define/public (custom-display port) (display hostname port))))
+                (define/public (custom-display port) (display hostname port))
+
+                (define/public (system/host #:interactive? [interactive? #f] . parts)
+                  ;; lltodo: implement a persistent connection here to prevent being blocked
+                  ;; by zythos for opening too many connections too quickly
+                  (define cmd-str (apply ~a (add-between parts " ")))
+                  (define cmd-str-escaped (string-replace cmd-str "\"" "\\\""))
+                  (system @~a{ssh @(if interactive? "-t" "") @hostname "@cmd-str-escaped"}))
+
+                (define/public (system/host/string #:interactive? [interactive? #f] . parts)
+                  (define out-str (open-output-string))
+                  (parameterize ([current-output-port out-str]
+                                 [current-error-port out-str])
+                    (send this system/host #:interactive? interactive? . parts))
+                  (get-output-string out-str))
+
+                (define/public (scp #:from-host [from-host-path #f]
+                                    #:to-local [to-local-path #f]
+                                    #:from-local [from-local-path #f]
+                                    #:to-host [to-host-path #f])
+                  (system/exit-code
+                   @~a{scp -q @(match* {from-host-path
+                                        to-local-path
+                                        from-local-path
+                                        to-host-path}
+                                 [{from-remote to-local #f #f}
+                                  @~a{@|hostname|:'@from-remote' '@to-local'}]
+                                 [{#f #f from-local to-remote}
+                                  @~a{'@from-local' @|hostname|:'@to-remote'}]
+                                 [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))))
 (define condor-host%
-  (class* host% (writable<%>)
+  (class* host% (writable<%> host<%>)
     (super-new)
+    (inherit system/host
+             system/host/string
+             scp)
     (inherit-field hostname
                    host-project-path
-                   host-jobdir-path
-                   host-jobfile-path
+                   data-store-path
                    host-racket-path
                    host-utilities-path
                    host-data-path)
-    (init-field [data-store (build-path store-path (~a "condor-" hostname ".rktd"))])
-
-    (define/public (system/host #:interactive? [interactive? #f] . parts)
-      ;; lltodo: implement a persistent connection here to prevent being blocked
-      ;; by zythos for opening too many connections too quickly
-      (system @~a{ssh @(if interactive? "-t" "") @hostname "@(apply ~a (add-between parts " "))"}))
-    (define/public (system/host/string #:interactive? [interactive? #f] . parts)
-      (define out-str (open-output-string))
-      (parameterize ([current-output-port out-str]
-                     [current-error-port out-str])
-        (send this system/host #:interactive? interactive? . parts))
-      (get-output-string out-str))
-
-    (define/public (scp #:from-host [from-host-path #f]
-                        #:to-local [to-local-path #f]
-                        #:from-local [from-local-path #f]
-                        #:to-host [to-host-path #f])
-      (system/exit-code
-       @~a{scp -q @(match* {from-host-path
-                            to-local-path
-                            from-local-path
-                            to-host-path}
-                     [{from-remote to-local #f #f}
-                      @~a{@|hostname|:'@from-remote' '@to-local'}]
-                     [{#f #f from-local to-remote}
-                      @~a{'@from-local' @|hostname|:'@to-remote'}]
-                     [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))
+    (init-field [host-jobdir-path "."])
+    (field [host-jobfile-path (build-path host-jobdir-path "job.sub")])
 
     (define/public (get-jobs [active? #t])
       (option-let*
@@ -192,13 +212,9 @@
                    (write-data-store! (dict-remove (read-data-store)
                                                    (list benchmark config-name)))))
 
-    (define/private (ensure-store!)
-      (make-directory* (path-only data-store))
-      (unless (file-exists? data-store)
-        (system @~a{touch '@data-store'})))
     (define/private (save-job! benchmark config-name id)
       (ensure-store!)
-      (with-output-to-file data-store #:exists 'append
+      (with-output-to-file data-store-path #:exists 'append
         (thunk (writeln (cons (list benchmark config-name) id)))))
     (define/private (read-job benchmark config-name) ; -> (option/c id?)
       (dict-ref (read-data-store)
@@ -207,15 +223,202 @@
     (define/private (find-job target-id) ; -> (option/c (list/c benchmark config-name))
       (ensure-store!)
       (try-unwrap
-       (for*/option ([{bench+config id} (in-dict (file->list data-store))]
+       (for*/option ([{bench+config id} (in-dict (file->list data-store-path))]
                      #:when (string=? id target-id))
                     bench+config)))
+
+    (define/private (ensure-store!)
+      (make-directory* (path-only data-store-path))
+      (unless (file-exists? data-store-path)
+        (system @~a{touch '@data-store-path'})))
     (define/private (read-data-store)
-      (file->list data-store))
+      (file->list data-store-path))
     (define/private (write-data-store! data)
       (display-lines-to-file (map ~s data)
-                             data-store
+                             data-store-path
                              #:exists 'replace))))
+(define (bool->option v)
+  (if v
+      (present v)
+      absent))
+(define direct-access-host%
+  (class* host% (writable<%> host<%>)
+    (super-new)
+    (inherit system/host
+             system/host/string
+             scp)
+    (inherit-field hostname
+                   data-store-path
+                   host-project-path
+                   host-racket-path
+                   host-utilities-path
+                   host-data-path)
+    (init-field [cpu-count 1])
+    (field [run-screen-name "experiment-run"]
+           [management-screen-name "experiment-manage"]
+           [queueing-thd (make-direct-access-host-queue-manager)])
+
+    (define/public (get-jobs [active? #t] #:with-pid? [with-pid? #f])
+      (option-let*
+       ([active (match (system/host/string "ps -ef | grep run-experiment.sh")
+                  [(regexp @pregexp{(?m:^\S+\s+(\d+)\s+(\S+\s+){5}/bin/bash .*run-experiment.sh (\S+) (\S+).rkt)}
+                           (list _ pid _ benchmark config-name))
+                   (present (list (list* benchmark config-name (if with-pid? (list pid) empty))))]
+                  [(regexp #px"^llazarek") (present empty)]
+                  [else absent])])
+
+       (match active?
+         [#t active]
+         ['both (list active (get-queued-jobs))]
+         [else (get-queued-jobs)])))
+
+    (define/private (get-queued-jobs)
+      (map (match-lambda [(list* benchmark config-name _) (list benchmark config-name)])
+           (read-data-store)))
+
+    (define/public (submit-job! benchmark
+                                config-name ; without .rkt
+                                #:mode [record/check-mode 'check]
+                                #:cpus [cpus cpu-count]
+                                #:name [name benchmark])
+      (option-let*
+       ([_ (thread-send queueing-thd
+                        `(submit ,(list benchmark config-name record/check-mode cpus name))
+                        (thunk absent))])
+       (void)))
+    (define/public (cancel-job! benchmark config-name)
+      (option-let*
+       ([_ (thread-send queueing-thd
+                        `(cancel ,(list benchmark config-name))
+                        (thunk absent))])
+       (void)))
+
+    (define/private (launch-job! benchmark
+                                 config-name ; without .rkt
+                                 record/check-mode
+                                 cpus
+                                 name)
+      (define run-cmd
+        @~a{
+            cd ~/blgt; @;
+            ./run-experiment.sh "@benchmark" "@|config-name|.rkt" @record/check-mode @cpus "@name"
+            })
+      (option-let*
+       ([_ (ensure-screen-setup!)]
+        [_ (bool->option
+            (system/host @~a{
+                             screen -S @run-screen-name -p 0 -X stuff '\'@|run-cmd|\r\''
+                             }))])
+       (void)))
+    (define/private (cancel-currently-running-job!)
+      (option-let*
+       ([active-jobs (get-jobs #t #:with-pid? #t)]
+        [_ (bool->option (not (empty? active-jobs)))]
+        [pid (match active-jobs
+               [`((,_ ,_ ,pid)) pid]
+               [else absent])]
+        [_ (bool->option (system/host @~a{kill @pid}))])
+       (void))
+      #;(option-let*
+       ([_ (ensure-screen-setup!)]
+        [_ (bool->option
+            (system/host @~a{
+                             screen -S @run-screen-name -p 0 -X stuff '\'^C\''
+                             }))]
+        [active-jobs (get-jobs #t)]
+        [_ (bool->option (empty? active-jobs))])
+       (void)))
+
+    (define/private (ensure-screen-setup!)
+      (define screens-output (system/host/string "screen -ls"))
+      (define (session-exists? name)
+        (regexp-match? @~a{[0-9]+\.@name} screens-output))
+      (define (launch-screen! name)
+        (system/host @~a{screen -dmS @name}))
+      (define run-ok?
+        (unless (session-exists? run-screen-name) (launch-screen! run-screen-name)))
+      (define management-ok?
+        (unless (session-exists? management-screen-name) (launch-screen! management-screen-name)))
+      (cond [(and run-ok? management-ok?) (present (void))]
+            [else
+             (displayln @~a{Failed to obtain necessary screen sessions})
+             absent]))
+
+    (define/private (make-direct-access-host-queue-manager)
+      (thread
+       (thunk
+        (define message-evt (thread-receive-evt))
+
+        (define (enqueue-job! spec)
+          (with-data-store-lock
+            (thunk (write-data-store! (append (read-data-store)
+                                              (list spec))))
+            (thunk (displayln @~a{Failed to enqueu job @spec, couldn't get data store lock}))))
+        (define (cancel-job! id)
+          (match-define (list benchmark config-name) id)
+          (with-data-store-lock
+            (thunk
+             (match (try-unwrap (get-jobs #t))
+               [(list running-job-id)
+                #:when (equal? running-job-id id)
+                (cancel-currently-running-job!)]
+               [(? list?)
+                (define current-q (read-data-store))
+                (define new-q (remf (match-lambda [(list* (== benchmark) (== config-name) _) #t]
+                                                  [else #f])
+                                    current-q))
+                (write-data-store! new-q)]
+               [other
+                (displayln @~a{Failed to cancel job @id, current-jobs: @other})]))
+            (thunk (displayln @~a{Failed to cancel job @id, couldn't get data store lock}))))
+
+        (define (current-job-done?)
+          (empty? (try-unwrap (get-jobs #t))))
+
+        (define (queue-empty?)
+          (empty? (read-data-store)))
+
+        (define (launch-next-job!)
+          (with-data-store-lock
+            (thunk (define current-q (read-data-store))
+                   (define new-q (rest current-q))
+                   (define job-info (first current-q))
+                   (send this launch-job! . job-info))
+            (thunk (displayln @~a{
+                                  Warning: couldn't launch next job @;
+                                  because couldn't get data store lock
+                                  }))))
+
+        (let loop ()
+          (cond [(thread-try-receive)
+                 => (match-lambda [`(submit ,job-spec) (enqueue-job! job-spec)]
+                                  [`(cancel ,job-id)   (cancel-job! job-id)])]
+                [else
+                 (if (and (current-job-done?)
+                          (not (queue-empty?)))
+                     (launch-next-job!)
+                     (sync/timeout (* 5 60) message-evt))])
+          (loop)))))
+
+    (define/private (ensure-store!)
+      (make-directory* (path-only data-store-path))
+      (unless (file-exists? data-store-path)
+        (system @~a{touch '@data-store-path'})))
+    ;; -> (listof any/c)
+    (define/private (read-data-store)
+      (ensure-store!)
+      (file->list data-store-path))
+    ;; (listof any/c) -> void
+    (define/private (write-data-store! data-list)
+      (display-lines-to-file (map ~s data-list)
+                             data-store-path
+                             #:exists 'replace))
+    (define/private (with-data-store-lock thunk fail-thunk)
+      (call-with-file-lock/timeout data-store-path
+                                   'exclusive
+                                   thunk
+                                   fail-thunk
+                                   #:max-delay 1))))
 
 (define-simple-macro (with-temp-file name body ...)
   (call-with-temp-file (λ (name) body ...)))
@@ -228,7 +431,10 @@
                     [hostname "zythos"]
                     [host-project-path "./blgt"]
                     [host-jobdir-path "./proj/jobctl"]))
-(define hosts (list zythos))
+(define benbox (new direct-access-host%
+                    [hostname "benbox"]
+                    [host-project-path "./blgt"]))
+(define hosts (list zythos benbox))
 
 ;; host<%> -> (option/c results?)
 (define (get-results a-host)
@@ -250,13 +456,26 @@
                   })
      absent]))
 
+(define (try-infer-benchmark-from-data-name benchmark-data-name)
+  (define ((prefix-or-suffix-of str) maybe-pre-or-suffix)
+    (or (string-prefix? str maybe-pre-or-suffix)
+        (string-suffix? str maybe-pre-or-suffix)))
+  (findf (prefix-or-suffix-of benchmark-data-name)
+         needed-benchmarks/10))
+
 ;; host? string? -> (option/c (and/c real? (between/c 0 1)))
 (define (get-progress a-host benchmark)
+  #;(define benchmark
+    (if (member benchmark needed-benchmarks/10)
+        benchmark
+        (try-infer-benchmark-from-data-name benchmark)))
   (define progress-str
     (send a-host
           system/host/string
           (get-field host-racket-path a-host)
           (build-path (get-field host-utilities-path a-host) "check-experiment-progress.rkt")
+          "-l"
+          (~a benchmark ".log")
           (build-path (get-field host-data-path a-host) benchmark)))
   (match progress-str
     [(regexp (pregexp @~a{[^@"\n"]+@"\n"([\d.]+)}) (list _ (app string->number %)))
@@ -295,9 +514,10 @@
                                                  ;; bug in
                                                  ;; check-experiment-progress.rkt
                                                  (hash-ref summary 'errored)))]
-              [benchmark (in-list active-jobs)]
+              [maybe-benchmark (in-list active-jobs)]
+              [benchmark (in-option maybe-benchmark)]
               [incomplete-job (in-list incomplete-jobs)]
-              #:when (match incomplete-job
+              #:when (match (try-unwrap incomplete-job)
                        [(list (== (first benchmark))
                               (== (second benchmark))
                               (? (>/c 0.99)))
@@ -381,7 +601,7 @@
        (displayln @~a{Something went wrong downloading data for @a-host})
        absent]))
   (match summary
-    [(hash-table ['completed (list (list* _ config-name) _ ...)]
+    [(hash-table ['completed (list (list* _ config-name _) _ ...)]
                  [_ '()] ...)
      #:when (or (config/mode-complete? summary)
                 (user-prompt!
@@ -513,7 +733,7 @@
 
 (define (format-status a-host
                        [summary* (summarize-experiment-status a-host)]
-                       [active+pending-jobs* (try-unwrap (send a-host get-jobs 'both))])
+                       [active+pending-jobs* (send a-host get-jobs 'both)])
   (option-let*
    ([summary summary*]
     [active+pending-jobs active+pending-jobs*])
@@ -530,7 +750,8 @@
                      (match job-id*
                        [(list* bench mode _) (list bench mode)]))))
       (define all-job-info
-        (for/list ([job-id (in-list all-job-ids)])
+        (for*/list ([maybe-job-id (in-list all-job-ids)]
+                    [job-id (in-option maybe-job-id)])
           (define active? (member job-id active-job-ids))
           (define pending? (member job-id pending-job-ids))
           (define status (cond [active?  "R"]
@@ -557,7 +778,7 @@
           (define prefix (if (zero? i) "" "\n         "))
           (match-define (list job-id status progress check-for-errors?) job)
           (display (~a prefix
-                       (fixed-width-format job-id 25)
+                       (fixed-width-format job-id 40)
                        "  "
                        (match* {status progress}
                          [{"-" 1} "✓"]
@@ -655,8 +876,7 @@
                'resume-queue
                ("Resume overseeing the queue specified by -q, which see."
                 "Only has an effect with -q.")
-               #:collect ["host" take-latest #f]
-               #:conflicts (λ (flags) (not (member 'queue flags)))]
+               #:collect ["host" take-latest #f]]
               #:multi
               [("-d" "--download-results")
                'download
