@@ -13,7 +13,7 @@ nature, it yields a large corpus of programs with  realistic and diverse type mi
 
 \hline
 
-  \texttt{acquire} & Board game simulation (M. Felleisen)  \\%[1em]
+  \texttt{acquire} & Object-oriented board game implementation (M. Felleisen)  \\%[1em]
 
 
 \hline
@@ -40,7 +40,7 @@ nature, it yields a large corpus of programs with  realistic and diverse type mi
   \texttt{synth} & Converter of notes and drum beats to WAV (V. St-Amour \& N. Toronto) \\%[1em]
 
 \hline
-  \texttt{take5} & Card game simulator (M.Felleisen)  \\%[1em]
+  \texttt{take5} & Mixin-based card game simulator (M.Felleisen)  \\%[1em]
 
 \hline
   \texttt{tetris} & Functional implementation of Tetris (D. Van Horn) \\%[1em]
@@ -86,7 +86,7 @@ However,  unlike the hard-to-kill mistakes introduced by standard mutators,
 gradual type systems flag mere typos.  Thus, in order to
 exercise the rational programmer in the context of gradual typing, 
 we need to develop alternative mutators
-that are fine-tuned to produce type-level mistakes gradual type systems 
+that are fine-tuned to produce the type-level mistakes gradual type systems 
 can detect. Our inspiration is our
 more-than-a-decade long experience of making type-level mistakes in Typed
 Racket. Some of these mistakes often take non-trivial effort to debug and
@@ -232,8 +232,8 @@ type-level mistakes do not necessarily turn our benchmarks into
 interesting debugging scenarios for the rational programmer.  The
 benchmarks are fully typed, and type checking detects each mistake at
 compile time.  Hence, we apply the mutators to versions, dubbed
-\dubbed{scenarios}, of the benchmarks where some components are
-stripped of their type annotation.  Without the annotations, the type
+\dubbed{scenarios}, of the benchmarks without 
+some  of their type annotation.  Without the annotations, the type
 checker may not detect a mistake at compile time and, instead, the run
 time checks
 of the gradual type system signal an error.  Scenarios
@@ -263,13 +263,13 @@ notice the mistake.
 
 
 The third criterion aims to capture debugging scenarios with a specific
-kind of run time error: one produced by the interaction of a buggy
-component with the rest of the program.  In those cases, the rational programmer
-may need to examine several components to locate the source of the faulty interaction.
+kind of run time error: one produced because of the interaction between the buggy
+portion of the program with the rest of the program.  In those cases, the rational programmer
+may need to examine several pieces of the program to locate the source of the faulty interaction.
 In technical terms, we mark these scenarios by
 analyzing the stack trace of a run time error.  If the stack trace mentions at
-least two distinct components, then this is accurate evidence of interaction between
-components.  We require a third component because our benchmarks come
+least two distinct components, then this is accurate evidence of
+interaction.  We require a third component because our benchmarks come
 with a driver component which is present in the stack trace of all run
 time errors.
 

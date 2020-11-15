@@ -58,7 +58,7 @@ another. For instance, the case study presented here builds on
 Greenman and Felleisen's transient variant for functional Typed
 Racket~\cite{gf-icfp-2018} to obtain a transient semantics that is
 comparable with Typed Racket's default natural one. This transient
-variant accommodates many more linguistic features and library calls
+variant accommodates varied linguistic features and library calls
 in a way that is faithful to the transient
 semantics~\cite{vss-popl-2017}.
 
@@ -71,17 +71,23 @@ erasure semantics does not blame a component per se, but it comes with an
 exception location and the usual stack traces. 
 
 Supporting these strategies is {\em not\/} just an issue of language
-implementation but affects greatly the behavior of the rational programmer.
-Specifically, the rational programmer must come with \emph{modes}
-that represent the alternative interpretations of blame. 
-For instance, a programmer using transient may
-pick the oldest element of a blame set as the next component to add types because
+implementation but affects greatly the behavior of the rational
+programmer.  Specifically, the rational programmer must come with
+\emph{modes} that represent the alternative interpretations of blame.  For
+instance, a mode of the rational programmer using transient may pick the
+oldest element of a blame set as the next component to add types because
 it corresponds to the earliest point in the program's evaluation that can
-discover an impedance mismatch.  Another mode does not distinguish between the elements of the
-blame set and has the rational programmer type all blamed components
-at once. Because this second kind of step 
-is more laborious than the first one, the analysis of the results must take 
-into account the rational programmer's effort.
+discover an impedance mismatch.  Another mode may opt to treat the blame
+set as another form of a stack trace and add types to its newest element.
+When both modes are equally successful in locating an impedance mismatch,
+the method has needs to take into account the rational programmer's effort
+to answer which mode is the most effective. 
+
+%Another mode does not distinguish between the elements of the
+%blame set and has the rational programmer type all blamed components
+%at once. Because this second kind of step 
+%is more laborious than the first one, the analysis of the results must take 
+%into account the rational programmer's effort.
 
 Besides the blame information they produce, the three gradual typing
 systems also differ in the runtime type checks they perform. Therefore an
