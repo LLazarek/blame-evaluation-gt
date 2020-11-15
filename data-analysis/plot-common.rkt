@@ -112,10 +112,12 @@
                                           [outcome 'type-error]
                                           [blamed blamed]))
                      config)
-     (and (equal? (hash-ref config mutated-mod-name) 'types)
+     ;; Original definition, changed to any type error because any type error
+     ;; should be good enough: see justification in notes
+     #;(and (equal? (hash-ref config mutated-mod-name) 'types)
           (list? blamed)
           (member mutated-mod-name blamed))
-     #;#t]
+     #t]
     [else #f]))
 
 (define ((add-to-list v) l) (cons v l))
