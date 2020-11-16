@@ -85,7 +85,16 @@
   (define (comparison-%-with-name comparison-%)
     (list (comparison->name (first comparison-%))
           (second comparison-%)))
-  (plot-pict (discrete-histogram (map comparison-%-with-name comparison-%s))
+  (define (comparison-%-annotation comparison% index)
+    (define % (second comparison%))
+    (point-label (list (+ index 0.5) %)
+                 (~r % #:precision 3)
+                 #:point-size 0
+                 #:anchor 'bottom))
+  (plot-pict (list (discrete-histogram (map comparison-%-with-name comparison-%s))
+                   (for/list ([comparison% (in-list comparison-%s)]
+                              [i (in-naturals)])
+                     (comparison-%-annotation comparison% i)))
              #:y-max 1
              #:y-label (~a "Percentage of all mutants")))
 
