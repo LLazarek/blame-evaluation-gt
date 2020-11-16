@@ -497,7 +497,7 @@
               #:when (match incomplete-job
                        [(list (== (first benchmark))
                               (== (second benchmark))
-                              (? (>/c 0.99)))
+                              (? (>/c 0.97)))
                         #t]
                        [else #f]))
     benchmark))
@@ -508,14 +508,35 @@
                 [_ (send a-host submit-job! benchmark config)])
                (void)))
 
+(define job-restart-history (make-hash))
 (define (restart-stuck-jobs! a-host
                              [maybe-active-jobs (send a-host get-jobs #t)]
                              [maybe-summary (summarize-experiment-status a-host)])
+  (define (should-restart? job-info)
+    (match-define (list restart-count skips-so-far)
+      (hash-ref job-restart-history
+                job-info
+                (list 0 0)))
+    (= restart-count skips-so-far))
+  (define (restart+record! job-info)
+    (displayln @~a{@(date->string (current-date) #t) Restarting stuck job: @job-info})
+    (restart-job! a-host job-info)
+    (hash-update! job-restart-history
+                  job-info
+                  (match-lambda [(list restart-count _) (list (add1 restart-count) 0)])
+                  (list 0 0)))
+  (define (record-skipped-start! job-info)
+    (hash-update! job-restart-history
+                  job-info
+                  (match-lambda [(list restart-count skips) (list restart-count (add1 skips))])
+                  (list 0 0)))
+
   (for* ([summary (in-option maybe-summary)]
          [active-jobs (in-option maybe-active-jobs)]
          [job-info (in-list (stuck-jobs active-jobs summary))])
-    (displayln @~a{@(date->string (current-date) #t) Restarting stuck job: @job-info})
-    (restart-job! a-host job-info)))
+    (if (should-restart? job-info)
+        (restart+record! job-info)
+        (record-skipped-start! job-info))))
 
 (define needed-benchmarks/14
   '("dungeon"
@@ -893,7 +914,10 @@
      (for ([benchmark (in-list target-benchmarks)]
            [i (in-naturals)])
        ;; lltodo: the submission here can be batched
-       (when (= i 5) (sleep (* 6 60)))
+       ;; > This is (slightly) harder than the progress checks, just because of the job files.
+       (when (and (not (zero? i))
+                  (zero? (modulo i 3)))
+         (sleep (* 2 60)))
        (if (absent? (action a-host benchmark config-name))
            (displayln @~a{Failed @name @(list a-host config-name benchmark)})
            (displayln @~a{Successful @name @(list a-host config-name benchmark)})))))
