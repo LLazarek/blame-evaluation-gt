@@ -1,33 +1,8 @@
 #lang at-exp rscript
 
 (require syntax/parse/define
-         racket/date)
-
-(define-values {absent absent?}
-  (let ()
-    (struct absent ())
-    (values (absent) absent?)))
-(define (option/c inner/c)
-  (or/c absent? inner/c))
-
-(define (in-option o)
-  (in-list (match o
-             [(? absent?) empty]
-             [else (list o)])))
-(define-simple-macro (for*/option clauses body ...)
-  (let/ec return
-    (for* clauses
-      (return (let () body ...)))
-    absent))
-(define-simple-macro (option-let* ([name maybe-option] more ...) body ...)
-  #:with result-expr (if (null? (attribute more))
-                         #'(let () body ...)
-                         #'(option-let* (more ...) body ...))
-  (let ([name maybe-option])
-    (if (absent? name)
-        absent
-        result-expr)))
-
+         racket/date
+         "option.rkt")
 
 (define-runtime-paths
   [store-path "../../experiment-data/experiment-manager"]
@@ -78,6 +53,8 @@
                 (define/public (system/host #:interactive? [interactive? #f] . parts)
                   ;; lltodo: implement a persistent connection here to prevent being blocked
                   ;; by zythos for opening too many connections too quickly
+                  ;; > Tried this and gave up after a few hours. It's hard.
+                  ;; Instead, I should think about batching these calls higher up in the logic.
                   (define cmd-str (apply ~a (add-between parts " ")))
                   (define cmd-str-escaped (string-replace cmd-str "\"" "\\\""))
                   (system @~a{ssh @(if interactive? "-t" "") @hostname "@cmd-str-escaped"}))
@@ -460,30 +437,29 @@
   (findf (prefix-or-suffix-of benchmark-data-name)
          needed-benchmarks/10))
 
-;; host? string? -> (option/c (and/c real? (between/c 0 1)))
-(define (get-progress a-host benchmark)
+;; host? (listof string?) -> (option/c (listof (option/c (and/c real? (between/c 0 1)))))
+(define (get-progress a-host . benchmarks)
   #;(define benchmark
     (if (member benchmark needed-benchmarks/10)
         benchmark
         (try-infer-benchmark-from-data-name benchmark)))
+  (define benchmark-paths (for/list ([benchmark (in-list benchmarks)])
+                            (build-path (get-field host-data-path a-host) benchmark)))
   (define progress-str
     (send a-host
           system/host/string
           (get-field host-racket-path a-host)
           (build-path (get-field host-utilities-path a-host) "check-experiment-progress.rkt")
-          "-l"
-          (~a benchmark ".log")
-          (build-path (get-field host-data-path a-host) benchmark)))
-  (match progress-str
-    [(regexp (pregexp @~a{[^@"\n"]+@"\n"([\d.]+)}) (list _ (app string->number %)))
-     %]
-    [other
-     (eprintf @~a{
-                  Unable to get experiment progress for @benchmark on host @a-host, @;
-                  found: @~v[other]
-
-                  })
-     absent]))
+          "-r"
+          .
+          benchmark-paths))
+  (define progresses (string->value progress-str))
+  (if (list? progresses)
+      (for/list ([% (in-list progresses)])
+        (match %
+          [(? number? n) n]
+          [else absent]))
+      absent))
 
 ;; summary/c :=
 ;; (hash 'completed                         (listof (list/c string? string?))
@@ -491,10 +467,14 @@
 
 ;; host<%> -> (option/c summary/c)
 (define (summarize-experiment-status a-host)
-  (define (with-progress incomplete-bench)
-    (match-define (list name config) incomplete-bench)
-    (printf "Retrieving ~a progress ...\r" name)
-    (list name config (get-progress a-host name)))
+  (define (add-progress incomplete-benchs)
+    (match-define (list (list names _) ...) incomplete-benchs)
+    (define progresses (apply get-progress a-host names))
+    (for/list ([job-id (in-list incomplete-benchs)]
+               [progress (in-list (if (absent? progresses)
+                                      (make-list (length incomplete-benchs) absent)
+                                      progresses))])
+      (append job-id (list progress))))
   (printf "Checking ~a...\r" a-host)
   (option-let*
    ([results (get-results a-host)])
@@ -502,7 +482,7 @@
              ([result-kind (in-list '(incomplete errored other))])
      (hash-update results+progress
                   result-kind
-                  (λ (benches) (map with-progress benches))))))
+                  add-progress))))
 
 (define (stuck-jobs active-jobs maybe-summary)
   (for*/list ([summary (in-option maybe-summary)]
@@ -643,12 +623,12 @@
            [(and no-jobs? (summary-empty? summary))
             'empty]
            [(and no-jobs? (summary-has-errors? summary))
-            (notify-phone! @~a{@host has errors})
-            (if (user-prompt! @~a{
-                                  Found errors on @host, summary:
-                                  @(format-status host summary)
-                                  Resume waiting for finish? (no means abort): 
-                                  })
+            (if (help!:continue? @~a{@host has errors}
+                                 @~a{
+                                     Found errors on @host, summary:
+                                     @(format-status host summary)
+                                     Resume waiting for finish? (no means abort): 
+                                     })
                 (loop)
                 'error)]
            [else
@@ -787,7 +767,9 @@
                          [{"R" _} "R"]
                          [{"W" _} "W"])
                        "  "
-                       (render-progress progress status)
+                       (if (absent? progress)
+                           "<no progress available>"
+                           (render-progress progress status))
                        "  "
                        (if check-for-errors? "⚠" " ")))))
       (define (render-progress % status)
@@ -910,6 +892,7 @@
                                  [else benchmarks]))
      (for ([benchmark (in-list target-benchmarks)]
            [i (in-naturals)])
+       ;; lltodo: the submission here can be batched
        (when (= i 5) (sleep (* 6 60)))
        (if (absent? (action a-host benchmark config-name))
            (displayln @~a{Failed @name @(list a-host config-name benchmark)})

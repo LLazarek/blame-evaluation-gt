@@ -4,21 +4,21 @@
          (submod "../experiment/mutant-factory.rkt" test)
          "../experiment/mutant-factory-data.rkt"
          "../configurations/configure-benchmark.rkt"
-         "mutant-util.rkt")
+         "mutant-util.rkt"
+         "option.rkt")
 
 (define-runtime-paths
   [configs-dir "../configurables"]
   [experiment-launch-dir "../.."])
 
-(define (guess-path . parts)
+(define (guess-path #:fail-thunk fail-f . parts)
   (define path (apply build-path parts))
   (if (or (path-to-existant-directory? path)
           (path-to-existant-file? path))
       path
-      (raise-user-error 'guess-path
-                        @~a{Unable to infer a necessary path. Guessed: @path})))
+      (fail-f path)))
 
-(define (infer-benchmark log-path)
+(define (infer-benchmark log-path #:fail-thunk fail-thunk)
   (define benchmark-path
     (match (system/string @~a{grep -E 'Running on benchmark' @log-path})
       [(regexp #px"(?m:Running on benchmark (.+)$)" (list _ path))
@@ -29,13 +29,10 @@
        (define a-mod-path-symbol (first (first benchmark-parts)))
        (simple-form-path (build-path (~a a-mod-path-symbol) ".." ".."))]
       [other
-       (displayln @~a{Got other: @other})
-       (raise-user-error
-        'check-experiment-progress
-        "Unable to infer benchmark path. Are you running from the same directory the experiment was run?")]))
+       (fail-thunk)]))
   (read-benchmark benchmark-path))
 
-(define (infer-configuration log-path)
+(define (infer-configuration log-path #:fail-thunk fail-thunk)
   (match (system/string @~a{grep -E 'Running experiment with config' @log-path})
     [(regexp #rx"(?m:config (.+)$)" (list _ path))
      #:when (path-to-existant-file? path)
@@ -47,8 +44,7 @@
      #:when (path-to-existant-file? (build-path configs-dir config-name))
      (build-path configs-dir config-name)]
     [else
-     (raise-user-error 'check-experiment-progress
-                       "Unable to infer path to config for this experiment.")]))
+     (fail-thunk)]))
 
 (define (all-mutants-for bench)
   (define select-mutants (configured:select-mutants))
@@ -82,73 +78,130 @@
 
 (main
  #:arguments {[(hash-table ['watch watch-mode?]
-                           ['log-name log-name])
-               (list benchmark-dir)]
+                           ['log-name log-names]
+                           ['readable-output? readable-output?])
+               benchmark-dirs]
               #:once-each
               [("-w" "--watch")
                'watch
-               ("Interactively show a progress bar that updates every 5 sec.")
+               ("Interactively show a progress bar that updates every 5 sec."
+                "Only works with a single benchmark-dir.")
                #:record]
+              [("-r" "--readable")
+               'readable-output?
+               ("Output information in a `read`able format.")
+               #:record]
+              #:multi
               [("-l" "--log-name")
                'log-name
-               ("Explicitly provide the log file name.")
-               #:collect ["path" take-latest #f]]
-              #:args [benchmark-dir]}
- #:check [(path-to-existant-directory? benchmark-dir)
-          @~a{Unable to find @benchmark-dir}]
+               ("Explicitly provide the log file name. (one per benchmark-dir)")
+               #:collect {"path" cons empty}]
+              #:args benchmark-dirs}
+ #:check [(andmap path-to-existant-directory? benchmark-dirs)
+          @~a{Unable to find @(filter-not path-to-existant-directory? benchmark-dirs)}]
+ #:check [(not (and watch-mode? (not (= (length benchmark-dirs) 1))))
+          @~a{Watch mode can only be specified with a single benchmark-dir.}]
 
- (define log-path
-   (guess-path benchmark-dir (or log-name (~a (basename benchmark-dir) ".log"))))
- (define bench (infer-benchmark log-path))
+ (define %s
+   (for/list ([benchmark-dir (in-list benchmark-dirs)]
+              [log-name (in-sequences log-names (in-cycle (in-value #f)))])
+     (option-let*
+      ([log-path
+        (guess-path benchmark-dir (or log-name (~a (basename benchmark-dir) ".log"))
+                    #:fail-thunk
+                    (λ (path)
+                      (if readable-output?
+                          absent
+                          (raise-user-error
+                           'guess-path
+                           @~a{Unable to infer log path. Guessed: @path}))))]
 
- (define config-path (infer-configuration log-path))
- (install-configuration! config-path)
+       [bench
+        (infer-benchmark
+         log-path
+         #:fail-thunk (thunk
+                       (if readable-output?
+                           absent
+                           (raise-user-error
+                            'check-experiment-progress
+                            @~a{
+                                Unable to infer benchmark path. @;
+                                Are you running from the same directory the experiment was run?
+                                }))))]
 
- (displayln @~a{
-                Inferred benchmark @(benchmark->name bench) @;
-                and config @(find-relative-path (simple-form-path configs-dir)
-                                                (simple-form-path config-path))
-                })
+       [config-path
+        (infer-configuration
+         log-path
+         #:fail-thunk (thunk
+                       (if readable-output?
+                           absent
+                           (raise-user-error
+                            'check-experiment-progress
+                            "Unable to infer path to config for this experiment."))))]
 
- (define all-mutants (all-mutants-for bench))
+       [_ (begin
+            (install-configuration! config-path)
+            (unless readable-output?
+              (displayln @~a{
+                             Inferred benchmark @(benchmark->name bench) @;
+                             and config @(find-relative-path (simple-form-path configs-dir)
+                                                             (simple-form-path config-path))
+                             })))]
 
- (define progress-log-path
-   (guess-path (path-replace-extension log-path "-progress.log")))
+       [all-mutants (all-mutants-for bench)]
 
- (cond [watch-mode?
-        (define period 5)
-        (define start-time (current-inexact-milliseconds))
-        (define start-% (check-progress-percentage progress-log-path
-                                                   all-mutants))
-        (let loop ()
-          (define % (check-progress-percentage progress-log-path
-                                               all-mutants))
-          (define pretty-%
-            (truncate-string-to (~a (* (/ (truncate (* % 1000)) 1000.0) 100))
-                                4))
-          (define completion-rate:%/s
-            (/ (- % start-%)
-               (/ (match (- (current-inexact-milliseconds)
-                            start-time)
-                    [0 +inf.0]
-                    [not-0 not-0])
-                  1000.0)))
-          (define remaining-% (- 1 %))
-          (define remaining-time-estimate
-            (if (zero? completion-rate:%/s)
-                0
-                (inexact->exact (round (/ (/ remaining-% completion-rate:%/s) 60.0)))))
-          (display
-           (format-updating-display
-            #:width 80
-            @~a{[@(progress-bar-string % #:width 50)] @|pretty-%|%}
-            " "
-            remaining-time-estimate
-            " min left"))
-          (display "\r")
-          (unless (= % 1)
-            (sleep period)
-            (loop)))]
-       [else
-        (displayln (exact->inexact (check-progress-percentage progress-log-path
-                                                              all-mutants)))]))
+       [progress-log-path
+        (guess-path (path-replace-extension log-path "-progress.log")
+                    #:fail-thunk
+                    (λ (path)
+                      (if readable-output?
+                          absent
+                          (raise-user-error
+                           'guess-path
+                           @~a{Unable to infer progress log path. Guessed: @path}))))])
+
+      (cond [watch-mode?
+             (define period 5)
+             (define start-time (current-inexact-milliseconds))
+             (define start-% (check-progress-percentage progress-log-path
+                                                        all-mutants))
+             (let loop ()
+               (define % (check-progress-percentage progress-log-path
+                                                    all-mutants))
+               (define pretty-%
+                 (truncate-string-to (~a (* (/ (truncate (* % 1000)) 1000.0) 100))
+                                     4))
+               (define completion-rate:%/s
+                 (/ (- % start-%)
+                    (/ (match (- (current-inexact-milliseconds)
+                                 start-time)
+                         [0 +inf.0]
+                         [not-0 not-0])
+                       1000.0)))
+               (define remaining-% (- 1 %))
+               (define remaining-time-estimate
+                 (if (zero? completion-rate:%/s)
+                     0
+                     (inexact->exact (round (/ (/ remaining-% completion-rate:%/s) 60.0)))))
+               (display
+                (format-updating-display
+                 #:width 80
+                 @~a{[@(progress-bar-string % #:width 50)] @|pretty-%|%}
+                 " "
+                 remaining-time-estimate
+                 " min left"))
+               (display "\r")
+               (unless (= % 1)
+                 (sleep period)
+                 (loop)))]
+            [else
+             (define % (exact->inexact (check-progress-percentage progress-log-path
+                                                                  all-mutants)))
+             (if readable-output?
+                 %
+                 (displayln %))]))))
+ (when readable-output?
+   (writeln (for/list ([maybe-% (in-list %s)])
+              (if (absent? maybe-%)
+                  'absent
+                  maybe-%)))))
