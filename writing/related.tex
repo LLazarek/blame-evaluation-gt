@@ -6,25 +6,25 @@ rational programmer but the basic ingredients of our technique derive
 directly from theirs. Specifically, we adapt their empirical technique
 to gradual typing which requires the development of custom mutators,
 careful selection of debugging scenarios and generalization of the
-technique to allow the comparison of different semantics. 
+technique to allow the comparison of different semantics.
 
-Besides the three semantics we consider, the literature on gradual typing
-comes with a plethora of different approaches. For example, Pyret
-(\shorturl{https://www.}{pyret.org}) treats fixed-size data types same as Natural
+The literature on gradual typing presents many semantics beyond the three
+that we study, but only two additional blame strategies.
+Pyret (\shorturl{https://www.}{pyret.org}) treats fixed-size data types same as Natural
 and functions same as Transient. The Forgetful~\cite{cl-icfp-2017} and
-the Amnesic~\cite{gfd-oopsla-2019} semantics are similar  to Transient but
+the Amnesic~\cite{gfd-oopsla-2019} semantics are similar to Transient but
 use wrappers instead of inlined checks.  Nom~\cite{mt-oopsla-2017} and
 other \emph{concrete\/} semantics~\cite{wnlov-popl-2010, rsfbv-popl-2015,
-rzv-ecoop-2015, rat-oopsla-2017} assume that every type maps to a unique
-known tag and they perform type tag checks  for every value that crosses
-from typed to untyped parts of a program or vice versa.  Monotonic
+rzv-ecoop-2015, rat-oopsla-2017} assume that every value comes with a type tag
+and use tag checks to supervise the interactions between typed and untyped code.
+Monotonic
 references~\cite{svctg-esop-2015} and the semantics~\cite{tlt-popl-2019,
 etg-icfp-19, tt-scp-20, tgt-popl-18, tt-sas-17} derived with the
-"turn-the-crank-get-a-POPL-paper" Abstracting Gradual Typing
-technique~\cite{gct-popl-2016} are (optimized) variants of Natural for
-different language features.  With the exception of Amnesic and Nom, all
-the above semantics forego blame. However,  Nom's gradual types impose
-significant restrictions on programmers, while Amnesic is a mere
-theoretical construction and is not meant as a blueprint for an
-implementation. 
+Abstracting Gradual Typing
+technique~\cite{gct-popl-2016} are (optimized) variants of Natural.
+Among these representative semantics, only Amnesic and Nom present innovative
+blame strategies.
+Our study nevertheless excludes these strategies because Amnesic is a mere
+theoretical construction and Nom imposes restrictions on untyped
+code that would necessitate new data definitions across our benchmarks.
  
