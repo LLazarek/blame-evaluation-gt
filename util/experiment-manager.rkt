@@ -146,9 +146,10 @@
                Universe = vanilla
 
                # Describe the target machine
-               Requirements = ((Machine == "allagash.cs.northwestern.edu") @;
-                               || (Machine == "piraat.cs.northwestern.edu") @;
-                               || (Machine == "fix.cs.northwestern.edu"))
+               Requirements = ((Machine == "fix.cs.northwestern.edu") @;
+                               @;|| (Machine == "piraat.cs.northwestern.edu") @;
+                               @;|| (Machine == "allagash.cs.northwestern.edu")
+                               )
 
                Rank = TARGET.Mips
                Copy_To_Spool = False
