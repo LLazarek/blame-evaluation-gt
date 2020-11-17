@@ -259,13 +259,13 @@
        ([_ (thread-send queueing-thd
                         `(submit ,(list benchmark config-name record/check-mode cpus name))
                         (thunk absent))])
-       (void)))
+       (thread-receive)))
     (define/public (cancel-job! benchmark config-name)
       (option-let*
        ([_ (thread-send queueing-thd
                         `(cancel ,(list benchmark config-name))
                         (thunk absent))])
-       (void)))
+       (thread-receive)))
 
     (define/private (launch-job! benchmark
                                  config-name ; without .rkt
@@ -281,7 +281,7 @@
        ([_ (ensure-screen-setup!)]
         [_ (bool->option
             (system/host @~a{
-                             screen -S @run-screen-name -p 0 -X stuff '\'@|run-cmd|\r\''
+                             screen -S @run-screen-name -p 0 -X stuff '@|run-cmd|\r'
                              }))])
        (void)))
     (define/private (cancel-currently-running-job!)
@@ -319,6 +319,7 @@
              absent]))
 
     (define/private (make-direct-access-host-queue-manager)
+      (define main-thd (current-thread))
       (thread
        (thunk
         (define message-evt (thread-receive-evt))
@@ -356,8 +357,12 @@
           (with-data-store-lock
             (thunk (define current-q (read-data-store))
                    (define new-q (rest current-q))
-                   (define job-info (first current-q))
-                   (send this launch-job! . job-info))
+                   ;; This unpacking is necessary because apparently there's no
+                   ;; way to do an `apply`-type application of a private method.
+                   (match-define (list benchmark config-name record/check-mode cpus name)
+                     (first current-q))
+                   (launch-job! benchmark config-name record/check-mode cpus name)
+                   (write-data-store! new-q))
             (thunk (displayln @~a{
                                   Warning: couldn't launch next job @;
                                   because couldn't get data store lock
@@ -365,8 +370,12 @@
 
         (let loop ()
           (cond [(thread-try-receive)
-                 => (match-lambda [`(submit ,job-spec) (enqueue-job! job-spec)]
-                                  [`(cancel ,job-id)   (cancel-job! job-id)])]
+                 => (match-lambda [`(submit ,job-spec)
+                                   (enqueue-job! job-spec)
+                                   (thread-send main-thd #t)]
+                                  [`(cancel ,job-id)
+                                   (cancel-job! job-id)
+                                   (thread-send main-thd #t)])]
                 [else
                  (if (and (current-job-done?)
                           (not (queue-empty?)))
