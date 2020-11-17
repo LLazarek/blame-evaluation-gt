@@ -443,23 +443,26 @@
     (if (member benchmark needed-benchmarks/10)
         benchmark
         (try-infer-benchmark-from-data-name benchmark)))
-  (define benchmark-paths (for/list ([benchmark (in-list benchmarks)])
-                            (build-path (get-field host-data-path a-host) benchmark)))
-  (define progress-str
-    (send a-host
-          system/host/string
-          (get-field host-racket-path a-host)
-          (build-path (get-field host-utilities-path a-host) "check-experiment-progress.rkt")
-          "-r"
-          .
-          benchmark-paths))
-  (define progresses (string->value progress-str))
-  (if (list? progresses)
-      (for/list ([% (in-list progresses)])
-        (match %
-          [(? number? n) n]
-          [else absent]))
-      absent))
+  (cond [(empty? benchmarks)
+         empty]
+        [else
+         (define benchmark-paths (for/list ([benchmark (in-list benchmarks)])
+                                   (build-path (get-field host-data-path a-host) benchmark)))
+         (define progress-str
+           (send a-host
+                 system/host/string
+                 (get-field host-racket-path a-host)
+                 (build-path (get-field host-utilities-path a-host) "check-experiment-progress.rkt")
+                 "-r"
+                 .
+                 benchmark-paths))
+         (define progresses (string->value progress-str))
+         (if (list? progresses)
+             (for/list ([% (in-list progresses)])
+               (match %
+                 [(? number? n) n]
+                 [else absent]))
+             absent)]))
 
 ;; summary/c :=
 ;; (hash 'completed                         (listof (list/c string? string?))
