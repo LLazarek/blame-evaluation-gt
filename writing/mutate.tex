@@ -249,29 +249,33 @@ scenario that
 \end{enumerate}
 
 The first criterion simply validates that the debugging scenario concerns
-a type-level mistake. However, The second and third criteria require 
+an actual type-level mistake. However, The second and third criteria require 
 more explanation.  The second one stipulates that the mistake is
 detectable under Erasure to ensure that it is detectable by all three
-semantics.  This is a direct consequence of~\citet{gfd-oopsla-2019}'s
-theorem that a run time error under Erasure implies a run time
-error under both Transient and Natural.  It is worth noting that this
-criterion excludes from consideration the very interesting scenarios where Natural or
-Transient can detect a mistake but Erasure cannot, and thus it favors
-Erasure.  However, our goal here is to test the rational programmer across
-these three semantics, and thus we opt for a setting where all of them
-notice the mistake.
-
+semantics.   Whether a scenario produces a run time error largely depends on 
+the underlying semantics but \citet{gfd-oopsla-2019}
+show that a run time error under Erasure implies a run time
+error under both Transient and Natural. Thus the criterion aligns
+interesting debugging scenarios with our lowest denominator, Erasure, 
+and excludes  from consideration the very interesting scenarios indeed where Natural or
+Transient can detect a mistake but where Erasure is powerless. Of course this choice favors
+Erasure over Transient and Natural and, for the same reason, Transient over
+Natural. We consider some form of bias towards one or the other semantics
+unavoidable no matter how we define interesting debugging scenarios and we
+opt for tipping the scales in favor of the theoretically weakest
+semantics.
 
 The third criterion aims to capture debugging scenarios with a specific
 kind of run time error: one produced because of the interaction between the buggy
-portion of the program with the rest of the program.  In those cases, the rational programmer
+portion of the program with the rest of the program.  In these cases, the rational programmer
 may need to examine several pieces of the program to locate the source of the faulty interaction.
-In technical terms, we mark these scenarios by
+In technical terms, we reliably mark these scenarios by
 analyzing the stack trace of a run time error.  If the stack trace mentions at
-least two distinct components, then this is accurate evidence of
-interaction.  We require a third component because our benchmarks come
+least two distinct components, then this indicates interaction.  We require a third component because our benchmarks come
 with a driver component which is present in the stack trace of all run
-time errors.
+time errors. In essence, this last criterion excludes a large number of
+trivial to debug, and thus ineffective, scenarios that error immediately when their mutated component is
+evaluated. 
 
 
 \begin{figure*}
@@ -282,7 +286,7 @@ time errors.
 \end{figure*}
 
 
-With this definition in hand, we analyze how effective our mutators
+With the definition of interesting debugging scenarios in hand, we analyze how effective our mutators
 are for turning the benchmarks into interesting debugging scenarios.
 Indeed the mutators produce at least 72192 interesting debugging scenarios
 across all mutants --- there are potentially many more but this is how
