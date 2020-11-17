@@ -24,6 +24,10 @@
                               #:to-host (or/c path-string? #f)}
                              natural?)]
 
+                  ;; may be implemented, must be called before submitting or canceling jobs
+                  ;; is idempotent
+                  [setup-job-management! (->m any)]
+
                   ;; must be implemented
                   [get-jobs
                    (let ([job-descr/c (listof (option/c (list/c string? string?)))])
@@ -49,6 +53,8 @@
                        [host-data-path (build-path host-project-path "experiment-output")])
                 (define/public (custom-write port) (write hostname port))
                 (define/public (custom-display port) (display hostname port))
+
+                (define/public (setup-job-management!) (void))
 
                 (define/public (system/host #:interactive? [interactive? #f] . parts)
                   ;; lltodo: implement a persistent connection here to prevent being blocked
@@ -231,8 +237,11 @@
     (init-field [cpu-count 1])
     (field [run-screen-name "experiment-run"]
            [management-screen-name "experiment-manage"]
-           [queueing-thd (make-direct-access-host-queue-manager)])
+           [queueing-thd #f])
 
+    (define/override (setup-job-management!)
+      (unless (thread? queueing-thd)
+        (set! queueing-thd (make-direct-access-host-queue-manager))))
     (define/public (get-jobs [active? #t] #:with-pid? [with-pid? #f])
       (option-let*
        ([active (match (system/host/string "ps -ef | grep run-experiment.sh")
@@ -256,12 +265,14 @@
                                 #:mode [record/check-mode 'check]
                                 #:cpus [cpus cpu-count]
                                 #:name [name benchmark])
+      (setup-job-management!)
       (option-let*
        ([_ (thread-send queueing-thd
                         `(submit ,(list benchmark config-name record/check-mode cpus name))
                         (thunk absent))])
        (thread-receive)))
     (define/public (cancel-job! benchmark config-name)
+      (setup-job-management!)
       (option-let*
        ([_ (thread-send queueing-thd
                         `(cancel ,(list benchmark config-name))
@@ -921,6 +932,7 @@
  (define (for-each-target targets action name)
    (for ([target (in-list targets)])
      (match-define (list a-host config-name benchmarks) target)
+     (send a-host setup-job-management!)
      (define target-benchmarks (match benchmarks
                                  ['("<all>") needed-benchmarks/10]
                                  [else benchmarks]))
@@ -949,6 +961,8 @@
                            (send a-host cancel-job! benchmark config-name))
                          "cancel")]
        [watch-for-stuck-jobs?
+        (for ([host (in-list hosts)])
+          (send host setup-job-management!))
         (let loop ()
           (for-each restart-stuck-jobs! hosts)
           (printf "Sleeping                    \r")
@@ -987,6 +1001,7 @@
             [else 'stop]))
         (when resume-Q/host
           (define host (host-by-name resume-Q/host))
+          (send host setup-job-management!)
           (define status (wait-for-jobs-to-finish+download-results host
                                                                    (~a "resuming " Q-path)))
           (unless (or (equal? status 'ok)
@@ -1005,6 +1020,7 @@
             [launch-spec-list
              (define launch-spec (list->benchmark-spec launch-spec-list))
              (define host (first launch-spec))
+             (send host setup-job-management!)
              (ensure-host-empty! host)
              (for-each-target (list launch-spec)
                               (λ (a-host benchmark config-name)
