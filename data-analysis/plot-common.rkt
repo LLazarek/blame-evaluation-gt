@@ -1,6 +1,11 @@
 #lang at-exp rscript
 
 (provide (contract-out
+          [directory->blame-trails-by-mutator/across-all-benchmarks
+           (path-to-existant-directory?
+            #:summaries-db db:path-to-db?
+            . -> .
+            (hash/c string? (listof blame-trail?)))]
           [make-distributions-table
            ({({string?
                (hash/c string? (listof blame-trail?))}
@@ -25,7 +30,8 @@
             . -> .
             (hash/c mutator-name? (listof blame-trail?)))])
          pict?
-         add-to-list)
+         add-to-list
+         for/hash/fold)
 
 (require plot
          plot-util
@@ -39,22 +45,30 @@
          "../configurables/configurables.rkt"
          "../runner/mutation-runner-data.rkt"
 
-         "read-data.rkt")
+         "read-data.rkt"
+         syntax/parse/define)
 
 (define pict? any/c)
 (define mutator-name? string?)
+
+(define (directory->blame-trails-by-mutator/across-all-benchmarks
+         data-dir
+         #:summaries-db mutation-analysis-summaries-db)
+  (define mutant-mutators
+    (read-mutants-by-mutator mutation-analysis-summaries-db))
+
+  (add-missing-active-mutators
+   (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
 
 (define (make-distributions-table make-distribution-plot
                                   #:breakdown-by breakdown-dimension
                                   #:summaries-db mutation-analysis-summaries-db
                                   #:data-directory data-dir
                                   #:dump-to-file [dump-path #f])
-  (define mutant-mutators
-    (read-mutants-by-mutator mutation-analysis-summaries-db))
-
   (define blame-trails-by-mutator/across-all-benchmarks
-    (add-missing-active-mutators
-     (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
+    (directory->blame-trails-by-mutator/across-all-benchmarks
+     data-dir
+     #:summaries-db mutation-analysis-summaries-db))
 
   (define all-mutator-names (mutator-names blame-trails-by-mutator/across-all-benchmarks))
 
@@ -158,3 +172,17 @@
               (for/and ([bt (in-list l)])
                 (equal? (blame-trail-mutant-id bt)
                         mutant))])))
+
+(define-simple-macro (for/hash/fold for-clauses
+                                    {~optional {~seq #:init initial-hash}
+                                               #:defaults ([initial-hash #'(hash)])}
+                                    #:combine combine
+                                    #:default default
+                                    body ...)
+  (for/fold ([result-hash initial-hash])
+            for-clauses
+    (define-values {key value} (let () body ...))
+    (hash-update result-hash
+                 key
+                 (λ (accumulator) (combine value accumulator))
+                 default)))
