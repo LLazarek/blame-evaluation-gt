@@ -1,0 +1,233 @@
+#lang at-exp rscript
+
+(require (prefix-in db: "../db/db.rkt")
+         "../mutation-analysis/mutation-analysis-summaries.rkt"
+         "../configurations/config.rkt"
+         "../configurations/configure-benchmark.rkt"
+         "../configurables/configurables.rkt"
+         "../util/progress-log.rkt"
+         "../util/mutant-util.rkt"
+         "../process-q/interface.rkt"
+         "../process-q/priority.rkt"
+         "../runner/mutation-runner.rkt"
+         racket/random)
+
+(define MUTANT-SAMPLE-SIZE 200)
+(define CONFIG-SAMPLE-SIZE 1000)
+(define CONFIG-SAMPLE-MAX-RETRIES 5)
+
+(define-runtime-paths
+  [erasure-config-path "../configurables/configs/erasure-stack-first.rkt"]
+  [transient-config-path "../configurables/configs/transient-newest.rkt"]
+  [natural-config-path "../configurables/configs/TR.rkt"])
+
+;; lltodo: <2020-11-18 Wed>
+;; Much of this is very similar to `filter-mutants-for-dynamic-errors.rkt`
+;; They should really share the same library.
+;; Not doing it now because no time to make sure I don't change the behavior of `filter-...`
+;; in the process.
+
+(define-logger comparison)
+
+(define (enQ-dynamic-error-checker q mutant benchmark id
+                                   #:log-progress log-progress!)
+  (define max-configuration (make-max-bench-config benchmark))
+  (define (random-configuration)
+    (hash-set (for/hash ([mod (in-hash-keys max-configuration)])
+                (values mod (random-ref '(none types))))
+              (mutant-module mutant) 'none))
+
+  (define all-modes-to-check (list natural-config-path
+                                   transient-config-path
+                                   erasure-config-path))
+  (define (enQ-a-new-dynamic-error-checker q
+                                           #:to-check modes-to-check
+                                           #:results-so-far results-so-far
+                                           #:retry-count retry-count)
+    (cond [(> retry-count CONFIG-SAMPLE-MAX-RETRIES)
+           (log-comparison-error @~a{Ran out of retries for @mutant})
+           q]
+          [else
+           (define a-config (random-configuration))
+           (process-Q-enq q
+                          (make-mutant-spawner a-config
+                                               modes-to-check
+                                               results-so-far
+                                               retry-count)
+                          (length modes-to-check))]))
+  (define (make-mutant-spawner run-configuration
+                               modes-to-check
+                               results-so-far
+                               retry-count)
+    (define this-mode (first modes-to-check))
+    (thunk
+     (define (will current-q info)
+       (define outcome (extract-outcome (process-info-data info)
+                                        mutant
+                                        run-configuration))
+       (define results+outcome (add-outcome outcome this-mode results-so-far))
+       (if (and (TR? this-mode) (not (equal? outcome 'blamed)))
+           (enQ-a-new-dynamic-error-checker current-q
+                                            #:to-check all-modes-to-check
+                                            #:results-so-far empty
+                                            #:retry-count (add1 retry-count))
+           (match modes-to-check
+             [(list _)
+              (log-progress! mutant id results+outcome)
+              current-q]
+             [(list* _ more-modes-to-check)
+              (enQ-a-new-dynamic-error-checker current-q
+                                               #:to-check more-modes-to-check
+                                               #:results-so-far results+outcome
+                                               #:retry-count 0)])))
+
+     (define configured-benchmark
+       (configure-benchmark benchmark
+                            run-configuration))
+     (define outfile (make-temporary-file @~a{@(benchmark->name benchmark)-~a}
+                                          #f
+                                          (working-dir)))
+     (define ctl
+       (parameterize ([mutant-error-log outfile])
+         (spawn-mutant-runner configured-benchmark
+                              (mutant-module mutant)
+                              (mutant-index mutant)
+                              outfile
+                              this-mode)))
+     (process-info outfile ctl will)))
+
+  (enQ-a-new-dynamic-error-checker q
+                                   #:to-check all-modes-to-check
+                                   #:results-so-far empty
+                                   #:retry-count 0))
+
+(define (add-outcome outcome mode results-so-far)
+  (cons (list (basename mode) outcome) results-so-far))
+
+(define (TR? mode)
+  (string-suffix? (~a mode) "TR.rkt"))
+
+(define (extract-outcome outfile mutant config)
+  (define result (with-handlers ([exn:fail? (const #f)])
+                   (file->value outfile)))
+  (match result
+    [(struct* run-status ([outcome outcome]))
+     outcome]
+    [else
+     (log-comparison-error
+      @~a{
+          Unable to read result from mutant @mutant config @config @;
+          Output file contents: @;
+          "@(file->string outfile)"
+          })
+     '?]))
+
+(define (find-mutant-benchmark mutant benchmarks-dir)
+  (define path (build-path benchmarks-dir (mutant-benchmark mutant)))
+  (unless (path-to-existant-directory? path)
+    (raise-user-error 'find-mutant-benchmark
+                      @~a{Can't find benchmark for @mutant in @benchmarks-dir}))
+  (read-benchmark path))
+
+;; (hash/c mod-name? summary?) string? -> (listof mutant?)
+(define (summaries->mutants summaries benchmark-name)
+  (for*/list ([{mod-name summary} (in-hash summaries)]
+              [{mutator indices} (in-hash (summary-valid-indices summary))]
+              [index (in-list indices)])
+    (mutant benchmark-name mod-name index)))
+
+(define ((add-to-list x) l) (cons x l))
+
+(define working-dir (make-parameter "compare-error-detection-scratch"))
+(main
+ #:arguments ({(hash-table ['summaries-db summaries-db-path]
+                           ['benchmarks-dir benchmarks-dir]
+                           ['progress-log progress-log-path]
+                           ['working-dir _]
+                           ['process-limit (app string->number process-limit)])
+               args}
+              #:once-each
+              [("-s" "--summaries-db")
+               'summaries-db
+               ("Input: A database containing mutation analysis summaries for mutants to further"
+                "analyze.")
+               #:collect {"path" take-latest #f}
+               #:mandatory]
+              [("-b" "--benchmarks")
+               'benchmarks-dir
+               ("Directory containing benchmarks referenced by the summaries-db.")
+               #:collect {"path" take-latest #f}
+               #:mandatory]
+              [("-l" "--progress-log")
+               'progress-log
+               ("Record progress in the given log file."
+                "If it exists and is not empty, resume from the point reached in the log.")
+               #:collect {"path" take-latest #f}
+               #:mandatory]
+
+              [("-w" "--working-dir")
+               'working-dir
+               ("Set the working directory for storing temporary data."
+                @~a{Default: @(working-dir)})
+               #:collect {"path" (set-parameter working-dir) (working-dir)}]
+              [("-j" "--process-limit")
+               'process-limit
+               ("How many parallel processes to use."
+                "Default: 1")
+               #:collect {"N" take-latest "1"}])
+
+ #:check [(db:path-to-db? summaries-db-path)
+          @~a{Can't find db at @summaries-db-path}]
+
+ (make-directory* (working-dir))
+
+ (log-comparison-info @~a{
+                          Starting comparison with summaries @summaries-db-path
+                          and benchmarks @benchmarks-dir
+                          and progress-log @progress-log-path
+                          and working dir @(working-dir)
+                          and process limit @process-limit
+                          })
+ (define progress
+   (match progress-log-path
+     [(? file-exists? path)
+      (log-comparison-info @~a{Pulling progress from log})
+      (make-hash (file->list path))]
+     [else (hash)]))
+ (define-values {log-progress!/raw finalize-log!}
+   (initialize-progress-log! progress-log-path
+                             #:exists 'append))
+ (define (log-progress! mutant id mode-outcomes)
+   (log-progress!/raw (cons (list mutant id)
+                            mode-outcomes)))
+ (define (logged-progress mutant id)
+   (hash-ref progress
+             (list mutant id)
+             #f))
+
+ (define summaries-db (db:get summaries-db-path))
+ (define all-mutants
+   (for*/list ([benchmark (in-list (db:keys summaries-db))]
+               [mutant (in-list (summaries->mutants (db:read summaries-db benchmark)
+                                                    benchmark))])
+     mutant))
+ (define mutants-to-sample-from
+   (cond [(hash-ref progress 'mutant-samples #f) => values]
+         [else
+          (define mutants (random-sample all-mutants MUTANT-SAMPLE-SIZE))
+          (log-progress!/raw (cons 'mutant-samples mutants))
+          mutants]))
+
+ (process-Q-wait
+  (for*/fold ([q (make-process-Q process-limit)])
+             ([mutant (in-list mutants-to-sample-from)]
+              [id (in-range (/ CONFIG-SAMPLE-SIZE (length mutants-to-sample-from)))])
+    (define benchmark (find-mutant-benchmark mutant benchmarks-dir))
+    (if (logged-progress mutant id)
+        q
+        (enQ-dynamic-error-checker q
+                                   mutant
+                                   benchmark
+                                   id
+                                   #:log-progress log-progress!))))
+ (log-comparison-info "Comparison complete."))
