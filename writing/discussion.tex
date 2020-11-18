@@ -56,8 +56,36 @@ assignment for trail extension as our experimental setup describes.
 %% the benchmark timeouts look like a threat, but this section shows that
 %%  we've looked carefully at those
 
+Surprisingly, Transient blames an empty set of boundaries in XXXX cases.
+Such cases should never occur, at least in theory, because an empty set
+ means the value has never crossed a boundary---if the value is indeed defined
+ in the current module, then we have typed code blaming itself for a typed
+ value; thus, the type checker must be unsound.
+After careful investigation of these empty blame cases, we found no soundness
+ bugs in Typed Racket.
+Instead, we found scenarios in which Transient lost track of the proper
+ boundaries.
+These scenarios suggest ways to improve the blame algorithm from~\citet{vss-popl-2017}:
+\begin{itemize}
+  \item
+    Entries in a blame map must point to several parent entries.
+    For example, if the function \texttt{f} receives bad input in the call
+    \texttt{(filter f xs)}, then blame should point to both \texttt{filter}
+    and the \texttt{xs} list.
+  \item
+    The construction of blame map entries must be guided by type-like specifications
+     instead of relying on syntax.
+    Aliasing the built-in \texttt{filter} function should not change the shape
+     of the blame map.
+  \item
+    The initial blame map must reflect the initial type environment.
+    Typed Racket trusts that untyped core-library functions, such as \texttt{filter},
+     behave correctly, but does not list the assumption in the blame map.
+\end{itemize}
+\noindent{}Despite these known limitations, we conjecture that these improvements
+ to Transient blame-tracking will not affect our overall conclusions.
 
-An apparent flaw in our transient is the high cost of blame.
+A second apparent flaw in our Transient semantics is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
  worst-case of 5.4x on fully-typed benchmarks in Reticulated,
  our configurations frequently exceed a 10 minute timeout with transient blame.
