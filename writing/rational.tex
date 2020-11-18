@@ -8,8 +8,9 @@ say modules, and a programmer converts a component at a time from its untyped
 state to a typed one. 
 
 Based on this idea, migratory paths offer a concise setting for
-evaluating the effectiveness of a rational programmer. If we group the
-scenarios from section ~\ref{sec:mutate} by mutation, then we obtain a set 
+evaluating the effectiveness of a rational programmer for dealing with the
+interesting debugging scenarios  from section ~\ref{sec:mutate}.
+If we group debugging scenarios by mutation, then we obtain a set 
 of programs that all contain the same mistake but differ in their type
 annotations.  In the setting of migratory typing,\footnote{The method can be adapted to
 so-called true gradual typing systems~\cite{svcb-snapl-2015} in a
@@ -30,15 +31,15 @@ ascending chain---dubbed a \emph{trail}---in $\lattice{\system}$.  The
 starting scenario $\conf_0$ of a trail---also referred to as the
 \emph{root} (of the trail)---is the initial debugging scenario.  Herein we
 consider only roots that are interesting debugging scenarios as described
-in~\ref{sec:mutate} --- we return to this point further on.  Intuitively,
+in~\ref{sec:mutate} --- we expand on this point further on.  Intuitively,
 starting from such a root, the rational programmer  steps along a trail,
-and at each step, uses reduces the current scenario to an ``easier'' next
+and at each step, reduces the current scenario to an ``easier'' next
 scenario to debug.  The easiest scenarios are those that the type checker
 rejects outright, because a type error pinpoints an impedance mismatch
 between the broken code of one component and its typed interface to
 others. At this point, the programmer has identified the broken component.
 If the scenario type-checks, the programmers runs the program until it
-raises an exception.  The rational programmer uses the blame
+raises a run time error.  The rational programmer uses the blame
 assignment\footnote{Blame can result either directly from a run time type
 check or, in the absence of blame, from an exception that we track back to
 the component that causes it with the help of the stack trace.} to decide
@@ -54,8 +55,7 @@ various semantics of gradual typing. Once this machinery is in place,
 we use the fourth subsection to state the precise experimental
 research questions that correspond to the high-level question on the
 first page and to explain our experimental process. The final
-subsection extends the development with a discussion of how we can
-compare the effectiveness of the rational programmer across semantics. 
+subsection extends the development with a discussion of programmer effort. 
 
 
 %% -----------------------------------------------------------------------------
@@ -106,7 +106,8 @@ trails.\\
 While these definitions describe how a rational programmer might gauge whether it
 pays off to heed blame assignments during debugging, they do not answer whether
 blame is a critical piece of the rational programmer's process.  For instance,
-typing the top of stack trace of a failed run time type check might be as useful as typing the blamed one.
+typing the top of stack trace of a failed run time type check, dubbed the
+location of the exception, might be as useful as typing the blamed one.
 
 To account for this situation, we devise a new mode of the natural rational
 programmer that follows a migration process based on exceptions:
@@ -114,8 +115,7 @@ programmer that follows a migration process based on exceptions:
 \it A natural exception trail is a sequence of scenarios $\conf_0,...\conf_n$ of a
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
 \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i = \{\random{\system, \conf_i}\}$
-where $\exception{\system, \conf}$ denotes the location of the runtime
-  error of $\conf$.
+where $\exception{\system, \conf}$ denotes the location of the exception of $\conf$.
 \end{quote}
 Similar to natural blame we determine how successful the exception
 migration is based on the success of natural exception trails: 
@@ -130,17 +130,14 @@ Given a program $\system$, the natural exception mode is\\
 exception trails.\\
 \end{quote}
 
-Putting the pieces together, we can now define that blame assignments adds value in
-the context of a natural semantics if blame mode  is better than the
-exception.
+Putting the pieces together, we can now define when blame 
+is more useful than mere exceptions in the context of a natural semantics.
 \begin{quote}
-\it Natural blame adds value to natural for a program $\system$ over
-  exceptions iff the natural blame mode is more successful than the
-  natural exception mode. And, the natural blame mode is more successful
-  than the natural exception mode for $\system$ if either natural blame is
-  always successful for $\system$ when natural exception is sometimes or
-  never successful, or natural blame is sometimes successful for $\system$
-  when natural exception is never successful.
+\it Natural blame  is more useful
+  than natural exceptions for $\system$ if either natural blame is
+  always useful for $\system$ when natural exception is sometimes or
+  never useful, or natural blame is sometimes useful for $\system$
+  when natural exception is never useful.
 \end{quote}
 
 
@@ -148,19 +145,20 @@ exception.
 %% -----------------------------------------------------------------------------
 \subsection{Modes of the Transient Rational Programmer} \label{sub:transient}
 
-The transient semantics assigns blame to a series of components. In this setting, a
+The transient semantics assigns blame to a set of components. In this setting, a
 blame assignment has the following meaning: the witness value to the impedance
-mismatch crossed the boundaries between neighbors in the sequence, and each crossing
-checked a portion of the value's type shape. 
+mismatch may have crossed the boundaries between elements in the set, and each crossing
+checked only a portion of the value's type shape. 
 
 This ambiguity in transient blame raises the question of how the rational programmer
 should react when the language produces a blame set. Our answer is that the rational
 programmer has at least two reasonable options. The first one is to select the component that is added
-to the blame set first and assign types to only that one---after all the types of
+to the blame set first and assign types to only that one---after all, if
+fully checked, the types of
 this first component should be able to detect an impedance mismatch earlier in the
 evaluation of a program than the later ones. The second option is to
 select the component that is added to the blame set last, effectively
-interpreting the blame set as an enhanced stack trace. 
+interpreting the blame set as a boundary-aware stack. 
 
 These two modes of rationalizing give rise to two different notions of trail.
 \begin{quote}
@@ -183,8 +181,8 @@ last component transient adds to the blame set for $\conf$.
 
 The definition of \emph{transient exception trails} 
 is analogous to that for natural and, same as for natural, we use it to  
-specify when the transient-last and transient-first blame modes add
-value to transient for a program.  
+specify when the transient-last and transient-first blame modes are more
+useful than exceptions in the context of a natural semantics.  
 
 
 %% -----------------------------------------------------------------------------
@@ -193,15 +191,17 @@ value to transient for a program.
  Since gradually typed languages with erasure semantics do not come with
  blame assignment, a rational programmer can only hope that the underlying
  safety checks and their exceptions are helpful.  Thus, the erasure 
- rational programmer has a single mode; the erasure exception mode. 
+ rational programmer has a single mode, the erasure exception mode, and
+ its definition and the accompanying notion of usefulness follow that for
+ natural.
 
 %% -----------------------------------------------------------------------------
 \subsection{Experimental Process.}
 
 Trails and their properties give us the tools for a rigorous examination
 of blame for natural, transient and erasure Typed Racket in the setting of the 
-mutants from section~\ref{sec:mutate}. In particular, our experimental
-process collects data to answer three questions for each mutant:
+mutants from section~\ref{sec:mutate}. In line with the discussion so far, 
+our experimental process collects data to answer three initial questions for each mutant:
 \begin{itemize}
 \item[$Q_1$] Is blame valuable for natural?
 
@@ -211,6 +211,14 @@ process collects data to answer three questions for each mutant:
 
 \end{itemize}
 
+Furthermore, our experiment can compare the relative value of blame
+between any two of the three semantics. 
+\begin{itemize}
+\item[$Q_*$] Is blame for X more valuable than blame for Y where X, Y is natural,
+  erasure or natural?
+\end{itemize}
+
+
 Table~\ref{fig:experiment-outline} summarizes how each question relates to
 different kinds of trails/modes of the rational programmer. For example experimental
 question $Q_1$ asks whether blame is valuable for natural and our experiment
@@ -218,14 +226,14 @@ uses the natural blame and exception trails to answer it.
 
 \begin{figure}[ht]
 \center
-{\begin{tabular}{l|c|c}
+{\begin{tabular}{l|c|c|c}
 %% ---------------------------------------------------------------------------------------------------------------
-                        & {\bf Natural}        & {\bf Transient}         \\ \hline 
+                        & {\bf Natural}  & {\bf Transient} &  {\bf Erasure} \\ \hline 
 %% ---------------------------------------------------------------------------------------------------------------
-{\bf Blame}             &       $Q_1$          &                           \\
-{\bf First blame}         &                      &     $Q_2$                \\
-{\bf Last blame}   &                      &     $      Q_3$                  \\
-{\bf Exceptions}         &       $Q_1$    &     $Q_2$/$Q_3$    \\
+{\bf Blame}             &  $Q_1/Q_*$    &                  &                \\
+{\bf First blame}       &               &     $Q_2/Q_*$    &                 \\
+{\bf Last blame}        &               &     $Q_3/Q_*$    &                 \\
+{\bf Exceptions}        &      $Q_1$    &     $Q_2/Q_3$    &      $Q_*$      \\
 \end{tabular}}
   \caption{ Experimental questions and rational programmer modes.}
   \label{fig:experiment-outline}
@@ -237,19 +245,30 @@ In detail we answer $Q_1$ for an ill-typed mutant from
 section~\ref{sec:mutate} by analyzing the natural blame and
 natural exception trails in the scenario lattice of the mutant. A
 log reports on success and failure endings.  The first step is to construct the
-mutant's scenario lattice and select an interesting debugging scenario
-as  the root of a trail.
+mutant's scenario lattice and select one of the interesting debugging
+scenarios from section~\ref{sec:mutate}.
 Our test
 bed extends these trails according to the natural-blame programmer.  If no scenarios
-can be added to the trail---a trail may the top of the finite lattice---we check if
+can be added to the trail, we check if
 the last scenario of the trail type checks or not. If it does, this natural-blame
 trail is successful, otherwise it is failing. We repeat the same process for the
-same roots once more following the natural-exception programmer
-. Finally, based on the collected data, we calculate the
-success/failure results for the trails to determine whether natural blame is more
-successful than natural exceptions  and we obtain the answer for
-$Q_1$.  The process is analogous for the other questions employing the respective
-modes of the rational programmer. Figure~\ref{fig:process} summarizes the
+same roots once more following the natural-exception programmer. 
+Next, based on the collected data, we calculate the
+success/failure results for the trails to determine whether blame
+is more useful than exceptions for this mutant. Finally, we
+obtain a positive answer for
+$Q_1$ when the percentage of mutants where blame is more useful
+than exceptions is greater than the percentage of mutants where exceptions
+are more useful
+than blame.  The process is analogous for $Q_2$ and $Q_3$  employing the respective
+modes of the rational programmer. For $Q_*$, we also proceed in a similar
+manner except that we use modes 
+of the rational programmer from different semantics. For instance to
+decide whether blame for natural is more valuable than blame for
+transient, we compare the usefulness of
+the natural blame mode with that of the transient first and transient last
+modes for all our mutants. 
+Figure~\ref{fig:process} summarizes the
 experimental process for one mode of the rational programmer and connects
 it with the mutations from section~\ref{sec:mutate}.
 
@@ -262,24 +281,40 @@ it with the mutations from section~\ref{sec:mutate}.
 \end{figure}
 
 
-\subsection{Comparing Modes through Programmer Effort}
+\subsection{Programmer Effort}
 
 In addition to successful and failure information for the various trails,  
 our experiment  records the number of components a rational programmer 
-has to type along each successful trail ($\lvert \conf_n \setminus \conf_0
+has to type along each trail ($\lvert \conf_n \setminus \conf_0
 \rvert$). We use this number as the metric for the effort 
-of the rational programmer to debug the root scenario of each successful trail.  
+of the rational programmer to debug an interesting scenario.  
 
-Programmer effort can help shed some light to the relative effectiveness of the
-three gradual typing systems. For example, consider a debugging scenario from  the
-lattice of one of our mutants.  If the
-scenario results in blame both under, for instance, the natural and transient semantics,
-then the natural blame rational programmer and the two transient blame
-rational programmers (all and firstborn) can compete to see which one
-reaches an ill-typed scenario with less effort. In
-general, the effort of trails of different modes that have the same
-root is a point of comparison for the effectiveness of these
-modes even if the modes correspond to different gradual typing systems.
-Since in our experiment all roots are interesting debugging scenarios and 
-those are independent of mode or semantics, effort of trails is sufficient 
-to compare the relative value of one mode versus another. 
+A comparison of the effort of different modes of the rational programmer
+can help shed some further light to the effectiveness of the
+three gradual typing systems. For example, consider one of 
+our mutants.  If, for instance, both natural blame and transient first
+blame are equally useful for the mutant, the two nodes of the 
+rational programmer can compete to see which one
+debugs the interesting scenarios of the mutant with less effort. In
+general, if the effort distribution of a mode of the rational programmer for a
+mutant has a shorter tail and more
+volume around smaller values compared to the effort distribution of another
+mode, then the first mode is the more effective of the two.  
+
+Finally, effort allows us to validate that the observed effectiveness 
+of the rational programmer is not an artifact of pure chance.
+To test the null hypothesis for the effectiveness of the rational
+programmer, we can simply compare the effort distribution of a mode of the
+rational programmer with a rational programmer that ignores blame and
+exceptions and instead selects which component to type next randomly. 
+Of course, since each mutant has a finite number of components, 
+such a random mode is always useful for all mutants in the context of all
+three semantics. At the same time though,
+the natural, transient and erasure random mode exhibit a normal effort distribution for each mutant
+that should be distinct from the effort distribution of all other modes of
+the rational programmer if the effectiveness of the latter is not
+coincidental.
+
+
+
+

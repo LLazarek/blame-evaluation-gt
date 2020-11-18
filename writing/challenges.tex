@@ -1,6 +1,5 @@
 
 \section{Why is it hard to evaluate blame?}
-\label{sec:challenges}
 
 The most serious challenge for evaluating blame concerns 
 the nature of this research. Unlike ordinary
@@ -121,17 +120,17 @@ also suggest a recipe:
 \item Implement all three gradual type systems on a common
   basis (section~\ref{sec:landscape});
 
-\item Generate a large set of programs with representative
-  type errors that all three systems can detect (section~\ref{sec:mutate}); 
+\item Generate a large set of programs with interesting
+  type-level errors (section~\ref{sec:mutate}); 
     
 \item Simulate the rational programmer on these programs with sufficient 
-  modes to (i) match the peculiarities of each  system and 
-    (ii) isolate blame from other confounding factors
+  modes to make meaningful comparisons between modes of the same or
+    different systems
     (section~\ref{sec:rational});
 
 
 
 \item Sample the experimental space  to obtain a computationally feasible
-  but statistically meaningful experiment (section~\ref{sec:sample}).
+  but statistically sound experiment (section~\ref{sec:sample}).
 
 \end{itemize}
