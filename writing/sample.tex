@@ -1,23 +1,38 @@
 \section{How to Sample the Experimental Space} 
 
-As we mention above we treat each definitions as a component. A
-consequence of this decision is that examining the whole lattice
-for each of the mutants becomes unfeasible.
-As figure~\ref{table:benchmark-descriptions} shows,  most of the programs contain dozens of definitions  
-resulting in lattices with as many as $1.41 \times 10^{28}$ configurations.
-Since running a single configuration can take 10 minutes or more 
-(due to contract checking and instrumentation), running every possible configuration is impractical.
-Evidence from similar contexts suggests that randomly sampling the lattice instead of
-an exhaustive exploration is an effective alternative~\cite{gtnffvf-jfp-2019}.
-Hence we randomly sample enough significant configurations
-from the lattice to obtain a confidence of 0.95 (with margin of error
-0.05) about whether our hypotheses hold or not.
-See accompanying appendix for the details of the calculations for the
-sufficient size of samples for this estimate.
-Exploring more of the lattice would yield higher confidence in the generalizability
-of our results for each benchmark in cases where no violations of a property
-(e.g. Blame Trail) are found.
-In such cases, we could be more certain that we did not simply miss
-the configuration(s) that reveal the violation by exploring the lattice more fully.
-Our choice of random sample counts reflects the (informal) standard practice of estimating
-results to 95 percent or higher confidence.
+The experiment as-outlined has all of the parts necessary to find information, but our mutations generate a lot of interesting debugging scenarios.
+Specifically, they generate 96,515,744 scenarios; far too many to try them all.
+Thus, we sample from the total set of scenarios we generate to obtain a computationally-feasible subset for exploration.
+At a high level, we perform a stratified uniform random sample with two levels of stratification to reduce the total number of scenarios we explore down to 728,000 scenarios.
+This section describes this sampling in detail and how it affects our results.
+
+The first natural place to perform sampling is in the sets of scenarios corresponding to each mutant, because those sets form a coherent and finite population.
+% We seek to understand the usefulness of blame for all of the scenarios of a given mutant, but through sampling 
+To understand usefulness, we formulate a binary question capturing whether or not the trail of a given scenario indicates that blame is useful: i.e. if it terminates successfully or not.
+Then, we can sample from the set of all possible scenarios for a given mutant to get an estimate of whether or not blame is useful for the entire set, i.e. if all trails for that mutant terminate successfully or not.
+Thus we can obtain a ``yes or no'' answer for the usefulness of blame in debugging a given mutant without having to explore all of its scenarios, up to some level of confidence based on the number of samples.
+Because these answers reflect whether blame is useful for all trails for a given mutant, we dub them ``always'' and ``never''.
+In fact, this formulation offers an additional implicit answer whenever the answer is neither ``always'' nor ``never'';
+in such cases, some of our samples answer ``yes'' and some answer ``no'', hence we dub this third answer ``sometimes''.
+We randomly select enough samples to obtain a confidence of 95\% in the answer obtained for a given mutant (with a margin of error of 5\%).
+We refer the interested reader to the accompanying appendix for the statistical calculations we used to determine the necessary sample size.
+
+By sampling within the population of possible scenarios for every mutant, we can explore a significantly smaller number of scenarios in exchange for only being able to understand blame's usefulness at the granularity of mutants, and only in terms of the three ``always'', ``sometimes'', and ``never'' answers.
+Even so, our mutators generate 16,800 mutants with interesting scenarios; still far too many to explore.
+Thus the set of mutants forms another natural place to perform sampling again.
+Unlike in the context of mutant scenarios, however, our set of mutants is not really a meaningful population because we don't know how they relate to the set of all possible mutants.
+So this time we simply select a sample size according to convenience.
+We sample five mutants per mutator, aiming to ensure that our sample reflects the diversity of the mutants (with respect to mutators) of the original set of all mutators we generate for a given benchmark.
+We have sixteen mutators, so selecting five mutants per mutator gives us a sample of 80 mutants per benchmark.
+The only wrinkle in this stage of sampling is that every benchmark has mutants produced by different mutators, and in particular no benchmark has five mutants from all of them.
+Therefore we cannot select five mutants per mutator for every benchmark; instead, we select the 80 mutants evenly-distributed across all of the mutators available for a benchmark.
+
+%% we use the following algorithm to select the 80 mutants evenly distributed across all of the mutators that do produce mutants of a benchmark:
+%% 1. Treat each mutator as a bucket containing the mutants produced by that mutator
+%% 2. Let the target-sample-size be 80
+%% 3. Let the bucket-sample-size be target-sample-size/number-of-buckets
+%% 4. For each bucket, do
+%%    1. Randomly remove min(bucket-sample-size, mutants-in(bucket)) mutants from the bucket
+%%    2. Set target-sample-size = target-sample-size - (the number of mutants removed)
+%% 5. If target-sample-size is empty, done; else, go back to 3.
+
