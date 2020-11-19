@@ -1,5 +1,7 @@
 #lang at-exp rscript
 
+(provide bt-length-distribution-histogram-for)
+
 (require plot
          plot-util
          plot-util/quick/infer
@@ -13,15 +15,19 @@
          "plot-common.rkt"
          "read-data.rkt")
 
-(define/contract (bt-length-distribution-plot-for key data
-                                                  #:normalize? normalize?
-                                                  #:dump-to [dump-port #f])
+(define plot-tree? any/c)
+
+(define/contract (bt-length-distribution-histogram-for key data
+                                                       #:normalize? normalize?
+                                                       #:dump-to [dump-port #f]
+                                                       #:color-by-success? [color-by-success? #f])
   ({string?
    (hash/c string? (listof blame-trail?))
    #:normalize? boolean?}
-   {#:dump-to (or/c output-port? #f)}
+   {#:dump-to (or/c output-port? #f)
+    #:color-by-success? boolean?}
    . ->* .
-   pict?)
+   plot-tree?)
 
   (define (trail-length trail)
     (define base-trail-length
@@ -45,8 +51,6 @@
           [else base-trail-length]))
 
   (define trails (hash-ref data key))
-  (define trail-lengths
-    (map trail-length trails))
   (when dump-port
     (define grouped-by-length (group-by trail-length trails))
     (pretty-write (for/hash ([group (in-list grouped-by-length)])
@@ -54,24 +58,49 @@
                     (values (trail-length a-trail)
                             group))
                   dump-port))
-  (define grouped-lengths
-    (group-by identity trail-lengths))
-  (define counts
-    (for/list ([group (in-list grouped-lengths)])
-      (list (first group) (/ (length group) (length trails)))))
-  (define counts/0-if-empty
-    (if (empty? counts)
-        '((0 0))
-        counts))
-  (define counts/0-if-empty/sorted
-    (sort counts/0-if-empty < #:key first))
-  (plot-pict (discrete-histogram counts/0-if-empty/sorted)
+
+  (define-values {partitioner colors}
+    (if color-by-success?
+        (values satisfies-BT-hypothesis? '("green" "red"))
+        (values (const #t) '("blue" "white"))))
+  (define trails-grouped-by-length
+    (group-by trail-length trails))
+  (define trails-by-length
+    (for/list ([group (in-list trails-grouped-by-length)])
+      (define a-trail (first group))
+      (list (trail-length a-trail)
+            group)))
+  (define partitioned-trail-proportions-by-length
+    (for/list ([length+trails (in-list trails-by-length)])
+      (define-values {group-a group-b} (partition partitioner (second length+trails)))
+      (list (first length+trails)
+            (list (/ (length group-a) (length trails))
+                  (/ (length group-b) (length trails))))))
+  (define partitioned-trail-proportions-by-length/sorted
+    (sort partitioned-trail-proportions-by-length < #:key first))
+
+  (stacked-histogram partitioned-trail-proportions-by-length/sorted
+                     #:colors colors))
+
+(define/contract (bt-length-distribution-plot-for key data
+                                                  #:normalize? normalize?
+                                                  #:dump-to [dump-port #f])
+  ({string?
+   (hash/c string? (listof blame-trail?))
+   #:normalize? boolean?}
+   {#:dump-to (or/c output-port? #f)}
+   . ->* .
+   pict?)
+
+  (plot-pict (bt-length-distribution-histogram-for key data
+                                                   #:normalize? normalize?
+                                                   #:dump-to dump-port)
              #:x-min 0
              #:y-min 0
              #:y-max 1
              #:x-label (~a "Blame trail length"
                            (if normalize? " (normalized)" ""))
-             #:y-label (~a "Percent (out of " (length trails) ")")
+             #:y-label (~a "Percent of trails")
              #:title key))
 
 (main

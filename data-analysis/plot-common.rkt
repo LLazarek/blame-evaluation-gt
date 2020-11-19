@@ -6,6 +6,18 @@
             #:summaries-db db:path-to-db?
             . -> .
             (hash/c string? (listof blame-trail?)))]
+          [make-distributions-plots
+           ({({string?
+               (hash/c string? (listof blame-trail?))}
+              {#:dump-to (or/c output-port? #f)}
+              . ->* .
+              pict?)
+             #:breakdown-by (or/c "mutator" "benchmark")
+             #:summaries-db db:path-to-db?
+             #:data-directory path-to-existant-directory?}
+            {#:dump-to-file (or/c path-string? boolean?)}
+            . ->* .
+            (hash/c string? pict?))]
           [make-distributions-table
            ({({string?
                (hash/c string? (listof blame-trail?))}
@@ -60,7 +72,7 @@
   (add-missing-active-mutators
    (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
 
-(define (make-distributions-table make-distribution-plot
+(define (make-distributions-plots make-distribution-plot
                                   #:breakdown-by breakdown-dimension
                                   #:summaries-db mutation-analysis-summaries-db
                                   #:data-directory data-dir
@@ -102,7 +114,19 @@
                                    #:dump-to dump-port))
          (values benchmark plot))]))
   (when dump-port (close-output-port dump-port))
+  distributions)
 
+(define (make-distributions-table make-distribution-plot
+                                  #:breakdown-by breakdown-dimension
+                                  #:summaries-db mutation-analysis-summaries-db
+                                  #:data-directory data-dir
+                                  #:dump-to-file [dump-path #f])
+  (define distributions
+    (make-distributions-plots make-distribution-plot
+                              #:breakdown-by breakdown-dimension
+                              #:summaries-db mutation-analysis-summaries-db
+                              #:data-directory data-dir
+                              #:dump-to-file dump-path))
   (define distributions/sorted
     (map cdr (sort (hash->list distributions) string<? #:key car)))
   (table/fill-missing distributions/sorted

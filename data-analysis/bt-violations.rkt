@@ -1,5 +1,9 @@
 #lang at-exp rscript
 
+(provide blame-reliability-plot-for
+         blame-reliability-bar-for
+         raw-bt-violation-distribution-plot-for)
+
 (require plot
          plot-util
          plot-util/quick/infer
@@ -33,25 +37,38 @@
              #:y-label (~a "Percent (out of " total-trail-count ")")
              #:title key))
 
-(define (blame-reliability-plot-for key
-                                    blame-trail-map
-                                    #:dump-to [dump-to #f])
+(define (blame-reliability-bar-for key
+                                   blame-trail-map
+                                   #:dump-to [dump-to #f]
+                                   #:colors [colors '("green" "yellow" "red")]
+                                   #:with-x-tick? [with-x-tick? #f])
   (define breakdown (blame-reliability-breakdown-for key blame-trail-map))
   (define total-mutant-count (for/sum ([mutant-trails (hash-values breakdown)])
                                (length mutant-trails)))
   (when (output-port? dump-to)
     (pretty-write breakdown dump-to))
-  (plot-pict (stacked-histogram
-              (list
-               (list key
-                     (for/list ([category (in-list '("always" "sometimes" "never"))])
-                       (define trail-count (length (hash-ref breakdown category)))
-                       (/ trail-count total-mutant-count))))
-              #:colors '("green" "yellow" "red"))
+  (stacked-histogram
+   (list
+    (list key
+          (for/list ([category (in-list '("always" "sometimes" "never"))])
+            (define trail-count (length (hash-ref breakdown category)))
+            (/ trail-count total-mutant-count))))
+   #:colors colors
+   #:add-ticks? with-x-tick?))
+
+(define (blame-reliability-plot-for key
+                                    blame-trail-map
+                                    #:dump-to [dump-to #f]
+                                    #:colors [colors '("green" "yellow" "red")])
+  (plot-pict (blame-reliability-bar-for key
+                                        blame-trail-map
+                                        #:dump-to dump-to
+                                        #:colors colors)
              #:y-max 1
              ;; #:x-label "Mutants"
-             #:y-label (~a "Percent (out of " total-mutant-count " mutants)")
-             #:x-label #f))
+             #:y-label (~a "Percent of mutants")
+             #:x-label #f
+             #:title key))
 
 (main
  #:arguments {[(hash-table ['data-dir data-dir]
