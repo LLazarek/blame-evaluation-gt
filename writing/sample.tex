@@ -6,36 +6,34 @@ them. Hence, we perform stratified uniform random sampling with two
 levels of stratification to collect sufficiently many interesting
 debugging scenarios for drawing statistically sound conclusions. 
 The outcome of our sampling process is that we test each mode of the
-rational programmer on 72192 randomly selected interesting debugging
+rational programmer on 72,192 randomly selected interesting debugging
 scenarios in total spread across both benchmarks and mutators.
 
 
 
-As outlined in section~\ref{sec:rational}, all our experimental questions
+As outlined in section~\ref{sec:rational}, our experimental questions
 require that we answer first whether a mode of the rational programmer is
 useful or not for all the interesting scenarios of a mutant $\system$.
 Given the binary nature of this basic question, we can rely on random
 sampling of interesting scenarios from $\lattice{\system}$ to obtain an
 approximate answer.  Thus $\lattice{\system}$ becomes the first stratum
-for our sampling and, given a sufficiently large sample, we can get with
-high confidence either a positive answer about the usefulness of a mode of
-the rational programmer or a negative answer or neither, in which case we
-deduce that the mode we examine is some times useful and some times it is
-not. For 95\% confidence interval and 5\% error margin, the sample  needs
-to include just 96 out of the $2^N$ scenarios of $\lattice{\system}$
-where $N$ is the number of components of $\system$. For lattices that have
-less than 96 interesting scenarios we select all their interesting
-scenarios.
+for our sampling; with a sufficiently large sample, we can obtain from the
+sample an estimate of the usefulness of a mode for the entire lattice.
+The estimate tells us with some confidence whether the mode is useful for all trails in the lattice (if all of the samples yield positive results) or none of them.
+In fact, the estimate can say neither if some of our samples yield positive results and others yield negative ones; in that case we can say no more than that the mode is sometimes useful.
+We select a sample size of 96 to obtain 95\% confidence and a 5\% margin of error for our estimates
+(using standard statistical methods, the choice does not depend on the population size for sufficiently large populations).
+For lattices that have less than 96 interesting scenarios, we select them all.
 
 The second sampling stratum is the set of mutants. After all, our mutators
 generate 16,800 mutants with interesting scenarios; still far too many to
 explore even after sampling the lattice of each mutant. Thus we randomly
-select form the mutants of each benchmarks to obtain  the largest random
-sample that keeps the experiment computationally feasible  while ensuring
-that, per benchmark, the sample reflects the diversity of mutants per with
+select from the mutants of each benchmark to obtain the largest
+sample that keeps the experiment computationally feasible.
+Our selection of mutants ensures that, per benchmark, the sample reflects the diversity of mutants with
 respect to the mutators that generated them.  Specifically,  we sample 80
-mutants with interesting scenarios per benchmark  evenly-distributed
-across all of the mutators that contribute mutants for a benchmark.
+mutants with interesting scenarios per benchmark,  evenly-distributed
+across all of the mutators that contribute mutants for the benchmark.
 
 
 %% we use the following algorithm to select the 80 mutants evenly distributed across all of the mutators that do produce mutants of a benchmark:
