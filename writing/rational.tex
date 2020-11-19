@@ -93,7 +93,7 @@ the rational programmer receives no hints from the gradual type system on how to
 continue the search for the bug.
 
 Equipped with these preliminary definitions, we can precisely define what it means
-for blame to add value to a gradual type system for a specific
+for blame to useful in the context of a gradual type system for a specific
 type-level mistake independently of a program's type annotations. 
 \begin{quote}
 \it
@@ -204,18 +204,18 @@ of blame for natural, transient and erasure Typed Racket in the setting of the
 mutants from section~\ref{sec:mutate}. In line with the discussion so far, 
 our experimental process collects data to answer three initial questions for each mutant:
 \begin{itemize}
-\item[$Q_1$] Is blame valuable for natural?
+\item[$Q_1$] Is blame useful in the context of natural?
 
-\item[$Q_2$] Is first blame valuable for transient?
+\item[$Q_2$] Is first blame useful in the context of transient?
 
-\item[$Q_3$] Is last blame valuable for transient?
+\item[$Q_3$] Is last blame useful in the context of transient?
 
 \end{itemize}
 
-Furthermore, our experiment can compare the relative value of blame
+Furthermore, our experiment can compare the relative usefulness of blame
 between any two of the three semantics. 
 \begin{itemize}
-\item[$Q_*$] Is blame for X more valuable than blame for Y where X, Y is natural,
+\item[$Q_*$] Is blame for X more useful than blame for Y where X, Y is natural,
   erasure or natural?
 \end{itemize}
 
@@ -265,7 +265,7 @@ than blame.  The process is analogous for $Q_2$ and $Q_3$  employing the respect
 modes of the rational programmer. For $Q_*$, we also proceed in a similar
 manner except that we use modes 
 of the rational programmer from different semantics. For instance to
-decide whether blame for natural is more valuable than blame for
+decide whether blame for natural more useful than blame for
 transient, we compare the usefulness of
 the natural blame mode with that of the transient first and transient last
 modes for all our mutants. 

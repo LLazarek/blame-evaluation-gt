@@ -1,31 +1,42 @@
 \section{How to Sample the Experimental Space} 
 
-The experiment as-outlined has all of the parts necessary to find information, but our mutations generate a lot of interesting debugging scenarios.
-Specifically, they generate 96,515,744 scenarios; far too many to try them all.
-Thus, we sample from the total set of scenarios we generate to obtain a computationally-feasible subset for exploration.
-At a high level, we perform a stratified uniform random sample with two levels of stratification to reduce the total number of scenarios we explore down to 728,000 scenarios.
-This section describes this sampling in detail and how it affects our results.
+The mutators for section~\ref{sec:mutate} generate 96,515,744 debugging scenarios; 
+far too many to even identify the interesting ones among
+them. Hence, we perform stratified uniform random sampling with two
+levels of stratification to collect sufficiently many interesting
+debugging scenarios for drawing statistically sound conclusions. 
+The outcome of our sampling process is that we test each mode of the
+rational programmer on 72192 randomly selected interesting debugging
+scenarios in total spread across both benchmarks and mutators.
 
-The first natural place to perform sampling is in the sets of scenarios corresponding to each mutant, because those sets form a coherent and finite population.
-% We seek to understand the usefulness of blame for all of the scenarios of a given mutant, but through sampling 
-To understand usefulness, we formulate a binary question capturing whether or not the trail of a given scenario indicates that blame is useful: i.e. if it terminates successfully or not.
-Then, we can sample from the set of all possible scenarios for a given mutant to get an estimate of whether or not blame is useful for the entire set, i.e. if all trails for that mutant terminate successfully or not.
-Thus we can obtain a ``yes or no'' answer for the usefulness of blame in debugging a given mutant without having to explore all of its scenarios, up to some level of confidence based on the number of samples.
-Because these answers reflect whether blame is useful for all trails for a given mutant, we dub them ``always'' and ``never''.
-In fact, this formulation offers an additional implicit answer whenever the answer is neither ``always'' nor ``never'';
-in such cases, some of our samples answer ``yes'' and some answer ``no'', hence we dub this third answer ``sometimes''.
-We randomly select enough samples to obtain a confidence of 95\% in the answer obtained for a given mutant (with a margin of error of 5\%).
-We refer the interested reader to the accompanying appendix for the statistical calculations we used to determine the necessary sample size.
 
-By sampling within the population of possible scenarios for every mutant, we can explore a significantly smaller number of scenarios in exchange for only being able to understand blame's usefulness at the granularity of mutants, and only in terms of the three ``always'', ``sometimes'', and ``never'' answers.
-Even so, our mutators generate 16,800 mutants with interesting scenarios; still far too many to explore.
-Thus the set of mutants forms another natural place to perform sampling again.
-Unlike in the context of mutant scenarios, however, our set of mutants is not really a meaningful population because we don't know how they relate to the set of all possible mutants.
-So this time we simply select a sample size according to convenience.
-We sample five mutants per mutator, aiming to ensure that our sample reflects the diversity of the mutants (with respect to mutators) of the original set of all mutators we generate for a given benchmark.
-We have sixteen mutators, so selecting five mutants per mutator gives us a sample of 80 mutants per benchmark.
-The only wrinkle in this stage of sampling is that every benchmark has mutants produced by different mutators, and in particular no benchmark has five mutants from all of them.
-Therefore we cannot select five mutants per mutator for every benchmark; instead, we select the 80 mutants evenly-distributed across all of the mutators available for a benchmark.
+
+As outlined in section~\ref{sec:rational}, all our experimental questions
+require that we decide whether a mode of the rational programmer is
+always, sometimes or never useful for all the interesting scenarios of a
+mutant $\system$. Assuming a normal distribution for the 
+interesting scenarios in the lattice $\lattice{\system}$, we can obtain an
+estimate answer with high confidence by randomly picking a sufficient
+number of interesting scenarios $\lattice{\system}$. Thus
+$\lattice{\system}$ becomes the first stratum for our sampling. For
+95\% confidence, that is a 5\% margin, the sample size needs
+to be just 95 out of $2^N$ scenarios in $\lattice{\system}$ where $N$ is the
+number of components of $\system$.
+
+The second sampling is the set of mutants. After all, our mutators
+generate 16,800 mutants with
+interesting scenarios; still far too many to explore even after sampling
+the lattice of each mutant.  Unlike the lattice of scenarios of a mutant
+, the set of mutants is not a coherent and finite population;  it is 
+unclear how we can relate a sample of mutants to the
+of all possible mutants. Thus we sacrifice the ability to generalize 
+beyond the mutants we randomly select and opt for the largest random
+sample that keeps the experiment computationally feasible. 
+In particular,  we sample 80 mutants with interesting scenarios
+per benchmark and for any benchmark, we ensure that our sample reflects the diversity of mutants with respect
+to the mutators that generated them. Specifically, we select the 80 mutants evenly-distributed
+across all of the mutators that contribute mutants for a benchmark.
+
 
 %% we use the following algorithm to select the 80 mutants evenly distributed across all of the mutators that do produce mutants of a benchmark:
 %% 1. Treat each mutator as a bucket containing the mutants produced by that mutator
