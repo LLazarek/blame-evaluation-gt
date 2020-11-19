@@ -12,29 +12,29 @@ scenarios in total spread across both benchmarks and mutators.
 
 
 As outlined in section~\ref{sec:rational}, all our experimental questions
-require that we decide whether a mode of the rational programmer is
-always, sometimes or never useful for all the interesting scenarios of a
-mutant $\system$. Assuming a normal distribution for the 
-interesting scenarios in the lattice $\lattice{\system}$, we can obtain an
-estimate answer with high confidence by randomly picking a sufficient
-number of interesting scenarios $\lattice{\system}$. Thus
-$\lattice{\system}$ becomes the first stratum for our sampling. For
-95\% confidence, that is a 5\% margin, the sample size needs
-to be just 95 out of $2^N$ scenarios in $\lattice{\system}$ where $N$ is the
-number of components of $\system$.
+require that we answer first whether a mode of the rational programmer is
+useful or not for all the interesting scenarios of a mutant $\system$.
+Given the binary nature of this basic question, we can rely on random
+sampling of interesting scenarios from $\lattice{\system}$ to obtain an
+approximate answer.  Thus $\lattice{\system}$ becomes the first stratum
+for our sampling and, given a sufficiently large sample, we can get with
+high confidence either a positive answer about the usefulness of a mode of
+the rational programmer or a negative answer or neither, in which case we
+deduce that the mode we examine is some times useful and some times it is
+not. For 95\% confidence interval and 5\% error margin, the sample  needs
+to include just 96 out of the $2^N$ scenarios of $\lattice{\system}$
+where $N$ is the number of components of $\system$. For lattices that have
+less than 96 interesting scenarios we select all their interesting
+scenarios.
 
-The second sampling is the set of mutants. After all, our mutators
-generate 16,800 mutants with
-interesting scenarios; still far too many to explore even after sampling
-the lattice of each mutant.  Unlike the lattice of scenarios of a mutant
-, the set of mutants is not a coherent and finite population;  it is 
-unclear how we can relate a sample of mutants to the
-of all possible mutants. Thus we sacrifice the ability to generalize 
-beyond the mutants we randomly select and opt for the largest random
-sample that keeps the experiment computationally feasible. 
-In particular,  we sample 80 mutants with interesting scenarios
-per benchmark and for any benchmark, we ensure that our sample reflects the diversity of mutants with respect
-to the mutators that generated them. Specifically, we select the 80 mutants evenly-distributed
+The second sampling stratum is the set of mutants. After all, our mutators
+generate 16,800 mutants with interesting scenarios; still far too many to
+explore even after sampling the lattice of each mutant. Thus we randomly
+select form the mutants of each benchmarks to obtain  the largest random
+sample that keeps the experiment computationally feasible  while ensuring
+that, per benchmark, the sample reflects the diversity of mutants per with
+respect to the mutators that generated them.  Specifically,  we sample 80
+mutants with interesting scenarios per benchmark  evenly-distributed
 across all of the mutators that contribute mutants for a benchmark.
 
 
