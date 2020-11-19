@@ -231,21 +231,31 @@
    (displayln (format-summary summary))
    (newline)
    (when run-checks?
-     (parameterize ([current-error-port (current-output-port)])
-       (displayln "check-for-missing-mutants:")
+     (define missing-mutants-output (open-output-string))
+     (define errors-output (open-output-string))
+     (parameterize ([current-output-port missing-mutants-output]
+                    [current-error-port missing-mutants-output])
        (system* "/usr/bin/fish"
                 "-c"
                 @~a{
                     rt check-for-missing-mutants-or-trails.rkt -s ../dbs/code-mutations/mutant-samples.rktdb -S @(mutation-analysis-summaries-db) -r ../dbs/code-mutations/pre-selected-bt-roots.rktdb -p '@data-dir'
-                    })
-       (newline)
-       (newline)
-       (displayln "check-for-errors:")
+                    }))
+     (parameterize ([current-output-port errors-output]
+                    [current-error-port errors-output])
        (system* "/usr/bin/fish"
                 "-c"
                 @~a{
                     rt check-for-errors.rkt '@data-dir'
-                    })))
+                    }))
+     (displayln @~a{
+                    check-for-missing-mutants:
+                    @(get-output-string missing-mutants-output)
+
+                    check-for-errors:
+                    @(get-output-string errors-output)
+
+
+                    }))
    (newline)
    (unless (empty? values-to-dump)
      (displayln "-------------------- data dump --------------------")
