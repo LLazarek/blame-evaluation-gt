@@ -2,13 +2,31 @@
 \section{What We Learned}
 
 \begin{itemize}
-  \item Interesting discoveries...?
+  \item Any kind of dynamic checking has a large positive impact, whether blame or stacktraces are used.
+    \begin{itemize}
+    \item Both in terms of usefulness and programmer effort
+    \item Erasure extremely often fails to provide any helpful information.
+    \item That said, there are no long trails for Erasure.
+    \end{itemize}
 
-  \item Comparison of existing GT systems represented in our study.  
-    Natural is here, transient is here, erasure is here, and they
-        compare as...
+  \item Blame helps significantly over just using stacktraces for both Natural and Transient.
+    \begin{itemize}
+    \item Natural's blame improves over exceptions by nearly 20\%
+    \item Transient's blame improves over exceptions half as much
+    \end{itemize}
 
-      \item Threats to validity:
+  \item Natural clearly offers the most utility, but Transient is not too far behind.
+    \begin{itemize}
+    \item Natural clearly improves over all other modes
+    \item Transient improves significantly over all other modes except Natural.
+    \item Keep in mind that our selection of scenarios is biased toward Erasure & Transient.
+    \end{itemize}
+    
+
+  \item Discussion of how confidence / margin of error should be interpreted wrt these results?
+
+
+   \item Threats to validity:
         \begin{itemize}
           \item Racket stack traces
           \item Mutant sampling
@@ -16,7 +34,7 @@
           \item Transient blame adaptations
           \item More?
 
-        \end{itemize}
+   \end{itemize}
 \end{itemize}        
 
 Like {\em homo economicus\/}, which decouples the actual behavior of a
