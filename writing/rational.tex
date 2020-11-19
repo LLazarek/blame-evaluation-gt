@@ -1,4 +1,4 @@
-\section{How to Simulate the Rational Programmer} 
+\section{How to Test the Rational Programmer} 
 
 Code migration is the raison d'\^etre of Typed Racket, which is why the community
 uses ``migratory typing'' instead of gradual typing. Roughly speaking a
@@ -93,7 +93,8 @@ the rational programmer receives no hints from the gradual type system on how to
 continue the search for the bug.
 
 Equipped with these preliminary definitions, we can precisely define what it means
-for blame to add value to a gradual type system in a specific setting. 
+for blame to add value to a gradual type system for a specific
+type-level mistake independently of a program's type annotations. 
 \begin{quote}
 \it
 Given a program $\system$, the natural blame mode is\\
