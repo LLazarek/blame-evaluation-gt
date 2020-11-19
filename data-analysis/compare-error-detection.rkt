@@ -12,7 +12,7 @@
          "../runner/mutation-runner.rkt"
          racket/random)
 
-(define MUTANT-SAMPLE-SIZE 200)
+(define MUTANT-SAMPLE-SIZE 500)
 (define CONFIG-SAMPLE-SIZE 1000)
 (define CONFIG-SAMPLE-MAX-RETRIES 5)
 
@@ -44,6 +44,11 @@
                                            #:to-check modes-to-check
                                            #:results-so-far results-so-far
                                            #:retry-count retry-count)
+    (log-comparison-info
+     @~a{
+         @mutant [@id] enQing checker attempt @retry-count / @CONFIG-SAMPLE-MAX-RETRIES @;
+         with modes-to-check @(map basename modes-to-check)
+         })
     (cond [(> retry-count CONFIG-SAMPLE-MAX-RETRIES)
            (log-comparison-error @~a{Ran out of retries for @mutant})
            q]
@@ -54,7 +59,8 @@
                                                modes-to-check
                                                results-so-far
                                                retry-count)
-                          (length modes-to-check))]))
+                          (- (length modes-to-check)
+                             retry-count))]))
   (define (make-mutant-spawner run-configuration
                                modes-to-check
                                results-so-far
@@ -65,6 +71,10 @@
        (define outcome (extract-outcome (process-info-data info)
                                         mutant
                                         run-configuration))
+       (log-comparison-info
+        @~a{
+            @mutant [@id] outcome for mode @(basename this-mode) = @outcome
+            })
        (define results+outcome (add-outcome outcome this-mode results-so-far))
        (if (and (TR? this-mode) (not (equal? outcome 'blamed)))
            (enQ-a-new-dynamic-error-checker current-q
@@ -73,13 +83,21 @@
                                             #:retry-count (add1 retry-count))
            (match modes-to-check
              [(list _)
+              (log-comparison-info
+               @~a{
+                   @mutant [@id] That's the last mode, done!
+                   })
               (log-progress! mutant id results+outcome)
               current-q]
              [(list* _ more-modes-to-check)
+              (log-comparison-info
+               @~a{
+                   @mutant [@id] Checking remaining modes...
+                   })
               (enQ-a-new-dynamic-error-checker current-q
                                                #:to-check more-modes-to-check
                                                #:results-so-far results+outcome
-                                               #:retry-count 0)])))
+                                               #:retry-count retry-count)])))
 
      (define configured-benchmark
        (configure-benchmark benchmark
@@ -94,6 +112,11 @@
                               (mutant-index mutant)
                               outfile
                               this-mode)))
+     (log-comparison-info
+      @~a{
+          @mutant [@id] checker attempt @retry-count / @CONFIG-SAMPLE-MAX-RETRIES @;
+          launched
+          })
      (process-info outfile ctl will)))
 
   (enQ-a-new-dynamic-error-checker q
@@ -214,7 +237,9 @@
  (define mutants-to-sample-from
    (cond [(hash-ref progress 'mutant-samples #f) => values]
          [else
-          (define mutants (random-sample all-mutants MUTANT-SAMPLE-SIZE))
+          (define mutants (random-sample all-mutants
+                                         MUTANT-SAMPLE-SIZE
+                                         #:replacement? #f))
           (log-progress!/raw (cons 'mutant-samples mutants))
           mutants]))
 
