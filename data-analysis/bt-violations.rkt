@@ -43,7 +43,7 @@
                                    #:colors [colors '("green" "yellow" "red")]
                                    #:with-x-tick? [with-x-tick? #f])
   (define breakdown (blame-reliability-breakdown-for key blame-trail-map))
-  (define total-mutant-count (for/sum ([mutant-trails (hash-values breakdown)])
+  (define total-mutant-count (for/sum ([mutant-trails (in-hash-values breakdown)])
                                (length mutant-trails)))
   (when (output-port? dump-to)
     (pretty-write breakdown dump-to))

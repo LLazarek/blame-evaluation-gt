@@ -1,5 +1,9 @@
 #lang at-exp rscript
 
+(provide adds-value-over
+         adds-value-over->%
+         simple-memoize)
+
 (require plot
          plot-util
          plot-util/quick/infer

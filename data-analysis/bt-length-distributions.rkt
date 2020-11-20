@@ -78,8 +78,17 @@
                   (/ (length group-b) (length trails))))))
   (define partitioned-trail-proportions-by-length/sorted
     (sort partitioned-trail-proportions-by-length < #:key first))
+  (define data-has-0-already?
+    (match partitioned-trail-proportions-by-length/sorted
+      [(list* (list 0 _) _) #t]
+      [else #f]))
+  (define partitioned-trail-proportions-by-length/sorted/with-0
+    (if data-has-0-already?
+        partitioned-trail-proportions-by-length/sorted
+        (cons (list 0 '(0 0))
+              partitioned-trail-proportions-by-length/sorted)))
 
-  (stacked-histogram partitioned-trail-proportions-by-length/sorted
+  (stacked-histogram partitioned-trail-proportions-by-length/sorted/with-0
                      #:colors colors))
 
 (define/contract (bt-length-distribution-plot-for key data
