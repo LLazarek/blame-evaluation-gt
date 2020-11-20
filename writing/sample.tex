@@ -1,39 +1,38 @@
 \section{How to Sample the Experimental Space} 
 
-The mutators for section~\ref{sec:mutate} generate 96,515,744 debugging scenarios; 
-far too many to even identify the interesting ones among
-them. Hence, we perform stratified uniform random sampling with two
-levels of stratification to collect sufficiently many interesting
-debugging scenarios for drawing statistically sound conclusions. 
-The outcome of our sampling process is that we test each mode of the
-rational programmer on 72,192 randomly selected interesting debugging
-scenarios in total spread across both benchmarks and mutators.
+The mutators from section~\ref{sec:mutate} generate 96,515,744 debugging
+scenarios; far too many to even identify the interesting ones among them.
+Furthermore this population is heterogeneous; different scenarios come
+from different mutants and different mutants are the result of a
+different mutator and benchmark pair. Hence, to make the experiment
+computationally feasible and statistically precise, we perform stratified
+uniform random sampling with two levels of stratification.  The first
+stratum is the set of mutants and we randomly select from the mutants of
+each benchmark.  Our selection of mutants ensures that, per
+benchmark, the sample reflects the diversity of mutants with respect to
+the mutators that generated them.  Specifically,  we sample 80 mutants
+with interesting scenarios per benchmark,  evenly-distributed across all
+of the mutators that contribute mutants for the benchmark.  The second
+stratum of our sampling is the lattice of a mutant and we draw 96 random
+interesting scenarios from each lattice. For lattices that have less than
+96 interesting scenarios, we select them all.
 
+In summary, our sampling process takes advantage of ancillary information
+to deliver a representative sufficiently large set of scenarios. As a result we test each
+mode of the rational programmer on 72,192 randomly selected interesting
+debugging scenarios spread across both benchmarks and mutators.
+Furthermore stratified random sampling allows us to derive conclusions
+about the proportions of the whole population from the proportions of
+our sample, exactly what we need to project comparisons about the
+usefulness of various modes of the
+rational programmer from the sample to set of all interesting debugging
+scenarios.  Finally, we can also provide separate estimates per stratum and provide different
+viewpoints of our results. For instance, because of the size of the sample
+of scenarios from the lattice of a mutant, we can estimate whether natural
+blame is more useful than natural exceptions for all interesting scenarios
+of each mutant separately with 95\% confidence and 5\% error margin.
 
-
-As outlined in section~\ref{sec:rational}, our experimental questions
-boil down whether a mode of the rational programmer is
-as useful as another mode for all the interesting scenarios of a mutant $\system$.
-Given the binary nature of this basic question, we can rely on random
-sampling of interesting scenarios from $\lattice{\system}$ to obtain an
-approximate answer.  Thus $\lattice{\system}$ becomes the first stratum
-for our sampling; with a sufficiently large sample, we can obtain from the
-sample an estimate of the usefulness of a mode for the entire lattice.
-The estimate tells us with some confidence whether the mode is useful for all trails in the lattice (if all of the samples yield positive results) or none of them.
-In fact, the estimate can say neither if some of our samples yield positive results and others yield negative ones; in that case we can say no more than that the mode is sometimes useful.
-We select a sample size of 96 to obtain 95\% confidence and a 5\% margin of error for our estimates
-(using standard statistical methods, the choice does not depend on the population size for sufficiently large populations).
-For lattices that have less than 96 interesting scenarios, we select them all.
-
-The second sampling stratum is the set of mutants. After all, our mutators
-generate 16,800 mutants with interesting scenarios; still far too many to
-explore even after sampling the lattice of each mutant. Thus we randomly
-select from the mutants of each benchmark to obtain the largest
-sample that keeps the experiment computationally feasible.
-Our selection of mutants ensures that, per benchmark, the sample reflects the diversity of mutants with
-respect to the mutators that generated them.  Specifically,  we sample 80
-mutants with interesting scenarios per benchmark,  evenly-distributed
-across all of the mutators that contribute mutants for the benchmark.
+ 
 
 
 %% we use the following algorithm to select the 80 mutants evenly distributed across all of the mutators that do produce mutants of a benchmark:
