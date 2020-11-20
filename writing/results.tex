@@ -3,21 +3,24 @@
 \begin{figure*}
   \centering
   \includegraphics[width=0.7\textwidth]{./plots/usefulness-table}
-  \caption{Usefulness: Each cell plots the proportion of a benchmark's mutants for which a mode is always useful (green), sometimes useful (yellow), and never useful (red).}
+  \caption{Usefulness: Each cell depicts the proportion of a benchmark's mutants for which a mode is always useful (green), sometimes useful (yellow), and never useful (red).}
   \label{fig:usefulness-table}
 \end{figure*}
 
 \begin{figure*}
   \centering
   \includegraphics[width=0.95\textwidth]{./plots/bt-lengths-table}
-  \caption{Programmer effort: Each cell depicts the distribution of trail lengths for a given mode and benchmark. The leftmost bar of every distribution shows the proportion of trails with length zero, and each bar to the right shows the same for length one, two, three, and so on.}
+  \caption{Programmer effort: Each cell depicts the distribution of trail
+  lengths for a given mode and a benchmark's mutants starting from trails
+  of length 0.}
   \label{fig:effort-table}
 \end{figure*}
 
 \begin{figure}
   \centering
   \includegraphics[width=0.45\textwidth]{./plots/avo-matrix}
-  \caption{Adds-value comparisons: Each row depicts the percentage of mutants for which that row's mode adds value over each other mode (in the columns). The diagonals are ommitted because they compare a mode with itself.}
+  \caption{Usefulness comparisons: Each cell depicts the percentage of a
+  benchmark's mutants for which the row mode is more useful than the column mode.}
   \label{fig:avo-matrix}
 \end{figure}
 
