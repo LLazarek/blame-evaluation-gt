@@ -23,13 +23,15 @@ to deliver a  sufficiently large representative set of scenarios.
 Concretely, we test each
 mode of the rational programmer on 72,192 randomly selected interesting
 debugging scenarios spread across both benchmarks and mutators.
-Furthermore stratified random sampling allows us to derive conclusions
-about the proportions of the whole population from the proportions of
-our sample despite the population's heterogeneity, exactly what we need to project comparisons about the
+Furthermore stratified random sampling allows us to derive precise conclusions
+about the proportion of the whole population that satisfies a given trait 
+from the proportion of the sample 
+that satisfies the trait despite the population's heterogeneity, exactly what we need to project comparisons about the
 usefulness of various modes of the
 rational programmer from the sample to the set of all interesting debugging
-scenarios.  Finally, we can also calculate separate estimates per stratum and provide different
-viewpoints of our results. For instance, because of the size of the sample
+scenarios.  Finally, we can also calculate separate estimates per stratum
+and provide an alternative
+viewpoint of our results. For instance, because of the size of the sample
 of scenarios from the lattice of a mutant, we can estimate whether natural
 blame is more useful than natural exceptions for all interesting scenarios
 of each mutant with 95\% confidence and 5\% error margin.
