@@ -64,18 +64,19 @@ method to three distinct blame assignment strategies and approximately
 722,000 cases (section~\ref{sec:results}): Vitousek et
 al.'s strategy of tracking typed/untyped boundaries in Reticulated, called Transient;
 Tobin-Hochstadt et al.'s use of higher-order contract system~\cite{ff-icfp-2002,
-mf-toplas-2009}; and the approach of industrial systems that forego blame
+mf-toplas-2009}, called Natural; and the approach of industrial systems that forego blame
 and instead rely on error messages from the
-underlying programming language. A direct interpretation of the results
+underlying programming language, called Erasure. A direct interpretation of the results
 (section~\ref{sec:discussion}) is that
 they validate the conjecture behind the work of theoreticians. A good blame assignment
 strategy helps the search for impedance mismatches between the specified types
-and the behavior of untyped components. Even better, the evaluation method 
+and the behavior of untyped components.
+Furthermore, the evaluation method
 identifies the wrapper-based blame tracking of Typed Racket as the most
-useful academic system with that of Reticulated Python only marginally  behind.
+useful approach, with that of Reticulated Python close behind.
 
 Next, the paper describes the challenges of developing an evaluation
-method, which may explain why the question has been neglected for such
+method for blame, which may explain why the question has been neglected for such
 a long time.
 
 
