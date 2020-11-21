@@ -73,7 +73,13 @@ Transient blame set. Hence, given the performance issues of Transient we discuss
 a possible optimization is to limit the size of blame sets
 using timestamps.
 
-There are a number of threats to the
+There are a number of threats to the validity of our conclusions that we
+describe in the previous section our attempts to mitigate: (i) the
+representativeness of benchmarks; (ii) the relation between mutations and
+real programming mistakes; (iii) the definition of interesting debugging
+scenarios; and (iv) our approach to sampling scenarios. In the remainder
+of this section, we discuss extensively two additional threats.
+
 
 \subsection{Threat: Is the Rational Programmer Realistic?}
 
@@ -110,16 +116,18 @@ assignment for trail extension as our experimental setup describes.
 \subsection{Threat: Is our Transient Correct?}
 \label{sec:threat:transient}
 
-Surprisingly, Transient blames an empty set of boundaries in 967 cases.
+As we discuss in section~\ref{sec:results}, surprisingly Transient blames
+an empty set of boundaries in 967 scenarios.
 Such cases should never occur, at least in theory, because an empty set
  means the value has never crossed a boundary---if the value is indeed defined
  in the current module, then we have typed code blaming itself for a typed
- value; thus, the type checker must be unsound.
+ value as all the checks are inlined in typed code. Thus, the type checker must be unsound.
 After careful investigation of these empty blame cases, we found no soundness
- bugs in Typed Racket.
+ bugs in Transient Typed Racket.
 Instead, we found scenarios in which Transient lost track of the proper
  boundaries.
-These scenarios suggest ways to improve the blame algorithm from~\citet{vss-popl-2017}:
+These scenarios suggest ways to improve~\citet{vss-popl-2017}'s blame
+algorithm:
 \begin{itemize}
   \item
     Entries in a blame map must point to several parent entries.
@@ -136,8 +144,9 @@ These scenarios suggest ways to improve the blame algorithm from~\citet{vss-popl
     For instance, Typed Racket trusts that untyped core-library functions, such as \texttt{filter},
      behave correctly; such assumptions should appear in the blame map.
 \end{itemize}
-\noindent{}Despite these known limitations, we conjecture that these improvements
- to Transient blame-tracking will not affect our overall conclusions.
+\noindent{}Despite these known limitations, based on the relatively small
+number of debugging failures, we conjecture that these improvements
+ to Transient blame-tracking do not affect our overall conclusions.
 
 A second apparent flaw in our Transient semantics is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
