@@ -152,7 +152,7 @@ and
 \it A \emph{transient-last blame trail} is a sequence of scenarios
 $\conf_0,...\conf_n$ of $\system$ where for all $0 \leq i \leq n - 1$,
 $\conf_i \subset \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =
-  \first{\mblame{\system, \conf_i}}$ where $\last{\mblame{\system, \conf}}$ is the
+  \last{\mblame{\system, \conf_i}}$ where $\last{\mblame{\system, \conf}}$ is the
 last component transient adds to the blame set for $\conf$.
 \end{quote}
 
@@ -175,6 +175,8 @@ transient exceptions for debugging a scenario.
 
 %% -----------------------------------------------------------------------------
 \subsection{Experimental Process.}
+\label{subsec:experiment}
+
 
 Trails and their properties give us the tools for a rigorous examination
 of blame for natural, transient and erasure Typed Racket in the setting of the 
