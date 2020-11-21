@@ -86,8 +86,8 @@ modules that that need to be typed is small relative to the random mode.
 
 A second point of interest is that the exceptions of
 the Erasure semantics either help the rational programmer immediately or 
-the rational programmer fails to debug a scenario altogether (in red). This shouldn't
-come as a surprise; no matter how many type annotations the programmer
+the rational programmer fails to debug a scenario altogether (in red).
+This is expected; no matter how many type annotations the programmer
 adds to an Erasure program, if the type checker doesn't reject the
 program, running the program always produces the same outcome. Thus an
 exception from the runtime has to point to the buggy module with
@@ -106,7 +106,7 @@ exception and the exception carries no useful information about which
 module the programmer should type next, e.g., because the stack trace 
 does not contain frames from any module of the program, or only typed modules. This situation
 can even happen immediately, which explains failures with 0 effort. 
-While the majority of
-failures to debug failed scenarios follow this pattern, a few do not. The next section takes a
+While the most
+failures to debug scenarios follow this pattern, a few do not. The next section takes a
 closer look at these unexpected failures of the rational programmer as part of the lessons we
 extract from our experimental results.
