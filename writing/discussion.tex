@@ -1,13 +1,12 @@
 %% -----------------------------------------------------------------------------
 \section{What We Learned}
-\label{sec:discussion}
 
 %% \begin{itemize}
 %% \item Why does the data look like this?
 %%   - why tr fails
 %%     - bad runtime errors
 %%     - TR bug
-%%   - why Transient fails
+%%   - why transient fails
 %%     - bad runtime errors
 %%     - timeouts/ooms: give context wrt fully untyped/typed versions
 %%     - empty blame: trim Ben's prose
@@ -45,46 +44,38 @@
 %%           \item More?
 
 %%    \end{itemize}
-%% \end{itemize}        
-
-\subsection{Why does the data look like this?}
-
-The figures in the last section raise a key question: why does blame fail in our dataset?
-We analyze the reasons for failure separately for each mode of the rational programmer.
-
-Breaking down the reasons for failure for all scenarios in which Natural is unsuccessful reveals two causes.
-First, most of the failing scenarios begin with a runtime exception, which the rational programmer can use to type components until blame becomes available.
-In these failing cases (there are 1708), however, blame never becomes available; the exception information points to the wrong component and the trail ends in failure.
-A second, much smaller set (40 scenarios) do produce a runtime type error blaming some component, but the blame identifies a non-buggy typed component.
-After careful inspection of these scenarios, we are confident that they reveal a bug in the implementation of Typed Racket.
-
-Transient's blame failures break down in a similar way.
-Like Natural, most failures occur with unhelpful exception information without ever getting blame (1851 scenarios).
-However, Transient also has a substantial number of failures that occur because the programs hit the resource limits (timed out or ran out of memory) and had to be killed (some 770 scenarios).
-Additionally, there are nearly a thousand cases where Transient's checks catch a problem, but the blame set reported is empty.
-We discuss each of these last two failure categories in detail in~\ref{sec:threat:transient}.
+%% \end{itemize}       
 
 
-\subsection{High level conclusions}
 
-The analysis in the last section indicates a number of interesting conclusions about blame in the gradual typing setting.
-First, figure~\ref{fig:avo-matrix} makes it clear that any kind of dynamic checking has a large positive impact over Erasure, and this is true regardless of whether the rational programmer uses blame or stacktraces.
-Indeed, the bottom row of figure~\ref{fig:avo-matrix} illustrates that Erasure almost never offers more useful information than any other mode.
-Nonetheless, figure~\ref{fig:effort-table} does show that even if Erasure often fails to provide helpful information, it provides the rational programmer with a quick answer.
+The analysis in the previous section suggests a number of interesting
+high-level conclusions about blame in the gradual typing setting.  First,
+run time type checks have a large positive impact. This is the case
+regardless of whether these checks issue blame or throw plain exceptions.
+Second, in many cases type checks that issue blame are more helpful than
+those that do not. However, our results indicate that in other cases blame
+is not critical and thus it is worth further investigation whether
+disabling blame tracking for the sake of performance may be   an
+acceptable trade off. Third, from the three different blame strategies the
+Natural approach of Typed Racket fares better than the Transient approach
+of Reticulated Python but by a small margin. Since Natural offers complete
+and sound path-based blame while Transient incomplete but sound heap-based
+blame~\cite{gfd-oopsla-2019}, our results call for a deeper understanding
+of the relative strengths of the two models for blame.  Fourth, given that
+Transient's sound but shallow run time type checks do not seem to hamper
+debugging, a version of Typed Racket that disables some of its wrappers
+may offer an answer to the performance issues of the Natural semantics. 
+Fifth, just as for Typed Racket, the experiment points to possible
+improvements for Reticulated Python. In particular, the experimental 
+data indicates that the usefulness of transient blame does not depend on
+whether  the rational programmer follows first or the last element from a
+Transient blame set. Hence, given the performance issues of Transient we discuss further on, 
+a possible optimization is to limit the size of blame sets
+using timestamps.
 
-Figure~\ref{fig:avo-matrix} also indicates that blame helps significantly over just using exception information.
-Both Natural and Transient's blame modes improve over their corresponding exception modes by about ten percent.
-This illustrates that blame tracking offers value for locating the source of mistakes beyond the value provided by the dynamic checks alone.
-At only ten percent, however, the amount of added value suggests that foregoing blame tracking in order to obtain performance gains may not hurt debugging all too much.
+There are a number of threats to the
 
-Finally, the results show that while Natural clearly offers the most utility compared to the other modes, Transient is not too far behind.
-Natural is more useful than every other mode in figure~\ref{fig:avo-matrix}, and by a larger proportion than any other mode.
-That said, the same can be said of Transient's two blame modes as compared to every other mode but Natural.
-Furthermore, the difference in usefulness between Natural and Transient's blame modes is quite small across the board.
-As we point out in~\ref{sec:mutate}, however, we should note that our selection of scenarios for analysis introduces bias toward Erasure and Transient.
-
-
-\subsection{Threats to validity}
+\subsection{Threat: Is the Rational Programmer Realistic?}
 
 Like {\em homo economicus\/}, which decouples the actual behavior of a
 participant in an economy for the sake of mathematical modeling, the model of a
@@ -118,11 +109,6 @@ assignment for trail extension as our experimental setup describes.
 
 \subsection{Threat: Is our Transient Correct?}
 \label{sec:threat:transient}
-%% purpose: talk about transient-blame implementation .... what did we do,
-%%  how did we test, what threats remain?
-%%
-%% the benchmark timeouts look like a threat, but this section shows that
-%%  we've looked carefully at those
 
 Surprisingly, Transient blames an empty set of boundaries in 967 cases.
 Such cases should never occur, at least in theory, because an empty set
@@ -156,7 +142,7 @@ These scenarios suggest ways to improve the blame algorithm from~\citet{vss-popl
 A second apparent flaw in our Transient semantics is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
 worst-case of 5.4x on fully-typed benchmarks in Reticulated,
-some of our configurations exceed a 4 minute timeout or 6GB memory limit with Transient blame.
+some of our configurations exceed a 4 minute timeout or 6GB memory limit with transient blame.
 To put those limits into context, the fully typed and fully untyped benchmarks all complete in a few seconds with minimal memory usage, and none of the mixed Natural configurations hit these limits.
 Unfortunately, our high cost is closer to the truth;
  there are at least three broad issues that skew the earlier results.

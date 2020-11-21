@@ -107,7 +107,24 @@ exception and the exception carries no useful information about which
 module the programmer should type next, e.g., because the stack trace 
 does not contain frames from any module of the program, or only typed modules. This situation
 can even happen immediately, which explains failures with 0 effort. 
-While the most
-failures to debug scenarios follow this pattern, a few do not. The next section takes a
-closer look at these unexpected failures of the rational programmer as part of the lessons we
-extract from our experimental results.
+
+
+While most failures to debug scenarios follow the above pattern, a few do not.
+Breaking down the reasons for failure for Natural blame (1748 in total)
+reveals an additional cause. For a small set of
+debugging scenarios (40), Natural produces a run time type error
+blaming a non-buggy already typed
+component. We tracked down all these cases to known open issues with Typed
+Racket and class contracts. 
+
+In Transient, similar to Natural,
+most failures are due to unhelpful exception information (1851 for both
+Transient first and last blame).  
+However, Transient also has a substantial
+number of failures because scenarios hit the time and memory
+limits of our experiment (~ 770 scenarios).  Additionally, there are nearly a 1000 cases where
+Transient reports an empty blame set which leaves the rational programmer
+without hints about how to proceed.
+In~\ref{sec:threat:transient}, we discuss how both of these causes of
+failure for transient affect our experiment. 
+
