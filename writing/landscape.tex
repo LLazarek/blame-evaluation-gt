@@ -95,15 +95,15 @@ through two different intermediary typed modules (center). The first,
 \texttt{typed/pack-lib}, simply imports \texttt{pack} and immediately
 exports as \texttt{typed-pack} asserting that it is a function
 that consumes JSON and returns an association list that maps symbols to
-strings. The second typed module, \texttt{typed/crypto-pack-lb},
+strings. The second typed module, \texttt{typed/crypto-pack-lib},
 also imports \texttt{pack} and assumes for it the same type as
-\texttt{typed/pack-lb} but instead of exporting it directly \texttt{typed/pack-lb} wraps it in
+\texttt{typed/pack-lib} but instead of exporting it directly \texttt{typed/pack-lib} wraps it in
 another function, \texttt{crypto-pack}, that encrypts its input before
 passing it to \texttt{pack}.
 
-Under Natural semantics~\cite{tf-popl-2008,tfffgksst-snapl-2017}, when
-\texttt{pack} is imported in either \texttt{typed/pack-lb} or
-\texttt{typed/secure-pack-lb}, the runtime checks that \texttt{pack} is a
+Under the Natural semantics~\cite{tf-popl-2008,tfffgksst-snapl-2017}, when
+\texttt{pack} is imported in either \texttt{typed/pack-lib} or
+\texttt{typed/secure-pack-lib}, the runtime checks that \texttt{pack} is a
 function and wraps it in a proxy that enforces its  type.  Analogously
 the runtime wraps the exports of the two typed modules in proxies that
 check that untyped code applies \texttt{typed-pack} and
@@ -129,7 +129,7 @@ they check types in a  \emph{shallow} manner. In our
 example, Transient's inlined checks make sure that the imported \texttt{pack} 
 is a function and that the result of its call in \texttt{typed/crypto-pack-lib} is a list.   Exactly this
 last check fails when \texttt{client} calls to \texttt{crypto-pack}. In
-order to pinpoint the responsible party for the failed checked, Transient
+order to pinpoint the responsible party for the failed check, Transient
 keeps on the side a map from values to the boundaries between modules they
 cross and the corresponding types. In the example, the map records that
 \texttt{pack} crosses from \texttt{untyped/pack-lib} to
@@ -138,14 +138,14 @@ cross and the corresponding types. In the example, the map records that
 forms in the example. Since the failed check corresponds to the return
 type of \texttt{pack}, Transient blames the sources of the two boundary
 crosses, which in this case is \texttt{untyped/pack-lib} for both. In
-general though, Transient may blame more than one parties. In fact, the
+general though, Transient may blame more than one party. In fact, the
 theoretical work of~\citet{gfd-oopsla-2019} shows that there are programs
 where Transient constructs a blame set that includes modules that are not
 relevant to the check failure or that it even misses entirely the responsible
 party ---  our experiment aims to examine the pragmatic impact of exactly these
 issues on debugging type-level mistakes.
 
-Under Erasure semantics, the example does not raise an error due to the
+Under the Erasure semantics, the example does not raise an error due to the
 gradual type system; Erasure performs no type checks at runtime. Thus the
 program may fail with an exception if \texttt{client} tries to use the
 result of \texttt{typed-pack} or \texttt{crypto-pack}, but it may also not
