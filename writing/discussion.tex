@@ -56,10 +56,10 @@ Second, in many cases type checks that issue blame are more helpful than
 those that do not. However, our results indicate that in other cases blame
 is not critical and thus it is worth further investigation whether
 disabling blame tracking for the sake of performance may be   an
-acceptable trade off. Third, from the three different blame strategies the
+acceptable trade off. Third, from the three different blame strategies, the
 Natural approach of Typed Racket fares better than the Transient approach
-of Reticulated Python but by a small margin. Since Natural offers complete
-and sound path-based blame while Transient incomplete but sound heap-based
+of Reticulated Python, but only by a small margin. Since Natural offers complete
+and sound path-based blame while Transient offers incomplete but sound heap-based
 blame~\cite{gfd-oopsla-2019}, our results call for a deeper understanding
 of the relative strengths of the two models for blame.  Fourth, given that
 Transient's sound but shallow run time type checks do not seem to hamper
@@ -73,12 +73,12 @@ Transient blame set. Hence, given the performance issues of Transient we discuss
 a possible optimization is to limit the size of blame sets
 using timestamps.
 
-There are a number of threats to the validity of our conclusions that we
-describe in the previous section our attempts to mitigate: (i) the
+There are a number of threats to the validity of our conclusions: (i) the
 representativeness of benchmarks; (ii) the relation between mutations and
 real programming mistakes; (iii) the definition of interesting debugging
-scenarios; and (iv) our approach to sampling scenarios. In the remainder
-of this section, we discuss extensively two additional threats.
+scenarios; and (iv) our approach to sampling scenarios. The previous sections
+have described the various ways we attempt to mitigate these threats;
+we discuss two additional threats in the remainder of this section.
 
 
 \subsection{Threat: Is the Rational Programmer Realistic?}
@@ -116,7 +116,7 @@ assignment for trail extension as our experimental setup describes.
 \subsection{Threat: Is our Transient Correct?}
 \label{sec:threat:transient}
 
-As we discuss in section~\ref{sec:results}, surprisingly Transient blames
+As we discuss in section~\ref{sec:results}, Transient surprisingly blames
 an empty set of boundaries in 967 scenarios.
 Such cases should never occur, at least in theory, because an empty set
  means the value has never crossed a boundary---if the value is indeed defined
@@ -151,9 +151,9 @@ number of debugging failures, we conjecture that these improvements
 A second apparent flaw in our Transient semantics is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
 worst-case of 5.4x on fully-typed benchmarks in Reticulated,
-some of our configurations exceed a 4 minute timeout or 6GB memory limit with transient blame.
+some of our configurations exceed our 4 minute timeout or 6GB memory limit with transient blame.
 To put those limits into context, the fully typed and fully untyped benchmarks all complete in a few seconds with minimal memory usage, and none of the mixed Natural configurations hit these limits.
-Unfortunately, our high cost is closer to the truth;
+Unfortunately, our high cost for Transient seems closer to the truth;
  there are at least three broad issues that skew the earlier results.
 First, the 2017 implementation of Reticulated fails to insert certain
  soundness checks\footnote{Missing check: \url{https://github.com/mvitousek/reticulated/issues/36}}
@@ -167,7 +167,7 @@ Third, \citet{vss-popl-2017} use relatively small benchmarks.
 Four have since been retired from the official Python benchmark suite
  because they are too small, unrealistic, and unstable.\footnote{Release notes: \url{https://pyperformance.readthedocs.io/changelog.html}}
 On larger programs, Reticulated suffers from high overhead.
-For example, a Reticulated version of our \texttt{sieve} benchmark runs in
+For example, a Reticulated version of our simplest benchmark runs in
  ~40 seconds without blame, and with blame times out after 10 minutes.
 
 %% NOTE: Vitousek's benchmarks are from the Python "pyperformance" suite.
