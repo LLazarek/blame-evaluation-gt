@@ -3,9 +3,9 @@
 
 
 We run the experimental process from section~\ref{sec:rational} on the
-sampled debugging scenarios from section~\ref{sec:sample} on a --- specs
-of fix. Each debugging scenario had a timeout limit of 4 minutes and an
-out of memory limit of 6GB. The complete experiment required
+sampled debugging scenarios from section~\ref{sec:sample} using a machine with two Intel Xeon Gold 6258R processors and 500GB of memory.
+Each debugging scenario had a timeout limit of 4 minutes and a
+memory limit of 6GB. The complete experiment required
 approximately 270 hours of compute hours on our machine. 
 
 
@@ -29,21 +29,21 @@ mutators.
 
 Figure~\ref{subsec:experiment} shows that the answers for questions $Q_1$
 to $Q_3$ are positive. In all three semantics, blame modes outperform
-their corresponding exception mode (by 9.44\% to 12.7\%). The natural
-exceptions mode is never more useful than natural blame and  transient
-exceptions are more useful than transient first and transient last blame
+their corresponding exception mode (by 9.44\% to 12.7\%). The Natural
+exceptions mode is never more useful than Natural blame, and  Transient
+exceptions are more useful than Transient first and Transient last blame
 in 2.19\% and 2.8\% of the scenarios respectively. 
 
 
 For the answers to $Q_*$, we compare the percentages in antisymmetric
 positions in the matrix. Blame for all three semantics is significantly
 more useful than Erasure exceptions (by 33\% to 35\%). Natural blame is
-more useful than both versions of transient blame by a small percentage;
-in 4.05\% of scenarios natural blame is more useful while in 1.67\% of the
-scenarios transient blame is more useful. The transient first and
-transient last blame are practically indistinguishable. Finally, there is
-no clear winner between natural exceptions and transient exceptions
-despite the theoretically advantageous additional checks of the natural
+more useful than both versions of Transient blame by a small percentage;
+in 4.05\% of scenarios Natural blame is more useful while in 1.67\% of the
+scenarios Transient blame is more useful. The Transient first and
+Transient last blame are practically indistinguishable. Finally, there is
+no clear winner between Natural exceptions and Transient exceptions
+despite the theoretically advantageous additional checks of the Natural
 semantics.
 
 \begin{figure}
@@ -68,15 +68,15 @@ semantics.
 
 
 Figure~\ref{fig:effort-table} shows the distribution of programmer effort
-for our sample of interesting debugging scenarios . Unlike the usefulness
-comparisons above, these results do not generalize to the full population.
+for our sample of interesting debugging scenarios. Unlike the usefulness
+comparisons above, these proportions do not generalize to a representation of the full population.
 Still, as we discuss in section~\ref{subsec:effort}, they provide an
 alternative view of the workings of the rational programmer. 
 
 There are
 three immediate take-aways from the figure. First, the effort for successfully
 debugging interesting scenarios (in green) for the random mode of the
-rational program  follows  a normal distribution as expected.\footnote{The
+rational programmer follows  a normal distribution, as expected.\footnote{The
 random mode distribution is indistinguishable for all three semantics and thus the figure~\ref{fig:effort-table} 
 only shows one plot.} In contrast, in the other modes, successful effort coalesces at
 the left side of the plot, meaning that in most cases the programmer needs
@@ -85,28 +85,28 @@ cases where a blame or exception mode has to work harder, the number of
 modules that that need to be typed is small relative to the random mode. 
 
 A second point of interest is that the exceptions of
-the erasure semantics either help the rational programmer immediately or 
+the Erasure semantics either help the rational programmer immediately or 
 the rational programmer fails to debug a scenario altogether (in red). This shouldn't
 come as a surprise; no matter how many type annotations the programmer
-adds to an erasure program, if the type checker doesn't reject the
-program, running the program produces always the same outcome. Thus an
-exception from the erasure's runtime has to point to the buggy module with
+adds to an Erasure program, if the type checker doesn't reject the
+program, running the program always produces the same outcome. Thus an
+exception from the runtime has to point to the buggy module with
 the first try. Otherwise the rational programmer types an irrelevant
 module, runs the program again and the exception points again to the
 already typed module. 
 
 A third notable piece of information from
 the figure is that every mode has failed debugging scenarios, not just
-erasure. This should
+Erasure. This should
 not come as a surprise to the astute
 reader. After all, as we
 discuss above, some modes are more successful than others in certain
 scenarios. Indeed any mode can fail if running a scenario results in an
 exception and the exception carries no useful information about which
 module the programmer should type next, e.g., because the stack trace 
-does not contain frames from any module of the program. This situation
+does not contain frames from any module of the program, or only typed modules. This situation
 can even happen immediately, which explains failures with 0 effort. 
-However  while the majority of
+While the majority of
 failures to debug failed scenarios follow this pattern, a few do not. The next section takes a
 closer look at these unexpected failures of the rational programmer as part of the lessons we
 extract from our experimental results.
