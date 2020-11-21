@@ -66,6 +66,22 @@ semantics.
 
 
 Figure~\ref{fig:effort-table} shows the distribution of programmer effort
-for the sampled interesting debugging --- in contrast to the usefulness
-comparisons these results do not generalize to the full population. 
+for  the sampled interesting debugging scenarios . Unlike the usefulness
+comparisons above, these results do not generalize to the full population.
+Still, as we discuss in section~\ref{subsec:effort}, they provide an
+alternative view of the workings of the rational programmer. There are two
+immediate take-aways from the figure. First, the effort for succesfully
+debugging interesting scenarios (in green) for the random mode of the
+rational program  follows  a normal distribution as expected.\footnote{The
+random mode distribution is indistinguishable for all three semantics and thus the figure~\ref{fig:effort-table} 
+only shows one plot.} In contrast, in the other modes, succesful effort coalesces at
+the left side of the plot, meaning that in most cases the programmer needs
+to type a single component to debug a scenario. Even in the minority of
+cases where the blame or exception rational programmer has to work harder, the number of
+modules that that need to be typed is small relative to the random
+rational programmer. A second point of interest is that the exceptions of
+the erasure semantics either help the rational programmer immediately or 
+the rational programmer fails to debug a scenario (in red). This shouldn't
+come as a surprise; no matter how many type annotations the programmer
+adds to an erasure program, if the program 
 

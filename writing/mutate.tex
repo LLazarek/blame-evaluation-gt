@@ -269,27 +269,25 @@ trivial to debug, and thus ineffective, scenarios that error immediately when th
 evaluated. 
 
 
-\begin{figure*}
-  \centering
-  \includegraphics[scale=0.35]{./plots/mutant-breakdown}
-  \caption{Interesting debugging scenarios produced by our mutators. Counts are cut off at 50.}
-  \label{fig:mutant-breakdown}
-\end{figure*}
+%\begin{figure*}
+%  \centering
+%  \includegraphics[scale=0.35]{./plots/mutant-breakdown}
+%  \caption{Interesting debugging scenarios produced by our mutators. Counts are cut off at 50.}
+%  \label{fig:mutant-breakdown}
+%\end{figure*}
 
 
 With the definition of interesting debugging scenarios in hand, we analyze how effective our mutators
 are for turning the benchmarks into interesting debugging scenarios.
 Indeed the mutators produce at least 72192 interesting debugging scenarios
 across all mutants --- there are potentially many more but this is how
-many we examined. 
-Figure~\ref{fig:mutant-breakdown} breaks down the interesting
-debugging scenarios produced  for each benchmark by mutator 
-but counts are cut off at 50. The mutators produce at least 40 interesting
+many we examined. In more detail, the mutators produce at least 40 interesting
 scenarios for every benchmark, and these scenarios originate from at
 least four different mutators per benchmark.  Thus the mutators result in 
 a sizeable and diverse population of scenarios for every benchmark.
 Furthermore, every mutator contributes scenarios to at least one
 benchmark. Especially some mutators  target specific features of
+benchmarks even if they do not contribute interesting scenarios to other
 benchmarks, which
 justifies their inclusion. For
 instance the class-focused mutators are effective in \texttt{take5}
