@@ -108,8 +108,10 @@ program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
 where $\exception{\system, \conf}$ denotes the location of the exception of $\conf$.
 \end{quote}
 
-Putting the two modes together, we can now compare the usefulness of blame 
-and mere exceptions for debugging a scenario in the context of Natural semantics.
+Same as for success for a Natural blame trail, we define success for a
+Natural exception trail.
+Putting the definitions for the two modes together, we can now compare the usefulness of blame 
+with that for mere exceptions for debugging a scenario in the context of Natural semantics.
 \begin{quote}
 \it 
   Given a program $\system$ and a root $\conf_0$ in $\lattice{\system}$,
@@ -171,8 +173,8 @@ Transient exceptions for debugging a scenario.
  blame assignment, a rational programmer can only hope that the underlying
  safety checks and their exceptions are helpful.  Thus, the Erasure 
  rational programmer has a single mode, the Erasure exception mode, and
- its definition and the accompanying notion of usefulness follow that for
- Natural.
+ its definition follows that for
+ the Natural exception mode.
 
 %% -----------------------------------------------------------------------------
 \subsection{Experimental Process.}
