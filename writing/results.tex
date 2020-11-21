@@ -7,7 +7,7 @@ We run the experimental process from section~\ref{sec:rational} on the
 sampled debugging scenarios from section~\ref{sec:sample} using a machine with two Intel Xeon Gold 6258R processors and 500GB of memory.
 Each debugging scenario had a timeout limit of 4 minutes and a
 memory limit of 6GB. The complete experiment required
-over 30,000 hours of compute hours on our machine.
+over 30,000 hours of compute hours.
 
 
 Figure~\ref{fig:avo-matrix} summarizes our results and provides answers to
@@ -15,9 +15,8 @@ the four questions from section~\ref{subsec:experiment}.  Specifically, it
 depicts a head-to-head comparison of the usefulness of each mode against
 every other mode.  The cell in row $R$ and column $C$ plots the percentage
 of interesting debugging scenarios for which $R$ is more useful $C$ ---
-this percentage has been calculated as an estimated proportion from the
-corresponding proportion of the debugging scenarios in our sample and the
-upper bound.  In effect, reading across a given row $R$ provides an
+we calculate this percentage as an estimated proportion from our sample.
+In effect, reading across a given row $R$ provides an
 overview of how $R$ compares to every other mode; the higher the bars, the
 more interesting debugging scenarios for which $R$ is strictly more useful
 than the other modes.  Reading down a given row $C$ provides an overview
