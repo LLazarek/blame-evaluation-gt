@@ -86,8 +86,8 @@ for all $0 \leq i \leq n - 1$, $\conf_i \subset \conf_{i+1}$ and
 $\conf_{i+1} \setminus \conf_i = \mode{\conf_i}$.
 
    For example we can obtain the simple blame mode
-for the natural system if we use, as above, the selector $\blame{\cdot}$. 
-However, the same mode has a different meaning in transient as this
+for the Natural system if we use, as above, the selector $\blame{\cdot}$. 
+However, the same mode has a different meaning in Transient as this
 semantics results in multiple blamed components. 
 
 This requires generalizing the notion of successful blametrail
@@ -95,7 +95,7 @@ to that of successful blametrees: a blametree is the set of all
 blametrails with root a configuration $\conf_0$. A blametree is succesful if at least one
 of its blametrails is succesful. 
 
-Of course for systems such as transient we can add modes where the rational
+Of course for systems such as Transient we can add modes where the rational
 programmer picks one blametrail as part of the migration process. For
 example the \first{\blame{\cdot}} mode continues with the oldest blame
 entry in the blameset of a configuration, as we discuss in

@@ -1,12 +1,13 @@
 %% -----------------------------------------------------------------------------
 \section{What to Do Next} 
+\label{sec:conclusion}
 
 The paper provides the first insight into the measurable value of blame
  in the gradually typed world. In an implicit manner researchers and
 language designers have answered this question one way or another, without any
 evidence. Now they may use the evaluation method of this paper to
 confirm or reject their answers. We already know from~\citet{tgpk-dls-2018}
-that, by intuition, programmers prefer the run-time checking of natural over
+that, by intuition, programmers prefer the run-time checking of Natural over
 other soundness methods. But, just because a random set of programmers expresses
 this view does not mean that blame assignment adds value. At this point we know
 that it does, in some circumstances, and that in others, the answer remains
@@ -30,8 +31,8 @@ The cited evidence suggests that this scenario is quite common and largely unadr
 Hence, a future evaluation must develop type-level mutators that produce incorrect type
 annotations without breaking the code itself. Some preliminary work suggests
 that such type mutators are much more difficult to develop than the code
-mutators of this paper. We conjecture that the natural semantics will
-usually discover such mistakes, while the transient and erasure semantics cannot
+mutators of this paper. We conjecture that the Natural semantics will
+usually discover such mistakes, while the Transient and Erasure semantics cannot
 help with such mistakes at all; indeed, we expect that these latter two raise
 misleading exceptions or produce plainly-wrong answers.  Of course, only further
 evaluation work can confirm or reject these conjectures.

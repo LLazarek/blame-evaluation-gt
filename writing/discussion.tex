@@ -1,12 +1,13 @@
 %% -----------------------------------------------------------------------------
 \section{What We Learned}
+\label{sec:discussion}
 
 %% \begin{itemize}
 %% \item Why does the data look like this?
 %%   - why tr fails
 %%     - bad runtime errors
 %%     - TR bug
-%%   - why transient fails
+%%   - why Transient fails
 %%     - bad runtime errors
 %%     - timeouts/ooms: give context wrt fully untyped/typed versions
 %%     - empty blame: trim Ben's prose
@@ -69,7 +70,7 @@ We discuss each of these last two failure categories in detail in~\ref{sec:threa
 The analysis in the last section indicates a number of interesting conclusions about blame in the gradual typing setting.
 First, figure~\ref{fig:avo-matrix} makes it clear that any kind of dynamic checking has a large positive impact over Erasure, and this is true regardless of whether the rational programmer uses blame or stacktraces.
 Indeed, the bottom row of figure~\ref{fig:avo-matrix} illustrates that Erasure almost never offers more useful information than any other mode.
-Nonetheless, figure~\ref{fig:effort-table} does show that even if erasure often fails to provide helpful information, it provides the rational programmer with a quick answer.
+Nonetheless, figure~\ref{fig:effort-table} does show that even if Erasure often fails to provide helpful information, it provides the rational programmer with a quick answer.
 
 Figure~\ref{fig:avo-matrix} also indicates that blame helps significantly over just using exception information.
 Both Natural and Transient's blame modes improve over their corresponding exception modes by about ten percent.
@@ -155,7 +156,7 @@ These scenarios suggest ways to improve the blame algorithm from~\citet{vss-popl
 A second apparent flaw in our Transient semantics is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
 worst-case of 5.4x on fully-typed benchmarks in Reticulated,
-some of our configurations exceed a 4 minute timeout or 6GB memory limit with transient blame.
+some of our configurations exceed a 4 minute timeout or 6GB memory limit with Transient blame.
 To put those limits into context, the fully typed and fully untyped benchmarks all complete in a few seconds with minimal memory usage, and none of the mixed Natural configurations hit these limits.
 Unfortunately, our high cost is closer to the truth;
  there are at least three broad issues that skew the earlier results.

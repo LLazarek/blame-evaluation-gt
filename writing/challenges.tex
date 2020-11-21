@@ -1,5 +1,6 @@
 
 \section{Why Is It Hard to Evaluate Blame?}
+\label{sec:challenges}
 
 The most serious challenge for evaluating blame concerns 
 the nature of this research. Unlike ordinary
@@ -54,32 +55,32 @@ system. Otherwise, results for different gradual typing systems
 do not share a common baseline and, therefore, do not lend support to any
 conclusions about whether the value of blame changes from one system to
 another. For instance, the case study presented here builds on
-Greenman and Felleisen's transient variant for functional Typed
-Racket~\cite{gf-icfp-2018} to obtain a transient semantics that is
-comparable with Typed Racket's default natural one. This transient
+Greenman and Felleisen's Transient variant for functional Typed
+Racket~\cite{gf-icfp-2018} to obtain a Transient semantics that is
+comparable with Typed Racket's default Natural one. This Transient
 variant accommodates varied linguistic features and library calls
-in a way that is faithful to the transient
+in a way that is faithful to the Transient
 semantics~\cite{vss-popl-2017}.
 
 Beyond the implementation issue, the method also faces the problem that
-the three variants---the natural semantics, the transient semantics, and
-the erasure semantics---come with three radically different blame
-assignment strategies.  For example, the natural semantics assigns blame
-to one component while transient assigns blame to a set of components. The
-erasure semantics does not blame a component per se, but it comes with an
+the three variants---the Natural semantics, the Transient semantics, and
+the Erasure semantics---come with three radically different blame
+assignment strategies.  For example, the Natural semantics assigns blame
+to one component while Transient assigns blame to a set of components. The
+Erasure semantics does not blame a component per se, but it comes with an
 exception location and the usual stack traces. 
 
 Supporting these strategies is {\em not\/} just an issue of language
 implementation but affects greatly the behavior of the rational
 programmer.  Specifically, the rational programmer must come with
 \emph{modes} that represent the alternative interpretations of blame.  For
-instance, a mode of the rational programmer using transient may pick the
+instance, a mode of the rational programmer using Transient may pick the
 oldest element of a blame set as the next component to add types because
 it corresponds to the earliest point in the program's evaluation that can
 discover an impedance mismatch.  Another mode may opt to treat the blame
 set as another form of a stack trace and add types to its newest element.
 When both modes are equally successful in locating an impedance mismatch,
-the method has needs to take into account the rational programmer's effort
+the method needs to take into account the rational programmer's effort
 to answer which mode is the most effective. 
 
 %Another mode does not distinguish between the elements of the

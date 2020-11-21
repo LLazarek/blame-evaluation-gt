@@ -1,4 +1,5 @@
 \section{Does Blame Matter?}
+\label{sec:introduction}
 
 Theoreticians of gradual typing have focused on
 blame theorems from the very beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
@@ -47,19 +48,20 @@ simulates a programmer who follows the Wadler-Findler slogan quoted above.
 Such a \emph{rational programmer} can find impedance-mismatch
 bugs by adding types to a partially typed program (section~\ref{sec:landscape}). That is, when the
 run-time system signals an impedance mismatch, a good blame message helps
-the programmer infer where to add an additional type specification. Since
-components that pass the type checker cannot cause impedance mismatches;
-the type checker discovers these mismatches at compile time and points
+the programmer infer where to add an additional type specification.
+Components that pass the type checker cannot cause impedance mismatches,
+so if the type checker discovers these mismatches at compile time then it points
 directly to the faulty component. Otherwise, if the
 additional type does {\em not\/} cause a static type error, the program
- is run again to signal another violation. Then the programmer can heed
-blame one more time to add yet another type specification. Weighing the number of
-steps it takes to discover the mistake in this manner is a measure of the effectiveness
+is run again to signal another violation. Then the programmer can heed
+blame one more time to add yet another type specification.
+Weighing whether we discover the mistake in this manner, and the number of
+steps it takes to do so, are measures of the effectiveness
 of the blame assignment strategy of the language.
 
 The paper's second contribution is a set of results from applying the evaluation
 method to three distinct blame assignment strategies and approximately
-72000 cases (section~\ref{sec:results}): Vitousek et
+722,000 cases (section~\ref{sec:results}): Vitousek et
 al.'s strategy of tracking typed/untyped boundaries in Reticulated;
 Tobin-Hochstadt et al.'s use of higher-order contract system~\cite{ff-icfp-2002,
 mf-toplas-2009}; and the approach of industrial systems that forego blame

@@ -1,4 +1,5 @@
 \section{How to Make Lots of Mistakes} 
+\label{sec:mutate}
 
 An important challenge from section~\ref{sec:challenges} is the generation of
 mix-typed programs with representative impedance mismatches between
@@ -56,11 +57,11 @@ The starting point for our corpus of programs
 is~\citet{gtnffvf-jfp-2019}'s gradual typing benchmark suite. The
 benchmark suite consists of fully typed correct programs that are written by different authors
 and have been used, maintained and evolved by their authors and others over a
-number of years.  They range widely in size, complexity, purpose and
+number of years.  They range widely in the size, complexity, purpose and
 features of Typed Racket they employ.  Furthermore the benchmarks use advanced aspects
 of Typed Racket's type system such as occurrence
 typing~\cite{tf-icfp-2010}, types for mutable and immutable data
-structures, polymorphic types, types for first-class classes and objects and types for
+structures, polymorphic types, types for first-class classes and objects, and types for
 Racket's numeric tower~\cite{stathff-padl-12}. Without loss of the diversity of the benchmarks,
 we select the ten largest in terms of numbers of components (between 6 and 14 components).
 These benchmarks also have the most complex dependency graphs and, hence,
@@ -223,7 +224,7 @@ interesting debugging scenarios for the rational programmer.  The
 benchmarks are fully typed, and type checking detects each mistake at
 compile time.  Hence, we apply the mutators to versions, dubbed
 \dubbed{scenarios}, of the benchmarks without 
-some  of their type annotation.  Without the annotations, the type
+some  of their type annotations.  Without the annotations, the type
 checker may not detect a mistake at compile time and, instead, the run
 time checks
 of the gradual type system signal an error.  Scenarios
@@ -279,17 +280,13 @@ evaluated.
 
 With the definition of interesting debugging scenarios in hand, we analyze how effective our mutators
 are for turning the benchmarks into interesting debugging scenarios.
-Indeed the mutators produce at least 72192 interesting debugging scenarios
-across all mutants --- there are potentially many more but this is how
-many we examined. In more detail, the mutators produce at least 40 interesting
+At a high level, the mutators produce 16,800 mutants with at least one interesting debugging scenario each across all of our benchmarks.
+Broken down by benchmark, the mutators produce at least 40 interesting
 scenarios for every benchmark, and these scenarios originate from at
 least four different mutators per benchmark.  Thus the mutators result in 
 a sizeable and diverse population of scenarios for every benchmark.
 Furthermore, every mutator contributes scenarios to at least one
-benchmark. Especially some mutators  target specific features of
-benchmarks even if they do not contribute interesting scenarios to other
-benchmarks, which
-justifies their inclusion. For
-instance the class-focused mutators are effective in \texttt{take5}
-which jives with the fact that it is the benchmark with 
-the most extensive use of object-oriented features.
+benchmark.
+That being said, some mutators only apply to a small subset of the benchmarks;
+those mutators target specific features which only those benchmarks make us of, so we include them despite their narrow applicability.
+For instance, the class-focused mutators are mainly effective in \texttt{take5}, since it is the benchmark with the most extensive use of object-oriented features.
