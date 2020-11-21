@@ -89,7 +89,7 @@ Like {\em homo economicus\/}, which decouples the actual behavior of a
 participant in an economy for the sake of mathematical modeling, the model of a
 rational programmer decouples the actual debugging behavior of a software
 developer for the sake of a systematic, large-scale analysis. This decoupling
-comes advantages and disadvantages. In the economic realm, mathematical models
+comes with advantages and disadvantages. In the economic realm, mathematical models
 have provided some predictive insights into the market's behavior; but as
 behavioral economics has shown more recently, the mathematical abstraction of a
 rational actor makes predictions also quite unreliable in some situations.
@@ -103,7 +103,7 @@ usefulness of the rational-programmer idea, the community will need a lot more
 experience with this form of evaluation and relating the evaluation to the
 behavior of working programmers.
 
-Our setup hides the type choice a rational programmer must make. When the
+Relatedly, our setup hides the type choice a rational programmer must make. When the
 run-time checks signal an impedance mismatch in the real world, a programmer
 does not have a typed component ready to swap in. Instead, the programmer must
 come up with the next set of types---and this means the programmer must make
@@ -146,16 +146,17 @@ These scenarios suggest ways to improve the blame algorithm from~\citet{vss-popl
      of the blame map.
   \item
     The initial blame map must reflect the initial type environment.
-    Typed Racket trusts that untyped core-library functions, such as \texttt{filter},
-     behave correctly, but does not list the assumption in the blame map.
+    For instance, Typed Racket trusts that untyped core-library functions, such as \texttt{filter},
+     behave correctly; such assumptions should appear in the blame map.
 \end{itemize}
 \noindent{}Despite these known limitations, we conjecture that these improvements
  to Transient blame-tracking will not affect our overall conclusions.
 
 A second apparent flaw in our Transient semantics is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
- worst-case of 5.4x on fully-typed benchmarks in Reticulated,
- our configurations frequently exceed a 10 minute timeout with transient blame.
+worst-case of 5.4x on fully-typed benchmarks in Reticulated,
+some of our configurations exceed a 4 minute timeout or 6GB memory limit with transient blame.
+To put those limits into context, the fully typed and fully untyped benchmarks all complete in a few seconds with minimal memory usage, and none of the mixed Natural configurations hit these limits.
 Unfortunately, our high cost is closer to the truth;
  there are at least three broad issues that skew the earlier results.
 First, the 2017 implementation of Reticulated fails to insert certain
