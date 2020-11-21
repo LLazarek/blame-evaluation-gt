@@ -1,50 +1,89 @@
 %% -----------------------------------------------------------------------------
 \section{What We Learned}
 
-\begin{itemize}
-\item Why does the data look like this?
-  - why tr fails
-    - bad runtime errors
-    - TR bug
-  - why transient fails
-    - bad runtime errors
-    - timeouts/ooms: give context wrt fully untyped/typed versions
-    - empty blame: trim Ben's prose
+%% \begin{itemize}
+%% \item Why does the data look like this?
+%%   - why tr fails
+%%     - bad runtime errors
+%%     - TR bug
+%%   - why transient fails
+%%     - bad runtime errors
+%%     - timeouts/ooms: give context wrt fully untyped/typed versions
+%%     - empty blame: trim Ben's prose
 
-  \item Any kind of dynamic checking has a large positive impact, whether blame or stacktraces are used.
-    \begin{itemize}
-    \item Both in terms of usefulness and programmer effort
-    \item Erasure extremely often fails to provide any helpful information.
-    \item That said, there are no long trails for Erasure.
-    \end{itemize}
+%%   \item Any kind of dynamic checking has a large positive impact, whether blame or stacktraces are used.
+%%     \begin{itemize}
+%%     \item Both in terms of usefulness and programmer effort
+%%     \item Erasure extremely often fails to provide any helpful information.
+%%     \item That said, there are no long trails for Erasure.
+%%     \end{itemize}
 
-  \item Blame helps significantly over just using stacktraces for both Natural and Transient.
-    \begin{itemize}
-    \item Natural's blame improves over exceptions by nearly 20\%
-    \item Transient's blame improves over exceptions half as much
-    \end{itemize}
+%%   \item Blame helps significantly over just using stacktraces for both Natural and Transient.
+%%     \begin{itemize}
+%%     \item Natural's blame improves over exceptions by nearly 20\%
+%%     \item Transient's blame improves over exceptions half as much
+%%     \end{itemize}
 
-  \item Natural clearly offers the most utility, but Transient is not too far behind.
-    \begin{itemize}
-    \item Natural clearly improves over all other modes
-    \item Transient improves significantly over all other modes except Natural.
-    \item Keep in mind that our selection of scenarios is biased toward Erasure & Transient.
-    \end{itemize}
+%%   \item Natural clearly offers the most utility, but Transient is not too far behind.
+%%     \begin{itemize}
+%%     \item Natural clearly improves over all other modes
+%%     \item Transient improves significantly over all other modes except Natural.
+%%     \item Keep in mind that our selection of scenarios is biased toward Erasure & Transient.
+%%     \end{itemize}
     
 
-  \item Discussion of how confidence / margin of error should be interpreted wrt these results?
+%%   \item Discussion of how confidence / margin of error should be interpreted wrt these results?
 
 
-   \item Threats to validity:
-        \begin{itemize}
-          \item Racket stack traces
-          \item Mutant sampling
-          \item Blame trails do not necessarily capture all aspects of error reporting
-          \item Transient blame adaptations
-          \item More?
+%%    \item Threats to validity:
+%%         \begin{itemize}
+%%           \item Racket stack traces
+%%           \item Mutant sampling
+%%           \item Blame trails do not necessarily capture all aspects of error reporting
+%%           \item Transient blame adaptations
+%%           \item More?
 
-   \end{itemize}
-\end{itemize}        
+%%    \end{itemize}
+%% \end{itemize}        
+
+\subsection{Why does the data look like this?}
+
+The figures in the last section raise a key question: why does blame fail in our dataset?
+We analyze the reasons for failure separately for each mode of the rational programmer.
+
+Breaking down the reasons for failure for all scenarios in which Natural is unsuccessful reveals two causes.
+First, most of the failing scenarios begin with a runtime exception, which the rational programmer can use to type components until blame becomes available.
+In these failing cases (there are 1708), however, blame never becomes available; the exception information points to the wrong component and the trail ends in failure.
+A second, much smaller set (40 scenarios) do produce a runtime type error blaming some component, but the blame identifies a non-buggy typed component.
+After careful inspection of these scenarios, we are confident that they reveal a bug in the implementation of Typed Racket.
+
+Transient's blame failures break down in a similar way.
+Like Natural, most failures occur with unhelpful exception information without ever getting blame (1851 scenarios).
+However, Transient also has a substantial number of failures that occur because the programs hit the resource limits (timed out or ran out of memory) and had to be killed (some 770 scenarios).
+Additionally, there are nearly a thousand cases where Transient's checks catch a problem, but the blame set reported is empty.
+We discuss each of these last two failure categories in detail in~\ref{sec:threat:transient}.
+
+
+\subsection{High level conclusions}
+
+The analysis in the last section indicates a number of interesting conclusions about blame in the gradual typing setting.
+First, figure~\ref{fig:avo-matrix} makes it clear that any kind of dynamic checking has a large positive impact over Erasure, and this is true regardless of whether the rational programmer uses blame or stacktraces.
+Indeed, the bottom row of figure~\ref{fig:avo-matrix} illustrates that Erasure almost never offers more useful information than any other mode.
+Nonetheless, figure~\ref{fig:effort-table} does show that even if erasure often fails to provide helpful information, it provides the rational programmer with a quick answer.
+
+Figure~\ref{fig:avo-matrix} also indicates that blame helps significantly over just using exception information.
+Both Natural and Transient's blame modes improve over their corresponding exception modes by about ten percent.
+This illustrates that blame tracking offers value for locating the source of mistakes beyond the value provided by the dynamic checks alone.
+At only ten percent, however, the amount of added value suggests that foregoing blame tracking in order to obtain performance gains may not hurt debugging all too much.
+
+Finally, the results show that while Natural clearly offers the most utility compared to the other modes, Transient is not too far behind.
+Natural is more useful than every other mode in figure~\ref{fig:avo-matrix}, and by a larger proportion than any other mode.
+That said, the same can be said of Transient's two blame modes as compared to every other mode but Natural.
+Furthermore, the difference in usefulness between Natural and Transient's blame modes is quite small across the board.
+As we point out in~\ref{sec:mutate}, however, we should note that our selection of scenarios for analysis introduces bias toward Erasure and Transient.
+
+
+\subsection{Threats to validity}
 
 Like {\em homo economicus\/}, which decouples the actual behavior of a
 participant in an economy for the sake of mathematical modeling, the model of a
@@ -77,13 +116,14 @@ assignment for trail extension as our experimental setup describes.
 
 
 \subsection{Threat: Is our Transient Correct?}
+\label{sec:threat:transient}
 %% purpose: talk about transient-blame implementation .... what did we do,
 %%  how did we test, what threats remain?
 %%
 %% the benchmark timeouts look like a threat, but this section shows that
 %%  we've looked carefully at those
 
-Surprisingly, Transient blames an empty set of boundaries in XXXX cases.
+Surprisingly, Transient blames an empty set of boundaries in 967 cases.
 Such cases should never occur, at least in theory, because an empty set
  means the value has never crossed a boundary---if the value is indeed defined
  in the current module, then we have typed code blaming itself for a typed
