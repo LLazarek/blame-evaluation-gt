@@ -90,7 +90,7 @@ iff $\conf_n$ type checks and the trail cannot be extended further.
 \end{quote}
 That is, failing Natural blame trails are those that have not reached a scenario that
 reveals the bug at compile time and their last scenario does not blame an untyped component. Thus
-the rational programmer receives no hints from the gradual type system on how to
+the rational programmer gets no hints from the gradual type system on how to
 continue the search for the bug.
 
 While a successful Natural blame trail indicates that it 
@@ -126,7 +126,7 @@ and mere exceptions for debugging a scenario in the context of Natural semantics
 The transient semantics assigns blame to a set of components. In this setting, a
 blame assignment has the following meaning: the witness value to the impedance
 mismatch may have crossed the boundaries between elements in the set, and each crossing
-checked only a portion of the value's type shape. 
+checked the value's type in a shallow manner. 
 
 This ambiguity in Transient blame raises the question of how the rational programmer
 should react when the language produces a blame set. Our answer is that the rational

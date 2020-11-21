@@ -97,7 +97,7 @@ exports as \texttt{typed-pack} asserting that it is a function
 that consumes JSON and returns an association list that maps symbols to
 strings. The second typed module, \texttt{typed/crypto-pack-lb},
 also imports \texttt{pack} and assumes for it the same type as
-\texttt{typed/pack-lb} but instead of exporting it directly it wraps in
+\texttt{typed/pack-lb} but instead of exporting it directly \texttt{typed/pack-lb} wraps it in
 another function, \texttt{crypto-pack}, that encrypts its input before
 passing it to \texttt{pack}.
 
@@ -105,9 +105,9 @@ Under Natural semantics~\cite{tf-popl-2008,tfffgksst-snapl-2017}, when
 \texttt{pack} is imported in either \texttt{typed/pack-lb} or
 \texttt{typed/secure-pack-lb}, the runtime checks that \texttt{pack} is a
 function and wraps it in a proxy that enforces its  type.  Analogously
-the run time wraps the exports of the two typed modules in proxies that
+the runtime wraps the exports of the two typed modules in proxies that
 check that untyped code applies \texttt{typed-pack} and
-\texttt{crypto-pack} to arguments of its type. In essence, the
+\texttt{crypto-pack} to arguments of the expected type. In essence, the
 return type checks protect  the typed modules in case they use
 \texttt{pack} and, as is the case here, it does not return an association
 list. The check of the argument type  treats the
@@ -149,7 +149,7 @@ Under Erasure semantics, the example does not raise an error due to the
 gradual type system; Erasure performs no type checks at runtime. Thus the
 program may fail with an exception if \texttt{client} tries to use the
 result of \texttt{typed-pack} or \texttt{crypto-pack}, but it may also not
-fail at all and produce an wrong result that goes undetected by the
+fail at all and produce a wrong result that goes undetected by the
 gradual type system .  In either case, the Erasure semantics provides no
 help to the programmer for detecting the bug in our program. 
 

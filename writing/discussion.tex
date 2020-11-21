@@ -65,12 +65,12 @@ blame~\cite{gfd-oopsla-2019}, our results call for a deeper understanding
 of the relative strengths of the two models for blame.  Fourth, given that
 Transient's sound but shallow run time type checks do not seem to hamper
 debugging, a version of Typed Racket that disables some of its wrappers
-may offer an answer to the performance issues of the Natural semantics. 
+may offer an answer to the performance issues of Natural. 
 Fifth, just as for Typed Racket, the experiment points to possible
 improvements for Reticulated Python. In particular, the experimental 
 data indicates that the usefulness of transient blame does not depend on
 whether  the rational programmer follows first or the last element from a
-Transient blame set. Hence, given the performance issues of Transient we discuss further on, 
+blame set. Hence, given the performance issues of Transient we discuss further on, 
 a possible optimization is to limit the size of blame sets
 using timestamps.
 
@@ -117,8 +117,9 @@ assignment for trail extension as our experimental setup describes.
 \subsection{Threat: Is our Transient Correct?}
 \label{sec:threat:transient}
 
-As we discuss in section~\ref{sec:results}, Transient surprisingly blames
-an empty set of boundaries in 967 scenarios.
+As we discuss in section~\ref{sec:results}, Transient surprisingly
+produces
+an empty blame set in 967 scenarios.
 Such cases should never occur, at least in theory, because an empty set
  means the value has never crossed a boundary---if the value is indeed defined
  in the current module, then we have typed code blaming itself for a typed
@@ -149,7 +150,7 @@ algorithm:
 number of debugging failures, we conjecture that these improvements
  to Transient blame-tracking do not affect our overall conclusions.
 
-A second apparent flaw in our Transient semantics is the high cost of blame.
+A second apparent flaw in our Transient implementation is the high cost of blame.
 Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
 worst-case of 5.4x on fully-typed benchmarks in Reticulated,
 some of our configurations exceed our 4 minute timeout or 6GB memory limit with transient blame.
