@@ -90,21 +90,23 @@ the rational programmer fails to debug a scenario altogether (in red). This shou
 come as a surprise; no matter how many type annotations the programmer
 adds to an erasure program, if the type checker doesn't reject the
 program, running the program produces always the same outcome. Thus an
-exception from the erasure's runtime has to point to the buggy component with
+exception from the erasure's runtime has to point to the buggy module with
 the first try. Otherwise the rational programmer types an irrelevant
-component, runs the program again and the exception points again to the
-already typed component. 
+module, runs the program again and the exception points again to the
+already typed module. 
 
-A third interesting piece of information from
-the figure is that every mode has failed debugging scenarios. This should
+A third notable piece of information from
+the figure is that every mode has failed debugging scenarios, not just
+erasure. This should
 not come as a surprise to the astute
-reader After all, as we
+reader. After all, as we
 discuss above, some modes are more successful than others in certain
 scenarios. Indeed any mode can fail if running a scenario results in an
 exception and the exception carries no useful information about which
-component the programmer should type next, e.g., because the stack trace 
-does not contain frames from the component of the program.
-This explains the majority of
-failures to debug failed scenarios but not all. The next section takes a
-closer look at these unexpected situations as part of the lessons we
+module the programmer should type next, e.g., because the stack trace 
+does not contain frames from any module of the program. This situation
+can even happen immediately, which explains failures with 0 effort. 
+However  while the majority of
+failures to debug failed scenarios follow this pattern, a few do not. The next section takes a
+closer look at these unexpected failures of the rational programmer as part of the lessons we
 extract from our experimental results.
