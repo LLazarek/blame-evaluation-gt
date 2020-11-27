@@ -30,7 +30,8 @@
 (define-logger comparison)
 
 (define (enQ-dynamic-error-checker q mutant benchmark id
-                                   #:log-progress log-progress!)
+                                   #:log-progress log-progress!
+                                   #:resample resample-mutant!)
   (define max-configuration (make-max-bench-config benchmark))
   (define (random-configuration)
     (hash-set (for/hash ([mod (in-hash-keys max-configuration)])
@@ -50,8 +51,13 @@
          with modes-to-check @(map basename modes-to-check)
          })
     (cond [(> retry-count CONFIG-SAMPLE-MAX-RETRIES)
-           (log-comparison-error @~a{Ran out of retries for @mutant})
-           q]
+           (log-comparison-info @~a{Ran out of retries for @mutant, trying to resample...})
+           (match (resample-mutant! mutant)
+             [#f q]
+             [new-mutant
+              (enQ-dynamic-error-checker q new-mutant benchmark id
+                                         #:log-progress log-progress!
+                                         #:resample resample-mutant!)])]
           [else
            (define a-config (random-configuration))
            (process-Q-enq q
@@ -87,7 +93,7 @@
                @~a{
                    @mutant [@id] That's the last mode, done!
                    })
-              (log-progress! mutant id results+outcome)
+              (log-progress! mutant id (list results+outcome run-configuration))
               current-q]
              [(list* _ more-modes-to-check)
               (log-comparison-info
@@ -211,12 +217,14 @@
                           and working dir @(working-dir)
                           and process limit @process-limit
                           })
- (define progress
+ (define progress-dict
    (match progress-log-path
      [(? file-exists? path)
       (log-comparison-info @~a{Pulling progress from log})
-      (make-hash (file->list path))]
-     [else (hash)]))
+      (file->list path)]
+     [else empty]))
+ (define progress (make-immutable-hash progress-dict))
+
  (define-values {log-progress!/raw finalize-log!}
    (initialize-progress-log! progress-log-path
                              #:exists 'append))
@@ -235,13 +243,35 @@
                                                     benchmark))])
      mutant))
  (define mutants-to-sample-from
-   (cond [(hash-ref progress 'mutant-samples #f) => values]
-         [else
-          (define mutants (random-sample all-mutants
-                                         MUTANT-SAMPLE-SIZE
-                                         #:replacement? #f))
-          (log-progress!/raw (cons 'mutant-samples mutants))
-          mutants]))
+   (match (hash-ref progress 'mutant-samples #f)
+     [#f
+      (define mutants (random-sample all-mutants
+                                     MUTANT-SAMPLE-SIZE
+                                     #:replacement? #f))
+      (log-progress!/raw (cons 'mutant-samples mutants))
+      mutants]
+     [original-sample
+      (for/fold ([mutants original-sample])
+                ([{key value} (in-dict progress-dict)]
+                 #:when (equal? key 'resample-mutant))
+        (match-define (list original-mutant resampled-mutant) value)
+        (define mutants-less-original (remove original-mutant mutants))
+        (cons resampled-mutant mutants-less-original))]))
+ (define resample-mutant!
+   (let ([remaining-unsampled-mutants (list->mutable-set
+                                       (set-subtract all-mutants
+                                                     mutants-to-sample-from))])
+     (λ (original-mutant)
+      (cond [(set-empty? remaining-unsampled-mutants)
+             (log-comparison-info @~a{Attempt to resample @original-mutant failed: out of mutants})
+             #f]
+            [else
+             (define new-mutant (random-ref remaining-unsampled-mutants))
+             (set-remove! remaining-unsampled-mutants new-mutant)
+             (log-progress!/raw (cons 'resample-mutant (list original-mutant new-mutant)))
+             (log-comparison-info
+              @~a{Attempt to resample @original-mutant success: chose @new-mutant})
+             new-mutant]))))
 
  (process-Q-wait
   (for*/fold ([q (make-process-Q process-limit)])
@@ -254,5 +284,6 @@
                                    mutant
                                    benchmark
                                    id
-                                   #:log-progress log-progress!))))
+                                   #:log-progress log-progress!
+                                   #:resample resample-mutant!))))
  (log-comparison-info "Comparison complete."))
