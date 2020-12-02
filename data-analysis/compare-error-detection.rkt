@@ -29,9 +29,10 @@
 
 (define-logger comparison)
 
-(define (enQ-dynamic-error-checker q mutant benchmark id
+(define (enQ-dynamic-error-checker q mutant id benchmarks-dir
                                    #:log-progress log-progress!
                                    #:resample resample-mutant!)
+  (define benchmark (find-mutant-benchmark mutant benchmarks-dir))
   (define max-configuration (make-max-bench-config benchmark))
   (define (random-configuration)
     (hash-set (for/hash ([mod (in-hash-keys max-configuration)])
@@ -55,7 +56,7 @@
            (match (resample-mutant! mutant)
              [#f q]
              [new-mutant
-              (enQ-dynamic-error-checker q new-mutant benchmark id
+              (enQ-dynamic-error-checker q new-mutant id benchmarks-dir
                                          #:log-progress log-progress!
                                          #:resample resample-mutant!)])]
           [else
@@ -277,13 +278,12 @@
   (for*/fold ([q (make-process-Q process-limit)])
              ([mutant (in-list mutants-to-sample-from)]
               [id (in-range (/ CONFIG-SAMPLE-SIZE (length mutants-to-sample-from)))])
-    (define benchmark (find-mutant-benchmark mutant benchmarks-dir))
     (if (logged-progress mutant id)
         q
         (enQ-dynamic-error-checker q
                                    mutant
-                                   benchmark
                                    id
+                                   benchmarks-dir
                                    #:log-progress log-progress!
                                    #:resample resample-mutant!))))
  (log-comparison-info "Comparison complete."))
