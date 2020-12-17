@@ -37,6 +37,8 @@
 
   (define stat:bt-failures-blaming-typed-code (bt-failures-blaming-typed-code all-bts))
 
+  (define stat:blamed-sizes (summarize-blamed-sizes all-bts))
+
   (hash 'total-bt-count stat:total-bt-count
         'total-mutant-count stat:mutant-count
         'outcomes stat:outcome-counts
@@ -46,7 +48,8 @@
         'resource-limits stat:resource-limits
         '0-length-bts stat:0-length-bts
         'bt-failure-outcomes stat:bt-failure-outcomes
-        'bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code))
+        'bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code
+        'blamed-sizes stat:blamed-sizes))
 
 (define (count-outcomes bts)
   (for/hash/fold ([bt (in-list bts)]
@@ -137,6 +140,28 @@
                    bt)
                  (values outcome bt)))
 
+(define (summarize-blamed-sizes bts)
+  (for/hash/fold ([bt (in-list bts)]
+                  #:when #t
+                  [mutant (in-list (blame-trail-mutant-summaries bt))]
+                  #:when (equal? (run-status-outcome (mutant-summary-run-status mutant))
+                                 'blamed))
+                 #:combine cons
+                 #:default empty
+                 (match-define (struct* mutant-summary
+                                        ([run-status
+                                          (struct* run-status
+                                                   ([outcome 'blamed]
+                                                    [blamed blamed-mods]))]
+                                         [config config]))
+                   mutant)
+                 (define unique-blamed-mods (remove-duplicates blamed-mods))
+                 (define untyped-blamed-mods (set-intersect unique-blamed-mods
+                                                            (for/list ([{mod level} (in-hash config)]
+                                                                       #:when (equal? level 'none))
+                                                              mod)))
+                 (values (length untyped-blamed-mods) mutant)))
+
 (define (format-summary summary)
   (match-define (hash-table ['total-bt-count stat:total-bt-count]
                             ['total-mutant-count stat:mutants]
@@ -147,7 +172,8 @@
                             ['0-length-bts stat:0-length-bts]
                             ['resource-limits stat:resource-limits]
                             ['bt-failure-outcomes stat:bt-failure-outcomes]
-                            ['bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code])
+                            ['bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code]
+                            ['blamed-sizes stat:blamed-sizes])
     summary)
   (define blame-disappearances-count (length stat:blame-disappearances))
   (define runtime-err-disappearances-count (length stat:runtime-err-inference-failures))
@@ -164,6 +190,10 @@
       Total blame trails:                          @stat:total-bt-count
 
       With outcome counts:                         @(pretty-format/indent stat:outcome-counts 45)
+
+      Blamed mod list size counts:                 @(pretty-format/indent
+                                                     (summary->counts stat:blamed-sizes)
+                                                     45)
 
       # NOTE: in stack modes, the outcomes `blamed` and `runtime-error` indicate which kind of
       # error happened, but the blame always comes from the stack. So "blaming" in below stats
