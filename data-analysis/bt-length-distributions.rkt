@@ -20,12 +20,14 @@
 (define/contract (bt-length-distribution-histogram-for key data
                                                        #:normalize? normalize?
                                                        #:dump-to [dump-port #f]
-                                                       #:color-by-success? [color-by-success? #f])
+                                                       #:color-by-success? [color-by-success? #f]
+                                                       #:colors [success-colors '("green" "red")])
   ({string?
    (hash/c string? (listof blame-trail?))
    #:normalize? boolean?}
    {#:dump-to (or/c output-port? #f)
-    #:color-by-success? boolean?}
+    #:color-by-success? boolean?
+    #:colors (listof any/c)}
    . ->* .
    plot-tree?)
 
@@ -61,7 +63,7 @@
 
   (define-values {partitioner colors}
     (if color-by-success?
-        (values satisfies-BT-hypothesis? '("green" "red"))
+        (values satisfies-BT-hypothesis? success-colors)
         (values (const #t) '("blue" "white"))))
   (define trails-grouped-by-length
     (group-by trail-length trails))
