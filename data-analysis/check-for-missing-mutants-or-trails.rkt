@@ -6,7 +6,8 @@
          "read-data.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../util/debug-mutant.rkt"
-         "../runner/mutation-runner.rkt")
+         "../runner/mutation-runner.rkt"
+         "../experiment/blame-trail-data.rkt")
 
 (define (check-mutants bench-name bench-data expected-samples log-path)
   (define expected-mutants
@@ -56,7 +57,20 @@
     (displayln
      @~a{
          @bench-name Has missing blame trails.
-         There are @expected-bt-count bt roots in the db, but only @actual-bt-count bts in the data.
+         There are @expected-bt-count bt roots in the db, but only @actual-bt-count bts in the data
+         (of which @;
+             @(count
+               (compose1 expected-mutant? blame-trail-mutant-id)
+               (remove-duplicates (map (λ (bt1)
+                                         (define (normalize-mutant-summary summary1)
+                                           (struct-copy mutant-summary summary1
+                                                        [id 0]))
+                                         (struct-copy blame-trail bt1
+                                                      [mutant-summaries
+                                                       (map normalize-mutant-summary
+                                                            (blame-trail-mutant-summaries bt1))]))
+                                       (flatten (hash-values bench-data))))) @;
+             are unique)
 
          })))
 
