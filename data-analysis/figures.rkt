@@ -7,6 +7,7 @@
                   "transient-newest" "Transient last blame"
                   "transient-oldest" "Transient first blame"
                   "transient-stack-first"  "Transient exceptions"
+                  "transient-all"  "Transient all blame"
 
                   "erasure-stack-first" "Erasure"
 
@@ -15,7 +16,7 @@
 (define rename-benchmark values)
 
 ;; (usefulness-table bt-lengths-table avo-matrix)
-(define to-generate '(avo-matrix))
+(define to-generate '(bt-lengths-table avo-matrix))
 
 
 
@@ -50,7 +51,7 @@
 (make-directory* outdir)
 
 (define modes
-  '("null" "TR" "TR-stack-first" "transient-newest" "transient-oldest" "transient-stack-first" "erasure-stack-first"))
+  '("null" "TR" "TR-stack-first" "transient-newest" "transient-oldest" "transient-all" "transient-stack-first" "erasure-stack-first"))
 (define benchmarks
   '("acquire"
     "gregor"
@@ -153,15 +154,21 @@
 (when (member 'bt-lengths-table to-generate)
   (define bt-lengths-table
     (let ()
-      (define (make-length-table-cell-plot key bts-by-key
-                                           #:dump-to [dump-to #f])
+      (define (make-length-table-cell-plot mode-name)
+        (define bts-by-mutator/across-all-benchmarks
+          (get-bts-by-mutator-for-mode mode-name))
         (define histogram
-          (bt-length-distribution-histogram-for key
-                                                bts-by-key
-                                                #:dump-to dump-to
-                                                #:normalize? #t
-                                                #:color-by-success? #t))
-        (parameterize ([plot-y-ticks no-ticks]
+          (bt-length-distribution-histogram-for
+           "yes"
+           (hash "yes"
+                 (append* (hash-values bts-by-mutator/across-all-benchmarks)))
+           #:normalize? #t
+           #:color-by-success? #t
+           #:colors '((153 225 187) (255 153 153))))
+        (parameterize ([plot-x-ticks (ticks (linear-ticks-layout #:number 1)
+                                            (linear-ticks-format))]
+                       [plot-font-size 20]
+                       ;; [plot-y-ticks no-ticks]
                        [plot-y-far-ticks no-ticks])
           (plot-pict histogram
                      #:y-min 0
@@ -169,63 +176,55 @@
 
                      #:x-label #f
                      #:y-label #f
-                     #:title #f)))
+                     #:title #f
+                     #:width (if (equal? mode-name "null")
+                                 (* 2 (plot-width))
+                                 (plot-width)))))
 
       (define distributions-plots/by-mode
         (for/hash ([mode (in-list modes)])
-          (values mode
-                  (make-distributions-plots make-length-table-cell-plot
-                                            #:breakdown-by "benchmark"
-                                            #:summaries-db dyn-err-summaries-db-path
-                                            #:data-directory (build-path data-dirs mode)))))
+          (values mode (make-length-table-cell-plot mode))))
 
-      (define column-labels (map rename-benchmark benchmarks))
-      (define row-labels (map rename-mode modes))
-      (define plots
-        (for*/list ([mode (in-list modes)]
-                    [benchmark (in-list benchmarks)])
-          (scale (hash-ref (hash-ref distributions-plots/by-mode
-                                     mode)
-                           benchmark)
-                 1
-                 1)))
-
-      (define column-spacing 5)
-      (define row-spacing 15)
-      (define plain-table
-        (table/fill-missing plots
-                            #:columns (length column-labels)
-                            #:column-spacing column-spacing
-                            #:row-spacing row-spacing))
-
-      (define a-cell (first plots))
-      (define cell-width-spacer (blank (pict-width a-cell) 1))
-      (define cell-height-spacer (blank 1 (pict-height a-cell)))
       (define (make-text str)
         (match str
           [(regexp #rx"([^ ]+) (.+)" (list _ first-word other-words))
-           (vc-append (text first-word null 60)
-                      (text other-words null 60))]
+           (vc-append (text first-word null 40)
+                      (text other-words null 40))]
           [else (text str
                       null
-                      60)]))
-      (define column-label-picts
-        (apply hc-append
-               column-spacing
-               (for/list ([col (in-list column-labels)])
-                 (cc-superimpose (make-text col)
-                                 cell-width-spacer))))
-      (define row-label-picts
-        (apply vr-append
-               row-spacing
-               (for/list ([row (in-list row-labels)])
-                 (cc-superimpose (make-text row)
-                                 cell-height-spacer))))
-      (hb-append
-       (+ column-spacing 5)
-       row-label-picts
-       (vl-append column-label-picts
-                  plain-table))))
+                      40)]))
+      (define modes/ordered '("null"
+                              "TR" "transient-newest" "transient-oldest"
+                              "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
+      (define plot-labels
+        (for/list ([mode (in-list modes/ordered)])
+          (make-text (rename-mode mode))))
+      (define uniform-label-filler
+        (ghost
+         (for/fold ([pict (blank 0 0)])
+                   ([plot-label (in-list plot-labels)])
+           (cc-superimpose pict
+                           plot-label))))
+      (define plots
+        (for/list ([mode (in-list (rest modes/ordered))]
+                   [label (in-list (rest plot-labels))])
+          (vc-append 10
+                     (cb-superimpose label uniform-label-filler)
+                     (hash-ref distributions-plots/by-mode
+                               mode))))
+
+      (define column-spacing 10)
+      (define row-spacing 25)
+      (define plain-table
+        (vc-append row-spacing
+                   (vc-append 10
+                              (cb-superimpose (first plot-labels) uniform-label-filler)
+                              (hash-ref distributions-plots/by-mode "null"))
+                   (table/fill-missing plots
+                            #:columns 3
+                            #:column-spacing column-spacing
+                            #:row-spacing row-spacing)))
+      plain-table))
   (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png")))
 
 (when (member 'avo-matrix to-generate)
