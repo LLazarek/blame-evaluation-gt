@@ -99,7 +99,8 @@
                    host-utilities-path
                    host-data-path)
     (init-field [host-jobdir-path "."])
-    (field [host-jobfile-path (build-path host-jobdir-path "job.sub")])
+    (field [host-jobfile-path (build-path host-jobdir-path "job.sub")]
+           [enabled-machines '("fix" "allagash" "piraat")])
 
     (define/public (get-jobs [active? #t])
       (option-let*
@@ -152,10 +153,9 @@
                Universe = vanilla
 
                # Describe the target machine
-               Requirements = ((Machine == "fix.cs.northwestern.edu") @;
-                               @;|| (Machine == "piraat.cs.northwestern.edu") @;
-                               @;|| (Machine == "allagash.cs.northwestern.edu")
-                               )
+               Requirements = (@(string-join (for/list ([name (in-list enabled-machines)])
+                                               @~a{(Machine == "@|name|.cs.northwestern.edu")})
+                                             " || "))
 
                Rank = TARGET.Mips
                Copy_To_Spool = False
