@@ -6,7 +6,8 @@
          mutation-index-exception?
          [struct-out run-status]
          run-status/c
-         index-exceeded?)
+         index-exceeded?
+         current-mutated-program-exn-recordor)
 
 (require racket/runtime-path
          syntax/parse
@@ -27,6 +28,8 @@
                     "../configurables/blame-following/natural-blame.rkt"))
 
 (define-logger mutant-runner)
+
+(define current-mutated-program-exn-recordor (make-parameter #f))
 
 (define (mutate-module the-module mutation-index #:in the-program)
   (define mutate-benchmark (configured:mutate-benchmark))
@@ -291,6 +294,7 @@
                             }))
     (define (handle-module-evaluation-error runner-e)
       (define e (exn:fail:runner:module-evaluation-error runner-e))
+      (when (current-mutated-program-exn-recordor) ((current-mutated-program-exn-recordor) e))
       (match e
         [(? type-checker-failure?)
          ((make-status* 'type-error)
@@ -305,6 +309,7 @@
                                   e)]))
     (define (handle-runtime-error runner-e)
       (define e (exn:fail:runner:runtime-error runner-e))
+      (when (current-mutated-program-exn-recordor) ((current-mutated-program-exn-recordor) e))
       (match e
         [(? runtime-error-with-blame?)
          ((make-status* 'runtime-error)
@@ -331,6 +336,8 @@
            [exn:fail:runner:runtime?           handle-runtime-error]
 
            [exn? (λ (e)
+                   (when (current-mutated-program-exn-recordor)
+                     ((current-mutated-program-exn-recordor) e))
                    (report-unexpected-error 'run-with-mutated-module
                                             "Something has gone horribly wrong."
                                             e))])

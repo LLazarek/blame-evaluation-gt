@@ -142,7 +142,10 @@
 
   (define the-run-status
       (parameterize ([current-output-port (mutant-output-or current-output-port)]
-                     [current-error-port  (mutant-output-or current-error-port)])
+                     [current-error-port  (mutant-output-or current-error-port)]
+                     [current-mutated-program-exn-recordor
+                      (and mutant-output-path-port
+                           (λ (e) ((error-display-handler) (exn-message e) e)))])
         (run-with-mutated-module
          the-program
          the-module-to-mutate
