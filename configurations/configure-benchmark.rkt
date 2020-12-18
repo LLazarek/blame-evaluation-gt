@@ -1,6 +1,7 @@
 #lang at-exp racket
 
-(require "../util/optional-contracts.rkt")
+(require "../util/optional-contracts.rkt"
+         "../util/experiment-exns.rkt")
 (provide (contract-out
           [read-benchmark
            (path-to-existant-directory? . -> . (or/c #f benchmark/c))]
@@ -59,7 +60,7 @@
                              ['types typed])
                            file))
       (or configured-file
-          (raise-user-error
+          (raise-experiment-user-error
            'configure-benchmark
            @~a{Unable to find module in benchmark corresponding to name in config for @file}))))
   (match-define-values {(list main) others}
@@ -164,7 +165,7 @@
   (define mods (benchmark-typed bench))
   (define main (pick-file-by-name mods "main.rkt"))
   (unless main
-    (raise-argument-error
+    (raise-internal-experiment-argument-error
      'benchmark->program/no-common
      "a benchmark with standard structure (i.e. having a main module named `main.rkt`)"
      bench))

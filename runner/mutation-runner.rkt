@@ -22,6 +22,7 @@
          "../configurations/config.rkt"
          "sandbox-runner.rkt"
          "../util/program.rkt"
+         "../util/experiment-exns.rkt"
          "instrumented-runner.rkt"
          "error-extractors/extract-type-error-source.rkt"
          (prefix-in racket-contracts:
@@ -277,21 +278,23 @@
            (exn:fail:contract:blame? e)
            (contract-from-runtime? (exn:fail:contract:blame-object e))))
     (define extract-runtime-contract-error-blamed-location
+      ;; lltodo: this should really refer not to the configurable, but a common
+      ;; utility required by both
       (racket-contracts:make-extract-blamed a-program
                                             program-config
                                             format-mutant-info-for-error))
     (define (report-unexpected-error name message e)
-      (raise-user-error name
-                        @~a{
-                            @message
-                            Message:
-                            @exn-message[e]
+      (raise-experiment-user-error name
+                                   @~a{
+                                       @message
+                                       Message:
+                                       @exn-message[e]
 
-                            Context:
-                            @(pretty-format
-                              (continuation-mark-set->context
-                               (exn-continuation-marks e)))
-                            }))
+                                       Context:
+                                       @(pretty-format
+                                         (continuation-mark-set->context
+                                          (exn-continuation-marks e)))
+                                       }))
     (define (handle-module-evaluation-error runner-e)
       (define e (exn:fail:runner:module-evaluation-error runner-e))
       (when (current-mutated-program-exn-recordor) ((current-mutated-program-exn-recordor) e))
@@ -331,6 +334,10 @@
         (with-handlers
           (;; see configurables/benchmark-runner/load-pre-computed-result.rkt
            [run-status? values]
+
+           [experiment-internal-error? raise]
+           [(exn:fail:runner-wrapped? experiment-internal-error?) (compose1 raise
+                                                                            exn:fail:runner-unwrap)]
 
            [exn:fail:runner:module-evaluation? handle-module-evaluation-error]
            [exn:fail:runner:runtime?           handle-runtime-error]

@@ -3,7 +3,8 @@
 (require "../util/program.rkt"
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt"
-         "../util/read-module.rkt")
+         "../util/read-module.rkt"
+         "../util/experiment-exns.rkt")
 
 (provide (contract-out
           [unified-benchmark/c contract?]
@@ -98,7 +99,7 @@
             other-parts)
        other-parts]
       [else
-       (raise-argument-error
+       (raise-internal-experiment-argument-error
         'unify-module-for-running
         "a module from a benchmark (ie conforming to standard benchmark structure)"
         a-mod)]))

@@ -7,12 +7,11 @@
          racket/runtime-path
          syntax/parse
          (prefix-in db: "../../db/db.rkt")
-         "../../db/util.rkt"
          "../../util/program.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/read-module.rkt"
          "../../util/path-utils.rkt"
-         "instrument-module.rkt")
+         "../../util/experiment-exns.rkt")
 
 (provide (contract-out
           [instrument-module module-instrumenter/c]
@@ -53,7 +52,7 @@
        (thunk (read-module/port (current-input-port)
                                 #:source (mod-path a-mod))))]
     [else
-     (raise-user-error
+     (raise-experiment-user-error
       'instrument-module:type-with-transient
       @~a{
           Invalid special case found in special cases db @;

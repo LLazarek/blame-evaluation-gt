@@ -4,11 +4,9 @@
          (prefix-in db: "../../db/db.rkt")
          "../../util/optional-contracts.rkt"
          "../../configurations/configure-benchmark.rkt"
-         "make-bt-root-sampler.rkt"
+         "../../util/experiment-exns.rkt"
          racket/format
          racket/function
-         racket/match
-         racket/random
          racket/runtime-path)
 
 (provide (contract-out [make-bt-root-sampler make-bt-root-sampler/c]
@@ -35,7 +33,7 @@
     (hash-ref pre-selected-roots-by-mutant mutant))
   (λ (n)
     (unless (= n (length pre-selected-roots))
-      (raise-user-error
+      (raise-experiment-user-error
        'pre-selected:make-bt-root-sampler
        @~a{
            Got a request for @n samples but there are @(length pre-selected-roots) @;

@@ -6,13 +6,15 @@
          exn:fail:runner:runtime?
          exn:fail:runner:runtime-error
 
+         exn:fail:runner-wrapped?
+         exn:fail:runner-unwrap
+
          run-with:require)
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
          "modgraph.rkt"
          "../util/program.rkt"
-         "../util/path-utils.rkt"
          "../util/optional-contracts.rkt")
 
 (define (module-path-resolve mod-path [load? #f])
@@ -139,6 +141,20 @@
           (make-result ns result)))))
 
   run)
+
+(define (exn:fail:runner-unwrap wrapped-e)
+  (match wrapped-e
+    [(? exn:fail:runner:module-evaluation?)
+     (exn:fail:runner:module-evaluation-error wrapped-e)]
+    [(? exn:fail:runner:runtime?)
+     (exn:fail:runner:runtime-error wrapped-e)]))
+(define (exn:fail:runner-wrapped? inner-exn-pred)
+  (λ (wrapped-e)
+    (match wrapped-e
+      [(or (? exn:fail:runner:module-evaluation?)
+           (? exn:fail:runner:runtime?))
+       (inner-exn-pred (exn:fail:runner-unwrap wrapped-e))]
+      [else #f])))
 
 (module+ test
   (require ruinit)

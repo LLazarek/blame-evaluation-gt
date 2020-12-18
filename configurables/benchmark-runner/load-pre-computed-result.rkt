@@ -40,7 +40,7 @@
                    _ ...)
        (raise result)]
       [else
-       (raise-user-error
+       (raise-experiment-user-error
         'benchmark-runner:load-pre-computed-result
         @~a{
             No pre-computed result found in db @(pre-computed-results-db) @;
