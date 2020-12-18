@@ -2,9 +2,7 @@
 
 (require (prefix-in db: "../db/db.rkt")
          "../mutation-analysis/mutation-analysis-summaries.rkt"
-         "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
-         "../configurables/configurables.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
          "../process-q/interface.rkt"
@@ -31,7 +29,8 @@
 
 (define (enQ-dynamic-error-checker q mutant id benchmarks-dir
                                    #:log-progress log-progress!
-                                   #:resample resample-mutant!)
+                                   #:resample resample-mutant!
+                                   #:resampled? [this-checker-has-been-resampled? #f])
   (define benchmark (find-mutant-benchmark mutant benchmarks-dir))
   (define max-configuration (make-max-bench-config benchmark))
   (define (random-configuration)
@@ -50,6 +49,7 @@
      @~a{
          @mutant [@id] enQing checker attempt @retry-count / @CONFIG-SAMPLE-MAX-RETRIES @;
          with modes-to-check @(map basename modes-to-check)
+         Queue state: [A: @(process-Q-active-count q), W: @(process-Q-waiting-count q)]
          })
     (cond [(> retry-count CONFIG-SAMPLE-MAX-RETRIES)
            (log-comparison-info @~a{Ran out of retries for @mutant, trying to resample...})
@@ -58,7 +58,8 @@
              [new-mutant
               (enQ-dynamic-error-checker q new-mutant id benchmarks-dir
                                          #:log-progress log-progress!
-                                         #:resample resample-mutant!)])]
+                                         #:resample resample-mutant!
+                                         #:resampled? #t)])]
           [else
            (define a-config (random-configuration))
            (process-Q-enq q
@@ -72,7 +73,18 @@
                                modes-to-check
                                results-so-far
                                retry-count)
-    (define this-mode (first modes-to-check))
+    (define-values {this-mode mode-to-run configuration-to-run}
+      (match (first modes-to-check)
+        [(and (== erasure-config-path)
+              erasure-mode)
+         ;; There should never be a type error since we're only doing racket ctc violations
+         ;; So we can just run the untyped config under Natural
+         (values erasure-mode
+                 natural-config-path
+                 (for/hash ([mod (in-hash-keys max-configuration)])
+                   (values mod 'none)))]
+        [another-mode
+         (values another-mode another-mode run-configuration)]))
     (thunk
      (define (will current-q info)
        (define outcome (extract-outcome (process-info-data info)
@@ -94,7 +106,7 @@
                @~a{
                    @mutant [@id] That's the last mode, done!
                    })
-              (log-progress! mutant id (list results+outcome run-configuration))
+              (log-progress! mutant id (list results+outcome run-configuration this-checker-has-been-resampled?))
               current-q]
              [(list* _ more-modes-to-check)
               (log-comparison-info
@@ -108,17 +120,29 @@
 
      (define configured-benchmark
        (configure-benchmark benchmark
-                            run-configuration))
+                            configuration-to-run))
      (define outfile (make-temporary-file @~a{@(benchmark->name benchmark)-~a}
                                           #f
                                           (working-dir)))
+     (log-comparison-debug
+      @~a{
+
+          Calling spawn-mutant-runner for mutant @mutant in @(basename this-mode) with
+          @(pretty-format
+            (list (list 'configure-benchmark benchmark run-configuration)
+                  (mutant-module mutant)
+                  (mutant-index mutant)
+                  outfile
+                  mode-to-run))
+
+          })
      (define ctl
        (parameterize ([mutant-error-log outfile])
          (spawn-mutant-runner configured-benchmark
                               (mutant-module mutant)
                               (mutant-index mutant)
                               outfile
-                              this-mode)))
+                              mode-to-run)))
      (log-comparison-info
       @~a{
           @mutant [@id] checker attempt @retry-count / @CONFIG-SAMPLE-MAX-RETRIES @;
@@ -275,14 +299,16 @@
              new-mutant]))))
 
  (process-Q-wait
-  (for*/fold ([q (make-process-Q process-limit)])
-             ([mutant (in-list mutants-to-sample-from)]
-              [id (in-range (/ CONFIG-SAMPLE-SIZE (length mutants-to-sample-from)))])
-    (if (logged-progress mutant id)
+  (for/fold ([q (make-process-Q process-limit)])
+            ([mutant (in-list mutants-to-sample-from)]
+             [mutant-id-number (in-naturals)]
+             #:when #t
+             [config-number (in-range (/ CONFIG-SAMPLE-SIZE (length mutants-to-sample-from)))])
+    (if (logged-progress mutant config-number)
         q
         (enQ-dynamic-error-checker q
                                    mutant
-                                   id
+                                   (cons mutant-id-number config-number)
                                    benchmarks-dir
                                    #:log-progress log-progress!
                                    #:resample resample-mutant!))))
