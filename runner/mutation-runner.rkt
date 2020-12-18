@@ -28,12 +28,14 @@
          (prefix-in racket-contracts:
                     "../configurables/blame-following/natural-blame.rkt"))
 
-(define-logger mutant-runner)
+(define-logger mutation-runner)
 
 (define current-mutated-program-exn-recordor (make-parameter #f))
 
 (define (mutate-module the-module mutation-index #:in the-program)
   (define mutate-benchmark (configured:mutate-benchmark))
+  (log-mutation-runner-info
+   @~a{Mutating module @the-module @"@" @mutation-index using configured mutator @mutate-benchmark})
   (syntax-parse (mod-stx the-module)
     #:datum-literals [module]
     [(module name lang {~and mod-body (mod-begin body ...)})
@@ -116,7 +118,7 @@
                                           "~v not found in ~v"
                                           path
                                           mod-paths/write-to))))
-      (log-mutant-runner-debug "writing module configuration for ~a to ~a"
+      (log-mutation-runner-debug "writing module configuration for ~a to ~a"
                                (find-relative-path base-path path)
                                new-path)
       (make-parent-directory* new-path)
@@ -161,6 +163,11 @@
 
   (define configured-instrumenter (configured:instrument-module))
   (define make-configured-runner (configured:make-benchmark-runner))
+
+  (log-mutation-runner-info
+   @~a{Constructing mutated-program-runner with
+                    configured instrumenter: @configured-instrumenter
+                    make-configured-runner:  @make-configured-runner})
 
   (define runner
     (make-instrumented-runner
@@ -241,6 +248,7 @@
                                    #:on-module-exists on-module-exists
                                    #:mutator mutate))
     (define ((make-status* status-sym) [blamed #f] [result #f])
+      (log-mutation-runner-debug @~a{Making run-status with outcome @status-sym blaming @blamed})
       (make-status status-sym
                    blamed
                    mutated-id))
@@ -250,6 +258,10 @@
                                  mutation-index)))
     (define make-extract-blamed (configured:make-extract-blamed))
     (define make-extract-runtime-error-location (configured:make-extract-runtime-error-location))
+    (log-mutation-runner-info
+     @~a{Making configured blamed and runtime-error location extractors with
+                make-extract-blamed: @make-extract-blamed
+                make-extract-runtime-error-location: make-extract-runtime-error-location})
     (define extract-blamed
       (make-extract-blamed a-program
                            program-config
@@ -297,6 +309,8 @@
                                        }))
     (define (handle-module-evaluation-error runner-e)
       (define e (exn:fail:runner:module-evaluation-error runner-e))
+      (log-mutation-runner-info
+       @~a{Run raised a module evaluation error with message: @(exn-message e)})
       (when (current-mutated-program-exn-recordor) ((current-mutated-program-exn-recordor) e))
       (match e
         [(? type-checker-failure?)
@@ -312,6 +326,10 @@
                                   e)]))
     (define (handle-runtime-error runner-e)
       (define e (exn:fail:runner:runtime-error runner-e))
+      (log-mutation-runner-info
+       @~a{Run raised a runtime error with message: @(exn-message e)})
+      (log-mutation-runner-debug
+       @~a{Is it an internal error? @(experiment-internal-error? e)})
       (when (current-mutated-program-exn-recordor) ((current-mutated-program-exn-recordor) e))
       (match e
         [(? runtime-error-with-blame?)
@@ -350,6 +368,7 @@
                                             e))])
           (run)
           ((make-status* 'completed)))))
+    (log-mutation-runner-info @~a{Running handled run thunk with limits})
     (run-with-limits run/handled
                      #:timeout/s timeout/s
                      #:timeout-result (make-status* 'timeout)
