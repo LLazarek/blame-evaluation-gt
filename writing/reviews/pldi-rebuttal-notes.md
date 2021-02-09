@@ -684,6 +684,7 @@ L1017: "33%" ==> "26%" ?
 
 L1304: "Problem is ...."
 
+chrdimo: Thank you. We will fix these. 
 
 
 Review #66E
