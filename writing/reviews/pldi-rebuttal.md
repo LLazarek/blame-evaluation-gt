@@ -1,10 +1,8 @@
 PLDI 2021 Paper #66 Author Response
 ===========================================================================
 
-First of all, we thank all of the reviewers for reading our submission, asking
-critical questions, and offering constructive feedback. Our responses to all
-comments and questions follow, in which we quote each comment/question and then
-respond below.
+Thank you to al reviewers for the helpful feedback. 
+critical questions, and offering constructive feedback. Our rebuttal combines each comment/question with a response.
 
 
 Review #66A
