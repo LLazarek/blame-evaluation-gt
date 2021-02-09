@@ -3,6 +3,8 @@ Response notes format: indented after ⟶ or TODO.
 
 chrdimo notes format: unindented after chrdimo.
 
+addressed: marks todos that have answers in `pldi-rebuttal.md`
+
 
 
 PLDI 2021 Paper #66 Reviews and Comments
@@ -106,6 +108,7 @@ Points against:
 	...
 	We will extend the discussion at the start of section 4 to clarify this point.
 
+  addressed
   TODO: Rewrite response along these lines...
     A common mutator in the literature is swapping constants of the same type, but this is not a good mutator for us because type system can't catch it.
 	Example of an obviously bad mutator: replacing any string with some pre-defined non-empty string (e.g. "foobar") would be a bad mutator.
@@ -207,6 +210,7 @@ chrdimo: Sure. Each CPU has 28 double cores.
 
 - L991: Figure 6: It took me some time to understand the figure. I wonder if
   there is a better way to represent the same data?
+  addressed
   TODO: come up with some thoughts for this figure
   ⟶ Thanks, we can see how it's difficult to read. We will consider some different presentations, such as...
     - a bunch of two-sided bar charts? Where there's one bar pair per pair of modes. Above the x-axis is % A > B, and below the axis is % B > A?
@@ -272,6 +276,7 @@ Natural for a particular kind of bugs for some reason? Also, can there
 be a new blame strategy that outperforms both Transient and Natural
 all the time?
 
+  addressed
   TODO: Response idea: This is an example where the experiment seems to contradict the theory.
 	The models don't include all of the features in the benchmarks. <enumerate them here> It's possible that the Natural, Transient theories don't scale as expected to rich PL features.
 	Make analogy to physics: theory makes predictions, we have found failures of the predictions. We have two courses of action: report the inconsistency to re-eval the theory, and do more experiments.
@@ -302,6 +307,7 @@ the precision of type annotations in a fine-grained way with the Dyn
 type rather than distinguishing typed and untyped modules. Would the
 same evaluation method be able to directly appliable to blame in such systems?
 
+  addressed
   TODO: The answer is yes, but this needs more thought to frame the answer the right way.
   ⟶ Our evaluation framework should be directly applicable to blame in gradual typing systems using Dyn.
     The details of how it applies depends on the granularity of the blame information offered by the system -- in other words, what the system considers components.
@@ -354,6 +360,7 @@ distributions. Based on this reasoning, it is unclear why the
 distribution is a normal distribution. This point does not affect the
 contribution of the paper, but it is not clear from the paper.
 
+  addressed
   TODO: response sketch: you're right, we misspoke, this is not the normal distribution; our reasoning for why the normal-ish shape of distribution we see makes sense is that given a fixed trail the probability at each step of the trail ending is 1/n, but we randomly select trails so we're multiplying the random distribution of trail lengths by that 1/n one? Not clear on the details of this reasoning.
   ⟶ 
 
@@ -406,6 +413,7 @@ This is a neat paper that develops an approach for evaluating gradual typing and
 
 But while there is a lot to like about the paper, it also has some shortcomings. The suite of programs used for the evaluation is fairly small (c.f., the SIGPLAN checklist).
   
+  addressed
   TODO: respond to this ^, saying that we use the standard suite of benchmarks for evaluating GT -- point to Ben's POPL paper and others, and we use all of the largest benchmarks in the suite
 
 chrdimo: Coupld you please clarify what you mean by fairly small with
@@ -418,6 +426,7 @@ features and structure.
 
 The faults are introduced using synthetic mutations that may or may not correspond to the kinds of errors that arise in practice. This can be seen from the results in Figure 7 -- the lengths of the "trails" is quite small.
 
+  addressed
   TODO: unclear that syntheticness relates to trail length at all, and synthetic bugs are the only option here -- there is no corpus of documented GT bugs in the wild anywhere. Indeed, most type errors never even make it into code repositories. Note that we are the first to evaluate blame in this setting.
 
 chrdimo: There is no exisitng catalogue of bugs in gradually typed
@@ -431,6 +440,7 @@ diverse set of bugs.
 While the study is mostly well done, it only considers two blame assignment strategies.
 For example, it would be interesting to consider the "omniscient programmer" to get a bound on the value of blame. But this is not done.
 
+  addressed
   TODO: We don't understand what is meant by "omniscient programmer", but our best understanding is the ideal oracle strategy that always picks the right module right away and thus always finds the bug in one step. We didn't show this because it's trivial. We do have other baselines to understand blame's performance: the random mode, and the exceptions modes for each of the semantics.
 
 chrdimo: Could you please explain what you mean by "omniscient
@@ -447,6 +457,7 @@ systems.
 
 And unfortunately the results are inconclusive -- Section 8 says "our results call for a deeper understanding of the two models for blame".
 
+  addressed
   TODO: This is what makes our results surprising: they challenge the theoretical conclusions that Natural is superior to Transient, suggesting that the theory is not good enough to understand the pragmatics of blame in reality.
 
 
@@ -459,6 +470,7 @@ Thus a side-effect of our experiment is a call to theoriticians for models
 that are atuned with practice. 
 
 Also, the published Transient scheme seems to have a minor bug, which might affect the outcomes when fixed (Section 8.2).
+  addressed
   TODO: 8.2 does not indicate a bug in Transient, but rather a defect in the design of the system. ... something about a gap between Reticulated Python and 
 
 chrdimo: Section 8.2 does not discuss a bug in Transient but rather a
@@ -484,6 +496,7 @@ Furthermore the exception modes serve as further ``controls'' to
 distinguish the effect fo checks from that of blame, 
 
 Similarly, I wondered why the modes of the transient programmer only consider picking the first/last blame, and not other choices. Section 5.2 just says "our answer" is that there are at least "two reasonable options." Why are other choices not reasonable?
+  addressed
   TODO: Answer suggested by Ben: it's unspecified how one should interpret Transient blame, and there isn't time to evaluate all possible choices, so we pick the most reasonable interpretations.
 
 
