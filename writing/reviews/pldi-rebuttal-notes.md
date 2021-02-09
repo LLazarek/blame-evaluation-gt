@@ -718,6 +718,26 @@ About Erasure: if I'm reading this correctly, the key thing here is that in Type
 
 It's interesting to note that there seems to be no convincing analogous experimental or modelling-based justification for plain old static typing, i.e. showing that it somehow presents a net gain to the programmer. Rather, this has simply been posited/assumed by a very long line of work. I am not defending that state of affairs, but it points to the difficulty of showing conclusively that something truly helps programmers. I can see value in this sort of simulation-style approach, and it is no less convincing than user studies. So I'd be interested to hear from the author(s) if they have any more arguments that (1) I've underestimated the results' conclusiveness, or (2) this is a novel/interesting family of methods that might be pursued more widely, or (3) that deeper experiments building on these ideas might yield more compelling insights.
 
+  mf: As posed, the question expresses a significant mis-characterization of
+	  the submission. It is not the benefits of a gradual type system that
+	  are in doubt. The experimental setup keeps the type system constant
+	  but allows to answer the question which of several run-time checking
+	  regimes (for enforcing type consistency) provides the best explanatory
+	  messages in case of violations.
+	  Hence the analogous question for purely static type systems would ask
+	  which of several reporting schemes provides the best explanatory
+	  message for type-errors. In the case of simply typed languages and
+	  even language with local type inference, this question is basically
+	  meaningless. In the case of languages with HM type inference, the
+	  question has been implicitly raised for four decades with the
+	  development of alternative ways of finding the source of inference
+	  conflicts.
+	  If the reviewer is indeed interested in the question of whether type
+	  systems help programmers---a question that this submission does _not_
+	  ask---the recent OOPSLA literature contains several user studies. A
+	  simple Google query will suggest a short list of these publications.
+
+
 Detailed comments:
 
 In the title, "evaluating blame" reads oddly. It is ambiguous, because "evaluate" sometimes means to compute a result. A fuller phrase, like "evaluating the usefulness of blame tracking...", would probably be worth the words.
