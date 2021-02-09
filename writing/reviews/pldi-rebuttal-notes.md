@@ -580,6 +580,7 @@ that the experiments are developed and run in the context of the
 large, real-world Racket ecosystem, I wonder whether about the chance
 of incidental implementation choices or bugs affecting this result.
 
+  addressed
   TODO: We should clarify that checks alone is faster, but adding blame is slower (bc blame map is linear).
 
 chrdimo: A side note here: Transient Typed Racket is faster than Natural
@@ -604,6 +605,7 @@ to see a concise formalism with clear "knobs" for choosing between
 blame assignment strategies. Trying to imagine readers with less
 familiarity, I wonder how well this discussion serves as a primer.
 
+  addressed
   TODO: this is a minor part of the paper (not a result), there is a large gap between the model and what's needed to scale to a full lang -- it's not clear from the simple model how to design check insertion and blame tracking for new features. This required research, will be published elsewhere
 
 
@@ -676,6 +678,7 @@ These also seem to be overemphasized. The main design choice seems to
 be in how to use Transient blame, which reports multiple components,
 and picking the first and last are pretty intuitive.
 
+  addressed
   TODO: the analytical part is important: we described all of these things in a common framework, allowing for comparison
 
 I'm also not sure why the exception mode is needed in addition to
@@ -683,6 +686,7 @@ Erasure (I was confused in Section 2 L204-215 and Section 5.1 L732).
 Indeed, Section 5.3 defines the Erasure mode the follow the Natural
 exceptional mode.
 
+  addressed
   TODO: the exception modes are a key part of the analysis framework, enabling understanding of the value of blame separately from checking
 
 chrdimo:
