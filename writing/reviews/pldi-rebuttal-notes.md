@@ -704,63 +704,95 @@ Paper summary
 This paper seeks to establish (or refute) the benefit of blame tracking in gradually typed programming environments. It takes several Typed Racket benchmarks and considers multiple approaches to blame tracking. The central idea is to use a fault injection method to create variant programs along two dimensions: type errors inserted according to some crafted heuristics, and static typing selectively removed on a component-by-component granularity. This creates a large number of variant programs which may produce run-time type errors with blame; this is then iterated to simulate a "rational programmer", i.e. such that blame is used to select where more static checking will be added next; at any given iteration this may or may not catch the injected error, and the number of iterations is counted as a proxy for effort. A further contribution is implementing the different forms of blame-tracking in the same framework so that they can be compared. The finding is that blame is found to offer some positive advantage in effort (over simply being guided by the stack trace of a run-time exception) in 9--13% of the initial sample of variants, with some minor differences between the forms of blame tracking tried.
 
   TODO: misunderstanding: we propose a methodology
+  ⟶ The primary intended contribution of this paper is the methodology, and the experimental results serve as secondary contributions that validate the methodology's utility.
+    We will rephrase the introduction to further emphasize that focus.
+	Furthermore, we would like to emphasize that the two key findings in the experimental results are that 1) both Natural and Transient's dynamic type enforcement with blame tracking improve significantly over Erasure, and 2) Natural's blame tracking is not significantly better than Transient's, despite the theoretical indications to the contrary.
 
 Comments for author
 -------------------
 I commend the authors for asking the question. Their method is clearly the product of much careful thought. I understand the difficulty in doing experiments about errors that tend not to hit 'real' source code repositories, and I appreciate the effort taken to re-create the different approaches to blame in a comparable setting.
 
 However, I don't find the results to be as conclusive as the authors state. Aside from the Erasure case, whose relevance I found unclear (see below), conclusions rest on some small-valued "more useful than" percentages. These are pretty hard to interpret, because the "usefulness" metrics necessarily build in a lot of simplifying assumptions. E.g. in 5.4, the "percentage of scenarios where ... is more effective" doesn't account for *extent* of difference, and the trail-length "programmer effort" metric in 5.5 is also unlikely to be a great proxy. These limitations are understandable, method-wise, but overall the results are fairly null... they let us continue believing "what we'd expect" but not with any great sense of added confidence. That doesn't entirely diminish the work, of course, but I'd say the current write-up overplays its hand a little. I appreciate the discussion of threats to validity.
+
   TODO: misunderstanding: the results are not at all "what we'd expect" based on the theory
+  ⟶ The status quo of what we would expect based on the current theory of Natural and Transient is that 1) either kind of blame tracking should be better than none, and 2) Natural should provide significantly better blame information than Transient and Erasure.
+    Our results validate the first expectation that blame provides benefits over plain exceptions.
+    Surprisingly, our results contradict the second expectation and suggest that in fact Natural and Transient offer comparable blame information.
+
 
 The presentation of the results is very much around aggregates and summaries. Indeed the whole method is about having run a huge compute job over a large number of variants. Perhaps it's paranoia but I'd be interested to see some specific examples walked through by hand (in the paper) and some smaller sample manually classified (as results). That would add an extra sanity check that the metrics do correspond to some meaningful reality.
 
 About Erasure: if I'm reading this correctly, the key thing here is that in Typed Racket, the set of static types is more expressive than the set of dynamic types. For example, there is a static notion of non-negative integer that is distinct from plain integer. This sort of design isn't universal -- in some languages/systems static types closely mirror the classification of objects in the language's dynamic semantics. Writing these stricter contracts into a program brings its own benefits, separate from blame or indeed from static checking. It feels like the paper doesn't take enough care to distinguish the two effects: the effect of systematically applying more refined contracts over program values, and the effect of gradually enabling static checking of those contracts (iteratively, guided by blame). The authors do mention this around line 204, and the comparisons in Figure 6 between "_ exceptions" and "Erasure" seem to be measuring this -- the gain from checking these extra annotations, with the more precise and/or more timely checks that they imply, relative to the erased case where only the language baseline contracts are checked. Indeed that's the point of 'exception' experiments. Since the biggest effect sizes on display are these ones -- between Erasure and anything else -- this seems at best distracting. I'd be glad to hear from the authors if I'm misunderstanding anything here. In the detailed comments below, I have noted some places in the text where it would be useful to remind the reader that this design property of Typed Racket is at play.
 
+  TODO: misunderstanding about gradual typing as a whole, and the point of the exception modes
+  ⟶ The idea of the Erasure semantics is not related to the expressiveness of the type system or how the types relate to kinds of runtime values.
+    Rather, the key idea is that Erasure does not enforce type annotations with dynamic checks at all.
+	Running a gradual program using the Erasure semantics is the same as stripping all annotations and running the resulting (completely dynamic) program.
+	Thus, Erasure programs can only raise exceptions from either the checks performed by the language's primitive operations (e.g. `+`), or from the program itself raising an exception.
+	In contrast, the other two semantics do enforce type annotations dynamically; both Natural and Transient insert dynamic checks verifying that the shape of values at runtime match their static annotations.
+	Thus, in addition to exceptions, gradual programs using these semantics may raise a second kind of error: a dynamic type check failure.
+	These dynamic errors can include blame information if the dynamic type checks are designed to track blame, or they can forego blame and just offer a stack trace.
+	In the case of Natural, these two options are captured by the "Natural" and "Natural exceptions" modes, respectively.
+	Thus the "Erasure" mode represents a completely different kind of checking (and thus error reporting) compared to both the "Natural" and "Natural exceptions" modes (the two of which share the same kind checking, but different error reporting).
+
+
 It's interesting to note that there seems to be no convincing analogous experimental or modelling-based justification for plain old static typing, i.e. showing that it somehow presents a net gain to the programmer. Rather, this has simply been posited/assumed by a very long line of work. I am not defending that state of affairs, but it points to the difficulty of showing conclusively that something truly helps programmers. I can see value in this sort of simulation-style approach, and it is no less convincing than user studies. So I'd be interested to hear from the author(s) if they have any more arguments that (1) I've underestimated the results' conclusiveness, or (2) this is a novel/interesting family of methods that might be pursued more widely, or (3) that deeper experiments building on these ideas might yield more compelling insights.
 
-  mf: As posed, the question expresses a significant mis-characterization of
-	  the submission. It is not the benefits of a gradual type system that
-	  are in doubt. The experimental setup keeps the type system constant
-	  but allows to answer the question which of several run-time checking
-	  regimes (for enforcing type consistency) provides the best explanatory
-	  messages in case of violations.
-	  Hence the analogous question for purely static type systems would ask
-	  which of several reporting schemes provides the best explanatory
-	  message for type-errors. In the case of simply typed languages and
-	  even language with local type inference, this question is basically
-	  meaningless. In the case of languages with HM type inference, the
-	  question has been implicitly raised for four decades with the
-	  development of alternative ways of finding the source of inference
-	  conflicts.
-	  If the reviewer is indeed interested in the question of whether type
-	  systems help programmers---a question that this submission does _not_
-	  ask---the recent OOPSLA literature contains several user studies. A
-	  simple Google query will suggest a short list of these publications.
+  ⟶ (Matthias) As posed, the question expresses a significant mis-characterization of
+    the submission. It is not the benefits of a gradual type system that
+	are in doubt. The experimental setup keeps the type system constant
+	but allows to answer the question which of several run-time checking
+	regimes (for enforcing type consistency) provides the best explanatory
+	messages in case of violations.
+	Hence the analogous question for purely static type systems would ask
+	which of several reporting schemes provides the best explanatory
+	message for type-errors. In the case of simply typed languages and
+	even language with local type inference, this question is basically
+	meaningless. In the case of languages with HM type inference, the
+	question has been implicitly raised for four decades with the
+	development of alternative ways of finding the source of inference
+	conflicts.
+	If the reviewer is indeed interested in the question of whether type
+	systems help programmers---a question that this submission does _not_
+	ask---the recent OOPSLA literature contains several user studies. A
+	simple Google query will suggest a short list of these publications.
 
 
 Detailed comments:
+
+  TODO ll: added responses to anything below that seems to warrant more than "Thanks, we'll fix it".
 
 In the title, "evaluating blame" reads oddly. It is ambiguous, because "evaluate" sometimes means to compute a result. A fuller phrase, like "evaluating the usefulness of blame tracking...", would probably be worth the words.
 
 The abstract doesn't say much about the work. It would be better written for experts to quickly gather an overview what the paper contributes.
 
 Conversely, the main body of the paper skimps a bit on background. It never explicitly covers what "blame" means and how it works in practice. Similarly, it repeatedly talks about "impedance mismatches" without defining them. Perhaps this phrase is now standard in the gradual typing literature, which I haven't kept up with (hence my Z expertise). But I did read the Wadler/Findler paper carefully at the time. It did not talk about impedance mismatches. In any case, it is a fuzzy metaphor... please say exactly what it means here.
+  ⟶ We will adjust the prose to more explicitly describe blame and impedance mismatches.
 
 line 34: "then their compilers remove types and rely on the built-in safety checks of the underlying language to catch any problems". This reads oddly in context. Didn't they just do a bunch of static checking? So they are *not* relying just on dynamic checks to catch problems? Maybe there is something more accurate to say here... e.g. no dynamic check is removed, or something like that.
 
+  ⟶ The static checking performed by languages using the Erasure semantics (like Flow, Hack, and TypeScript) is done in a best-effort fashion; the fact that a program passes type checking has absolutely no effect on how the program runs.
+    These languages literally erase the types to obtain a program of the underlying language (e.g. TypeScript or PHP) to run.
+	Those underlying languages perform all of the dynamic checks that a typical dynamic language performs for primitive operations (e.g. that `+` is only used with numbers).
+
 line 38: "explicit statement and challenge" -- what is it?
+  ⟶ The challenge questions whether blame is useful at all in gradual typing.
+    We will clarify this in the prose.
 
 line 49: I agree they got the word wrong, but you should explain this
 
 line 60: around this paragraph the writing started to grate. There's no need to generalise about what people do or think, and the "As a matter of fact... simply..." style is somewhere between laboured and patronising. It's better to more plainly state the gap in the literature that you're addressing. Throughout the paper, much space could be saved by writing in a more direct style.
+  ⟶ Noted, we will simplify the language where possible.
 
 line 69: be explicit that Lazarek et al were (as I later gathered) doing something about blame to do with higher-order contracts but not gradual types
 
 line 70: what does it mean to "follow" the slogan? Was unclear to me.
+  ⟶ The following sentences are meant to explain this, so we will adjust the prose to make that clear.
 
 line 90: at first I wondered: what is a case? Maybe say "program variant" to foreshadow the idea of generating mutants etc?
 
 line 91-ish: "Transient, "Natural", "Erasure" -- be explicit that these are names that *you* are introducing
+  ⟶ These are names from the Gradual Typing literature (see for instance [9, 10, 37]).
 
 line 94: "forego" => "forgo"
 
@@ -785,40 +817,57 @@ line 211: "languages exceptions" typo
 line 268: this explanation of the workings of proxies seemed overwrought
 
 line 277: what is "responsibility" of a "party", exactly? Are "party", "module" and "component" all the same things?
+  ⟶ Components are parties, and in the case of Typed Racket modules are components because they are the units of migration. Other gradual type systems, like those that do not require annotated entire modules, may consider smaller units of code (e.g. definitions) as components.
+    We will clarify this in the prose.
 
 line 283: "rewrites typed modules to inline checks" -- so a module gets turned into a check? Clearly not, but that's how it reads
 
 line 293: I was wondering what constitutes a boundary crossing. Clearly, passing by function call or return crosses from the caller's module to the callee's. What about values exchanged through reads/writes to shared state?
+  ⟶ Yes, communicating a value via state also constitutes a boundary crossing.
+    We will clarify what a boundary crossing is in the prose.
 
 line 299: "crosses" => "crossings" (probably)
 
 line 313: it threw me that a program might not fail but "produce a wrong result". If it could be caught by the gradual type system, why can't it be caught at run time? My best get at explaining this is by what I wrote above, i.e. it's a consequence of Typed Racket's more refined static notion of type. In certain other systems this wouldn't be possible, because the static checker would only catch (albeit earlier) errors that would be caught at run time, so there would be no basis to call the result "wrong".
+  ⟶ The result can be wrong in that it doesn't agree with the annotations (which we assume express programmer intent), even if none of the primitive operations applied to the result raise an error.
+    For example, imagine the the client saves the result to a file.
+    The language primitives for writing values to a file (typically) can write any kind of value to a file, so they have no checks that could fail due to the result being of the wrong type.
+    Instead, the resulting file just ends up with the incorrect contents and the program terminates normally.
 
 lien 352: "three interpretations" -- what are they? I don't see them in the figure.
 
 line 380: from this I inferred that "migratory typing" means "gradual typing applied at modulewise granularity". Assuming that's correct, it's worth saying directly.
+  ⟶ The three choices of using Dyn, the granularity of components, and how compilation affects completely untyped components represent orthogonal aspects of the design of a Gradual Typing system.
+    In the case of Typed Racket's migratory typing, those three choices amount to more than just applying the ideas of [21] at the granularity of modules.
 
 line 421: "type mistake" -- does this mean "feasible run-time type error"?
+  ⟶ Could you clarify what a makes a runtime type error "feasible"?
 
 line 424: "fully typed correct programs" -- presumably your method could also work with not-yet-fully-typed correct programs, just not ranging over the entire lattice in those cases. I was wondering whether that might give different/interesting results.
+  ⟶ Yes, the approach could be applied, but the results may be mostly inconclusive depending on how many trails reach the point where the blamed component lacks type informtion.
+    All trails that reach that point provide no useful information.
 
 line 433: "without loss of diversity" -- this is glib. Clearly diversity is lost; just claim that what remains is still diverse enough.
 
 line 497: "truthiness" needs explaining
 
 line 517: the difference between #1 and #2 here again relies on the surprising property (to the unfamiliar) that Typed Racket has a notion of "type-level mistake" that doesn't surface under erasure (as an exception or whatever) but also is not a false positive (i.e. you're not talking about conservativeness of static checking). Line 538's "unavoidable" claim is probably also true only in such a context.
+  TODO: Don't respond to this in light of above explanation(s) of why they misunderstand erasure and TR?
 
 line 519: "at least three" -- better to claim this is only two here, then explain later that the driver doesn't count. Mentioning "three" up-front just raises an unnecessary question in the reader's mind.
 
 line 634: earlier I had inferred that the distinction between "migratory" and "gradual" was more than just preferring one word; this seems to contradict that
 
 line 640: what makes it "concise"?
+  TODO ll: Why does it? I'm not sure about the word here either. Just say we'll change it?
 
 line 673: "programmers runs" typo
 
 line 727: "dubbed" -- reads oddly. Maybe italicise the "location", but it seems overkill. The phrase is pretty self-suggesting as it is.
 
 line 756: "checked the value's type.." -- and the check passed!?
+  ⟶ Indeed, Transient checks only check the top-level type constructor of a value, so many checks can pass for a bad value before it is unwrapped to discover the problem.
+    We will add a reminder of this fact to the prose here.
 
 line 752: "added to the blame set first" -- should it be a blame list, then?
 
@@ -827,5 +876,8 @@ line 936: no need for hyphen after the adverb
 line 966: "more useful C" -- missing "than"
 
 line 982: don't think these percentages deserve 3 significant figures
+  TODO: "deserve"?
+  ⟶ We include the hundreths place to highlight in particular that Transient first and last blame are not exactly the same.
+    If this information isn't useful, we can use just the tenths place.
 
 line 1304: "Problem is" -- missing "The". Also, no need to italicise the next sentence... it is really not that deep or surprising.
