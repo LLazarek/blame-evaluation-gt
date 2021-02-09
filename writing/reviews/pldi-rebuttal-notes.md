@@ -218,16 +218,10 @@ Natural for a particular kind of bugs for some reason? Also, can there
 be a new blame strategy that outperforms both Transient and Natural
 all the time?
 
-  ⟶ 
-	Response idea: This is an example where the experiment seems to contradict the theory. 
+  TODO: Response idea: This is an example where the experiment seems to contradict the theory.
 	The models don't include all of the features in the benchmarks. <enumerate them here> It's possible that the Natural, Transient theories don't scale as expected to rich PL features.
 	Make analogy to physics: theory makes predictions, we have found failures of the predictions. We have two courses of action: report the inconsistency to re-eval the theory, and do more experiments.
 	It's also possible we have a bug in TR, or in Transient implementation.
-
-    Later: TODO: Scenarios where Transient is more useful than Natural imply that Transient locates the bug while Natural gets stuck.
-	      check what the reasons for those scenarios are;
-	      - the % is too high to all be because of the classes bug,
-		  - how else could Natural get stuck if Transient isn't? It can't be the bad exn cases, because then Transient should be stuck as well because Transient shouldn't be able to get blame in those cases.
 
 Theoretical gradual type systems usually allow programmers to control
 the precision of type annotations in a fine-grained way with the Dyn
