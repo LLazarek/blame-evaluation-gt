@@ -1,6 +1,10 @@
 Response notes format: indented after ⟶ or TODO.
 ⟶ is a drafted response, TODO records notes about what to respond to or how.
 
+chrdimo notes format: unindented after chrdimo.
+
+
+
 PLDI 2021 Paper #66 Reviews and Comments
 ===========================================================================
 Paper #66 How to Evaluate Blame for Gradual Types
@@ -94,6 +98,7 @@ Points against:
 - Could you comment a bit more on what makes a mutator "good"? (other than
   experimentally seeing that it is good.) Perhaps, what would be a really bad
   mutator for evaluating blame assignment?
+
   
   ⟶ Abstractly, a good mutator reliably generates bugs that are detectable by the type system and by all three semantics' runtime type checks; ideally the bugs also manifest during the interaction of multiple components.
     We rely on the experimental check of our mutators since this criteria is difficult or impossible to decide otherwise.
@@ -107,10 +112,24 @@ Points against:
 	Examples of mutators we cut: `wrap-cond` (tricks occurrence typing by hiding the result of conditionals to produce a type error, but never a dynamic error), `add-extra-method`, swapping `car` and `cdr`, `set!`ing an ID to itself (only causes a type error), swapping mutable and immutable hashes+vectors.
 	# This answer should serve to justify our mutators and the challenge of making good mutators more broadly, to answer reviewer D's concerns about the delta of making mutators.
 
+
+chrdimo: A bad mutator results in a type-level bug that is trivial to
+locate. For instance a bug that leads to a type-level error during the
+evaluation of the component that contains it is trivial to locate. In
+contrast, a bug that is non-trivial to locate is one  that causes the
+component that mutates it to evaluate without an error but produce instead
+a value of the wrong type.  An interesting bug is one where the value with
+the wrong type manages also to cross undetected to at least another
+component than the one that produces it until a type-level checks flags
+it. These latter bugs are those that good mutators should be able to
+produce. 
+
 - I don't understand where the 16,800 number comes from. Is it an exhaustive
   enumeration of all possible mutations? (Or the number of mutants constructed
   in X amount of time?)
-  ⟶ The former, we will clarify in the text.
+  ⟶  The former, we will clarify in the text.
+
+chrdimo: It is an exhaustive enumeration. We will clarify the prose. 
 
 - How large are the programs in the benchmark suite?
   ⟶ The program sizes without type annotations, as reported by Racket's `syntax-sloc` tool, are below. We will add this information to the table in Figure 2.
@@ -127,14 +146,39 @@ Points against:
 	take5 | 465 | 8
 	tetris | 280 | 9
 
+
+chrdimo: Please find below the loc and number of components for each
+benchmark. We will add the information to figure 2.
+
+   benchmark | LOC | components
+	----------|-----|-----------
+	acquire | 1941 | 9
+	gregor | 2336 | 13
+	kcfa | 328 | 7
+	quadT | 7396 | 14
+	quadU | 7282 | 14
+	snake | 182 | 8
+	suffixtree | 1500 | 6
+	synth | 871 | 10
+	take5 | 465 | 8
+	tetris | 280 | 9
+
+
 # Minor Comments
 
 - L38: Should there have been a colon? Is the text "This contrast... " and
   challenge quote from [3]? Who is saying what here...
   ⟶ Thanks, we will reword the text from "This contrast" to clarify that this our research question, it is not coming from [3].
 
+
+chrdimo: No, the quote is not from [3]. We will rephrase to clarify that
+it is our statement of the research question. 
+
 - L104: I was confused by the word "Next". Maybe instead: We now ..."
   ⟶ Thanks, we will change the wording.
+
+chrdimo: Thank you. We will reword.
+
 
 - L268: Grammar issue.
   ⟶ Thanks, we will fix this.
@@ -145,13 +189,21 @@ Points against:
 - L441: Add line numbers (or other metric of size).
   ⟶ See above, we will add this information.
 
+- L980: Figure 5.4??
+  ⟶ Thanks, this is a bad reference; it should be figure 6. We will fix it.
+  
+chrdimo: We will fix these. Thanks.  
+
+
 - L956: 30,000 hours of compute time is 1,250 days. I assume that the CPU has
   many cores. Could you put that number?
   ⟶ Each CPU has 28 cores and 56 threads; when we last ran the experiment, it took about two weeks of real time from start to end. 
   We will add this information at the start of section 7.
 
-- L980: Figure 5.4??
-  ⟶ Thanks, this is a bad reference; it should be figure 6. We will fix it.
+chrdimo: Sure. Each CPU has 28 double cores.
+
+
+
 
 - L991: Figure 6: It took me some time to understand the figure. I wonder if
   there is a better way to represent the same data?
@@ -160,7 +212,9 @@ Points against:
     - a bunch of two-sided bar charts? Where there's one bar pair per pair of modes. Above the x-axis is % A > B, and below the axis is % B > A?
 	- a bunch of stacked histograms? Where there's one stack per pair of modes. A bar has three parts: A > B, A = B, and B > A.
 
-
+chrdimo: We have reached the same conclusion and we are considering
+alternatives such as a series of two-sided bar charts that make it easier
+to spot how two modes compare to each other. 
 
 Review #66B
 ===========================================================================
@@ -223,6 +277,26 @@ all the time?
 	Make analogy to physics: theory makes predictions, we have found failures of the predictions. We have two courses of action: report the inconsistency to re-eval the theory, and do more experiments.
 	It's also possible we have a bug in TR, or in Transient implementation.
 
+
+chrdimo: We were also surprised to discover that transient outperforms
+natural in some scenarios. After all, the theory of blame says otherwise. Even thought
+we haven't identified specific patterns, we believe that the reason behind 
+transient's unexpected success is due to the advanced features of Typed
+Racket's type system that haven't appeared in models that compare Natural
+and Transient: polymorphism, row types, mixins etc. Such features require 
+custom loopholes to be compatible with Racket idioms. In turn these
+loopholes can result in subpar checks in Natural. Our experimentation with 
+transient indicates that the same problem doesn't occur in transient. 
+We do not have any clues about a strategy that outperforms both Natural
+and Erasure. But our current conjecture is that a simple strategy that
+just points somewhere in the blame trail may be good enough and enable
+downstream optimization that are keeping track of blame in Typed Racket
+inhibits. The good thing is is that now we have a method to compare
+different strategies. 
+
+chrdimo? We need more details from Ben here.
+
+
 Theoretical gradual type systems usually allow programmers to control
 the precision of type annotations in a fine-grained way with the Dyn
 type rather than distinguishing typed and untyped modules. Would the
@@ -234,12 +308,26 @@ same evaluation method be able to directly appliable to blame in such systems?
 	If components are modules, as in Typed Racket, then nothing changes.
 	Systems with Dyn more likely treat top-level definitions as components, in which case definitions are individually typed (the whole definition is annotated) rather than modules.
 
+chrdimo: Yes. Incorporating type Dyn boils down to considering a hierarchy
+of types for each component rather than a single type. At the same time,
+our method is parametric to the ``size'' of a component and adpats in a
+straightforward manner to a setting where each definition can be
+considered a component instead of a whole module. Of course both of these
+adjustments lead to significantly larger scenario lattices than the ones we
+investigate and they have to be sampled aggresively and carefully.
+
+
 Please explain what impedance mismatches are in the paper. Is it
 simply type mismatches?
 
   ⟶ Impedance mismatches are mismatches between a piece of code's true type and its annotation.
     For instance, the code `(λ (x) (+ x 42))` has type `Number -> Number` but might be annotated as `Number -> String`, causing an impedance mismatch.
     We will adjust the text to clarify or remove this terminology.
+
+
+chrdimo: An impednace mismathc denotes a type annotation that doesn't
+match the actual type of the annotated code. We will adjust the prose to
+clarify. 
 
 # Strengths
 
@@ -269,6 +357,15 @@ contribution of the paper, but it is not clear from the paper.
   TODO: response sketch: you're right, we misspoke, this is not the normal distribution; our reasoning for why the normal-ish shape of distribution we see makes sense is that given a fixed trail the probability at each step of the trail ending is 1/n, but we randomly select trails so we're multiplying the random distribution of trail lengths by that 1/n one? Not clear on the details of this reasoning.
   ⟶ 
 
+chrdimo: You are right that for a given trail of length n the probability
+that the random rational programmer discovers the buggy component after k 
+attempts is always 1/n and independent of k. However we sample randomly
+from the set of sceharios and as a result the set of trails. So the curve 
+of the random programmer matches our sampling distribution. That said, as
+you observe, what is the distribution of the random programmer is an
+irrelevant point to our results and we will remove the characterization.
+
+
 * page 9 line 980: Figure 5.4 -> Figure 6
   ⟶ Thanks, we will fix this.
 * page 10 Figure 7: Null -> Random
@@ -276,6 +373,7 @@ contribution of the paper, but it is not clear from the paper.
 * page 11 line 1103: ( 770 -> (770
   ⟶ Thanks, we will fix this.
 
+chrdimo: Thank you. We will fix all these. 
 
 
 Review #66C
@@ -307,21 +405,93 @@ Comments for author
 This is a neat paper that develops an approach for evaluating gradual typing and blame assignment. Thanks for submitting it to PLDI '21! The results are presented in an extremely clear way that draws out the key insights without compromising on technical detail. The notion of a rational programmer -- loosely modeled on rational agents from economic theory -- is a neat conceptual device. And the empirical approach does seem like the right way to address the question of the usefulness of blame. 
 
 But while there is a lot to like about the paper, it also has some shortcomings. The suite of programs used for the evaluation is fairly small (c.f., the SIGPLAN checklist).
+  
   TODO: respond to this ^, saying that we use the standard suite of benchmarks for evaluating GT -- point to Ben's POPL paper and others, and we use all of the largest benchmarks in the suite
+
+chrdimo: Coupld you please clarify what you mean by fairly small with
+respect to the SIGPLAN checklist? We are the first to conduct an empirical
+study for blame and gradual typing so we repurposed the standard
+performance benchmark suite for Typed Racket and, in particular, its
+largest and most complex benchmarks. Our inspection of the benchmarks
+indicates that they are representative set of Racket programs in terms of
+features and structure. 
+
 The faults are introduced using synthetic mutations that may or may not correspond to the kinds of errors that arise in practice. This can be seen from the results in Figure 7 -- the lengths of the "trails" is quite small.
+
   TODO: unclear that syntheticness relates to trail length at all, and synthetic bugs are the only option here -- there is no corpus of documented GT bugs in the wild anywhere. Indeed, most type errors never even make it into code repositories. Note that we are the first to evaluate blame in this setting.
-While the study is mostly well done, it only considers two blame assignment strategies. For example, it would be interesting to consider the "omniscient programmer" to get a bound on the value of blame. But this is not done.
+
+chrdimo: There is no exisitng catalogue of bugs in gradually typed
+programs. Furthermore, most type-level bugs do not survive after decent tsting and 
+thus do not make it to code repos. There are a few anecdotes from the literature but they are mostly
+artificial. Hence, since we need a large number of buggy scenarions for a
+meaningful study, a synthetic approach is the only way forward. In
+addtion, with our mutation we can tune the set of scenarios to get a
+diverse set of bugs. 
+
+While the study is mostly well done, it only considers two blame assignment strategies.
+For example, it would be interesting to consider the "omniscient programmer" to get a bound on the value of blame. But this is not done.
+
   TODO: We don't understand what is meant by "omniscient programmer", but our best understanding is the ideal oracle strategy that always picks the right module right away and thus always finds the bug in one step. We didn't show this because it's trivial. We do have other baselines to understand blame's performance: the random mode, and the exceptions modes for each of the semantics.
+
+chrdimo: Could you please explain what you mean by "omniscient
+programmer"? If this is the programmer that always makes the best choice,
+i.e., finds the bug at the first try then this programmer is trivial. It
+has 100% success rate and a constant blame trail of 1. Thus comparing it
+with any strategy amounts to the number of scenarios where a strategy
+fails and those where it succeeds but the blame trail has length greater
+than one. This information is in the paper byt If you think it would be
+useful, we point it out. Moreover, the experiment considers 10 different
+modes of the rational programmer spread across 3 different gradaul typing
+systems. 
+
+
 And unfortunately the results are inconclusive -- Section 8 says "our results call for a deeper understanding of the two models for blame".
+
   TODO: This is what makes our results surprising: they challenge the theoretical conclusions that Natural is superior to Transient, suggesting that the theory is not good enough to understand the pragmatics of blame in reality.
+
+
+chrdimo: The quote from section 8 refers to the theory of blame rather
+than our results. Our results show in clear terms that, at least for our
+benchmarks, a blame strategy is superior that exceptions and that natural
+and transient have comparable efficacy. The latter is surprisng given that
+theoretical models (and our intiail expectations) point to the opposite.
+Thus a side-effect of our experiment is a call to theoriticians for models
+that are atuned with practice. 
+
 Also, the published Transient scheme seems to have a minor bug, which might affect the outcomes when fixed (Section 8.2).
   TODO: 8.2 does not indicate a bug in Transient, but rather a defect in the design of the system. ... something about a gap between Reticulated Python and 
+
+chrdimo: Section 8.2 does not discuss a bug in Transient but rather a
+limitation of its current design that we discovered exactly becasue of the
+experiement.
+
 Most if not all of these shortcomings are discussed in the paper, which is much appreciated. But they do risk undermine the value of the contributions to some degree.
+
+chrdimo: We would like to point out that the resutls of the comparison
+between the tree systems are only one part of the contribution of the
+paper.  The other part is the method itself. Benchmarks, source of
+interesting bugs and rational programmer modes are all parameters that can
+be instantiated differently without affecting the recipe we discuss at the
+end of section 2 nor the analytical framework from section 5 that
+underlies our experiment.  
 
 To explain one comment above: I was surprised not to see a comparison against an "omniscient programmer" to establish a baseline (c.f., the SIGPLAN checklist). That is, model a blame assignment scheme in which blame could be placed on any component. And always pick the component that minimizes the length of the trail. Of course, this would be infeasible to implement in practice, but it would place an upper bound on the utility of blame. 
 
+
+chrdimo: Our experiemnt does have a baseline. The random mode of the
+rational programmer serves as the ``control'' of our experiment. 
+Furthermore the exception modes serve as further ``controls'' to
+distinguish the effect fo checks from that of blame, 
+
 Similarly, I wondered why the modes of the transient programmer only consider picking the first/last blame, and not other choices. Section 5.2 just says "our answer" is that there are at least "two reasonable options." Why are other choices not reasonable?
   TODO: Answer suggested by Ben: it's unspecified how one should interpret Transient blame, and there isn't time to evaluate all possible choices, so we pick the most reasonable interpretations.
+
+
+chrdimo: The transient semantics provide no interpratation for the blame
+set. We picked the first and last because they match the intuitive
+interpretation of the blame set as a list. We didn't mean to imply that
+other options are unreasonable. We just needed to make a reasonable choice 
+and keep the duration of the experiemtn within reasonbale limits.
 
 
 Review #66D
@@ -396,7 +566,9 @@ there were flaws in those experiments, as noted in this paper). Given
 that the experiments are developed and run in the context of the
 large, real-world Racket ecosystem, I wonder whether about the chance
 of incidental implementation choices or bugs affecting this result.
+
   TODO: We should clarify that checks alone is faster, but adding blame is slower (bc blame map is linear).
+
 
 Overall, I think this is a useful reference for further usability work
 on contracts and gradual type systems, and am generally in favor of
