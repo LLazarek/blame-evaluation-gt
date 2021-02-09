@@ -9,20 +9,18 @@ respond below.
 
 Review #66A
 ===========================================================================
-> # Questions
 > - Could you comment a bit more on what makes a mutator "good"? (other than
 >   experimentally seeing that it is good.) Perhaps, what would be a really bad
 >   mutator for evaluating blame assignment?
 
 A bad mutator results in a type-level bug that is trivial to locate. For
-instance a bug that leads to a type-level error during the evaluation of the
+instance, a bug that leads to a type-level error during the evaluation of the
 component that contains it is trivial to locate. In contrast, a bug that is
-non-trivial to locate is one that causes the component that mutates it to
-evaluate without an error but produce instead a value of the wrong type. An
-interesting bug is one where the value with the wrong type manages also to cross
-undetected to at least another component than the one that produces it until a
-type-level checks flags it. These latter bugs are those that good mutators
-should be able to produce.
+non-trivial to locate is one that causes the buggy component to evaluate without
+an error but produce instead a value of the wrong type. An interesting bug is
+one where the value with the wrong type manages also to cross undetected to at
+least another component before a type-level check flags it. Good mutators should
+be able to produce these interesting bugs.
 
 
 > - I don't understand where the 16,800 number comes from. Is it an exhaustive
@@ -72,14 +70,14 @@ We will fix these. Thanks.
 > - L956: 30,000 hours of compute time is 1,250 days. I assume that the CPU has
 >   many cores. Could you put that number?
 
-Sure. Each CPU has 28 double-threaded cores.
+Sure. Each CPU has 28 doubly-threaded cores.
 
 > - L991: Figure 6: It took me some time to understand the figure. I wonder if
 >   there is a better way to represent the same data?
 
-We have reached the same conclusion and we are considering alternatives such as
-a series of two-sided bar charts that make it easier to spot how two modes
-compare to each other.
+We have reached the same conclusion and we are considering alternatives that
+will make it easier to see how two modes compare to each other, such as a series
+of two-sided bar charts.
 
 
 
@@ -93,20 +91,19 @@ Review #66B
 > be a new blame strategy that outperforms both Transient and Natural
 > all the time?
 
-We were also surprised to discover that transient outperforms natural in some
-scenarios. After all, the theory of blame says otherwise. Even thought we
-haven't identified specific patterns, we believe that the reason behind
-transient's unexpected success is due to the advanced features of Typed Racket's
-type system that haven't appeared in models that compare Natural and Transient:
-polymorphism, row types, mixins, and more. Such features require custom
-loopholes to be compatible with Racket idioms. In turn these loopholes can
-result in subpar checks in Natural. Our experimentation with transient indicates
-that the same problem doesn't occur in transient. We do not have any clues about
-a strategy that outperforms both Natural and Erasure. But our current conjecture
-is that a simple strategy that just points somewhere in the blame trail may be
-good enough and enable downstream optimization that are keeping track of blame
-in Typed Racket inhibits. The good thing is is that now we have a method to
-compare different strategies.
+We were also surprised to discover that Transient outperforms Natural in some
+scenarios. After all, the theory of blame says otherwise. Even though we haven't
+identified specific patterns, we believe that the reason behind Transient's
+unexpected success is due to the advanced features of Typed Racket's type system
+that haven't appeared in models that compare Natural and Transient:
+polymorphism, row types, mixins, and more.
+
+We do not have any clues about a strategy that outperforms both Natural and
+Erasure. That said, our current conjecture is that a simple strategy that just
+points somewhere in the blame trail may be good enough. Such a strategy would
+also enable optimizations that Typed Racket currently foregoes in order to track
+blame. The good thing is that now we have a method to compare different
+strategies.
 
 chrdimo: TODO We need more details from Ben here.
 
@@ -118,18 +115,18 @@ chrdimo: TODO We need more details from Ben here.
 
 Yes. Incorporating type Dyn boils down to considering a hierarchy of types for
 each component rather than a single type. At the same time, our method is
-parametric to the ``size'' of a component and adapts in a straightforward manner
+parametric to the "size" of a component and adapts in a straightforward manner
 to a setting where each definition can be considered a component instead of a
 whole module. Of course both of these adjustments lead to significantly larger
-scenario lattices than the ones we investigate and they have to be sampled
-aggressively and carefully.
+scenario lattices than the ones we investigate, so keeping the experiment
+computationally feasible would require more aggressive sampling.
 
 
 > Please explain what impedance mismatches are in the paper. Is it
 > simply type mismatches?
 
-An impedance mismatch denotes a type annotation that doesn't match the actual
-type of the annotated code. We will adjust the prose to clarify.
+An impedance mismatch denotes a type annotation that is detected to disagree
+with the actual type of the annotated code. We will adjust the prose to clarify.
 
 
 > The paper states that the effort distribution of the random mode
@@ -138,13 +135,13 @@ type of the annotated code. We will adjust the prose to clarify.
 > This point does not affect the contribution of the paper, but it
 > is not clear from the paper.
 
-You are right that for a given trail of length n the probability that the random
-rational programmer discovers the buggy component after k attempts is always 1/n
-and independent of k. However we sample randomly from the set of scenarios and
-as a result the set of trails. So the curve of the random programmer matches our
-sampling distribution. That said, as you observe, what is the distribution of
-the random programmer is an irrelevant point to our results and we will remove
-the characterization.
+You are right that for a given trail of length $n$ the probability that the
+random rational programmer discovers the buggy component on every step is $1/n$.
+The missing piece is that we randomly sample from the set of scenarios -- and by
+extension the set of trails. So the shape of the random programmer's effort
+matches our sampling distribution. That said, as you observe, the distribution
+of the random programmer's effort is not relevant to our results, so we will
+remove the characterization.
 
 
 > * page 9 line 980: Figure 5.4 -> Figure 6
