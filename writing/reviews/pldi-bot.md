@@ -432,6 +432,8 @@ for purely static type systems would ask which of several reporting
   finding the source of inference conflicts.
 
 TODO ll: should this be in our response?
+Instead of google, point them to <names>: Ben will do this
+
 If the reviewer is indeed interested in the question of whether type
 systems help programmers---a question that this submission does _not_
 ask---the recent OOPSLA literature contains several user studies. A simple
@@ -549,16 +551,11 @@ We will clarify what a boundary crossing is in the prose.
 > would be caught at run time, so there would be no basis to call the
 > result "wrong".
 
-TODO ll: better to refer to the actual example in section 3 here, instead of a hypothetical function? e.g.
-If the client in Figure 1 just writes the result to a file, then the file contents will be wrong.
-Nonetheless, the fact that the contents are in the wrong format will not be detected by the primitives for writing data to a file, so the program will not fail.
-
-Consider a function with a type annotation that says its a function from
-integers to string that formats its argument to a string and returns it.
-If we import the function in an untyped module under Erasure there are no
-checks to make sure that the function is going to be applied to integers.
-So we can apply it to character or a string and still get back a result
-except that it is not the string representation of a number.
+TODO chrdimo
+If the client in Figure 1 just writes the result to a file, then the file
+contents will be wrong. Nonetheless, the fact that the contents are in the
+wrong format will not be detected by the primitives for writing data to a
+file, so the program will not fail.
 
 
 
