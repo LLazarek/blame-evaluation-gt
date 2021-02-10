@@ -108,9 +108,9 @@ for each component rather than a single type. At the same time, our method
 > Please explain what impedance mismatches are in the paper. Is it simply
 > type mismatches?
 
-An impedance mismatch denotes a type annotation that is detected to
-disagree with the actual type of the annotated code. We will adjust the
-prose to clarify.
+"Impedence mismatch" is our name for a run-time disagreement between a
+type annotation and an untyped value. The point of the name is to suggest
+that either side (type or value) could be at fault. We will adjust the prose.
 
 
 > The paper states that the effort distribution of the random mode follows
@@ -140,17 +140,43 @@ Thank you. We will fix all these.
 
 Review #66C
 ===========================================================================
+
+> Paper summary
+> -------------
+>
+> [....]
+>
+> To evaluate this approach, the paper also presents empirical results. Starting
+> with a small corpus of programs, the authors use mutations to systematically
+> (but synthetically) introduce type errors -- e.g., one mutation replaces a
+> constants with another of a different type, and another mutation swaps method
+> identifiers. They then conduct experiments to quantify the number of steps
+> required by a rational programmer for several blame assignment schemes: Natural
+> (used in Typed Racket, which tracks at most one location for blame), Transient
+> (used in Reticulated Python, which tracks a set of locations), and Erasure
+> (which does not actually assign blame, and is widely used in industry).
+
+chrdimo: TODO
+effort is part 2/2 of the metrics
+
+
 > But while there is a lot to like about the paper, it also has some
 > shortcomings. The suite of programs used for the evaluation is fairly
 > small (c.f., the SIGPLAN checklist).
 
-Could you clarify what you mean by fairly small with respect to the
-SIGPLAN checklist? We are the first to conduct an empirical study for
-blame and gradual typing, so we repurposed the standard performance
-benchmark suite for Typed Racket -- in particular, its largest and most
-complex benchmarks. Our inspection of the benchmarks indicates that they
-are representative set of Racket programs in terms of features and
-structure.
+The paper does follow the SIGPLAN checklist guidelines for Principled Benchmark
+Choice:
+
+- This paper is the first to conduct an empirical study for blame and gradual
+  typing, so there is no established benchmark suite to reuse.
+
+- The paper thus explains how we adapted a suite of gradual typing performance
+  benchmarks to a new setting (section 4).
+
+- The paper also explains how we selected pertinent benchmarks to work within
+  our resource constraints.
+
+We cannot find any minimum size guidelines in the SIGPLAN checklist.
 
 
 > The faults are introduced using synthetic mutations that may or may not
@@ -158,25 +184,21 @@ structure.
 > seen from the results in Figure 7 -- the lengths of the "trails" is
 > quite small.
 
-There is no existing catalog of bugs in gradually typed programs.
-Furthermore, most type-level bugs do not survive  decent testing and thus
-do not make it to code repos. There are a few anecdotes from the
-literature but they are mostly artificial. Hence, since we need a large
-number of buggy scenarios for a meaningful study, a synthetic approach
-is the only way forward. In addition, mutation allows us to tune the set
-of scenarios to get a diverse set of interesting bugs.  We discuss in
-section 8 how our approach to bug injection is a threat to validity.
-ll: TODO the review already acknowledges that we discuss this point in the threats; do we need to repeat that?
+There is no existing catalog of bugs in gradually typed programs, nor any
+statistics about common trail lengths.  Furthermore, most type-level bugs do
+not survive  decent testing and thus do not make it to code repos. There are a
+few anecdotes from the literature but they are mostly artificial. Hence, since
+we need a large number of buggy scenarios for a meaningful study, a synthetic
+approach is the only way forward. In addition, mutation allows us to tune the
+set of scenarios to get a diverse set of interesting bugs.
 
 
 > While the study is mostly well done, it only considers two blame
 > assignment strategies.
 
-We would like to point out that the experiment considers nine different
-modes of the rational programmer spread across three different gradual
-typing systems.
-
-ll: TODO are we calling the random modes for each of natural, transient, and erasure distinct? I'm not sure that makes sense, in which case it's seven modes.
+We would like to point out that the experiment considers six different
+modes of the rational programmer spread across three different gradual typing
+systems plus the random rational programmer. Figure 7 clearly shows them all.
 
 
 > For example, it would be interesting to consider the "omniscient
@@ -264,13 +286,16 @@ is even worse than what we have observed in Typed Racket.
 > *Natural and Transient Under the Same Roof (Section 3)*
 >
 > This seems to be "only" an engineering challenge.
-
-
+>
+> [...]
+>
 > *Custom Mutators (Section 4)* The paper suggests that the mutators
 > required here are significantly different and more subtle, but this does
 > not seem to be the case when comparing Figure 3 and Table 3 of the POPL
 > 2020 paper.  ...
-
+>
+> [...]
+>
 > *Debugging Strategies (Section 5)*
 >
 > These also seem to be overemphasized. The main design choice seems to be
@@ -312,8 +337,6 @@ Thank you. We will fix these.
 Review #66E
 ===========================================================================
 
-
-
 > However, I don't find the results to be as conclusive as the authors
 > state. Aside from the Erasure case, whose relevance I found unclear (see
 > below), conclusions rest on some small-valued "more useful than"
@@ -329,14 +352,23 @@ Review #66E
 > current write-up overplays its hand a little. I appreciate the
 > discussion of threats to validity.
 
-We absolutely disagree with you. Please see our discussion of the
-conclusions form our experiment at the beginning of our reply. 
+TODO chrdimo
+- see general comments for how to interpret results, their significance, and how they challenge existing perceptions
+- usefulness asks if one succeeds when another failed; no extent for this
+- if both succeed, can quantify difference, use trail length to do so
+- trail length is proxy, paper discusses limitations, allows automation ... no humans + large scale
 
-chrdimo: Should we be more assertive here about the metrics? I think this
-is a hard to defend position because of the non-constructive manner of the
-criticism --- it is plain dismissive without explanation. 
+> The presentation of the results is very much around aggregates and summaries.
+> Indeed the whole method is about having run a huge compute job over a large
+> number of variants. Perhaps it's paranoia but I'd be interested to see some
+> specific examples walked through by hand (in the paper) and some smaller sample
+> manually classified (as results). That would add an extra sanity check that the
+> metrics do correspond to some meaningful reality.
 
-ll: TODO "absolutely disagree with *you*" seems too personal and confrontational. I'm not sure, but just referring to the beginning should speak for itself?
+TODO chrdimo
+.... 
+
+if you are asking whether our results
 
 > About Erasure: if I'm reading this correctly, the key thing here is that
 > in Typed Racket, the set of static types is more expressive than the set
@@ -470,7 +502,7 @@ We will clarify this in the prose.
 > that you're addressing. Throughout the paper, much space could be saved
 > by writing in a more direct style.
 
-Noted, we will simplify the language where possible.
+Noted, we will rephrase.
 
 > line 69: be explicit that Lazarek et al were (as I later gathered) doing
 > something about blame to do with higher-order contracts but not gradual
@@ -492,9 +524,9 @@ It means debugging scenario. We will clarify the prose.
 
 > line 91-ish: "Transient, "Natural", "Erasure" -- be explicit that these
 > are names that *you* are introducing
- 
-These are standard names for these three systems [9, 10, 37]. We didn't
-introduce them.
+
+We are reusing these names from Greenman et al. and Vitousek et al. [10, 37],
+but will explain more.
 
 
 > line 187: what is a "component"? Should be easy to define.
@@ -523,23 +555,6 @@ We will clarify what a boundary crossing is in the prose.
 
 
 
-> In the title, "evaluating blame" reads oddly. It is ambiguous, because
-> "evaluate" sometimes means to compute a result. A fuller phrase, like
-> "evaluating the usefulness of blame tracking...", would probably be
-> worth the words.
-
-> The abstract doesn't say much about the work. It would be better written
-> for experts to quickly gather an overview what the paper contributes.
-
-> Conversely, the main body of the paper skimps a bit on background. It
-> never explicitly covers what "blame" means and how it works in practice.
-> Similarly, it repeatedly talks about "impedance mismatches" without
-> defining them. Perhaps this phrase is now standard in the gradual typing
-> literature, which I haven't kept up with (hence my Z expertise). But I
-> did read the Wadler/Findler paper carefully at the time. It did not talk
-> about impedance mismatches. In any case, it is a fuzzy metaphor...
-> please say exactly what it means here.
-
 
 
 > line 313: it threw me that a program might not fail but "produce a wrong
@@ -564,17 +579,18 @@ file, so the program will not fail.
 > worth saying directly.
   
 
-There are two points that distinguish gradual typing from migratory
-typing: the existence of Dyn and the granularity of components.  We will
-clarify the prose. 
+We will clarify. Migratory typing is not about granularity, but whether the
+type system forces rewrites upon untyped code. A gradual type system for Python
+would be migratory. A new gradual-from-the-start language would not be.
+
 
 > line 424: "fully typed correct programs" -- presumably your method could
 > also work with not-yet-fully-typed correct programs, just not ranging
 > over the entire lattice in those cases. I was wondering whether that
 > might give different/interesting results. 
 
-Yes, the approach could be applied.
-ll: TODO worth a sentence saying that this would probably not be worthwhile to do?
+Yes. In fact, we already do this for programs that depend on library code.
+
 
 > line 517: the difference between #1 and #2 here again relies on the
 > surprising property (to the unfamiliar) that Typed Racket has a notion
@@ -593,6 +609,22 @@ value. We will add a reminder of section 3's discussion of Transient
 checks to the prose here.
 
 
+> In the title, "evaluating blame" reads oddly. It is ambiguous, because
+> "evaluate" sometimes means to compute a result. A fuller phrase, like
+> "evaluating the usefulness of blame tracking...", would probably be
+> worth the words.
+
+> The abstract doesn't say much about the work. It would be better written
+> for experts to quickly gather an overview what the paper contributes.
+
+> Conversely, the main body of the paper skimps a bit on background. It
+> never explicitly covers what "blame" means and how it works in practice.
+> Similarly, it repeatedly talks about "impedance mismatches" without
+> defining them. Perhaps this phrase is now standard in the gradual typing
+> literature, which I haven't kept up with (hence my Z expertise). But I
+> did read the Wadler/Findler paper carefully at the time. It did not talk
+> about impedance mismatches. In any case, it is a fuzzy metaphor...
+> please say exactly what it means here.
 
 > line 119: "homo economicus" needs glossing or a reference
 
@@ -612,6 +644,10 @@ checks to the prose here.
 > line 174: ... instead of just saying what you built on, first say what
 > you did! It's really not clear at this point.
 
+> line 199: "blame set as another form of a stack trace" -- yes. I was hoping to
+> see a clearer example of debugging with and without blame, i.e. something
+> making explicit the similarities and differences between having blame info and
+> having only a stack trace at the error site.
 
 > line 211: "languages exceptions" typo
 
