@@ -10,22 +10,22 @@ Are the empirical results conclusive or surprising?
 
 Here are the two relevant major conclusions from our experiment:
 
-1) Transient and Natural make rational programmers more effective than
+1. Transient and Natural make rational programmers more effective than
 Erasure;
 
-2) According to the rational programmer, the effectiveness of Natural is (merely)
+2. According to the rational programmer, the effectiveness of Natural is (merely)
 comparable to Transient.
 
 As review `D` astutely points out, the second one is surprising: _While Theory predicts that Natural blame is more accurate than Transient blame, the experimental results do not support this prediction to a sufficient degree._ 
 
 Thus our results point to two possible explanations: 
 
-(i) a need for theoretical models with improved predictive power
+- a need for theoretical models with improved predictive power
 
 The predictive power of gradual typing formal models fails when it comes to blame. In all likelihood, the current models are too small and do not include crucial
 features. (It is posisble that the current models are inherently limited.) 
 
-(ii) a need for "blame data" from large systems 
+- a need for "blame data" from large systems 
 
 The presented data is based on systems with up to 15 modules, totalling 25,000 loc. While the chosen benchmarks represent a wide spectrum of realistic code, Natural may prove its worth only when the dependency chains are even deeper than the ones in the existing benchmarks. 
 
@@ -38,39 +38,19 @@ provides an automatic tool to guide their exploration.
 Is the method novel? 
 ===========================================================================
 
-Our work builds on the idea of Lazarek et al.'s paper that it is possible
-to evaluate the effectiveness of blame by simulating a debugging process.
-Both their work and our work is inspired by Greenman et al's work that
-uses a lattice of configurations to systematically explore variants of the
-same program with specifications of different precision (for performance
-reasons in Greenman et al).  Both the ideas of ``following`` blame while
-debugging and of gradually adding specifications to tweak the evaluation
-of the program originate from the practice of contracts (see the story in
-the intro of Lazarek's paper and similar anecdotes in Meyer's writings).
+Our inspiration is Lazarek et al.'s POPL paper, which shows the possibility of large-scale PL desiggn evaluations that do _not_ involve human sw devs.
 
-That said,
+The challenge is how to adapt this work to different problems than contracts. Given the close relationship between Natural and contracts, it is _natural_ to pursue an adaptation of the Lazarek method to gradual typing. Adaptation means retaining some ideas and injecting entirely new ones: 
 
-1) In the context of Lazarek et al.'s work interesting bugs  are those
-detectable by behavioral contracts. Hence, they can use off-the-shelf
-mutators. In fact, their contracts do not detect the overwhelming majority
-of bugs except at the highest precision, where the contracts describe the full
-functional correctness of components.
+1. Lazarek et al.'s work can use off-the-shelf mutators because their programs are untyped. For typed prorgams, we must create new ones, for which we occasionally chose the same name as Lazarek --- a significant articulation mistake on our side. For the final version, we will use distinct names. 
 
-2) Lazarek et al.'s method does not isolate the effect of blame from that
-of checks or mere luck. Thus they cannot really conclude that blame is the
-reason for the success of the debugging process --- only that blame
-shifting works. In other words, their work is lacking proper `controls'. 
+2. Lazarek et al.'s method cannot really conclude that blame is the reason for the success of the debugging process because it fails to isolate the effect of blame from that of checks or mere luck. What they can assert is only that blame shifting works. Our work demands a proper `control', which we have developed. 
 
-3) Lazarek et al. deal with a single contact system and examine a yes or
-no question: does blame-shifting find the bug for all debugging scenarios
-of a benchmark. They do not provide any guidance how to generalize to
-multiple systems with different notions of checks and/or blame in a
-uniform way that also allows comparisons.
+3. Lazarek et al. deal with a single contact system and examine a yes-or-no question, namely, whether  blame-shifting finds the bug for all debugging scenarios of a benchmark. Our experiment compares fundamentally different error-reporting schemes. 
 
-This brings us to the three problems we had to solve in order to design
-our experiment: 
+As to the specific complaints in reviews `c` and `d`: 
 
-1) Natural and Transient under the same roof (section 3).
+* Natural and Transient under the same roof (section 3).
 
 Implementing Transient Typed Racket is not mere engineering.  Neither
 Reticulated nor the Transient model provide answers about what shallow
@@ -82,9 +62,7 @@ Transient model and Reticulated that we had to fix. We do not think that
 this paper is the appropriate place to describe the implementation in
 detail.
 
-
-
-2) Custom mutators (section 4).
+* Custom mutators (section 4).
 
 The identification of good mutators for gradual typing is not
 straightforward. A bad mutator results in a type-level bug that is trivial
@@ -105,7 +83,7 @@ mutators that leads to a sufficiently large set of interesting and diverse
 bugs.
 
 
-ll: TODO phrasing of "original set we tried" seems off
+* TODO phrasing of "original set we tried" seems off
 The sixteen mutators we include in the paper are not the original set we
 tried and others that seemed like good candidates proved to be
 ineffective. For instance replacing car with cdr should lead to type-level
@@ -117,7 +95,7 @@ it turns out such mutations  are not interesting in our setting.
 
 
 
-3) Modes of the rational programmer (section 5).
+* Modes of the rational programmer (section 5).
 
 
 A key step for realizing our experiment is the precise and unified
