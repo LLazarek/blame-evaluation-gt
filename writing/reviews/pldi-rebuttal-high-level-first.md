@@ -27,10 +27,11 @@ different ways:
 
 (i) An important motivation for Transient is performance but our
 experiment provides evidence that performance issues, which stem from the
-design of Transient, have a negative effect on the effectiveness of blame.
+design of Transient, negatively impact the effectiveness of blame.
 
-(ii) Theory claims that natural blame is more accurate than transient
+(ii) Theory claims that Natural blame is more accurate than Transient
 blame but our experiment provides evidence for the opposite;
+ll: TODO is "the opposite" the right phrasing? It seems more accurate to say evidence that doesn't support the prediction.
 
 Thus our results point to two directions for further research in gradual
 typing: 
@@ -66,9 +67,9 @@ That said,
 
 1) In the context of Lazarek et al.'s work interesting bugs  are those
 detectable by behavioral contracts. Hence, they can use off-the-shelf
-mutators. In fact, their method does not detect the overwhelming majority
-of bugs except when contracts describe the full functional correctness of
-components. 
+mutators. In fact, their contracts do not detect the overwhelming majority
+of bugs except at the highest precision, where the contracts describe the full
+functional correctness of components.
 
 2) Lazarek et al.'s method does not isolate the effect of blame from that
 of checks or mere luck. Thus they cannot really conclude that blame is the
@@ -119,6 +120,7 @@ mutators that leads to a sufficiently large set of interesting and diverse
 bugs.
 
 
+ll: TODO phrasing of "original set we tried" seems off
 The sixteen mutators we include in the paper are not the original set we
 tried and others that seemed like good candidates proved to be
 ineffective. For instance replacing car with cdr should lead to type-level
@@ -145,7 +147,7 @@ exception modes allow us to determine what part of the success of Natural
 and Transient is due to the checks or due to blame (and also whether blame
 masks useful information from exceptions). For example, we see that
 Natural without blame but with the same checks outperforms Erasure in ~25%
-of the scenarios (figure 6).  Blame add another ~11% on top of that. For
+of the scenarios (figure 6).  Blame adds another ~11% on top of that. For
 Transient there is a small percentage of scenarios where exceptions due
 better than blame but still blame improves over exceptions by ~11%
 compared to Erasure. Finally, we introduce yet another mode, the random
@@ -188,11 +190,17 @@ It is an exhaustive enumeration. We will clarify the prose.
 Here are the LOC counts and number of components for each benchmark. We
 will add the information to figure 2.
 
-  benchmark    | LOC  | components -------------|------|-----------
-  acquire      | 1941 | 9 gregor       | 2336 | 13 kcfa         | 328  | 7
-  quadT        | 7396 | 14 quadU        | 7282 | 14 snake        | 182  |
-  8 suffixtree   | 1500 | 6 synth        | 871  | 10 take5        | 465  |
-  8 tetris       | 280  | 9
+  benchmark    | LOC  | components
+  -------------|------|-----------
+  acquire      | 1941 | 9
+  gregor       | 2336 | 13
+  kcfa         | 328  | 7
+  quadT        | 7396 | 14
+  quadU        | 7282 | 14
+  snake        | 182  | 8
+  suffixtree   | 1500 | 6
+  synth        | 871  | 10
+  take5        | 465  | 8
 
 
 > # Minor Comments
@@ -239,7 +247,7 @@ Review #66B
 We were also surprised to discover that Transient outperforms Natural in
 some scenarios. After all, theory says otherwise. We haven't identified
 any patterns for these scenarios. We conjecture that they point to
-limitations of the theory but we can;t exclude that some of them aren't
+limitations of the theory but we can't exclude that some of them aren't
 because of some unknown Typed Racket bug. Please see the first part of the
 discussion at the beginning of our response for more details and for our
 take on your last question.
@@ -317,19 +325,22 @@ structure.
 There is no existing catalog of bugs in gradually typed programs.
 Furthermore, most type-level bugs do not survive  decent testing and thus
 do not make it to code repos. There are a few anecdotes from the
-  literature but they are mostly artificial. Hence, since we need a large
-  number of buggy scenarios for a meaningful study, a synthetic approach
-  is the only way forward. In addition, mutation allows us to tune the set
-  of scenarios to get a diverse set of interesting bugs.  We discuss in
-  section 8 how our approach to bug injection is a threat to validity,
+literature but they are mostly artificial. Hence, since we need a large
+number of buggy scenarios for a meaningful study, a synthetic approach
+is the only way forward. In addition, mutation allows us to tune the set
+of scenarios to get a diverse set of interesting bugs.  We discuss in
+section 8 how our approach to bug injection is a threat to validity.
+ll: TODO the review already acknowledges that we discuss this point in the threats; do we need to repeat that?
 
 
 > While the study is mostly well done, it only considers two blame
 > assignment strategies.
 
-We would like to point out that the experiment considers ten different
+We would like to point out that the experiment considers nine different
 modes of the rational programmer spread across three different gradual
 typing systems.
+
+ll: TODO are we calling the random modes for each of natural, transient, and erasure distinct? I'm not sure that makes sense, in which case it's seven modes.
 
 
 > For example, it would be interesting to consider the "omniscient
@@ -379,7 +390,7 @@ Our experiment does have a baseline. The random mode of the rational
 programmer serves as the "control" of our experiment. Furthermore the
 exception modes each serve as further "controls" to distinguish the effect
 of checks from that of blame within each semantics. Please also see our
-discussion of modes in the second theme at the beginning of our reply,
+discussion of modes in the second theme at the beginning of our reply.
 
 
 > Similarly, I wondered why the modes of the transient programmer only
@@ -387,7 +398,7 @@ discussion of modes in the second theme at the beginning of our reply,
 > 5.2 just says "our answer" is that there are at least "two reasonable
 > options." Why are other choices not reasonable?
 
-The transient semantics provide no interpretation for the blame set. We
+The Transient semantics provide no interpretation for the blame set. We
 picked the first and last because they match the intuitive interpretation
 of the blame set as a list. We didn't mean to imply that other options are
 unreasonable. We just needed to make a reasonable choice to keep the
@@ -399,6 +410,8 @@ experiment feasible.
 Review #66D
 ===========================================================================
 
+> 2. That Transient --- as implemented in Typed Racket --- is much
+> slower than Natural. ...
 > Given that the experiments are developed and run in the context of the
 > large, real-world Racket ecosystem, I wonder whether about the chance of
 > incidental implementation choices or bugs affecting this result.
@@ -406,7 +419,7 @@ Review #66D
 A side note here: Transient Typed Racket is faster than Natural Typed
 Racket when we turn off blame. Exactly as a sanity check that this is not
 an artifact of our implementation we have coded up benchmarks in Python
-and we confirmed that in Reticulated the performance of transient with
+and we confirmed that in Reticulated the performance of Transient with
 blame is even worse than what we have observed in Typed Racket.
 
 
@@ -470,12 +483,14 @@ Review #66E
 > current write-up overplays its hand a little. I appreciate the
 > discussion of threats to validity.
 
- We absolutely disagree with you. Please see our discussion of the
- conclusions form our experiment at the beginning of our reply. 
+We absolutely disagree with you. Please see our discussion of the
+conclusions form our experiment at the beginning of our reply. 
 
- chrdimo: Should we be more assertive here about the metrics? I think this
- is a hard to defend position because of the non-constructive manner of the
- criticism --- it is plain dismissive without explanation. 
+chrdimo: Should we be more assertive here about the metrics? I think this
+is a hard to defend position because of the non-constructive manner of the
+criticism --- it is plain dismissive without explanation. 
+
+ll: TODO "absolutely disagree with *you*" seems too personal and confrontational. I'm not sure, but just referring to the beginning should speak for itself?
 
 > About Erasure: if I'm reading this correctly, the key thing here is that
 > in Typed Racket, the set of static types is more expressive than the set
@@ -510,9 +525,9 @@ TypeScript, Flow etc. These languages come with an equally sophisticated
 type system as Typed Racket. Programmers add annotations to their program
 and the type checker does its best to type check the program in order to
 discover mistakes and help the IDE. Then types are erased and the program
-is run. Since the program is not fully typed, the run time type checks of
-primitive operations may detect an incompatible argument and raise an
-exception. 
+is run in the underlying dynamic language. That language's primitive
+operations have runtime checks that may detect an incompatible argument
+and raise an exception. 
 
 2) The other two semantics introduce extra run time checks (in the form of
 proxies for Natural and inlined checks for Transient) to enforce that
@@ -522,7 +537,7 @@ mechanisms).
 
 3) In Typed Racket programmers cannot add contracts. The precision of the
 checks is determined by the types and matches those. In turn the types of
-primitive operations much the checks that their Racket counterparts
+primitive operations match the checks that their Racket counterparts
 perform. Finally our benchmarks come with the most precise types that
 allow them to type check (where precision is based on subtyping). 
 
@@ -710,6 +725,7 @@ clarify the prose.
 > might give different/interesting results. 
 
 Yes, the approach could be applied.
+ll: TODO worth a sentence saying that this would probably not be worthwhile to do?
 
 > line 517: the difference between #1 and #2 here again relies on the
 > surprising property (to the unfamiliar) that Typed Racket has a notion
