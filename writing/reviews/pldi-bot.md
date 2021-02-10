@@ -42,8 +42,8 @@ will add the information to figure 2.
 > - L38: Should there have been a colon? Is the text "This contrast... "
 >   and challenge quote from [3]? Who is saying what here...
 
-No, the quote is not from [3]. We will rephrase to clarify that it is our
-statement of the research question.
+No, that text is not a quote from [3]. We will rephrase to clarify that it is
+our statement of the research question.
 
 > - L104: I was confused by the word "Next". Maybe instead: We now ..."
 
@@ -59,7 +59,7 @@ We will fix these. Thanks.
 > - L956: 30,000 hours of compute time is 1,250 days. I assume that the
 >   CPU has many cores. Could you put that number?
 
-Sure. Each CPU has 28 doubly-threaded cores.
+Sure. Each CPU has 28 doubly-threaded cores. We will add it to the line.
 
 > - L991: Figure 6: It took me some time to understand the figure. I
 >   wonder if there is a better way to represent the same data?
@@ -121,11 +121,12 @@ prose to clarify.
 
 You are right that for a given trail of length $n$ the probability that
 the random rational programmer discovers the buggy component on every step
-is $1/n$.  The missing piece is that we randomly sample from the set of
+is $1/n$. The missing piece is that we randomly sample from the set of
 scenarios -- and by extension the set of trails. So the shape of the
-random programmer's effort matches our sampling distribution. That said,
-as you observe, the distribution of the random programmer's effort is not
-relevant to our results, so we will remove the characterization.
+random programmer's effort in figure 7 matches our sampling distribution.
+That said, as you observe, the distribution of the random programmer's
+effort is not relevant to our results, so we will remove the
+characterization.
 
 
 > * page 9 line 980: Figure 5.4 -> Figure 6
@@ -181,13 +182,14 @@ ll: TODO are we calling the random modes for each of natural, transient, and era
 > For example, it would be interesting to consider the "omniscient
 > programmer" to get a bound on the value of blame. But this is not done.
 
-If  an  "omniscient programmer"  is the programmer that always makes the
-best choice, i.e. finds the bug at the first try, then this corresponds to
-a trivial mode; It has 100% success rate and a constant blame trail length
-of 1.  Thus, comparing its success to any other strategy amounts to
+If an "omniscient programmer" is the programmer that always makes the best
+choice, i.e. finds the bug at the first try, then this corresponds to a
+trivial mode; it has 100% success rate and a constant blame trail length
+of 1. Thus, comparing its success to any other strategy amounts to
 counting the number of scenarios where the other strategy fails; comparing
-effort is similarly trivial. This information is in the paper implicitly,
-but we can certainly add an explicit mention if it would be useful.
+effort is similarly trivial. This information can be inferred from the
+definitions of section 5, but we can certainly add an explicit mention if
+it would be useful.
 
 
 
@@ -210,8 +212,8 @@ its current design that we discovered exactly because of the experiment.
 > contributions to some degree.
 
 We would like to point out that the results of the comparison between the
-three systems are only one part of the contribution of the paper. The
-other part is the method itself. 
+three systems in section 7 is only one part of the contribution of the
+paper. The other part is the method itself (sections 3, 4, and 5).
 
 > To explain one comment above: I was surprised not to see a comparison
 > against an "omniscient programmer" to establish a baseline (c.f., the
@@ -221,11 +223,12 @@ other part is the method itself.
 > infeasible to implement in practice, but it would place an upper bound
 > on the utility of blame.
 
-Our experiment does have a baseline. The random mode of the rational
-programmer serves as the "control" of our experiment. Furthermore the
-exception modes each serve as further "controls" to distinguish the effect
-of checks from that of blame within each semantics. Please also see our
-discussion of modes in the second theme at the beginning of our reply.
+Our experiment has several baselines. The random mode of the rational
+programmer described in section 5.5 serves as the "control" of the whole
+experiment. In addition, the exception modes described in sections 5.1 and
+5.2 each serve as further "controls" to distinguish the effect of checks
+from that of blame within each semantics. Please also see our discussion
+of modes in the second theme at the beginning of our reply.
 
 
 > Similarly, I wondered why the modes of the transient programmer only
@@ -252,10 +255,10 @@ Review #66D
 > incidental implementation choices or bugs affecting this result.
 
 A side note here: Transient Typed Racket is faster than Natural Typed
-Racket when we turn off blame. Exactly as a sanity check that this is not
-an artifact of our implementation we have coded up benchmarks in Python
-and we confirmed that in Reticulated the performance of Transient with
-blame is even worse than what we have observed in Typed Racket.
+Racket when we turn off blame. As a sanity check that this is not an
+artifact of our implementation, we implemented some benchmarks in Python
+and confirmed that in Reticulated the performance of Transient with blame
+is even worse than what we have observed in Typed Racket.
 
 
 > *Natural and Transient Under the Same Roof (Section 3)*
@@ -286,12 +289,20 @@ beginning of our response.
 >
 > L69: I wish here, and elsewhere, the comparison to [13] had been made
 > more explicit. As discussed above, there seem to be more similarities
-> than suggested.  L92: "use of _a_ higher-order contract system" L155:
-> "authors extensive" L253: "exports _it_ as" L280: Missing `untyped-`
-> L314: " . " L382: "Dyn," Fig 2: Presumably authors were included to
-> indicate the variety of sources, but I'm not sure that was necessary.
-> L597: "make us_e_ of" L664: "described in _Section_ 4" L980: "Figure
-> 5.4" ==> "Figure 6" L986: "2.8%" ==> "2.18%" ?  L1017: "33%" ==> "26%" ?
+> than suggested.
+> L92: "use of _a_ higher-order contract system"
+> L155: "authors extensive"
+> L253: "exports _it_ as"
+> L280: Missing `untyped-`
+> L314: " . "
+> L382: "Dyn,"
+> Fig 2: Presumably authors were included to indicate the variety of
+> sources, but I'm not sure that was necessary.
+> L597: "make us_e_ of"
+> L664: "described in _Section_ 4"
+> L980: "Figure 5.4" ==> "Figure 6"
+> L986: "2.8%" ==> "2.18%" ?
+> L1017: "33%" ==> "26%" ?
 > L1304: "Problem is ...."
 
 Thank you. We will fix these.
@@ -365,16 +376,17 @@ operations have runtime checks that may detect an incompatible argument
 and raise an exception. 
 
 2) The other two semantics introduce extra run time checks (in the form of
-proxies for Natural and inlined checks for Transient) to enforce that
-values untyped code provides to typed code have the expected type. when
-one of these checks fails they also issue blame (with different
-mechanisms). 
+proxies for Natural and inlined checks for Transient, as section 3
+describes) to enforce that values untyped code provides to typed code have
+the expected type. When one of these checks fails they both also issue
+blame (though each with different mechanisms).
 
 3) In Typed Racket programmers cannot add contracts. The precision of the
 checks is determined by the types and matches those. In turn the types of
 primitive operations match the checks that their Racket counterparts
-perform. Finally our benchmarks come with the most precise types that
-allow them to type check (where precision is based on subtyping). 
+perform. We also want to note that our benchmarks come with the most
+precise types that allow them to type check (where precision is based on
+subtyping).
 
 4) The Natural and Transient exception modes perform the same checks as
 Natural and Transient correspondingly. The only difference is that they do
@@ -402,11 +414,10 @@ here. It seems a bit like rambling to me sprinkled with bold statements.
 For point 1 and 3 please see our discusssion at the beginning of the
 reply. For point 2, the idea of the rational programmer is a new one so
 far applied to blame in contracts (Lazarek et al. POPL 2020) and blame in
-gradual typing (our work). We don't know the future but we believe it can
-have a similar effect in programming languages as homo economicus in
-economics. 
+gradual typing (our work). We believe it can have a similar effect in
+programming languages as homo economicus in economics.
 
-That said, as posed, the comment expresses a significant
+That said, as posed, this comment expresses a significant
 mis-characterization of the submission. It is not the benefits of a
 gradual type system that are in doubt. The experimental setup keeps the
 type system constant but allows to answer the question which of several
@@ -420,6 +431,7 @@ for purely static type systems would ask which of several reporting
   raised for four decades with the development of alternative ways of
   finding the source of inference conflicts.
 
+TODO ll: should this be in our response?
 If the reviewer is indeed interested in the question of whether type
 systems help programmers---a question that this submission does _not_
 ask---the recent OOPSLA literature contains several user studies. A simple
@@ -435,10 +447,11 @@ Google query will suggest a short list of these publications.
 > check is removed, or something like that.
 
 In Erasure, a program can type check and still have type-level errors
-because some type annotations may be missing. In contrast to Natural and
-Transient, types do not result in run time checks so the only way to
+because some type annotations may be missing. Section 3 illustrates
+exactly this scenario by example. In contrast to Natural and Transient,
+types in Erasure do not result in run time checks so the only way to
 detect type-level errors that the type checker couldn't find is the
-built-in checks of the language's primitives.  
+built-in checks of the language's primitives.
 
   
 > line 38: "explicit statement and challenge" -- what is it?
@@ -461,7 +474,7 @@ Noted, we will simplify the language where possible.
 > something about blame to do with higher-order contracts but not gradual
 > types
 
-Thanks we will add a more detailed comparison along the lines of the
+Thanks, we will add a more detailed comparison along the lines of the
 discussion at the beginning of our response.
 
 
@@ -473,7 +486,7 @@ prose to make that clear.
 > line 90: at first I wondered: what is a case? Maybe say "program
 > variant" to foreshadow the idea of generating mutants etc?
 
-It means debugging scenario. We will clarify.
+It means debugging scenario. We will clarify the prose.
 
 > line 91-ish: "Transient, "Natural", "Erasure" -- be explicit that these
 > are names that *you* are introducing
@@ -484,7 +497,7 @@ introduce them.
 
 > line 187: what is a "component"? Should be easy to define.
 
-In this context a component is a module. 
+In the context of Typed Racket, a component is a module. 
 
 > line 199: "blame set as another form of a stack trace" -- yes. I was
 > hoping to see a clearer example of debugging with and without blame,
@@ -495,8 +508,8 @@ In this context a component is a module.
 > line 277: what is "responsibility" of a "party", exactly? Are "party",
 > "module" and "component" all the same things?
  
-Yes in this context. Blame refers to the unit of blame which in Typed
-Racket is a module. 
+Yes in this context. Party and component refer to the entities that can be
+blamed, which in Typed Racket is modules.
 
 > line 293: I was wondering what constitutes a boundary crossing. Clearly,
 > passing by function call or return crosses from the caller's module to
@@ -535,6 +548,10 @@ We will clarify what a boundary crossing is in the prose.
 > because the static checker would only catch (albeit earlier) errors that
 > would be caught at run time, so there would be no basis to call the
 > result "wrong".
+
+TODO ll: better to refer to the actual example in section 3 here, instead of a hypothetical function? e.g.
+If the client in Figure 1 just writes the result to a file, then the file contents will be wrong.
+Nonetheless, the fact that the contents are in the wrong format will not be detected by the primitives for writing data to a file, so the program will not fail.
 
 Consider a function with a type annotation that says its a function from
 integers to string that formats its argument to a string and returns it.
@@ -575,7 +592,8 @@ Yes please see our answer to a relevant comment above.
 > line 756: "checked the value's type.." -- and the check passed!?
   
 Indeed, Transient checks only check the top-level type constructor of a
-value.  We will add a reminder of this fact to the prose here.
+value. We will add a reminder of section 3's discussion of Transient
+checks to the prose here.
 
 
 
