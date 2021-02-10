@@ -3,54 +3,39 @@ PLDI 2021 Paper #66 Author Response
 
 Thank you to all the reviewers for the helpful feedback. 
 
-We start off with a couple of common themes. Then we reply to all points
-individually.
+The first part of our response addresses a couple of common themes in the reviews; the second part addresses all remaining concerns individually.
 
-The conclusions from our experiment
+Are the empirical results conclusive or surprising?
 ===========================================================================
 
-There are three clear major conclusions from our experiment:
+Here are the two relevant major conclusions from our experiment:
 
-1) The Transient and Natural rational programmers are more effective than
-the Erasure one;
+1) Transient and Natural make rational programmers more effective than
+Erasure;
 
-2) Part of  the additional effectiveness of the former is due to runtime
-checks (that Erasure foregoes) but another part is due to blame;
+2) According to the rational programmer, the effectiveness of Natural is (merely)
+comparable to Transient.
 
-3) The effectiveness of the Natural and Transient rational programmers is
-comparable.
+As review `D` astutely points out, the second one is surprising: _While Theory predicts that Natural blame is more accurate than Transient blame, the experimental results do not support this prediction to a sufficient degree._ 
 
-The first two results confirm what the vast literature on gradual typing
-claims without systematic evidence: blame is useful. However, as review
-`D` astutely points out, the third conclusion is surprising in two
-different ways: 
+Thus our results point to two possible explanations: 
 
-(i) An important motivation for Transient is performance but our
-experiment provides evidence that performance issues, which stem from the
-design of Transient, negatively impact the effectiveness of blame.
+(i) a need for theoretical models with improved predictive power
 
-(ii) Theory claims that Natural blame is more accurate than Transient
-blame but our experiment provides evidence for the opposite;
-ll: TODO is "the opposite" the right phrasing? It seems more accurate to say evidence that doesn't support the prediction.
+The predictive power of gradual typing formal models fails when it comes to blame. In all likelihood, the current models are too small and do not include crucial
+features. (It is posisble that the current models are inherently limited.) 
 
-Thus our results point to two directions for further research in gradual
-typing: 
+(ii) a need for "blame data" from large systems 
 
-(i) Implementors can experiment with checks and blame to find a sweet spot
-between type soundness, blame effectiveness and performance. Our method
+The presented data is based on systems with up to 15 modules, totalling 25,000 loc. While the chosen benchmarks represent a wide spectrum of realistic code, Natural may prove its worth only when the dependency chains are even deeper than the ones in the existing benchmarks. 
+
+In both cases, our new method provides the tools for validating new theoretical results and/or gathering new data. 
+
+Additionally, the experiment suggests that implementors can experiment with checks and blame to find a sweet spot between type soundness, blame effectiveness and performance. Our method
 provides an automatic tool to guide their exploration.
 
-(ii) The predictive power of gradual typing formal models (the reason
-d'etre of scientific models) fails when it comes to blame. This may be
-because the current models are too small and do not include crucial
-features or because the current models are inherently limited. In any case
-our results are a call to theoreticians to re-examine their assumptions
-about blame.  Our method provides an automatic tool to validate their
-models similar to the way the methods of experimental physicists help
-prove or disprove the  math of theoretical physicists.
 
-
-Challenges for our work compared to Lazarek's POPL paper
+Is the method novel? 
 ===========================================================================
 
 Our work builds on the idea of Lazarek et al.'s paper that it is possible
