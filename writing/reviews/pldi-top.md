@@ -46,52 +46,50 @@ is _natural_ to pursue an adaptation of the Lazarek method to gradual
 typing. Adaptation means retaining some ideas and injecting entirely new
 ones:
 
-1. Lazarek et al.'s work can use off-the-shelf mutators because they are
-only looking for bugs that contracts can discover in an untyped world.  In
-particular, type-preserving mutators are acceptable. Our work must use
-mutators whose effect the type system can discover---meaning almost all of
-Lazarek's. Unfortunately, we re-used Lazarek's _names_ for our mutators ---
-a significant articulation mistake on our side. For the final version, we
-will use distinct names.
+1. Lazarek et al.'s work can use off-the-shelf mutators because they are only
+   looking for bugs that contracts can discover in an untyped world.  Our
+   work demands an entirely new judgement of which mutators are "good" or
+   "bad". This new judgment means cutting one mutator, change five of them,
+   and added eleven. There was no other way to get an _interesting_ and
+   diverse body of bugs (see section 4).
 
-2. Lazarek et al. deal with a single contract system and examine a yes-or-no
-question, namely, whether  blame-shifting finds the bug for all debugging
-scenarios of a benchmark. Our experiment compares fundamentally different
-error-reporting schemes and asks questions of degree. 
+2. Lazarek et al. deal with a single contract system. Our experiment compares
+   fundamentally different checking and error-reporting schemata: the
+   industrial Erasure standard and the academic ones (Natural and Transient). 
+   
+3. Lazarek et al. examine a single yes-or-no question: whether blame-shifting
+   works. Our work asks (a) several yes-or-no questions and (b) asks
+   questions of degree. It yields definitive answers for the former; only the
+   latter suffer from ambiguous data.
 
-3. Lazarek et al.'s method cannot really conclude that blame is the reason
-for the success of the debugging process because it fails to isolate the
-effect of blame from that of checks or mere luck. It merely validates that
-blame shifting works. Our work focuses on the value of blame and that kind
-of work demands proper `control's, which are entirely new. 
+4. Lazarek et al.'s method cannot really conclude that blame is the reason
+   for the success of the debugging process, because it fails to isolate the
+   effect of blame from that of checks or mere luck. It simply validates that
+   blame shifting works. Our work focuses on the value of blame and that kind
+   of work demands proper `control's, which are entirely new.
 
-Additionally our work also has to work with at least two different
-baselines:
+   Our work relies on two different baselines to understand the value of blame:
 
-- the run-time checking of the underlying language
+   - _the "random" ("lottery") programmer_ ~~ An irrational programmer ignores
+   the error report and adds types to one randomly chosen component at a
+   time. Hence we use the "random mode" as a baseline to show that following the
+   error report is _not_ a question of luck.
 
-All gradual type systems are built atop languages that check the tags of
-values at run time and, if the tags don't match the operation, raise an
-exception that reports the current stack (trace). Many programmers use
-stack traces for debugging, and our work must show that blame assignment is
-at least as good as this traditional method.
+   - _the run-time checking of the underlying language_ ~~ All sound gradual
+   type systems employ run-time checks to guarantee the consistency of types,
+   but they do not have to track blame. If a run-time check fails, they can
+   raise an exception that reports a stack (trace).  Many programmers use stack
+   traces for debugging, and our work must show that blame assignment is better
+   than keeping checks and throwing out blame.
 
-- the "random" ("lucky") programmer
+5. One additional point from review `D` stands out, namely, the remark that
+   bringing Natural and Transient under the same roof (section 3) is "just
+   engineering."
 
-A less-than-rational programmer may pick random elements from the error
-report and "luck out" all the time. Hence we use the "random mode" as a
-second baseline.
-
-- One additional point from review `D` stands out, namely, the remark that
-  bringing Natural and Transient under the same roof (section 3) is "just
-  engineering."
-
-Neither Reticulated Python nor the model of Transient provide answers about
-what shallow checks correspond to the sophisticated types of Typed Racket
-(or TypeScript), e.g.  polymorphism, row types for mixins, occurrence
-typing) and what information is necessary to record in the blame map.
-Similarly, neither of these two guides an implementor on how to record
-blame properly in principle, not to speak of an implementation. But, we do
-not think that this paper is the proper place to describe this aspect of
-the work. 
-
+   Neither Reticulated Python nor the model of Transient provide answers
+   about what shallow checks correspond to the sophisticated types of Typed
+   Racket (or TypeScript), e.g.  polymorphism, row types for mixins,
+   occurrence typing) and what information is necessary to record in the
+   blame map.  But, we do not think that this paper is the proper place to
+   describe this aspect of the work; the large explanation would distract the
+   reader from the actual thesis of the paper.
