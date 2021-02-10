@@ -166,7 +166,6 @@ Transient, and Erasure strategies. The result shows that both Natural
 and Transient outperform Erasure, which does not assign any blame,
 and, therefore, implies usefulness of blame assignments.
 
-TODO: This seems to imply that we are proposing or assuming the way that real "rational programmers" would behave. Should we try to answer or clarify about that?
 
 Comments for author
 -------------------
@@ -252,8 +251,15 @@ Paper summary
 -------------
 This paper develops an approach for empirically evaluating the effectiveness of blame assignment in gradually typed languages. Roughly speaking, the idea is to model the steps taken by a "rational programmer" who systematically debugs errors in a gradually typed programming. The question is whether different blame assignment strategies are able to help this rational programmer find the "true" source of errors faster, requiring fewer steps.
 
-To evaluate this approach, the paper also presents empirical results. Starting with a small corpus of programs, the authors use mutations to systematically (but synthetically) introduce type errors -- e.g., one mutation replaces a constants with another of a different type, and another mutation swaps method identifiers. They then conduct experiments to quantify the number of steps required by a rational programmer for several blame assignment schemes: Natural (used in Typed Racket, which tracks at most one location for blame), Transient (used in Reticulated Python, which tracks a set of locations), and Erasure (which does not actually assign blame, and is widely used in industry).
-TODO: do we need to clarify that effort is a secondary aspect of the evaluation, and more important is whether blame leads to the bug at all? This is not explicitly clarified anywhere in the rebuttal.
+To evaluate this approach, the paper also presents empirical results. Starting
+with a small corpus of programs, the authors use mutations to systematically
+(but synthetically) introduce type errors -- e.g., one mutation replaces a
+constants with another of a different type, and another mutation swaps method
+identifiers. They then conduct experiments to quantify the number of steps
+required by a rational programmer for several blame assignment schemes: Natural
+(used in Typed Racket, which tracks at most one location for blame), Transient
+(used in Reticulated Python, which tracks a set of locations), and Erasure
+(which does not actually assign blame, and is widely used in industry).
 
 Unsurprisingly, the evaluation shows that blame is effective, when used by a rational programmer. The results are inconclusive, but some trends are clear. Most significant, all of the schemes that assign blame are more useful than Erasure. And Natural blame more often more useful than Transient blame.
 
@@ -483,7 +489,12 @@ I commend the authors for asking the question. Their method is clearly the produ
 DONE
 However, I don't find the results to be as conclusive as the authors state. Aside from the Erasure case, whose relevance I found unclear (see below), conclusions rest on some small-valued "more useful than" percentages. These are pretty hard to interpret, because the "usefulness" metrics necessarily build in a lot of simplifying assumptions. E.g. in 5.4, the "percentage of scenarios where ... is more effective" doesn't account for *extent* of difference, and the trail-length "programmer effort" metric in 5.5 is also unlikely to be a great proxy. These limitations are understandable, method-wise, but overall the results are fairly null... they let us continue believing "what we'd expect" but not with any great sense of added confidence. That doesn't entirely diminish the work, of course, but I'd say the current write-up overplays its hand a little. I appreciate the discussion of threats to validity.
 
-The presentation of the results is very much around aggregates and summaries. Indeed the whole method is about having run a huge compute job over a large number of variants. Perhaps it's paranoia but I'd be interested to see some specific examples walked through by hand (in the paper) and some smaller sample manually classified (as results). That would add an extra sanity check that the metrics do correspond to some meaningful reality.
+The presentation of the results is very much around aggregates and summaries.
+Indeed the whole method is about having run a huge compute job over a large
+number of variants. Perhaps it's paranoia but I'd be interested to see some
+specific examples walked through by hand (in the paper) and some smaller sample
+manually classified (as results). That would add an extra sanity check that the
+metrics do correspond to some meaningful reality.
 
 DONE
 About Erasure: if I'm reading this correctly, the key thing here is that in Typed Racket, the set of static types is more expressive than the set of dynamic types. For example, there is a static notion of non-negative integer that is distinct from plain integer. This sort of design isn't universal -- in some languages/systems static types closely mirror the classification of objects in the language's dynamic semantics. Writing these stricter contracts into a program brings its own benefits, separate from blame or indeed from static checking. It feels like the paper doesn't take enough care to distinguish the two effects: the effect of systematically applying more refined contracts over program values, and the effect of gradually enabling static checking of those contracts (iteratively, guided by blame). The authors do mention this around line 204, and the comparisons in Figure 6 between "_ exceptions" and "Erasure" seem to be measuring this -- the gain from checking these extra annotations, with the more precise and/or more timely checks that they imply, relative to the erased case where only the language baseline contracts are checked. Indeed that's the point of 'exception' experiments. Since the biggest effect sizes on display are these ones -- between Erasure and anything else -- this seems at best distracting. I'd be glad to hear from the authors if I'm misunderstanding anything here. In the detailed comments below, I have noted some places in the text where it would be useful to remind the reader that this design property of Typed Racket is at play.
@@ -551,7 +562,10 @@ DONE
 line 187: what is a "component"? Should be easy to define.
 
 TODO
-line 199: "blame set as another form of a stack trace" -- yes. I was hoping to see a clearer example of debugging with and without blame, i.e. something making explicit the similarities and differences between having blame info and having only a stack trace at the error site.
+line 199: "blame set as another form of a stack trace" -- yes. I was hoping to
+see a clearer example of debugging with and without blame, i.e. something
+making explicit the similarities and differences between having blame info and
+having only a stack trace at the error site.
 
 DONE
 line 211: "languages exceptions" typo
