@@ -67,7 +67,7 @@ That said,
 1) In the context of Lazarek et al.'s work interesting bugs  are those
 detectable by behavioral contracts. Hence, they can use off-the-shelf
 mutators. In fact, their method does not detect the overwhelming majority
-of bugs unless if contracts describe the full functional correctness of
+of bugs except when contracts describe the full functional correctness of
 components. 
 
 2) Lazarek et al.'s method does not isolate the effect of blame from that
@@ -78,8 +78,8 @@ shifting works. In other words, their work is lacking proper `controls'.
 3) Lazarek et al. deal with a single contact system and examine a yes or
 no question: does blame-shifting find the bug for all debugging scenarios
 of a benchmark. They do not provide any guidance how to generalize to
-multiple systems with different notions of checks and/or blame in a way
-that allows comparisons.
+multiple systems with different notions of checks and/or blame in a
+uniform way that also allows comparisons.
 
 This brings us to the three problems we had to solve in order to design
 our experiment: 
@@ -88,14 +88,14 @@ our experiment:
 
 Implementing Transient Typed Racket is not mere engineering.  Neither
 Reticulated nor the Transient model provide answers about what shallow
-check corresponds to Typed Racket's sophisticated types (e.g.
-polymorphism, row types for mixins, occurrence typing) and what information
-is necessary to record in the blame map. Moreover in the process of the
-implementation we discovered issues with the published Transient model and
-the Reticulated model that we had to fix.  We are happy to share with the
-chair a recent dissertation chapter that describes all the ideas and work
-that went into Transient Typed Racket. We do not think that this paper is
-the appropriate place to describe the implementation in detail. 
+checks correspond to Typed Racket's sophisticated types (e.g.
+polymorphism, row types for mixins, occurrence typing) and what
+information is necessary to record in the blame map. Moreover in the
+process of the implementation we discovered issues with the published
+Transient model and Reticulated that we had to fix. We do not think that
+this paper is the appropriate place to describe the implementation in
+detail.
+
 
 
 2) Custom mutators (section 4).
@@ -134,7 +134,7 @@ it turns out such mutations  are not interesting in our setting.
 
 
 A key step for realizing our experiment is the precise and unified
-description of debugging in different gradual typing system  as  the
+description of debugging in the three gradual typing system  as  the
 different modes of the rational programmer. Because of their common
 definitional substrate of blame trails, modes enable the comparison
 between the different systems even when sampling is involved.  Furthermore
