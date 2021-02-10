@@ -3,15 +3,15 @@ PLDI 2021 Paper #66 Author Response
 
 Thank you to all the reviewers for the helpful feedback. 
 
-The first part of our response addresses a couple of common themes in the
+The first part of our response addresses two common themes in the
 reviews; the second part addresses all remaining concerns individually.  
 
-Are the empirical results conclusive or surprising?
+Are the empirical results conclusive? Are they surprising?
 ===========================================================================
 
 Here are the two relevant major conclusions from our experiment:
 
-1. Transient and Natural make rational programmers more effective than Erasure.
+1. Transient and Natural's blame makes rational programmers more effective than Erasure.
 
 2. The effectiveness of Natural is (merely) comparable to Transient.
 
@@ -23,20 +23,22 @@ In analogy to physics research, this points to two possible explanations:
 
 - a need for theoretical models with improved predictive power
 
-In all likelihood, the current models are too small to include features
+In all likelihood, the current models are too small to include language features
 critical to blame assignment. 
 
 - a need for "blame data" from large systems 
 
-The presented data is based on systems with up to 15 modules.  Natural may
-prove its worth only when the dependency chains are deeper than the ones in
-the existing benchmarks. If so, this should guide future research.
+The presented data is based on systems with up to 14 modules (see table
+below).  Natural may prove its worth only when the dependency chains are
+deeper than the ones in the existing benchmarks. If Natural works better
+for programs with deeper dependency chains, this should guide future research
+on mixing approaches.
 
 Is the method novel? 
 ===========================================================================
 
 Our inspiration is Lazarek et al.'s POPL paper, which shows the possibility
-of large-scale desiggn evaluations that do _not_ involve human sw devs.
+of large-scale design evaluations that do _not_ involve human sw devs.
 
 The challenge is how to adapt this work to problems other than
 contracts. Given the close relationship between Natural and contracts, it
@@ -46,7 +48,7 @@ ones:
 
 1. Lazarek et al.'s work can use off-the-shelf mutators because they are
 only looking for bugs that contracts can discover in an untyped world.  In
-particular, type-like mutators are acceptable. Our work must eliminate all
+particular, type-preserving mutators are acceptable. Our work must use
 mutators whose effect the type system can discover---meaning almost all of
 Lazarek's. Unfortunately, we re-used Lazarek's _names_ for our mutators ---
 a significant articulation mistake on our side. For the final version, we
