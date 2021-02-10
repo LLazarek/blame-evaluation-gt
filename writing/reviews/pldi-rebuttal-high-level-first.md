@@ -509,9 +509,9 @@ It means debugging scenario. We will clarify.
 
 > line 91-ish: "Transient, "Natural", "Erasure" -- be explicit that these
 > are names that *you* are introducing
- 
-These are standard names for these three systems [9, 10, 37]. We didn't
-introduce them.
+
+We are reusing these names from Greenman et al. and Vitousek et al. [10, 37],
+but will explain more.
 
 
 > line 187: what is a "component"? Should be easy to define.
@@ -574,9 +574,8 @@ would be migratory. A new gradual-from-the-start language would not be.
 > over the entire lattice in those cases. I was wondering whether that
 > might give different/interesting results. 
 
-Yes, the approach could be applied.
-ll: worth a sentence saying that this would probably not be worthwhile to do?
-bg: TODO try explaining in 2-3 words
+Yes. In fact, we already do this for programs that depend on library code.
+
 
 > line 517: the difference between #1 and #2 here again relies on the
 > surprising property (to the unfamiliar) that Typed Racket has a notion
@@ -587,9 +586,9 @@ bg: TODO try explaining in 2-3 words
 
 Yes please see our answer to a relevant comment above.
 
- 
+
 > line 756: "checked the value's type.." -- and the check passed!?
-  
+
 Indeed, Transient checks only check the top-level type constructor of a
 value.  We will add a reminder of this fact to the prose here.
 
