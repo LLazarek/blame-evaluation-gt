@@ -66,21 +66,21 @@ ones:
    for the success of the debugging process, because it fails to isolate the
    effect of blame from that of checks or mere luck. It simply validates that
    blame shifting works. Our work focuses on the value of blame and that kind
-   of work demands proper `control's, which are entirely new.
+   of work demands proper controls, which are entirely new.
 
    Our work relies on two different baselines to understand the value of blame:
 
    - _the "random" ("lottery") programmer_ ~~ An irrational programmer ignores
-   the error report and adds types to one randomly chosen component at a
-   time. Hence we use the "random mode" as a baseline to show that following the
-   error report is _not_ a question of luck.
+     the error report and adds types to one randomly chosen component at a
+     time. Hence we use the "random mode" as a baseline to show that following
+     the error report is _not_ a question of luck.
 
    - _the run-time checking of the underlying language_ ~~ All sound gradual
-   type systems employ run-time checks to guarantee the consistency of types,
-   but they do not have to track blame. If a run-time check fails, they can
-   raise an exception that reports a stack (trace).  Many programmers use stack
-   traces for debugging, and our work must show that blame assignment is better
-   than keeping checks and throwing out blame.
+     type systems employ run-time checks to guarantee the consistency of types,
+     but they do not have to track blame. If a run-time check fails, they can
+     raise an exception that reports a stack (trace).  Many programmers use
+     stack traces for debugging, but our work must show that blame assignment
+     is better than keeping checks and throwing out blame.
 
 5. One additional point from review `D` stands out, namely, the remark that
    bringing Natural and Transient under the same roof (section 3) is "just

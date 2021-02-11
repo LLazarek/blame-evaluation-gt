@@ -13,10 +13,10 @@ A bad mutator results in a type-level bug that is trivial to locate. For
 instance, a bug that leads to a type-level error during the evaluation of the
 component that contains it is trivial to locate. In contrast, a bug that is
 non-trivial to locate is one that causes the buggy component to evaluate without
-an error but produce instead a value of the wrong type. An interesting bug is
+an error and to produce a value of the wrong type. An interesting bug is
 one where the value with the wrong type manages also to cross undetected to at
-least another component before a type-level check flags it. Good mutators should
-be able to produce these interesting bugs.
+least one other component before a type-level check flags it. Good mutators
+should be able to produce these interesting bugs.
 
 
 > - I don't understand where the 16,800 number comes from. Is it an
@@ -65,7 +65,7 @@ We will fix these. Thanks.
 > - L956: 30,000 hours of compute time is 1,250 days. I assume that the
 >   CPU has many cores. Could you put that number?
 
-Sure. Each CPU has 28 doubly-threaded cores. We will add it to the line.
+Each CPU has 28 doubly-threaded cores. We will add it to the line.
 
 > - L991: Figure 6: It took me some time to understand the figure. I
 >   wonder if there is a better way to represent the same data?
@@ -198,13 +198,13 @@ definitions of section 5, but we can certainly add an explicit mention if
 it would be useful.
 
 
-
 > And unfortunately the results are inconclusive -- Section 8 says "our
 > results call for a deeper understanding of the two models for blame".
 
 The quote from section 8 refers to the theory of blame rather than our
 results.  Please see our discussion of the first theme above for more
 details on this.
+
 
 > Also, the published Transient scheme seems to have a minor bug, which
 > might affect the outcomes when fixed (Section 8.2).
@@ -217,9 +217,10 @@ its current design that we discovered exactly because of the experiment.
 > is much appreciated. But they do risk undermine the value of the
 > contributions to some degree.
 
-We would like to point out that the results of the comparison between the
-three systems in section 7 is only one part of the contribution of the
-paper. The other part is the method itself (sections 3, 4, and 5).
+The results of the comparison between the three systems in section 7 is only
+one part of the contribution of the paper. The other part is the method itself
+(sections 3, 4, and 5).
+
 
 > To explain one comment above: I was surprised not to see a comparison
 > against an "omniscient programmer" to establish a baseline (c.f., the
@@ -303,7 +304,6 @@ insight that allowed us to find the right set of mutators to be the
 definition of interesting bugs. Please see the high level comments at the
 start for more discussion of this.
 
->
 > *Debugging Strategies (Section 5)*
 >
 > These also seem to be overemphasized. The main design choice seems to be
@@ -318,11 +318,12 @@ start for more discussion of this.
 We disagree that section 5 boils down to picking the first and last modes
 for Transient. The core of this section is the analysis of of the
 different systems and their unification in a common precise framework as
-modes. Because of the common substrate of blame trails modes enable the
+modes. Because of the common substrate of blame trails, modes enable the
 comparison between the different systems even when sampling is involved.
+
 Furthermore we use modes to introduce in a uniform manner in the framework
 baselines that help us isolate confounding factors from the actual
-effectiveness of blame. This si exactly the role of the exception modes
+effectiveness of blame. This is exactly the role of the exception modes
 for Natural and Transient. Those two perform checks at runtime and the
 exception modes help us determine what part of the success of Natural and
 Transient is due to the extra checks or due to blame (and also whether
@@ -385,8 +386,8 @@ succeeds in a debugging scenario while another system fails. If both
 succeed we use the length of the trail to quantify the difference between
 the two systems. Trail length may not be the most optimal proxy for programmer
 effort, as we discuss in the paper, but it also allows us to perform a
-large scale automatic experiment about blame without the
-practical limitations of user studies.
+large scale automatic experiment about blame without the practical limitations
+of user studies.
 
 > The presentation of the results is very much around aggregates and summaries.
 > Indeed the whole method is about having run a huge compute job over a large
@@ -436,38 +437,38 @@ factor for the success or failure of the rational programmer.
 > of Typed Racket is at play.
 
 
-We do think there is a misunderstanding here about what gradual typing is
+We think there is a misunderstanding here about what gradual typing is
 in general. 
 
-1) Erasure is the established name of the standard semantics implemented
-by industrial languages such as TypeScript, Flow etc. These languages come
-with an equally sophisticated type system as Typed Racket. Programmers add
-annotations to their program and the type checker does its best to type
-check the program in order to discover mistakes and help the IDE. Then
-types are erased and the program is run in the underlying dynamically typed
-language. That language's primitive operations have runtime checks that
-may detect an incompatible argument and raise an exception. 
+1. Erasure is the established name of the standard semantics implemented
+   by industrial languages such as TypeScript, Flow etc. These languages come
+   with an equally sophisticated type system as Typed Racket. Programmers add
+   annotations to their program and the type checker does its best to type
+   check the program in order to discover mistakes and help the IDE. Then
+   types are erased and the program is run in the underlying dynamically typed
+   language. That language's primitive operations have runtime checks that
+   may detect an incompatible argument and raise an exception. 
 
-2) The two academic semantics introduce extra run time checks (in the form
-of proxies for Natural and inlined checks for Transient, as section 3
-describes). The checks enforce that values the untyped code provides to
-typed code behave according to their expected type. When one of these
-checks fails both Natural and Transient issue blame (though each with
-different mechanisms).
+2. The two academic semantics introduce extra run time checks (in the form
+   of proxies for Natural and inlined checks for Transient, as section 3
+   describes). The checks enforce that values the untyped code provides to
+   typed code behave according to their expected type. When one of these
+   checks fails both Natural and Transient issue blame (though each with
+   different mechanisms).
 
-3) In Typed Racket programmers cannot add contracts. The precision of the
-checks matches the type annotations of a programs. In turn the types of
-Typed Racket primitive operations match the checks that their Racket
-counterparts perform. We also want to note that our benchmarks come with
-the most precise types that allow them to type check (where precision is
-is determined subtyping).
+3. In Typed Racket, programmers cannot add contracts. The precision of the
+   checks matches the type annotations of a programs. In turn, the types of
+   Typed Racket primitive operations match the checks that their Racket
+   counterparts perform. We also want to note that our benchmarks come with
+   the most precise types that allow them to type check (where precision is
+   is determined subtyping).
 
-4) The Natural and Transient exception modes perform the same checks as
-Natural and Transient correspondingly. The only difference is that they do
-not produce blame but instead signal an exception with the stack trace of
-the failed check. We use these modes to separate the effectiveness of
-blame from that of the checks. Please also see the second part of the
-discussion at the beginning of our response.
+4. The Natural and Transient exception modes perform the same checks as
+   Natural and Transient correspondingly. The only difference is that they do
+   not produce blame but instead signal an exception with the stack trace of
+   the failed check. We use these modes to separate the effectiveness of
+   blame from that of the checks. Please also see the second part of the
+   discussion at the beginning of our response.
 
 
 > It's interesting to note that there seems to be no convincing analogous
@@ -484,29 +485,29 @@ discussion at the beginning of our response.
 > or (3) that deeper experiments building on these ideas might yield more
 > compelling insights.
 
-For point 1 and 3 please see our discussion at the beginning of the
+For points 1 and 3 please see our discussion at the beginning of the
 reply. For point 2, the idea of the rational programmer is a new one so
 far applied only to blame in contracts (Lazarek et al. POPL 2020) and blame in
 gradual typing (our work). We do believe it can have a similar effect in
 programming languages as homo economicus in economics.
 
-That said, as posed, this comment expresses a significant
-mis-characterization of the submission. It is not the benefits of a
-gradual type system that are in doubt. The experimental setup keeps the
-type system constant but allows to answer the question which of several
-checking and blaming regimes (for enforcing types) provides the best
-explanatory messages in case of violations. Hence the analogous question
-for purely static type systems would ask which of several reporting
-schemes provides the best explanatory message for type errors. In the case
-of simply typed languages and even languages with local type inference,
-this question is basically meaningless. In the case of languages with HM
-type inference, the question has been implicitly raised for four decades
-with the development of alternative ways of finding the source of
-inference conflicts. One recent example is SHErrLoc (Zhang et al. TOPLAS
-2017). If the reviewer is indeed interested in the question of whether
-type systems help programmers --- a question that this submission does
-_not_ ask --- then Hanenberg and Stefik's papers are a good starting point
-(e.g. ICSE 2014).
+That said, as posed, this comment expresses a significant mis-characterization
+of the submission. It is not the benefits of a gradual type system that are in
+doubt. The experimental setup keeps the type system constant but allows to
+answer the question which of several checking and blaming regimes (for
+enforcing types) provides the best explanatory messages in case of violations.
+Hence the analogous question for purely static type systems would ask which of
+several reporting schemes provides the best explanatory message for type
+errors. In the case of simply typed languages and even languages with local
+type inference, this question is basically meaningless. In the case of
+languages with HM type inference, the question has been implicitly raised for
+four decades with the development of alternative ways of finding the source of
+inference conflicts. One recent example is SHErrLoc (Zhang et al. TOPLAS 2017).
+
+If the reviewer is indeed interested in the question of whether type systems
+help programmers --- a question that this submission does _not_ ask --- then
+Hanenberg and Stefik's papers are a good starting point (e.g. ICSE 2014).
+
 
 > line 34: "then their compilers remove types and rely on the built-in
 > safety checks of the underlying language to catch any problems". This
@@ -519,7 +520,7 @@ In Erasure, a program can type check and still have type-level errors
 because some type annotations may be missing. Section 3 illustrates
 exactly this scenario by example. In contrast to Natural and Transient,
 types in Erasure do not result in run time checks so the only way to
-detect type-level errors that the type checker couldn't find is the
+detect type-level errors that the type checker could not find is the
 built-in checks of the language's primitives.
 
   
@@ -527,6 +528,7 @@ built-in checks of the language's primitives.
 
 The challenge questions whether blame is useful at all in gradual typing.
 We will clarify this in the prose.
+
 
 > line 49: I agree they got the word wrong, but you should explain this
 
@@ -538,6 +540,7 @@ We will clarify this in the prose.
 > by writing in a more direct style.
 
 Noted, we will rephrase.
+
 
 > line 69: be explicit that Lazarek et al were (as I later gathered) doing
 > something about blame to do with higher-order contracts but not gradual
@@ -552,10 +555,12 @@ discussion at the beginning of our response.
 The sentences that follow line 70 are meant to expand on the slogan. We
 will adjust the prose to make it clear.
 
+
 > line 90: at first I wondered: what is a case? Maybe say "program
 > variant" to foreshadow the idea of generating mutants etc?
 
 It means debugging scenario. We will clarify the prose.
+
 
 > line 91-ish: "Transient, "Natural", "Erasure" -- be explicit that these
 > are names that *you* are introducing
@@ -575,6 +580,7 @@ In the context of Typed Racket, a component is a module.
 Yes in this context. Party and component refer to the entities that can be
 blamed, which in Typed Racket is modules.
 
+
 > line 293: I was wondering what constitutes a boundary crossing. Clearly,
 > passing by function call or return crosses from the caller's module to
 > the callee's. What about values exchanged through reads/writes to shared
@@ -583,6 +589,7 @@ blamed, which in Typed Racket is modules.
 Yes, exchange of values via state also constitutes a boundary crossing.
 Some of our benchmarks do exactly that. We will clarify what a boundary
 crossing is in the prose.
+
 
 > line 313: it threw me that a program might not fail but "produce a wrong
 > result". If it could be caught by the gradual type system, why can't it
@@ -594,20 +601,18 @@ crossing is in the prose.
 > result "wrong".
 
 No. A buggy program can terminate in Erasure where in Natural or Transient
-it produces a run time type error. Greenman et al. [OOPSLA 2019] prove
+it produces a run time type error. Greenman et al. [10] prove
 formally this proposition but it is easy to construct an example that
 demonstrates the issue. For instance if the client in Figure 1 just
 formats the result of 'crypto-pack' to string, then the client will
 terminate without an error but its string result will be wrong; it will be
 a string representation of a hash rather than a list. The reason is that
-the `format' primitive of Racket does not care what its argument is.
-
+the `format` primitive of Racket does not care what its argument is.
 
 
 > line 380: from this I inferred that "migratory typing" means "gradual
 > typing applied at modulewise granularity". Assuming that's correct, it's
 > worth saying directly.
-  
 
 In contrast to the initial formulation of gradual typing [21], migratory
 typing does not provide support for type Dyn, components are either
@@ -615,6 +620,7 @@ untyped or fully typed and the gradual type system does not affect the
 compilation of untyped components. Please see the note at the end of
 section 3 about why this distinction is not important in the context of
 our paper. 
+
 
 > line 424: "fully typed correct programs" -- presumably your method could
 > also work with not-yet-fully-typed correct programs, just not ranging
@@ -710,7 +716,6 @@ checks to the prose here.
 > seems to contradict that
 
 > line 640: what makes it "concise"?
-  
 
 > line 673: "programmers runs" typo
 
@@ -725,7 +730,6 @@ checks to the prose here.
 > line 966: "more useful C" -- missing "than"
 
 > line 982: don't think these percentages deserve 3 significant figures
-
 
 > line 1304: "Problem is" -- missing "The". Also, no need to italicise the
 > next sentence... it is really not that deep or surprising.
