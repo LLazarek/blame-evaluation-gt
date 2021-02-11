@@ -9,8 +9,14 @@ Review #66A
 >   than experimentally seeing that it is good.) Perhaps, what would be a
 >   really bad mutator for evaluating blame assignment?
 
-Please see our reply to the second part of the discussion at the beginning
-of the rebuttal.
+A bad mutator results in a type-level bug that is trivial to locate. For
+instance, a bug that leads to a type-level error during the evaluation of the
+component that contains it is trivial to locate. In contrast, a bug that is
+non-trivial to locate is one that causes the buggy component to evaluate without
+an error but produce instead a value of the wrong type. An interesting bug is
+one where the value with the wrong type manages also to cross undetected to at
+least another component before a type-level check flags it. Good mutators should
+be able to produce these interesting bugs.
 
 
 > - I don't understand where the 16,800 number comes from. Is it an
@@ -83,9 +89,7 @@ We were also surprised to discover that Transient outperforms Natural in
 some scenarios. After all, theory says otherwise. We haven't identified
 any patterns for these scenarios. We conjecture that they point to
 limitations of the theory but we can't exclude that some of them aren't
-because of some unknown Typed Racket bug. Please see the first part of the
-discussion at the beginning of our response for more details and for our
-take on your last question.
+because of some unknown Typed Racket bug.
 
 
 
@@ -250,7 +254,7 @@ programmer described in section 5.5 serves as the "control" of the whole
 experiment. In addition, the exception modes described in sections 5.1 and
 5.2 each serve as further "controls" to distinguish the effect of checks
 from that of blame within each semantics. Please also see our discussion
-of modes in the second theme at the beginning of our reply.
+of baselines in the second theme at the beginning of our reply.
 
 
 > Similarly, I wondered why the modes of the transient programmer only
