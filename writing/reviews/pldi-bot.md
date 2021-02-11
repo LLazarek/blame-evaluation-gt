@@ -380,18 +380,13 @@ Please see the discussion at the beginning of our response about the
 interpretation of our results, their significance and how they challenge
 existing perceptions about blame.
 
-We are unclear what ``extent'' means. Usefulness asks whether one system
+We are unclear what "extent" means. Usefulness asks whether one system
 succeeds in a debugging scenario while another system fails. If both
 succeed we use the length of the trail to quantify the difference between
-the two systems. Trail length may be the most optimal proxy for programmer
+the two systems. Trail length may not be the most optimal proxy for programmer
 effort, as we discuss in the paper, but it also allows us to perform a
 large scale automatic experiment about blame without the
 practical limitations of user studies.
-
-- see general comments for how to interpret results, their significance, and how they challenge existing perceptions
-- usefulness asks if one succeeds when another failed; no extent for this
-- if both succeed, can quantify difference, use trail length to do so
-- trail length is proxy, paper discusses limitations, allows automation ... no humans + large scale
 
 > The presentation of the results is very much around aggregates and summaries.
 > Indeed the whole method is about having run a huge compute job over a large
@@ -403,7 +398,7 @@ practical limitations of user studies.
 We are not sure what the question is here. If the question is whether our
 implementation of the experiment is faithful to the definitions from
 section 5 and the discussion about statistics from section 6, then the
-answer is emphatically yes. Of course we have validate manually a number of
+answer is emphatically yes. Of course we have validated manually a number of
 blame trails for each mode and moreover our implementation of the
 experiment comes with plenty of sanity checks.
 
@@ -500,18 +495,18 @@ mis-characterization of the submission. It is not the benefits of a
 gradual type system that are in doubt. The experimental setup keeps the
 type system constant but allows to answer the question which of several
 checking and blaming regimes (for enforcing types) provides the best
-explanatory messages in case of violations.  Hence the analogous question
+explanatory messages in case of violations. Hence the analogous question
 for purely static type systems would ask which of several reporting
-  schemes provides the best explanatory message for type errors.  In the
-  case of simply typed languages and even languages with local type
-  inference, this question is basically meaningless. In the case of
-  languages with HM type inference, the question has been implicitly
-  raised for four decades with the development of alternative ways of
-  finding the source of inference conflicts. One recent example is
-  SHErrLoc (Zhang et al. TOPLAS 2017).  If the reviewer is indeed
-  interested in the question of whether type systems help programmers --- a
-  question that this submission does _not_ ask --- then Hanenberg and
-  Stefik's papers are a good starting point (e.g. ICSE 2014).
+schemes provides the best explanatory message for type errors. In the case
+of simply typed languages and even languages with local type inference,
+this question is basically meaningless. In the case of languages with HM
+type inference, the question has been implicitly raised for four decades
+with the development of alternative ways of finding the source of
+inference conflicts. One recent example is SHErrLoc (Zhang et al. TOPLAS
+2017). If the reviewer is indeed interested in the question of whether
+type systems help programmers --- a question that this submission does
+_not_ ask --- then Hanenberg and Stefik's papers are a good starting point
+(e.g. ICSE 2014).
 
 > line 34: "then their compilers remove types and rely on the built-in
 > safety checks of the underlying language to catch any problems". This
