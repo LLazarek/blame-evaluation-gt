@@ -49,8 +49,8 @@ ones:
 1. Lazarek et al.'s work can use off-the-shelf mutators because they are only
    looking for bugs that contracts can discover in an untyped world.  Our
    work demands an entirely new judgement of which mutators are "good" or
-   "bad". This new judgment means cutting one mutator, change five of them,
-   and added eleven. There was no other way to get an _interesting_ and
+   "bad". This new judgment means cutting one mutator, changing four of them,
+   and adding nine. There was no other way to get an _interesting_ and
    diverse body of bugs (see section 4).
 
 2. Lazarek et al. deal with a single contract system. Our experiment compares
