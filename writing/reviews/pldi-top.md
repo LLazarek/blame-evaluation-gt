@@ -4,7 +4,7 @@ PLDI 2021 Paper #66 Author Response
 Thank you to all the reviewers for the helpful feedback. 
 
 The first part of our response addresses two common themes in the
-reviews; the second part addresses all remaining concerns individually.  
+reviews; the second part addresses all remaining concerns individually.
 
 Are the empirical results conclusive? Are they surprising?
 ===========================================================================
@@ -38,17 +38,17 @@ Is the method novel?
 ===========================================================================
 
 Our inspiration is Lazarek et al.'s POPL paper, which shows the possibility
-of large-scale design evaluations that do _not_ involve human sw devs.
+of large-scale design evaluations that do _not_ involve human software devs.
 
 The challenge is how to adapt this work to problems other than
 contracts. Given the close relationship between Natural and contracts, it
-is _natural_ to pursue an adaptation of the Lazarek method to gradual
+is "natural" to pursue an adaptation of the Lazarek method to gradual
 typing. Adaptation means retaining some ideas and injecting entirely new
 ones:
 
 1. Lazarek et al.'s work can use off-the-shelf mutators because they are only
    looking for bugs that contracts can discover in an untyped world.  Our
-   work demands an entirely new judgement of which mutators are "good" or
+   work demands an entirely new judgment of which mutators are "good" or
    "bad". This new judgment means cutting one mutator, changing four of them,
    and adding nine. There was no other way to get an _interesting_ and
    diverse body of bugs (see section 4).
@@ -59,8 +59,8 @@ ones:
    
 3. Lazarek et al. examine a single yes-or-no question: whether blame-shifting
    works. Our work asks (a) several yes-or-no questions and (b) asks
-   questions of degree. It yields definitive answers for the former; only the
-   latter suffer from ambiguous data.
+   questions of degree; it yields statistically sound answers for the former
+   and evidence to shed light on the latter.
 
 4. Lazarek et al.'s method cannot really conclude that blame is the reason
    for the success of the debugging process, because it fails to isolate the
