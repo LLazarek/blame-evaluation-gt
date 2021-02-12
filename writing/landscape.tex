@@ -117,7 +117,7 @@ return type check fails then the problem is with
 \texttt{untyped/pack-lib}, while if the argument type check fails
 responsibility lies with \texttt{client}. The Natural semantics keep track
 of the responsible party for each check in the corresponding proxy. Thus,
-in our example, when the call to \texttt{typed-pack} returns, the return
+in our example, as the call to \texttt{typed-pack} returns, the return
 type check fails and the Natural semantics blames \texttt{pack-lib}.
 
 Under the Transient semantics~\cite{vss-popl-2017}, the call to \texttt{typed-pack} does not
@@ -136,22 +136,24 @@ cross and the corresponding types. In the example, the map records that
 \texttt{typed/pack-lib} and from \texttt{typed/pack-lib} to
 \texttt{client} with the type that appears in the \texttt{required/typed}
 forms in the example. Since the failed check corresponds to the return
-type of \texttt{pack}, Transient blames the sources of the two boundary
-crosses, which in this case is \texttt{untyped/pack-lib} for both. In
-general though, Transient may blame more than one party. In fact, the
-theoretical work of~\citet{gfd-oopsla-2019} shows that there are programs
-where Transient constructs a blame set that includes modules that are not
-relevant to the check failure or that it even misses entirely the responsible
-party ---  our experiment aims to examine the pragmatic impact of exactly these
-issues on debugging type-level mistakes.
+type of \texttt{pack}, Transient blames the sources of the two
+boundary crosses, which in this case is \texttt{untyped/pack-lib} for
+both. In general though, Transient may blame more than one party. In
+fact, the theoretical work of~\citet{gfd-oopsla-2019} shows that there
+are programs where Transient constructs a blame set that includes
+modules that are not relevant to the check failure or that it even
+entirely misses the responsible party--our experiment aims to examine
+the pragmatic impact of exactly these issues on debugging type-level
+mistakes.
 
-Under the Erasure semantics, the example does not raise an error due to the
-gradual type system; Erasure performs no type checks at runtime. Thus the
-program may fail with an exception if \texttt{client} tries to use the
-result of \texttt{typed-pack} or \texttt{crypto-pack}, but it may also not
-fail at all and produce a wrong result that goes undetected by the
-gradual type system .  In either case, the Erasure semantics provides no
-help to the programmer for detecting the bug in our program. 
+Under the Erasure semantics, the example does not raise an error due
+to the gradual type system; Erasure performs no type checks at
+runtime. Thus the program may fail with an exception if
+\texttt{client} tries to use the result of \texttt{typed-pack} or
+\texttt{crypto-pack}, but it may also not fail at all and produce a
+result of the proper kind---and yet is completely wrong.  In either
+case, the Erasure semantics provides no help to the programmer for
+detecting the bug in our program.
 
 Since, the goal of our experiment is to compare the effectiveness of blame
 across the three semantics, it is critical to isolate their
@@ -163,7 +165,7 @@ is while for Erasure we run programs with plain Racket after erasing any
 type annotations. Third, for Transient we implement a variant of Typed
 Racket that follows closely the semantics from~\citet{vss-popl-2017}. 
 
-The first major ingredient of Transient Typed Racket is to determine the
+The first major ingredient to the construction of Transient Typed Racket is to determine the
 Racket implementation of the shallow checks that map to each type.  For
 certain types, such as {\tt String} or {\tt (Vectorof Byte)}, Transient
 can re-use a predicate from the Racket language.  Other types require custom
@@ -184,8 +186,8 @@ string result because {\tt f} could be an untyped function.  Rewriting
 also inserts hooks to update the blame map.  When a value crosses a module
 boundary, the blame map records a type assumption.  The inlined checks
 for elimination forms also extend the blame map with further information. For
-instance, the check of the result of {\tt (f x)} adds to the blame map
-that the expected type of the result is the return type of the type of
+instance, the check of the result of {\tt (f x)} adds an entry to the blame map
+that records the expected type of the result as the return type of the type of
 {\tt f}.  If a Transient check ever fails, Transient Typed Racket walks over 
 the information in the blame map and reports a set of blamed components.
 
@@ -195,8 +197,10 @@ the information in the blame map and reports a set of blamed components.
 Typed Racket's migratory typing. In contrast to the initial formulation of
 gradual typing~\cite{st-sfp-2006}, migratory typing does not provide
 support for type \texttt{Dyn}, components are either untyped or fully
-typed and the gradual type system does not affect the compilation of
-untyped components. Despite, these differences, Typed Racket is the most
+typed.
+%% MF: does it ever:
+%% and the gradual type system does not affect the compilation of untyped components. 
+Despite, these differences, Typed Racket is the most
 mature system for sound mix-typed code
 and recent theoretical work has established that
 its migratory typing offers a setting for comparing different approaches to gradual

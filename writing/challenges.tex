@@ -2,73 +2,75 @@
 \section{Why Is It Hard to Evaluate Blame?}
 \label{sec:challenges}
 
-The most serious challenge for evaluating blame concerns 
-the nature of this research. Unlike ordinary
-work on programming languages, the question seems to call for empirical research
-similar to that of human-computer interaction. At the same time, a
-significant evaluation result demands a large number of cases yielding a serious
-amount of data. But, as~\citet{lksfd-popl-2020} already demonstrated, the way
-around this dilemma is to postulate the equivalent of a {\it homo economicus\/}
-for programming languages---the {\em rational programmer\/}---and to implement
-this rational programmer as an algorithm.  As indicated in the introduction, in
-the context of gradual typing, the rational programmer translates the
+%% -----------------------------------------------------------------------------
+
+The challenge of evaluating blame is a methodological one. Unlike most research
+on programming languages, the question seems to call for empirical research
+similar to that of human-computer interaction. At the same time, a significant
+evaluation result demands a large number of cases yielding a serious amount of
+data. As~\citet{lksfd-popl-2020} recently demonstrated, the way around this
+dilemma is to postulate the equivalent of a {\it homo economicus\/} for
+programming languages---the {\em rational programmer\/}---and to implement this
+rational programmer as an algorithm.
+
+In the context of gradual typing, the rational programmer translates the
 Wadler-Findler slogan into a debugging method, searching for the source of the
 impedance mismatch in an incremental fashion. Measuring this simulated
-programmer's behavior on a large number of inputs yields relevant 
-data, similar to collecting empirical data in a human-focused discipline. 
+programmer's behavior on a large number of debugging sessions yields data that
+is similar to empirical data collected in a human-focused discipline.
 
-A derivative challenge is the problem of simulating the programmer's
-mistakes or, more precisely, the origin of impedance mismatches. Before a
-programmer can try to find mistakes, mistakes have to be made.
-Specifically, a necessary step to test the rational programmer is to find
-a collection of  type mistakes in  mix-typed programs that is highly
-representantive of both mistakes and programs ``in the wild.''
-Unfortunately no such collection exists.  There is a good reason for that;
-the kind of mistakes the rational programmer targets are easily detected
-by unit tests and, even if their sources are hard to find, these mistakes do not make it
-into code repositories with appropriate commit messages.  In other words, the problem is how to generate a
-sufficiently large and representantive corpus of type mistakes for a meaningful
-experiment.  Following~\citet{lksfd-popl-2020} again, the solution is to
-use mutation analysis~\cite{lipton1971fault, demillo1978hints,
-jia2011analysis} to create mistakes in a synthetic manner. This process
-yields a large number of buggy programs whose mixed-typed versions are
-suitable subjects for our experiment.  The mutation analysis of Lazarek et
-al, is, however, useless for creating impedance mismatches.
+A derivative challenge is the problem of simulating the impedance mismatches
+between typed and untyped pieces of code that programmers may accidentally create
+and that the run-time checks of academic systems catch. In other words, the
+experiment calls for a collection of type mistakes in mix-typed programs that is
+representative of those ``in the wild.'' Unfortunately no such collection exists,
+and with good reason; the kind of mistakes the rational programmer targets are
+easily detected by unit tests and, even if their sources take some time to find,
+these mistakes do not make it into code repositories with appropriate commit
+messages.  Hence the experimenter must generate a sufficiently large and
+representative corpus of type mistakes for a suitable collection of benchmark
+programs.  Following~\citet{lksfd-popl-2020} again, the solution is to synthesize
+mistakes using mutation analysis~\cite{lipton1971fault, demillo1978hints,
+jia2011analysis}.  The mutation analysis of Lazarek et al, is, however, useless
+for creating impedance mismatches.  While mutation analysis traditionally aims to
+inject bugs that challenge test suites, it discards those that yield ill-typed
+mutants as \emph{incompetent}.  Indeed, mutation analysis frameworks are
+fine-tuned to avoid them---and yet it is precisely those that are needed for
+evaluating blame assignment strategies.
 
-While mutation analysis traditionally aims to inject bugs that challenge
-extensive test suites, the ones yielding ill-typed mutants are usually deemed
-\emph{incompetent}. As a matter of fact, mutation analysis frameworks are
-fine-tuned to avoid them---yet it is precisely those that are needed for
-evaluating blame assignment strategies. The mutators used here are newly designed,
-inspired by the authors extensive experience with programming in Typed Racket.
-They cause type errors that cover a wide range of Typed Racket's type system and moreover
-reliably cause runtime exceptions in mixed-typed versions of mutants.
+Thus, an experimental analysis of blame needs a mostly new set of mutators.
+Roughly speaking, the new mutators inject type errors into fully typed programs.
+Applying such a mutator to any typed component produces a mutatnt component.  A
+debugging scenario results from removing the types from the mutatnt. For the
+design of such mutators, the authors relied on their own extensive programming
+experience though not without discovering a major pitfall: some of their original
+mutators systematically produced programs that immediately revealed the source of
+the impedance mismatch. About two thirds of the original mutators survived this
+first scrutiny testing. All of the remaining ones yield interesting debugging
+sessions. 
 
-The second big challenge is the disparity of gradually
-typed languages. While the approaches are well understood in theory,
-they come with vastly different type systems, accommodate seemingly
-incompatible language features, and apply to radically different coding
-styles in the untyped world.  To eliminate the effect of these differences 
-on its results, the application of an evaluation method to different
-gradual typing systems must use the same test programs and the same type
-system. Otherwise, results for different gradual typing systems 
-do not share a common baseline and, therefore, do not lend support to any
-conclusions about whether the value of blame changes from one system to
-another. For instance, the case study presented here builds on
-Greenman and Felleisen's Transient variant for functional Typed
-Racket~\cite{gf-icfp-2018} to obtain a Transient semantics that is
-comparable with Typed Racket's default Natural one. This Transient
-variant accommodates varied linguistic features and library calls
-in a way that is faithful to the Transient
+A somewhat coincidental challenge is the disparity of gradually typed
+languages. While the approaches are well understood in theory, they come with
+vastly different type systems, accommodate seemingly incompatible language
+features, and apply to radically different coding styles in the untyped world.
+To eliminate the effect of these differences on its results, the application of
+an evaluation method to different gradual typing systems must use the same test
+programs and the same type system. Otherwise, results for different gradual
+typing systems do not share a common baseline and, therefore, do not lend support
+to any conclusions about whether the value of blame changes from one system to
+another. For instance, the case study presented here builds on Greenman and
+Felleisen's Transient variant for functional Typed Racket~\cite{gf-icfp-2018} to
+obtain a Transient semantics that is comparable with Typed Racket's default
+Natural one. This Transient variant accommodates varied linguistic features and
+library calls in a way that is faithful to the Transient
 semantics~\cite{vss-popl-2017}.
 
-Beyond the implementation issue, the method also faces the problem that
-the three variants---the Natural semantics, the Transient semantics, and
-the Erasure semantics---come with three radically different blame
-assignment strategies.  For example, the Natural semantics assigns blame
-to one component while Transient assigns blame to a set of components. The
-Erasure semantics does not blame a component per se, but it comes with an
-exception location and the usual stack traces. 
+Beyond the sheer implementation issue, the development of a method must also
+address the problem that the three semantic variants---Natural, Transient, and
+Erasure---come with three different blame assignment strategies.  While Natural
+assigns blame to {\em one\/} component, Transient assigns blame to a sequence of
+components. The Erasure semantics does not blame a component per se, but it comes
+with an exception location and a stack trace.
 
 Supporting these strategies is {\em not\/} just an issue of language
 implementation but affects greatly the behavior of the rational
@@ -99,39 +101,34 @@ from the underlying languages exceptions to select the next component(s) to type
 This \emph{exception} mode simulates a rational programmer that ignores
 blame and serves as the baseline for blame's value.
 
-
-The final big challenge is that the different gradual type
-systems, the number of necessary modes for the rational programmer
-and the large number of mutants lead to an explosion of scenarios the
-method needs to examine. Thus a practical application of the
-method has no option but to carefully sample the space of scenarios while 
-making sure that it still produces reproducible conclusions.
-
+The final big challenge is the explosion of debugging scenarios that results from
+the combination of mutation-based scenario generation and mode-based analysis.
+Specifically, the experiment demands a large amount of computational resources
+due to the multiplicative effect of mixing the different gradual type systems,
+the number of debugging modes for the rational programmer, and the large number
+of mutants.  A practical application of the method has no option but to sample
+the space of scenarios, carefully ensuring that it still produces reproducible
+conclusions.
 
 \smallskip
 
-These challenges expose the subtlety of evaluating blame strategies but
-also suggest a recipe:
+Overcoming these challenges needs a systematic approach: 
 
 %% for doing so correctly
 %% MF: what is correct about this recipe? 
 
 \begin{itemize}
 
-\item Implement all three gradual type systems on a common
-  basis (section~\ref{sec:landscape});
+\item a single-language implementation of all three gradual type systems (section~\ref{sec:landscape});
 
-\item Generate a large set of programs with interesting
-  type-level errors (section~\ref{sec:mutate}); 
+\item a suitable set of mutators for the generation of a large set of debugging
+  scenarios with interesting type-level errors (section~\ref{sec:mutate}); 
     
-\item Simulate the rational programmer on these programs with sufficient 
-  modes to make meaningful comparisons between modes of the same or
-    different systems
-    (section~\ref{sec:rational});
+\item an algorithmic simulation of the rational programmer on these debugging
+  scenarios with sufficient modes to make meaningful comparisons between modes of
+  the same or different systems (section~\ref{sec:rational});
 
-
-
-\item Sample the experimental space  to obtain a computationally feasible
-  but statistically sound experiment (section~\ref{sec:sample}).
+\item a careful sampling of the experimental space to obtain a computationally
+  feasible and statistically sound experiment (section~\ref{sec:sample}).
 
 \end{itemize}

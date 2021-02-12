@@ -1,9 +1,9 @@
 \section{How to Make Lots of Mistakes} 
 \label{sec:mutate}
 
-An important challenge from section~\ref{sec:challenges} is the generation of
-mix-typed programs with representative impedance mismatches between
-the typed components, their types, and the behavior of untyped components. In this section, we
+%% this is awkward, but what I removed was exponentially awkward
+
+In this section, we
 present a generation process and argue that, despite its synthetic
 nature, it yields a large corpus of programs with  realistic and diverse type mistakes.
 
@@ -75,7 +75,7 @@ Of course, the gradual typing benchmarks have no mistakes for the rational
 programmer to debug. Therefore, we follow ~\citet{lksfd-popl-2020} and we
 inject bugs with mutation
 analysis~\cite{jia2011analysis,demillo1978hints,lipton1971fault}.  A
-mutation is a local syntactic change of the code of a program that may
+mutation is a local syntactic change of the code that may
 produce a bug. Usually, the outcome of mutating a program once, dubbed a
 mutant, can be distinguished from the original program with a test case.
 The better the test suite of a program, the more mutants it can ``kill.''
@@ -83,7 +83,7 @@ Mutants that are hard to ``kill'' usually correspond to subtle programming
 errors, and mutation frameworks typically come with standard mutators
 carefully designed to create such mutants.
 
-However,  unlike the hard-to-kill mistakes introduced by standard mutators, 
+Unlike the hard-to-kill mistakes introduced by standard mutators, 
 gradual type systems catch shallow errors.  Thus, in order to
 exercise the rational programmer in the context of gradual typing, 
 we need to develop alternative mutators
@@ -218,12 +218,12 @@ attempt to confuse occurrence typing.
 
 \subsection{Are these mutators any good?}
 
-The astute reader must have observed that mutators that produce 
+The reader may have observed that mutators that produce 
 type-level mistakes do not necessarily turn our benchmarks into
 interesting debugging scenarios for the rational programmer.  The
 benchmarks are fully typed, and type checking detects each mistake at
 compile time.  Hence, we apply the mutators to versions, dubbed
-\dubbed{scenarios}, of the benchmarks without 
+dubbed{scenarios}, of the benchmarks without 
 some  of their type annotations.  Without the annotations, the type
 checker may not detect a mistake at compile time and, instead, the run
 time checks
@@ -240,8 +240,7 @@ scenario that
 \end{enumerate}
 
 The first criterion simply validates that the debugging scenario concerns
-an actual type-level mistake. However, The second and third criteria require 
-more explanation.  The second one stipulates that the mistake is
+an actual type-level mistake. The second one stipulates that the mistake is
 detectable under Erasure to ensure that it is detectable by all three
 semantics.   Whether a scenario produces a run time error largely depends on 
 the underlying semantics but \citet{gfd-oopsla-2019}
@@ -254,7 +253,7 @@ Erasure over Transient and Natural and, for the same reason, Transient over
 Natural. We consider some form of bias towards one or the other semantics
 unavoidable no matter how we define interesting debugging scenarios and we
 opt for tipping the scales in favor of the theoretically weakest
-semantics. We discuss further the implications of this choice in
+semantics. We further discuss the implications of this choice in
 section~\ref{sec:discussion}.
 
 The third criterion aims to capture debugging scenarios with a specific
