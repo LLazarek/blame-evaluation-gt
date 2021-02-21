@@ -1,26 +1,24 @@
 \section{Does Blame Matter?}
 \label{sec:introduction}
 
-Theoreticians of gradual typing have focused on
-blame theorems from the very beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
+Theoreticians of gradual typing have focused on blame theorems from the very
+beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
 [components]\footnote{The original authors got this word wrong.} can't be
-blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Indeed,
-academic implementations---for example, Reticulated
-Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
-Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}---come
-with sophisticated blame assignment strategies. The academics that
-created them firmly embrace the idea that blame can help practicing
-programmers find impedance mismatches between the types they added to a
-software system and the behavior of the remaining untyped components. 
+blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Academic systems
+(Reticulated Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
+Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}) come
+with sophisticated blame assignment strategies. Their academic creators embrace
+the idea that blame can help practicing programmers find impedance mismatches
+between the types they added to a software system and the behavior of the
+remaining untyped components.
 
-Industrial implementors of  gradual typing systems have almost completely ignored blame assignment.
-Systems such as Flow,\footnote{\url{https://flow.org}}
+Industrial implementors of gradual typing systems have almost completely ignored
+blame assignment.  Systems such as Flow,\footnote{\url{https://flow.org}}
 Hack,\footnote{\url{https://hacklang.org}} or
-TypeScript\footnote{\url{https://www.typescriptlang.org}} exploit types for IDE actions and for finding typos in
-code. Then their compilers remove types and rely on the built-in safety checks of
-the underlying language to catch any problems. 
-Recently, \citet{cc-snapl-19} have turned this implicitly expressed
-skepticism into an explicit statement and challenge.
+TypeScript\footnote{\url{https://www.typescriptlang.org}} exploit types for IDE
+actions and for finding typos in code. Then their compilers remove types and
+rely on the built-in safety checks of the underlying language to catch any
+problems.
 
 This contrast between theoretical research and industrial applications of gradual typing raises the question 
 \begin{quote}
@@ -28,55 +26,57 @@ This contrast between theoretical research and industrial applications of gradua
  whether blame assignment adds any value to a gradually typed language,
  especially for the benefit of the working programmer.
 \end{quote}
-Given the long standing academic interest in blame  and its complete absence in
+Given the long-standing academic interest in blame and its complete absence in
 industrial systems, it comes as an even bigger surprise that the research
-literature and the industrial blog world do not present or discuss any
-possible answers.  Instead, when language designers decide to look into the
-question, they seem to answer it one way or another without any scientific
-justification. As a matter of fact, the research community simply does not have a
-method for evaluating blame, and given the question's practical
-relevance, this is a significant problem.
+literature and the industrial blog world do not discuss any possible answers.
+Instead, when language designers make relevant decisions, they seem to answer it
+one way or another without any scientific justification. Then again, the
+community has thus far failed to offer a method for evaluating blame assignment.
 
-This paper's first contribution is an automated method for evaluating the
-effectiveness of blame assignment strategies in the gradual typing world.
-%% (sections ~\ref{sec:landscape},~\ref{sec:mutate},~\ref{sec:rational} and \ref{sec:sample}). 
-%% MF: says you can't simulate a roadmap by listing all sections.
-%% MF: and for heaven's sake lookup the use of ~ in TeX
-Roughly speaking, the method, which is
-loosely based on the work of Lazarek et al.~\cite{lksfd-popl-2020},
-simulates a programmer who follows the Wadler-Findler slogan quoted above.
-Such a \emph{rational programmer} can find impedance-mismatch
-bugs by adding types to a partially typed program (section~\ref{sec:landscape}). That is, when the
-run-time system signals an impedance mismatch, a good blame message helps
-the programmer infer where to add an additional type specification.
-Components that pass the type checker cannot cause impedance mismatches,
-so if the type checker discovers these mismatches at compile time then it points
-directly to the faulty component. Otherwise, if the
-additional type does {\em not\/} cause a static type error, the program
-is run again to signal another violation. Then the programmer can heed
-blame one more time to add yet another type specification.
-Weighing whether we discover the mistake in this manner, and the number of
-steps it takes to do so, are measures of the effectiveness
-of the blame assignment strategy of the language.
+This paper's first contribution is {\em an automated method for evaluating the
+effectiveness of blame assignment strategies\/} in the gradual typing world.
+speaking, the method simulates a programmer who follows the Wadler-Findler
+slogan quoted above; its automation borrows elements of of Lazarek et
+al.~\cite{lksfd-popl-2020}'s recent work.\footnote{\citet{cc-snapl-19} use this
+tracing method to localize type errors reported by gradual typing systems based
+on inference.}  Such a \emph{rational programmer} can find impedance-mismatch
+bugs by adding types to a partially typed program (see
+section~\ref{sec:landscape}). That is, when the run-time system signals an
+impedance mismatch, a good blame message helps the programmer infer where to add
+an additional type specification because, by the basic theory, well-typed
+components cannot cause impedance mismatches. Otherwise, if the additional type
+does {\em not\/} cause a static type error, the program is run again to signal
+another violation. Then the programmer can heed blame one more time to add yet
+another type specification. Evaluating the quality of blame assignment thus
+becomes a question of whether the tracing the error messages finds the source of
+the mistake and how many steps it takes to get to this point.
 
-The paper's second contribution is a set of results from applying the evaluation
-method to three distinct blame assignment strategies and approximately
-72,200 cases (section~\ref{sec:results}): Vitousek et
-al.'s strategy of tracking typed/untyped boundaries in Reticulated, called Transient;
-Tobin-Hochstadt et al.'s use of higher-order contract system~\cite{ff-icfp-2002,
-mf-toplas-2009}, called Natural; and the approach of industrial systems that forego blame
-and instead rely on error messages from the
-underlying programming language, called Erasure. A direct interpretation of the results
-(section~\ref{sec:discussion}) is that
-they validate the conjecture behind the work of theoreticians. A good blame assignment
-strategy helps the search for impedance mismatches between the specified types
-and the behavior of untyped components.
-Furthermore, the evaluation method
-identifies the wrapper-based blame tracking of Typed Racket as the most
-useful approach, with that of Reticulated Python close behind.
+The paper's second contribution is a set of {\em results from applying the
+evaluation method to three distinct blame assignment strategies and
+approximately 72,200 cases\/} (see section~\ref{sec:results}): (1) {\it
+Transient\/}, i.e. Reticulated's tracking of typed/untyped boundaries; (2) {\it
+Natural\/}, i.e. the use of higher-order contract system and its blame
+assignment~\cite{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e. the approach of
+industrial systems, which forego blame assignment and rely on error messages
+from the safety checks of the underlying programming language.
 
-Next, the paper describes the challenges of developing an evaluation
-method for blame, which may explain why the question has been neglected for such
-a long time.
+The results of the method's first application (see section~\ref{sec:discussion})
+are at least somewhat surprising. In principle they validate the conjectures
+behind the work of theoreticians. First, a good blame assignment strategy helps
+with the search for impedance mismatches between the specified types and the
+behavior of untyped components.  Second, Natural's wrapper-based blame tracking
+is more useful than Transient's ``collective blame'' tracking algorithm, which
+in turn is superior to Erasure. {\em But\/}, the application of the method also
+indicates problems with the expectations of theoreticians. The first problem is
+that the cost of Transient's blame can be huge. The second one concerns the
+difference between the methods; neither is {\it Natural\/} vastly better than
+{\it Transient\/} nor are the two blame assignment methods clearly preferable to
+{\it Erasure\/}. The third one casts doubt on the current the trade-off between
+the cost of blame-assignment systems and the quality of their blame messages.
+In turn, these problems suggests that, on one hand, the existing theory does not
+predict practice properly, and on the other hand, the existing practice needs to
+be supported by additional data. 
+
+
 
 
