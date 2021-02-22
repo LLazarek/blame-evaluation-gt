@@ -116,16 +116,20 @@ is helpful to a rationally acting programmer.
 %% environment and commands, and keywords command.
 \maketitle
 
-\input{introduction.tex}    %\label{sec:introduction}
-\input{challenges.tex}      %\label{sec:challenges}
-\input{landscape.tex}       %\label{sec:landscape}
-\input{mutate.tex}          %\label{sec:mutate}
-\input{rational.tex}	    %\label{sec:rational}
-\input{sample.tex}          %\label{sec:sample}
-\input{results.tex}         %\label{sec:results}
-\input{discussion.tex}      %\label{sec:discussion}
-\input{related.tex}         %\label{sec:related}
-\input{conclusion.tex}      %\label{sec:conclusion}
+%% -----------------------------------------------------------------------------
+\def\sec#1#2{\section{#2} \label{sec:#1} \input{#1.tex}}
+
+\sec{introduction}{Does Blame Matter}
+\sec{challenges}  {Why Is It Hard to Evaluate Blame}
+\sec{landscape}   {How to Think About All Three Systems}
+\sec{mutate}      {How to Make Lots of Mistakes}
+\sec{rational}    {How to Test the Rational Programmer}
+\sec{sample}      {How to Sample the Experimental Space}
+\sec{results}     {What We Discovered}
+\sec{discussion}  {What We Learned}
+\sec{related}     {Related Work}
+\sec{conclusion}  {What to Do Next}
+%% -----------------------------------------------------------------------------
 
 %% Acknowledgments
 %%\begin{acks}                 
