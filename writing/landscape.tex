@@ -158,13 +158,13 @@ plus its stack trace, or may not help the programmer find the source of the
 impedance mismatch between the specified return types of {\tt pack} in the two
 typed modules and the actual return value of {\tt pack}.
 
-All three systems used here are implemented on top of the common basis of
-Racket. The use the Typed Racket syntax and type checker for all three
-semantics. The Natural semantics is inherited as is, while the Erasure semantics
-is the one of plain Racket.  The Transient system implements the design
-of~\citet{vss-popl-2017}, though constructing it demands two design decisions:
-which shallow checks to use and where, plus how to maintain a blame map in a
-full-fledged run-time system. 
+All three systems used for the experiment are variants of Racket. The
+use the Typed Racket syntax and type checker for all three
+semantics. The Natural semantics is inherited as is, while the Erasure
+semantics is the one of plain Racket.  The Transient system implements
+the design of~\citet{vss-popl-2017}, though constructing it demands
+two design decisions: which shallow checks to use and where, plus how
+to maintain a blame map in a full-fledged run-time system.
 
 For certain types, such as {\tt String} or {\tt (Vectorof Byte)}, Transient can
 realize shallow checks with the predicate from Racket.  Other types require
@@ -174,11 +174,11 @@ constant time, but some, such as the one for {\tt (Union T1 ... Tn)}, run in
 linear time. The key point is that no shallow check inspects beyond the top
 constructor of each type.
 
-Once the type checker has completed its work, Transient translates the source
-into an alternative form and in the process inserts run-time checks. Technically
-speaking, the rewriting pass wraps all elimination in applications of shallow
-checks.  For example, if the variable {\tt f} has the static type {\tt (->
-String String)}, the application {\tt (f x)} must be rewritten to check for a
+Once the type checker has completed its work, Transient rewrites the
+source to insert run-time checks. Technically speaking, the rewriting
+pass wraps all elimination in applications of shallow checks.  For
+example, if the variable {\tt f} has the static type {\tt (-> String
+String)}, the application {\tt (f x)} must be rewritten to check for a
 string result because {\tt f} could be an untyped function.
 
 The rewriting pass also inserts hooks for updating the blame map.  When a value
