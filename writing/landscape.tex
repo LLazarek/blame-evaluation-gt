@@ -151,7 +151,7 @@ checks that ensure the dynamic safety of all operations as specified in the
 underlying untyped language. Hence, neither the call to {\tt typed-pack} nor the
 call to {\tt crypto-pack} signals an error due to the gradual type system.
 
-When run, the program may fail with an exception if \texttt{client} tries to
+When run, the program may raise an exception if \texttt{client} tries to
 inspect the elements of the list that \texttt{typed-pack} and
 \texttt{crypto-pack} are supposed to produce. The information in this exception,
 plus its stack trace, or may not help the programmer find the source of the
