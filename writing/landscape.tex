@@ -1,4 +1,4 @@
-\section{How to Bring Natural, Transient and Erasure Under the Same Roof} 
+\section{How to Think About All Three Systems} 
 \label{sec:landscape}
 
 
@@ -80,128 +80,132 @@ _ _ _  and definitions     _ _ _
 \end{figure*}
 %% -----------------------------------------------------------------------------
 
-The  program in figure~\ref{fig:example} demonstrates the differences
-between Natural, Transient and Erasure using Typed Racket syntax.  It
-consists of four modules: the left and right ones are untyped while
-the two modules in the middle are typed.
+The program sketch in figure~\ref{fig:example} demonstrates the
+differences between Natural, Transient and Erasure using Typed Racket
+syntax.  The modules on the left and right are untyped while the two
+in the middle are typed.
 
-The \texttt{untyped/pack-lib} module (left) provides, among
-others, a function \texttt{pack} that consumes JSON data and packages it
-in a dictionary. However, by mistake \texttt{pack} returns
-a hash table instead of the association list its documentation promises.
-The \texttt{client} module (right) uses \texttt{pack} indirectly to
-package public and sensitive data it reads from the filesystem. It does so
-through two different intermediary typed modules (center). The first,
-\texttt{typed/pack-lib}, simply imports \texttt{pack} and immediately
-exports as \texttt{typed-pack} asserting that it is a function
-that consumes JSON and returns an association list that maps symbols to
-strings. The second typed module, \texttt{typed/crypto-pack-lib},
-also imports \texttt{pack} and assumes for it the same type as
-\texttt{typed/pack-lib} but instead of exporting it directly \texttt{typed/pack-lib} wraps it in
-another function, \texttt{crypto-pack}, that encrypts its input before
-passing it to \texttt{pack}.
+The \texttt{untyped/pack-lib} module (left) provides, among others, a function
+\texttt{pack} that consumes JSON data and packages it in a dictionary. However,
+by mistake \texttt{pack} returns a hash table instead of the association list
+its documentation promises.  The \texttt{client} module (right) uses
+\texttt{pack} indirectly to package public and sensitive data it reads from the
+filesystem. It does so through two different intermediary typed modules
+(center). The first, {\tt typed/pack-lib}, imports \texttt{pack} and re-exports
+it as \texttt{typed-pack} asserting that it is a function that consumes {\tt
+JSON} and returns a list associating {\tt Symbol}s with {\tt String}s. The
+second typed module, {\tt typed/crypto-pack-lib}, also imports \texttt{pack} and
+assumes for it the same type as {\tt typed/pack-lib}. Instead of exporting it,
+it uses the function in the exported {\tt crypto-pack} function, which encrypts
+its input before passing it to \texttt{pack}.
 
-Under the Natural semantics~\cite{tf-popl-2008,tfffgksst-snapl-2017}, when
-\texttt{pack} is imported in either \texttt{typed/pack-lib} or
-\texttt{typed/secure-pack-lib}, the runtime checks that \texttt{pack} is a
-function and wraps it in a proxy that enforces its  type.  Analogously
-the runtime wraps the exports of the two typed modules in proxies that
-check that untyped code applies \texttt{typed-pack} and
-\texttt{crypto-pack} to arguments of the expected type. In essence, the
-return type checks protect  the typed modules in case they use
-\texttt{pack} and, as is the case here, it does not return an association
-list. The check of the argument type  treats the
-exports of the two typed modules as typed values that need to be protected
-when they are used by untyped code.  As this analysis implies, if the
-return type check fails then the problem is with
-\texttt{untyped/pack-lib}, while if the argument type check fails
-responsibility lies with \texttt{client}. The Natural semantics keep track
-of the responsible party for each check in the corresponding proxy. Thus,
-in our example, as the call to \texttt{typed-pack} returns, the return
-type check fails and the Natural semantics blames \texttt{pack-lib}.
+Under the {\it Natural\/} semantics~\cite{tf-popl-2008,tfffgksst-snapl-2017},
+functions imported into and exported from typed modules are wrapped in proxies
+that enforce the static type discipline with run-time checks and track
+responsibilities. Thus, when \texttt{pack} is imported into a typed module, the
+run-time system checks that it is a function and wraps it in a protective proxy,
+which in turn, enforces the type of the function with run-time checks.  In
+essence, this check protects typed modules when they call an untyped function
+because it may not produce the promised kind of value, as is the case here with
+{\tt pack} from {\tt untyped/pack-lib}. Analogously the run-time system wraps
+exported functions such as {\tt crypto-pack} of a typed modules in a proxy that
+checks its arguments.  This check protects functions exported from type modules
+against applications in untyped code that supply the wrong kind of argument
+value.
 
-Under the Transient semantics~\cite{vss-popl-2017}, the call to \texttt{typed-pack} does not
-produce an error. In contrast to Natural, Transient does not rely on
-proxies. Instead, it rewrites typed modules to inline checks at appropriate
-places. Furthermore, these checks are
-partial, that is, they check only the top constructor of a type. In other words
-they check types in a  \emph{shallow} manner. In our
-example, Transient's inlined checks make sure that the imported \texttt{pack} 
-is a function and that the result of its call in \texttt{typed/crypto-pack-lib} is a list.   Exactly this
-last check fails when \texttt{client} calls to \texttt{crypto-pack}. In
-order to pinpoint the responsible party for the failed check, Transient
-keeps on the side a map from values to the boundaries between modules they
-cross and the corresponding types. In the example, the map records that
-\texttt{pack} crosses from \texttt{untyped/pack-lib} to
-\texttt{typed/pack-lib} and from \texttt{typed/pack-lib} to
-\texttt{client} with the type that appears in the \texttt{required/typed}
-forms in the example. Since the failed check corresponds to the return
-type of \texttt{pack}, Transient blames the sources of the two
-boundary crosses, which in this case is \texttt{untyped/pack-lib} for
-both. In general though, Transient may blame more than one party. In
-fact, the theoretical work of~\citet{gfd-oopsla-2019} shows that there
-are programs where Transient constructs a blame set that includes
-modules that are not relevant to the check failure or that it even
-entirely misses the responsible party--our experiment aims to examine
-the pragmatic impact of exactly these issues on debugging type-level
-mistakes.
+As this analysis implies, if the return-type check fails, the problem is with
+the untyped module that supplied an incorrect function, here {\tt
+untyped/pack-lib}. If the argument-type check fails, responsibility lies with
+{\tt client}. Due to the proxies wrapped around functions, Natural can easily
+track the responsible party for each check. Thus, in the example of
+figure~\ref{fig:example}, as \texttt{typed-pack} returns, the return-type check
+fails, and Natural blames \texttt{pack-lib}.
 
-Under the Erasure semantics, the example does not raise an error due
-to the gradual type system; Erasure performs no type checks at
-runtime. Thus the program may fail with an exception if
-\texttt{client} tries to use the result of \texttt{typed-pack} or
-\texttt{crypto-pack}, but it may also not fail at all and produce a
-result of the proper kind---and yet is completely wrong.  In either
-case, the Erasure semantics provides no help to the programmer for
-detecting the bug in our program.
+Under the Transient semantics~\cite{vss-popl-2017}, typed code is compiled so
+that all entry points to functions check their arguments at run time and all
+function calls check their return values against the expected type.
+Furthermore, Transient uses \emph{shallow} checks, meaning they check only the
+top constructor of a value. Since retrieving a value from within a structure (or
+list, array, hash table etc.) is performed via a function call, the innards of a
+complex value are checked on a piecemeal basis.
 
-Since, the goal of our experiment is to compare the effectiveness of blame
-across the three semantics, it is critical to isolate their
-distinguishing characteristics from superficial implementation
-differences. Thus we implement all three systems on top of the common
-basis of Racket. First, we use the Typed Racket syntax and type
-checker for all three semantics. Second, for Natural we use Typed Racket as
-is while for Erasure we run programs with plain Racket after erasing any
-type annotations. Third, for Transient we implement a variant of Typed
-Racket that follows closely the semantics from~\citet{vss-popl-2017}. 
+As a result, the call to \texttt{typed-pack} does not signal an error because
+the call takes place in the untyped {\tt client} module, which is compiled in
+the usual manner. Because {\tt pack} is called in the {\tt
+typed/crypto-pack-lib} module, Transient's inlined checks make sure that the
+imported \texttt{pack} is a function and that the result of its call in is a
+list. This last check fails when \texttt{client} calls to {\tt crypto-pack}.
 
-The first major ingredient to the construction of Transient Typed Racket is to determine the
-Racket implementation of the shallow checks that map to each type.  For
-certain types, such as {\tt String} or {\tt (Vectorof Byte)}, Transient
-can re-use a predicate from the Racket language.  Other types require custom
-predicates; for example the type {\tt Index} of valid array indices allows
-a range of positive exact integers.  Many custom predicates run in
-constant time, but some are more involved.  One linear-time check is for
-{\tt (Listof T)} for any element type {\tt T}, because it must distinguish
-proper from improper list-like structures.  The
-key point, however, is that no shallow check inspects beyond the top
+In order to pinpoint the responsible party for failed checks, Transient
+maintains a map from values to the boundaries between typed/untyped modules that
+they cross, plus the corresponding types. In the example, the map records that
+\texttt{pack} crosses from \texttt{untyped/pack-lib} to {\tt typed/pack-lib} and
+from {\tt typed/pack-lib} to {\tt client} with the type that appears in the {\tt
+required/typed} forms in the example. Since the failed check corresponds to the
+return type of \texttt{pack}, Transient blames the sources of the two boundary
+crosses, which in this particular case is \texttt{untyped/pack-lib} for both. In
+general though, Transient blames more than one party. In fact, the theoretical
+work of~\citet{gfd-oopsla-2019} shows that for some programs Transient
+constructs a blame set that excludes responsible parties and includes modules
+irrelevant to the failing check.
+
+Under the Erasure semantics, the compiler checks the specified types and then
+discards them when it generates code. The generated code includes run-time
+checks that ensure the dynamic safety of all operations as specified in the
+underlying untyped language. Hence, neither the call to {\tt typed-pack} nor the
+call to {\tt crypto-pack} signals an error due to the gradual type system.
+
+When run, the program may fail with an exception if \texttt{client} tries to
+inspect the elements of the list that \texttt{typed-pack} and
+\texttt{crypto-pack} are supposed to produce. The information in this exception,
+plus its stack trace, or may not help the programmer find the source of the
+impedance mismatch between the specified return types of {\tt pack} in the two
+typed modules and the actual return value of {\tt pack}.
+
+All three systems used here are implemented on top of the common basis of
+Racket. The use the Typed Racket syntax and type checker for all three
+semantics. The Natural semantics is inherited as is, while the Erasure semantics
+is the one of plain Racket.  The Transient system implements the design
+of~\citet{vss-popl-2017}, though constructing it demands two design decisions:
+which shallow checks to use and where, plus how to maintain a blame map in a
+full-fledged run-time system. 
+
+For certain types, such as {\tt String} or {\tt (Vectorof Byte)}, Transient can
+realize shallow checks with the predicate from Racket.  Other types require
+custom predicates; for example the type {\tt Index} of valid array indices
+allows a range of positive exact integers.  Many custom predicates run in
+constant time, but some, such as the one for {\tt (Union T1 ... Tn)}, run in
+linear time. The key point is that no shallow check inspects beyond the top
 constructor of each type.
 
-The second major ingredient of Transient Typed Racket  is the addition of
-a pass to the compiler of Typed Racket that rewrites all typed code.
-Rewriting modifies all elimination forms to shallow-check their result.
-For example, if the variable {\tt f} has the static type {\tt (-> String
-String)} then the application {\tt (f x)} must be rewritten to check for a
-string result because {\tt f} could be an untyped function.  Rewriting
-also inserts hooks to update the blame map.  When a value crosses a module
-boundary, the blame map records a type assumption.  The inlined checks
-for elimination forms also extend the blame map with further information. For
-instance, the check of the result of {\tt (f x)} adds an entry to the blame map
-that records the expected type of the result as the return type of the type of
-{\tt f}.  If a Transient check ever fails, Transient Typed Racket walks over 
-the information in the blame map and reports a set of blamed components.
+Once the type checker has completed its work, Transient translates the source
+into an alternative form and in the process inserts run-time checks. Technically
+speaking, the rewriting pass wraps all elimination in applications of shallow
+checks.  For example, if the variable {\tt f} has the static type {\tt (->
+String String)}, the application {\tt (f x)} must be rewritten to check for a
+string result because {\tt f} could be an untyped function.
 
-\smallskip
-\noindent
-{\bf Note.} As the common basis for the three semantics, we choose 
-Typed Racket's migratory typing. In contrast to the initial formulation of
-gradual typing~\cite{st-sfp-2006}, migratory typing does not provide
-support for type \texttt{Dyn}, components are either untyped or fully
-typed.
-%% MF: does it ever:
-%% and the gradual type system does not affect the compilation of untyped components. 
-Despite, these differences, Typed Racket is the most
-mature system for sound mix-typed code
-and recent theoretical work has established that
-its migratory typing offers a setting for comparing different approaches to gradual
-typing~\cite{gf-icfp-2018,gfd-oopsla-2019}.
+The rewriting pass also inserts hooks for updating the blame map.  When a value
+crosses a module boundary, such a hook records a type assumption in the blame
+map.  The in-lined checks for elimination forms extend the blame map with
+further information. For instance, the check of the result of {\tt (f x)} adds
+an entry to the blame map that records the expected type of the result as the
+return type of the type of {\tt f}.  If a Transient check ever fails, the
+run-time checking system of Transient Racket walks over the information in the
+blame map and reports a sequence of blamed components.
+
+%% MF: I have no clue what the following contributes: 
+
+% \smallskip
+% \noindent
+% {\bf Note.} As the common basis for the three semantics, we choose Typed
+% Racket's migratory typing. In contrast to the initial formulation of gradual
+% typing~\cite{st-sfp-2006}, migratory typing does not provide support for type
+% \texttt{Dyn}, components are either untyped or fully typed.
+% %% MF: does it ever:
+% %% and the gradual type system does not affect the compilation of untyped components. 
+% Despite, these differences, Typed Racket is the most
+% mature system for sound mix-typed code
+% and recent theoretical work has established that
+% its migratory typing offers a setting for comparing different approaches to gradual
+% typing~\cite{gf-icfp-2018,gfd-oopsla-2019}.
