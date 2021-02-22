@@ -1,0 +1,91 @@
+The starting point for our corpus of programs
+is~\citet{gtnffvf-jfp-2019}'s gradual typing benchmark suite. The
+benchmark suite consists of fully typed correct programs that are written by different authors
+and have been used, maintained and evolved by their authors and others over a
+number of years.  They range widely in the size, complexity, purpose and
+features of Typed Racket they employ.  Furthermore the benchmarks use advanced aspects
+of Typed Racket's type system such as occurrence
+typing~\cite{tf-icfp-2010}, types for mutable and immutable data
+structures, polymorphic types, types for first-class classes and objects, and types for
+Racket's numeric tower~\cite{stathff-padl-12}. Without loss of the diversity of the benchmarks,
+we select the ten largest in terms of numbers of components (between 6 and 14 components).
+These benchmarks also have the most complex dependency graphs and, hence,
+can make the debugging process the hardest for the rational programmer.
+The table in figure~\ref{table:benchmark-descriptions} shows our selection
+together with a short description for each benchmark.
+
+\begin{figure}
+\begin{tabular}{p{1.75cm} | p{6cm} }
+  {\bf  name} & {\bf description (author)}  \\
+
+\hline
+  \texttt{acquire} & Object-oriented board game implementation (M. Felleisen)  \\%[1em]
+
+\hline
+  \texttt{gregor} & Utilities for calendar dates (J. Zeppieri) \\%[1em]
+
+\hline
+  \texttt{kcfa} & Functional implementation of 2CFA for the lambda calculus (M. Might) \\%[1em]
+
+\hline
+  \texttt{quadT} & Converter from S-expression source code to PDF format (M. Butterick)\\%[1em]
+
+\hline
+  \texttt{quadU} & Converter from S-expression source code to PDF format  (B. Greenman) \\%[1em]
+
+\hline
+  \texttt{snake} & Functional implementation of the  Snake video game (D. Van Horn) \\%[1em]
+
+\hline
+  \texttt{suffixtree} & Algorithm for common longest subsequences between strings. (D. Yoo) \\%[1em]
+
+\hline
+  \texttt{synth} & Converter of notes and drum beats to WAV (V. St-Amour \& N. Toronto) \\%[1em]
+
+\hline
+  \texttt{take5} & Mixin-based card game simulator (M.Felleisen)  \\%[1em]
+
+\hline
+  \texttt{tetris} & Functional implementation of Tetris (D. Van Horn) \\%[1em]
+
+\end{tabular}
+  \caption{Benchmarks summary.}
+  \label{table:benchmark-descriptions}
+\end{figure}
+
+Of course, the gradual typing benchmarks have no mistakes for the rational
+programmer to debug. Therefore, we follow ~\citet{lksfd-popl-2020} and we
+inject bugs with mutation
+analysis~\cite{jia2011analysis,demillo1978hints,lipton1971fault}.  A
+mutation is a local syntactic change of the code that may
+produce a bug. Usually, the outcome of mutating a program once, dubbed a
+mutant, can be distinguished from the original program with a test case.
+The better the test suite of a program, the more mutants it can ``kill.''
+Mutants that are hard to ``kill'' usually correspond to subtle programming
+errors, and mutation frameworks typically come with standard mutators
+carefully designed to create such mutants.
+
+Unlike the hard-to-kill mistakes introduced by standard mutators, 
+gradual type systems catch shallow errors.  Thus, in order to
+exercise the rational programmer in the context of gradual typing, 
+we need to develop alternative mutators
+that are fine-tuned to produce the type-level mistakes gradual type systems 
+can detect. Our inspiration is our
+more-than-a-decade long experience of making type-level mistakes in Typed
+Racket. Some of these mistakes often take non-trivial effort to debug and
+have become the seed for our mutators, which we summarize in
+figure~\ref{table:mutation-ops}.  For each one, the figure provides a
+short description and an example mutation.
+
+
+Most of our mutators are self-explanatory.
+The first twelve apply to most gradually typed languages, including those with classes.
+The last four mutators target distinguishing features of Typed Racket.
+Specifically, \texttt{arithmetic} may replace a \texttt{+} with a \texttt{-}
+in an attempt to change the type of the result of the arithmetic
+operation. In Typed Racket, \texttt{+}'s result is a
+\texttt{Positive-Integer} when all arguments are
+positive integers. However, the result of \texttt{-} is
+\texttt{Integer}. In the same spirit, \texttt{boolean} aims to take
+advantage of Typed Racket's ``truthiness.'' Finally, \texttt{negate-cond} and \texttt{force-cond}
+attempt to confuse occurrence typing.
