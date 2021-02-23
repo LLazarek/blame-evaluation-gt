@@ -1,0 +1,103 @@
+
+\begin{figure*}
+  \begin{tabular}{p{2.1cm} | p{7cm}  | p{7.5cm} }
+    {\bf name} & {\bf description} & {\bf example} \\
+\hline
+
+    \texttt{constant}
+& Swaps a constant with another of the same value but different type.
+& \texttt{5.6} $\rightarrow$ \texttt{5.6+0.0i} \\
+\hline
+
+    \texttt{deletion}
+    & Deletes the result expression of a sequence.
+    & \texttt{(begin x y z)} $\rightarrow$ \texttt{(begin x y)} \\
+\hline
+
+   \texttt{position}
+ & Swaps two subexpressions.
+  &  \texttt{(f a 42 "b" 0)} $\rightarrow$\texttt{(f a 42 0 "b")} \\
+\hline
+
+     \texttt{list}
+    & Replaces \texttt{append} with \texttt{cons}.
+    &  \begin{tabular}[t]{@{}l}
+      \texttt{append} $\rightarrow$ \texttt{cons}
+    \end{tabular}\\
+\hline
+
+    \texttt{top-level-id}
+ & Swaps identifiers defined in the same module.
+ &\texttt{(f x 42)} $\rightarrow$ \texttt{(g x 42)}\\
+\hline
+
+    \texttt{imported-id}
+ & Swaps identifiers imported from the same module.
+ &\texttt{(f x 42)} $\rightarrow$ \texttt{(g x 42)}\\
+\hline
+
+    \texttt{method-id}
+ & Swaps two method identifiers.
+ &\texttt{(send o f x 42)} $\rightarrow$ \texttt{(send o g x 42)}\\
+\hline
+
+    \texttt{field-id}
+ & Swaps two field identifiers.
+    &  \texttt{(get-field o f)} $\rightarrow$  \texttt{(get-field o g)}\\
+\hline
+
+     \texttt{class:init}
+  & Swaps values of class initializers.
+   &  \begin{tabular}[t]{@{}l}
+     \texttt{(new c [a 5] [b "hello"])} $\rightarrow$\\
+     \texttt{(new c [a "hello"] [b 5])}\\
+    \end{tabular}\\
+\hline
+
+     \texttt{class:parent}
+    & Replaces the parent of classes with \texttt{object\%}.
+    &  \begin{tabular}[t]{@{}l}
+     \texttt{(class foo\% (super-new))} $\rightarrow$\\
+     \texttt{(class object\% (super-new))}\\
+    \end{tabular}\\
+\hline
+
+     \texttt{class:public}
+    & Makes a public method private and vice versa.
+    & \begin{tabular}[t]{@{}l}
+      \texttt{(class object (define/public (m x) x))} $\rightarrow$\\
+      \texttt{(class object (define/private (m x) x))}\\
+    \end{tabular}\\
+\hline
+
+     \texttt{class:super}
+    & Removes \texttt{super-new} calls from class definitions.
+    & \begin{tabular}[t]{@{}l}
+      \texttt{(class foo\% (super-new))} $\rightarrow$ \\
+      \texttt{(class foo\% (void))}\\
+       \end{tabular}\\
+\hline
+
+
+     \texttt{arithmetic}
+& Swaps arithmetic operators.
+    & \texttt{+} $\rightarrow$ \texttt{-} \\
+\hline
+
+     \texttt{boolean}
+& Swaps \texttt{and} and \texttt{or}.
+& \texttt{and} $\rightarrow$ \texttt{or} \\
+\hline
+
+     \texttt{negate-cond}
+    & Negates conditional test expressions.
+    &  \texttt{(if (= x 0) t e)} $\rightarrow$ \texttt{(if (not (= x 0)) t e)}\\
+\hline
+
+     \texttt{force-cond}
+    & Replaces conditional test expressions with \texttt{\#t}.
+    & \texttt{(if (= x 0) t e)} $\rightarrow$ \texttt{(if \#t t e)}
+\end{tabular}
+  \caption{Summary of mutators.}
+  \label{table:mutation-ops}
+\end{figure*}

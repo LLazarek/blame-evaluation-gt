@@ -1,12 +1,18 @@
 %% -----------------------------------------------------------------------------
 
 As section~\ref{sec:challenges} explains, the first challenge is to
-generate a representative mistakes in representative software. The
-following two subsections explain in reverse order. 
+generate a representative mistakes in representative software. This
+section explains the specific choices made for the first application
+of the method: the source and nature of the chosen benchmarks
+(sec.~\ref{sub:mutate-benchmarks}), the newly developed mutators
+(sec.~\ref{sub:mutate-mutators}), and why they are suitable for this
+experiment (sec.~\ref{sub:mutate-interesting}). 
 
 %% -----------------------------------------------------------------------------
 \def\sub#1#2{\subsection{#2} \label{sub:mutate-#1} \input{mutate-#1.tex}}
 
+\input{mutate-benchmarks-figure.tex}
 \sub{benchmarks} {Which Software to Use As Benchmarks}
 \sub{mutators}   {How to Mutate the Benchmarks} 
+\input{mutate-mutators-figure.tex}
 \sub{interesting}{Are These Mutators Interesting} 
