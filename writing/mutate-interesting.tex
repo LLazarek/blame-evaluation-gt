@@ -6,12 +6,11 @@ cannot use for a debugging session. Even if the program execution ends in an
 exceptional state, it may do so too quickly; for example, the first-order export
 checks of Natural may catch the error and point directly to the faulty module.
 
-To avoid these pitfalls, an \emph{interesting debugging scenario} is defined as
-a mutation that satisfies three conditions.
-
-First, {\em the mutation is rejected by the type checker when all missing type
-annotations are restored\/}. This first criterion validates that the debugging
-scenario concerns an actual type-level mistake.
+To avoid these pitfalls, an \emph{interesting debugging scenario} is
+defined as a mutation that satisfies three conditions.  First, {\em
+the mutation is rejected by the type checker when all missing type
+annotations are restored\/}. This first criterion validates that the
+debugging scenario concerns an impedance mismatch.
 
 Second, {\em it produces a run-time exception under Erasure as-is\/}, which
 ensures that it is detectable under all three semantics.  Whether a scenario
@@ -28,18 +27,19 @@ other semantics is unavoidable. Tipping the scales in favor of the theoretically
 weakest semantics yields the most stable results. See
 section~\ref{sec:discussion} for some further discussion of this choice.
 
-Third, {\em the exception's stack trace mentions at least three distinct
-components\/}, meaning the scenario demands a sufficiently sophisticated
-debugging effort: one due to the interaction between the buggy portion of the
-program with the rest of the program.  In these cases, the rational programmer
-may need to examine several modules of the program to locate the source of the
-faulty interaction.  In technical terms, if the stack trace mentions at least
-two distinct components, the bug should be revealed by the run-time checks
-governing an interaction. A third component is required because all benchmark
-programs come with a driver component, which is present in the stack trace of
-all run-time errors. In essence, this last criterion excludes a large number of
-trivial-to-debug scenarios that error immediately when their mutated component
-is evaluated.
+Third, {\em the exception's stack trace mentions at least three
+distinct components\/}, meaning the scenario demands a sufficiently
+sophisticated debugging effort: one due to the interaction between the
+buggy portion of the program with the rest of the program.  In these
+cases, the rational programmer must examine at least modules to locate
+the source of the faulty interaction.  In technical terms, if the
+stack trace mentions at least two distinct components, the bug should
+be revealed by the run-time checks governing an interaction. A third
+component is required because all benchmark programs include a driver
+component, which is guaranteed to be in the stack trace. In essence,
+this last criterion excludes a large number of trivial-to-debug
+scenarios that error immediately when their mutated component is
+evaluated.
 
 %\begin{figure*}
 %  \centering
