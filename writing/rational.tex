@@ -5,55 +5,58 @@ base. From this perspective, a code base consists of some number of components,
 say modules, and a programmer converts a component at a time from its untyped
 state to a typed one. 
 
+%% MF: I don't think we should honor the nonsense of ``true gt.''  We
+% are it as much as anyone!
+% 
+% \footnote{The method can be adapted to so-called true gradual typing
+% systems~\cite{svcb-snapl-2015} in a straightforward manner.}
+
 Based on this idea, migratory paths offer a concise setting for
-evaluating the effectiveness of a rational programmer for dealing with the
-interesting debugging scenarios  from section ~\ref{sec:mutate}.
-If we group debugging scenarios by mutation, then we obtain a set 
-of programs that all contain the same mistake but differ in their type
-annotations.  In the setting of migratory typing,\footnote{The method can be adapted to
-so-called true gradual typing systems~\cite{svcb-snapl-2015} in a
-straightforward manner.} each scenario differs from another in which
-components are typed. Formally, a program $\system$ is a set of
-components $\set{\component}$, and a scenario $\conf$ is the typed subset of
-$\set{\component}$ . Hence, the scenarios of $\system$ are ordered by the
-subset relation and, naturally,  form a lattice $\lattice{\system}$ with
-$2^{\size{\system}}$ elements, like
-the one introduced by ~\citet{tfgnvf-popl-2016} for performance
-evaluations. The bottom scenario of
-$\lattice{\system}$ is always $\emptyset$ and the top one is $\system$
-itself. In between are all the mix-typed scenarios.
+evaluating the effectiveness of a rational programmer for dealing with
+the interesting debugging scenarios from section ~\ref{sec:mutate}.
+Grouping debugging scenarios by mutation yields a set of programs that
+all contain the same mistake but differ in their type annotations.  In
+the setting of migratory typing, each scenario differs from another in
+which components are typed. Formally, a program $\system$ is a set of
+components $\set{\component}$, and a scenario $\conf$ is the typed
+subset of $\set{\component}$ . Hence, the scenarios of $\system$ are
+ordered by the subset relation and, naturally, form a lattice
+$\lattice{\system}$ with $2^{\size{\system}}$
+elements.\footnote{\citet{tfgnvf-popl-2016} use this lattice for
+performance evaluations.} The bottom scenario of $\lattice{\system}$
+is always $\emptyset$ and the top one is $\system$ itself. In between
+are all the mixed-typed scenarios.
 
-
-With these definitions, the actions of the rational programmer map to an
+In this context, the actions of the rational programmer map to an
 ascending chain---dubbed a \emph{trail}---in $\lattice{\system}$.  The
 starting scenario $\conf_0$ of a trail---also referred to as the
-\emph{root} (of the trail)---is the initial debugging scenario.  Herein we
-consider only roots that are interesting debugging scenarios as described
-in~\ref{sec:mutate} --- we expand on this point further on.  Intuitively,
-starting from such a root, the rational programmer  steps along a trail,
-and at each step, reduces the current scenario to an ``easier'' next
-scenario to debug.  The easiest scenarios are those that the type checker
-rejects outright, because a type error pinpoints an impedance mismatch
-between the broken code of one component and its typed interface to
-others. At this point, the programmer has identified the broken component.
-If the scenario type-checks, the programmers runs the program until it
-raises a run time error.  The rational programmer uses the error's blame
-assignment\footnote{Blame can result either directly from a run time type
-check or, in the absence of blame, from an exception that we track back to
-the component that causes it with the help of the stack trace.} to decide
-which component(s) to equip with types. This choice constructs scenario
-$\conf_{i+1}$ from $\conf_{i}$ and implies the creation of trail.  
+\emph{root} (of the trail)---is the initial debugging scenario; only
+interesting (as described in~\ref{sec:mutate}) debugging scenarios
+serve as roots.  Intuitively, starting from such a root, the rational
+programmer steps along a trail, and at each step, reduces the current
+scenario to an ``easier'' next scenario to debug.  The easiest
+scenarios are those that the type checker rejects outright, because a
+type error pinpoints an impedance mismatch between the broken code of
+one component and its typed interface to others. At this point, the
+programmer has identified the broken component.  If the scenario
+type-checks, the programmers runs the program until it raises a run
+time error.  The rational programmer uses the error's blame
+assignment\footnote{Blame can result either directly from a run-time
+check or, in the absence of blame, from an exception that can be
+traced back to the component that causes it with the help of the stack
+trace.} to decide which component(s) to equip with types. This choice
+constructs scenario $\conf_{i+1}$ from $\conf_{i}$ and thus creates a trail.
 
 % The successor of a scenario on a trail has more typed component;
 % formally, configuration $\conf_{i+1}$ on the trail differs from its
 % predecessor $\conf_{i}$ in that more components are typed.
 
-The next three subsections specialize the trail-scenario idea to the
-various semantics of gradual typing. Once this machinery is in place,
-we use the fourth subsection to state the precise experimental
-research questions that correspond to the high-level question on the
-first page and to explain our experimental process. The final
-subsection extends the development with a discussion of programmer effort. 
+The first three subsections specialize the trail-scenario idea to the
+three semantics of gradual typing. Once this machinery is in place,
+the fourth subsection presents a reformulation of the informal
+question on page~1 as precise experimental research questions. The
+final subsection adds a notion of programmer effort to the
+experimental setup. 
 
 
 %% -----------------------------------------------------------------------------
