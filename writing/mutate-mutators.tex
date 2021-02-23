@@ -8,21 +8,20 @@ safety checks of the underlying language can detect. Once detected,
 the rational programmer can attempt to detect the mistake by gradually
 adding types to blamed modules.
 
-Figure~\ref{table:mutation-ops} describes the sixteen mutators used
-for the data reported here. They are inspired by the authors
-decades-long experience of making type-level mistakes in Typed Racket,
-some of which take a non-trivial effort to debug.  For each mutaror,
-the figure provides a short description and an example mutation.
+Figure~\ref{table:mutation-ops} describes the 16 mutators used for the
+experiment.  They are inspired by the authors decades-long experience
+of making type-level mistakes in Typed Racket, some of which take a
+non-trivial effort to debug.  For each mutaror, the figure provides a
+short description and an example mutation.
 
-Most of these mutators are self-explanatory.  The first twelve apply
-to most gradually typed languages, including those with classes.  The
-last four target distinguishing features of Typed Racket.
-Specifically, {\tt arithmetic} may replace a {\tt +} with a {\tt -} in
-an attempt to change the type of the result of the arithmetic
-operation. In Typed Racket, {\tt +}'s result is a {\tt
-Positive-Integer} when all arguments are positive
-integers~\cite{stathff-padl-12}. However, the result of {\tt -}
-is {\tt Integer}. In the same spirit, the {\tt boolean} mutator aims
-to take advantage of Typed Racket faithfulness to Racket's
-``falsiness.'' Finally, {\tt negate-cond} and {\tt force-cond} attempt
-to confuse occurrence typing.
+Most mutators are self-explanatory.  The first twelve apply to most
+gradually typed languages, including those with classes.  The last
+four target distinguishing features of Typed Racket.  Specifically,
+{\tt arithmetic} may replace a {\tt +} with a {\tt -} in an attempt to
+change the type of the result of the arithmetic operation. In Typed
+Racket, {\tt +}'s result is a {\tt Positive-Integer} when all
+arguments are positive integers~\cite{stathff-padl-12}. However, the
+result of {\tt -} is {\tt Integer}. In the same spirit, the {\tt
+boolean} mutator aims to take advantage of Typed Racket faithfulness
+to Racket's ``falsiness.'' Finally, {\tt negate-cond} and {\tt
+force-cond} attempt to confuse occurrence typing.
