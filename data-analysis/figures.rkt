@@ -22,16 +22,10 @@
 
 
 (require plot
-         plot-util
-         plot-util/quick/infer
          (except-in pict-util line)
          (except-in pict pict?)
          pict-util/file
-         (prefix-in db: "../db/db.rkt")
-         "../mutation-analysis/mutation-analysis-summaries.rkt"
-         "../experiment/blame-trail-data.rkt"
          "../configurables/configurables.rkt"
-         "../runner/mutation-runner-data.rkt"
 
          "plot-common.rkt"
          "read-data.rkt"
@@ -236,33 +230,40 @@
         (list (blame-trail-mutant-id bt)
               (blame-trail-trail-id bt)))
 
+      (define direct-avo-%
+        (simple-memoize
+         #:on-disk "direct-avo-percents.rktd"
+         (λ (top-mode bottom-mode dump-to)
+           (displayln @~a{@top-mode vs @bottom-mode})
+           (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
+           (define bottom-bts-by-id
+             (for*/hash ([bts (in-hash-values bottom-bts-by-mutator)]
+                         [bt (in-list bts)])
+               (values (bt->id bt) bt)))
+           (define get-top-bts-by-benchmark+mutant
+             (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
+           (define (get-bts-by-benchmark+mutant benchmark mutator)
+             (define top-bts-by-mutant (get-top-bts-by-benchmark+mutant benchmark mutator))
+             (for/hash ([{mutant top-bts} (in-hash top-bts-by-mutant)])
+               (values mutant
+                       (for/list ([top-bt (in-list top-bts)])
+                         (define corresponding-bottom-bt (hash-ref bottom-bts-by-id (bt->id top-bt)))
+                         (list top-bt corresponding-bottom-bt)))))
+           (define estimate
+             (strata-proportion-estimate (match-lambda
+                                           [(list top-bt bottom-bt)
+                                            (and (satisfies-BT-hypothesis? top-bt)
+                                                 (not (satisfies-BT-hypothesis? bottom-bt)))])
+                                         get-bts-by-benchmark+mutant))
+           (define p (hash-ref estimate 'proportion-estimate))
+           (define error-margin (variance->margin-of-error (hash-ref estimate 'variance)
+                                                           1.96))
+           (displayln error-margin)
+           (list p error-margin))))
+
       (define (direct-avo-bar-for top-mode bottom-mode
                                   #:dump-to [dump-to #f])
-        (displayln @~a{@top-mode vs @bottom-mode})
-        (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-        (define bottom-bts-by-id
-          (for*/hash ([bts (in-hash-values bottom-bts-by-mutator)]
-                      [bt (in-list bts)])
-            (values (bt->id bt) bt)))
-        (define get-top-bts-by-benchmark+mutant
-          (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
-        (define (get-bts-by-benchmark+mutant benchmark mutator)
-          (define top-bts-by-mutant (get-top-bts-by-benchmark+mutant benchmark mutator))
-          (for/hash ([{mutant top-bts} (in-hash top-bts-by-mutant)])
-            (values mutant
-                    (for/list ([top-bt (in-list top-bts)])
-                      (define corresponding-bottom-bt (hash-ref bottom-bts-by-id (bt->id top-bt)))
-                      (list top-bt corresponding-bottom-bt)))))
-        (define estimate
-          (strata-proportion-estimate (match-lambda
-                                        [(list top-bt bottom-bt)
-                                         (and (satisfies-BT-hypothesis? top-bt)
-                                              (not (satisfies-BT-hypothesis? bottom-bt)))])
-                                      get-bts-by-benchmark+mutant))
-        (define p (hash-ref estimate 'proportion-estimate))
-        (define error-margin (variance->margin-of-error (hash-ref estimate 'variance)
-                                                        1.96))
-        (displayln error-margin)
+        (match-define (list p error-margin) (direct-avo-% top-mode bottom-mode dump-to))
         (list (discrete-histogram (list (list "hide me" p))
                                   #:add-ticks? #f)
               (point-label (list 0.5 p)
