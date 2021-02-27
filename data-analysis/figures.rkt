@@ -330,3 +330,32 @@
              plots)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
   (void))
+
+(when (member 'success-bars to-generate)
+  (define success-bars
+    (let ([modes (remove "null" modes)])
+      (define (all-bts-for-mode mode-name)
+        (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
+        (for/fold ([all-bts empty])
+                  ([{_ bts} (in-hash bts-by-mutator)])
+          (append bts all-bts)))
+      (define mode-success-%
+        (simple-memoize
+         #:on-disk (build-path here "success-percents.rktd")
+         (λ (mode-name)
+           (define bts (all-bts-for-mode mode-name))
+           (define success-count (count satisfies-BT-hypothesis? bts))
+           (/ success-count (length bts)))))
+
+      (parameterize ([plot-x-tick-label-angle 40]
+                     [plot-x-tick-label-anchor 'top-right])
+        (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes)])
+                                         (list (rename-mode mode-name) (mode-success-% mode-name)))
+                                       #:color success-color)
+                   #:y-max 1
+                   #:y-min 0
+                   #:y-label "% of scenarios"
+                   #:x-label #f))))
+  (pict->png! success-bars (build-path outdir "success-bars.png"))
+  (void))
+
