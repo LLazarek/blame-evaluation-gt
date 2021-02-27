@@ -25,6 +25,7 @@
          (except-in pict-util line)
          (except-in pict pict?)
          pict-util/file
+         racket/hash
          "../configurables/configurables.rkt"
 
          "plot-common.rkt"
@@ -224,6 +225,112 @@
                             #:row-spacing row-spacing)))
       plain-table))
   (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png")))
+
+(when (member 'bt-length-comparisons to-generate)
+  (define bt-length-comparisons
+    (let ()
+      (define make-bt-by-benchmark+mutant-getter-for-mode
+        (simple-memoize
+         (λ (mode-name)
+           (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
+           (λ (benchmark mutator)
+             (for/hash/fold ([bt (in-list (hash-ref bts-by-mutator mutator))]
+                             #:when (equal? (mutant-benchmark (blame-trail-mutant-id bt))
+                                            benchmark))
+                            #:combine cons
+                            #:default empty
+                            (values (blame-trail-mutant-id bt)
+                                    bt))))))
+
+      (define direct-bt-length-comparison-distribution
+        (simple-memoize
+         #:on-disk (build-path data-cache "direct-effort-comparison-distributions.rktd")
+         (λ (top-mode bottom-mode dump-to)
+           (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
+           (define bottom-bts-by-id
+             (for*/hash ([bts (in-hash-values bottom-bts-by-mutator)]
+                         [bt (in-list bts)])
+               (values (bt->id bt) bt)))
+           (define get-top-bts-by-benchmark+mutant
+             (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
+           (define/contract (get-bts-by-benchmark+mutant benchmark mutator)
+             (string? string? . -> . (hash/c mutant? (listof (list/c blame-trail? blame-trail?))))
+
+             (define top-bts-by-mutant (get-top-bts-by-benchmark+mutant benchmark mutator))
+             (for/hash ([{mutant top-bts} (in-hash top-bts-by-mutant)])
+               (values mutant
+                       (for/list ([top-bt (in-list top-bts)])
+                         (define corresponding-bottom-bt (hash-ref bottom-bts-by-id (bt->id top-bt)))
+                         (list top-bt corresponding-bottom-bt)))))
+           (define Δ-counts
+             (for/hash/fold ([benchmark (in-list benchmarks)]
+                             #:when #t
+                             [mutator (in-list (configured:active-mutator-names))]
+                             #:when #t
+                             [{mutant bts} (in-hash (get-bts-by-benchmark+mutant benchmark mutator))]
+                             #:when #t
+                             [bt-pair (in-list bts)])
+               #:combine +
+               #:default 0
+               (match-define (list top bot) bt-pair)
+               (define length-difference
+                 (- (bt-length top #t) (bt-length bot #t)))
+               (if (and (satisfies-BT-hypothesis? top)
+                        (satisfies-BT-hypothesis? bot))
+                   (values length-difference 1)
+                   (values 0 0))))
+           (define total-Δs (apply + (hash-values Δ-counts)))
+           (for/hash ([{Δ count} (in-hash Δ-counts)])
+             (values Δ (/ count total-Δs))))))
+
+      (define (direct-bt-length-comparison top-mode other-mode)
+        (define Δ-distribution (direct-bt-length-comparison-distribution top-mode other-mode #f))
+        ;; lltodo: there seems to be another bug with discrete-histogram here
+        ;; this doesn't work at all:
+        #;(plot (list (discrete-histogram '((1 2) (2 10))
+                                             #:color "red")
+                         (discrete-histogram '((0 20))
+                                             #:color "gray")
+                         (discrete-histogram '((-1 8) (-2 5))
+                                             #:color "green")))
+        ;; Actually, there just need to be placeholders for every x-value that I want
+        ;; to show up in the final plot
+        (define Δ-distribution+placeholders
+          (for/hash ([i (in-range -3 4)])
+            (values i (hash-ref Δ-distribution i 0))))
+        (parameterize ([plot-y-transform (collapse-transform 0.15 0.8)])
+          (plot-pict (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
+                                [color (in-list (list success-color "light gray" failure-color))])
+                       (define group-data (for/list ([{Δ %} (in-hash Δ-distribution+placeholders)])
+                                            (list Δ
+                                                  ;; Need a placeholder for every Δ, even if
+                                                  ;; it's not in this group
+                                                  (if (filter Δ) % 0))))
+                       (discrete-histogram (sort group-data < #:key first)
+                                           #:color color))
+                     #:title @~a{@(rename-mode top-mode) vs @(rename-mode other-mode)}
+                     #:y-label "% of scenarios"
+                     #:x-label @~a{length difference}
+                     #:y-min 0
+                     #:y-max 1
+                     #:x-min 0
+                     #:x-max 7)))
+
+      (define plots
+        (for/list ([comparison (in-list '(["TR" "TR-stack-first"]
+                                          ["TR" "transient-newest"]
+                                          ["TR" "transient-oldest"]
+
+                                          ["transient-newest" "transient-oldest"]
+                                          ["transient-newest" "transient-stack-first"]
+                                          ["transient-oldest" "transient-stack-first"]))])
+          (apply direct-bt-length-comparison comparison)))
+      (table/fill-missing plots
+                          #:columns 3
+                          #:column-spacing 15
+                          #:row-spacing 15)))
+  (pict->png! bt-length-comparisons (build-path outdir "bt-length-comparisons.png")))
+
 
 
 (define/contract (two-sided-histogram data
