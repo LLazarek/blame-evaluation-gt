@@ -60,9 +60,22 @@
       (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir
                                                           mutant-mutators)))))
 
-(define (bt->id bt)
+
+(define bt-id? (list/c mutant? natural?))
+
+(define/contract (bt->id bt)
+  (blame-trail? . -> . bt-id?)
+
   (list (blame-trail-mutant-id bt)
         (blame-trail-trail-id bt)))
+
+(define/contract (bts-by-id bts-by-mutator)
+  ((hash/c string? (listof blame-trail?)) . -> . (hash/c bt-id? blame-trail?))
+
+  (for*/hash ([bts (in-hash-values bts-by-mutator)]
+              [bt (in-list bts)])
+    (values (bt->id bt) bt)))
+
 
 (define success-color '(153 225 187))
 (define failure-color '(255 153 153))
@@ -247,10 +260,7 @@
          #:on-disk (build-path data-cache "direct-effort-comparison-distributions.rktd")
          (λ (top-mode bottom-mode dump-to)
            (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-           (define bottom-bts-by-id
-             (for*/hash ([bts (in-hash-values bottom-bts-by-mutator)]
-                         [bt (in-list bts)])
-               (values (bt->id bt) bt)))
+           (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
            (define get-top-bts-by-benchmark+mutant
              (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
            (define/contract (get-bts-by-benchmark+mutant benchmark mutator)
@@ -337,19 +347,22 @@
                                       #:top-color [top-color (rectangle-color)]
                                       #:bot-color [bot-color (rectangle-color)]
                                       #:gap [gap (discrete-histogram-gap)]
-                                      #:skip [skip (discrete-histogram-skip)])
+                                      #:skip [skip (discrete-histogram-skip)]
+                                      #:add-ticks? [add-ticks? #t])
   ({(listof (list/c any/c real? real?))}
    {#:top-color any/c
     #:bot-color any/c
     #:gap any/c
-    #:skip any/c}
+    #:skip any/c
+    #:add-ticks? boolean?}
    . ->* .
    list?)
   (list (discrete-histogram (map (match-lambda [(list name top _) (list name top)])
                                  data)
                             #:color top-color
                             #:gap gap
-                            #:skip skip)
+                            #:skip skip
+                            #:add-ticks? add-ticks?)
         ;; lltodo: this is a workaround for a bug with discrete-histogram
         ;; This doesn't work:
         #;(plot (list (discrete-histogram '((a 5) (b 3)))
@@ -369,7 +382,8 @@
                               #:x-min i
                               #:color bot-color
                               #:gap gap
-                              #:skip skip))))
+                              #:skip skip
+                              #:add-ticks? add-ticks?))))
 
 (when (member 'avo-bars to-generate)
   (define avo-bars
@@ -393,10 +407,7 @@
          (λ (top-mode bottom-mode dump-to)
            (displayln @~a{@top-mode vs @bottom-mode})
            (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-           (define bottom-bts-by-id
-             (for*/hash ([bts (in-hash-values bottom-bts-by-mutator)]
-                         [bt (in-list bts)])
-               (values (bt->id bt) bt)))
+           (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
            (define get-top-bts-by-benchmark+mutant
              (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
            (define (get-bts-by-benchmark+mutant benchmark mutator)
@@ -450,6 +461,95 @@
                           #:column-spacing 10
                           #:row-spacing 20)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
+  (void))
+
+(when (member 'blame-vs-exns-bars to-generate)
+  (define blame-vs-exns-bars
+    (let ()
+      (struct utility-comparison (bts-where-top-or-bottom->-erasure-%
+                                  bts-where-top->-bottom-sub-%
+                                  bts-where-bottom->-top-sub-%)
+        #:prefab)
+      (define utility-comparison-when-better-than-erasure
+        (simple-memoize
+         #:on-disk (build-path data-cache "blame-vs-exns-comparisons.rktd")
+         (λ (top-mode bottom-mode dump-to)
+           (displayln @~a{@top-mode vs @bottom-mode})
+           (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
+           (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
+           (define erasure-bts-by-mutator (get-bts-by-mutator-for-mode "erasure-stack-first"))
+           (define erasure-bts-by-id (bts-by-id erasure-bts-by-mutator))
+           (define top-bts-by-mutator (get-bts-by-mutator-for-mode top-mode))
+           (define top-bts-by-id (bts-by-id top-bts-by-mutator))
+           (define top+bottom-bts-by-id/either->-erasure
+             (for*/hash ([{id top-bt} (in-hash top-bts-by-id)]
+                         [bottom-bt (in-value (hash-ref bottom-bts-by-id id))]
+                         [erasure-bt (in-value (hash-ref erasure-bts-by-id id))]
+                         #:when (and (or (satisfies-BT-hypothesis? top-bt)
+                                         (satisfies-BT-hypothesis? bottom-bt))
+                                     (not (satisfies-BT-hypothesis? erasure-bt))))
+               (values id (list top-bt bottom-bt))))
+           (define top-vs-bottom-bt-breakdown
+             (for/hash/fold ([{id top+bottom-bt} (in-hash top+bottom-bts-by-id/either->-erasure)])
+               #:combine +
+               #:default 0
+               (match (map satisfies-BT-hypothesis? top+bottom-bt)
+                 [(list #t #f) (values 'top->-bottom 1)]
+                 [(list #f #t) (values 'bottom->-top 1)]
+                 [else         (values 'bottom->-top 0)])))
+           (define top+bottom-bts-by-id/either->-erasure-count
+             (hash-count top+bottom-bts-by-id/either->-erasure))
+           (define bts-where-top-or-bottom->-erasure-%
+             (/ top+bottom-bts-by-id/either->-erasure-count
+                (hash-count top-bts-by-id)))
+           (if (zero? bts-where-top-or-bottom->-erasure-%)
+               (utility-comparison 0 0 0)
+               (utility-comparison
+                bts-where-top-or-bottom->-erasure-%
+                (/ (hash-ref top-vs-bottom-bt-breakdown 'top->-bottom 0)
+                   top+bottom-bts-by-id/either->-erasure-count)
+                (/ (hash-ref top-vs-bottom-bt-breakdown 'bottom->-top 0)
+                   top+bottom-bts-by-id/either->-erasure-count))))))
+
+      (define (utility-comparison-when-better-than-erasure-bar top-mode bottom-mode)
+        (define comparison
+          (utility-comparison-when-better-than-erasure top-mode
+                                                       bottom-mode
+                                                       #f))
+        (parameterize ([plot-x-ticks no-ticks])
+          (plot-pict (list (two-sided-histogram
+                            `(("hide me"
+                               ,(utility-comparison-bts-where-top->-bottom-sub-% comparison)
+                               ,(utility-comparison-bts-where-bottom->-top-sub-% comparison)))
+                            #:top-color success-color
+                            #:bot-color failure-color
+                            #:add-ticks? #f)
+                           (x-axis #:ticks? #f))
+                     #:title (rename-mode top-mode)
+                     #:y-label @~a{
+                                   % of filtered scenarios @;
+                                   (@(~r
+                                      (* 100.0
+                                         (utility-comparison-bts-where-top-or-bottom->-erasure-%
+                                          comparison))
+                                      #:precision 0)% of total)
+                                   }
+                     #:x-label #f
+                     #:y-min -0.4
+                     #:y-max 0.4)))
+      (define plots
+        (for/list ([comparison (in-list '(["TR" "TR-stack-first"]
+                                          ["transient-newest" "transient-stack-first"]
+                                          ["transient-oldest" "transient-stack-first"]))])
+          (apply utility-comparison-when-better-than-erasure-bar comparison)))
+
+      (table/fill-missing (list* (first plots)
+                                 (blank 0)
+                                 (rest plots))
+                          #:columns 2
+                          #:column-spacing 40
+                          #:row-spacing 30)))
+  (pict->png! blame-vs-exns-bars (build-path outdir "blame-vs-exns-bars.png"))
   (void))
 
 (when (member 'success-bars to-generate)
