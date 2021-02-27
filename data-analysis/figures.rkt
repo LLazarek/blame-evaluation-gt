@@ -11,7 +11,7 @@
 
                   "erasure-stack-first" "Erasure"
 
-                  "null" "Null")
+                  "null" "Random")
             mode-name))
 (define rename-benchmark values)
 
@@ -329,19 +329,25 @@
                      #:y-min -0.4
                      #:y-max 0.4)))
 
+      (define modes/ordered '("TR" "transient-newest" "transient-oldest"
+                              "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
       (define plots
-        (for*/list ([top (in-list modes)])
+        (for*/list ([top (in-list modes/ordered)])
           (direct-avo-comparisons top modes)))
 
-      (apply vc-append
+      #;(apply vc-append
              20
-             plots)))
+             plots)
+      (table/fill-missing plots
+                          #:columns 3
+                          #:column-spacing 10
+                          #:row-spacing 20)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
   (void))
 
 (when (member 'success-bars to-generate)
   (define success-bars
-    (let ([modes (remove "null" modes)])
+    (let ()
       (define (all-bts-for-mode mode-name)
         (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
         (for/fold ([all-bts empty])

@@ -7,7 +7,7 @@
 (require "../configurables/configurables.rkt")
 
 (define modes
-  '("null" "TR" "TR-stack-first" "transient-newest" "transient-oldest" "transient-all" "transient-stack-first" "erasure-stack-first"))
+  '("null" "TR" "TR-stack-first" "transient-newest" "transient-oldest" #;"transient-all" "transient-stack-first" "erasure-stack-first"))
 (define benchmarks
   '("acquire"
     "gregor"
