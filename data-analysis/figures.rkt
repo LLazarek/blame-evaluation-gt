@@ -40,7 +40,8 @@
   [data-dirs "../../experiment-data/results/code-mutations"]
   [dyn-err-summaries-db-path "../dbs/code-mutations/dyn-err-summaries.rktdb"]
   [TR-config "../configurables/configs/TR.rkt"]
-  [outdir "./figures"])
+  [outdir "./figures"]
+  [here "."])
 
 (install-configuration! TR-config)
 
@@ -57,6 +58,9 @@
      (add-missing-active-mutators
       (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir
                                                           mutant-mutators)))))
+
+(define success-color '(153 225 187))
+(define failure-color '(255 153 153))
 
 (when (member 'usefulness-table to-generate)
   (define usefulness-table
@@ -146,7 +150,7 @@
                  (append* (hash-values bts-by-mutator/across-all-benchmarks)))
            #:normalize? #t
            #:color-by-success? #t
-           #:colors '((153 225 187) (255 153 153))))
+           #:colors (list success-color failure-color)))
         (parameterize ([plot-x-ticks (ticks (linear-ticks-layout #:number 1)
                                             (linear-ticks-format))]
                        [plot-font-size 20]
@@ -211,6 +215,44 @@
   (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png")))
 
 
+(define/contract (two-sided-histogram data
+                                      #:top-color [top-color (rectangle-color)]
+                                      #:bot-color [bot-color (rectangle-color)]
+                                      #:gap [gap (discrete-histogram-gap)]
+                                      #:skip [skip (discrete-histogram-skip)])
+  ({(listof (list/c any/c real? real?))}
+   {#:top-color any/c
+    #:bot-color any/c
+    #:gap any/c
+    #:skip any/c}
+   . ->* .
+   list?)
+  (list (discrete-histogram (map (match-lambda [(list name top _) (list name top)])
+                                 data)
+                            #:color top-color
+                            #:gap gap
+                            #:skip skip)
+        ;; lltodo: this is a workaround for a bug with discrete-histogram
+        ;; This doesn't work:
+        #;(plot (list (discrete-histogram '((a 5) (b 3)))
+                         (discrete-histogram '((a -2) (b -4)))
+                         (x-axis))
+                   #:y-min -5)
+        ;; while this does:
+        #;(plot (list (discrete-histogram '((a 5) (b 3)))
+                         (discrete-histogram '((a -2)) #:x-min 0)
+                         (discrete-histogram '((b -4)) #:x-min 1)
+                         (x-axis))
+                   #:y-min -5)
+        (for/list ([bar-sides (in-list data)]
+                   [i (in-naturals)])
+          (match-define (list name _ bottom) bar-sides)
+          (discrete-histogram `((,name ,(- bottom)))
+                              #:x-min i
+                              #:color bot-color
+                              #:gap gap
+                              #:skip skip))))
+
 (when (member 'avo-bars to-generate)
   (define avo-bars
     (let ([modes (remove "null" modes)])
@@ -232,7 +274,7 @@
 
       (define direct-avo-%
         (simple-memoize
-         #:on-disk "direct-avo-percents.rktd"
+         #:on-disk (build-path here "direct-avo-percents.rktd")
          (λ (top-mode bottom-mode dump-to)
            (displayln @~a{@top-mode vs @bottom-mode})
            (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
@@ -261,92 +303,30 @@
            (displayln error-margin)
            (list p error-margin))))
 
-      (define (direct-avo-bar-for top-mode bottom-mode
-                                  #:dump-to [dump-to #f])
-        (match-define (list p error-margin) (direct-avo-% top-mode bottom-mode dump-to))
-        (list (discrete-histogram (list (list "hide me" p))
-                                  #:add-ticks? #f)
-              (point-label (list 0.5 p)
-                           (~a (~r (* 100 p) #:precision 2)
-                               "%"
-                               ;; " +/- "
-                               ;; (~r (* 100 error-margin) #:precision 1)
-                               )
-                           #:point-size 0
-                           #:anchor 'bottom
-                           #:size 60)))
+      (define (direct-avo-comparisons top-mode other-modes)
+        (define comparison-data
+          (for/list ([other-mode (in-list other-modes)]
+                     [index (in-naturals)])
+            (match-define (list top/other top/other-error-margin) (direct-avo-% top-mode other-mode #f))
+            (match-define (list other/top other/top-error-margin) (direct-avo-% other-mode top-mode #f))
+            (list (rename-mode other-mode) top/other other/top)))
+        (parameterize ([plot-x-tick-label-angle 40]
+                       [plot-x-tick-label-anchor 'top-right])
+          (plot-pict (two-sided-histogram comparison-data
+                                          #:top-color success-color
+                                          #:bot-color failure-color)
+                     #:title (rename-mode top-mode)
+                     #:y-label @~a{% of scenarios} ; where @top-mode is more useful than mode X (above) | vice versa (below)
+                     #:x-label #f
+                     #:y-min -0.4
+                     #:y-max 0.4)))
 
-
-
-      (define (make-avo-matrix-cell-plot top-mode bottom-mode)
-        (define direct-avo-bar (direct-avo-bar-for top-mode bottom-mode))
-        (parameterize ([plot-x-ticks no-ticks]
-                       [plot-y-ticks no-ticks]
-                       [plot-y-far-ticks no-ticks])
-          (scale (plot-pict direct-avo-bar
-                            #:y-min 0
-                            #:y-max 1
-
-                            #:x-label #f
-                            #:y-label #f
-                            #:title #f)
-                 0.5
-                 0.5)))
-
-
-      (define filler-blank
-        (frame (cc-superimpose
-                (ghost (make-avo-matrix-cell-plot (first modes) (first modes)))
-                (text "×" null 70))
-               #:color "gray"))
       (define plots
-        (for*/list ([top (in-list modes)]
-                    [bottom (in-list modes)])
-          (if (equal? top bottom)
-              filler-blank
-              (make-avo-matrix-cell-plot top bottom))))
-      (define column-labels (map rename-mode modes))
-      (define row-labels column-labels)
+        (for*/list ([top (in-list modes)])
+          (direct-avo-comparisons top modes)))
 
-      (define column-spacing 5)
-      (define row-spacing 15)
-      (define plain-table
-        (table/fill-missing plots
-                            #:columns (length column-labels)
-                            #:column-spacing column-spacing
-                            #:row-spacing row-spacing))
-
-      (define a-cell (first plots))
-      (define cell-width-spacer (blank (pict-width a-cell) 1))
-      (define cell-height-spacer (blank 1 (pict-height a-cell)))
-      (define (make-text str)
-        (match str
-          [(regexp #rx"([^ ]+) (.+)" (list _ first-word other-words))
-           (vc-append (text first-word null 40)
-                      (text other-words null 40))]
-          [else (text str
-                      null
-                      40)]))
-      (define column-label-picts
-        (apply hb-append
-               column-spacing
-               (for/list ([col (in-list column-labels)])
-                 (cc-superimpose (let ([rotated (rotate (make-text col) (* pi 1/4))])
-                                   (inset/clip rotated
-                                               (/ (- (pict-width a-cell)
-                                                     (pict-width rotated))
-                                                  2)))
-                                 cell-width-spacer))))
-      (define row-label-picts
-        (apply vr-append
-               row-spacing
-               (for/list ([row (in-list row-labels)])
-                 (cc-superimpose (make-text row)
-                                 cell-height-spacer))))
-      (hb-append
-       (+ column-spacing 5)
-       row-label-picts
-       (vl-append column-label-picts
-                  plain-table))))
+      (apply vc-append
+             20
+             plots)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
   (void))
