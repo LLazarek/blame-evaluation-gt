@@ -37,7 +37,7 @@
 %%   Right brace   \}     Tilde         \~}
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{acmart}
-[2020/10/25 v1.74 Typesetting articles for the Association for Computing Machinery]
+[2020/11/15 v1.75 Typesetting articles for the Association for Computing Machinery]
 \def\@classname{acmart}
 \InputIfFileExists{acmart-preload-hook.tex}{%
   \ClassWarning{\@classname}{%
@@ -1778,8 +1778,12 @@
    \else
     \g@addto@macro\thankses{\thanks{#1}}%
    \fi}}
+\ifx\@beginmaketitlehook\@undefined
+  \let\@beginmaketitlehook\@empty
+\fi
+\def\AtBeginMaketitle{\g@addto@macro\@beginmaketitlehook}
 \newbox\mktitle@bx
-\def\maketitle{%
+\def\maketitle{\@beginmaketitlehook
   \@ACM@maketitle@typesettrue
   \if@ACM@anonymous
     % Anonymize omission of \author-s
@@ -2209,7 +2213,8 @@
   \ClassWarningNoLine{\@classname}{No city present for an affiliation}%
   \fi
   \if@ACM@countrypresent\else
-  \ClassWarningNoLine{\@classname}{No country present for an affiliation}%
+  \ClassError{\@classname}{No country present for an affiliation}{ACM
+    requires each author to indicate their country using country macro.}%
   \fi
 }
 \def\@mkauthors@i{%
