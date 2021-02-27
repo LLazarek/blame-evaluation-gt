@@ -41,7 +41,7 @@
   [dyn-err-summaries-db-path "../dbs/code-mutations/dyn-err-summaries.rktdb"]
   [TR-config "../configurables/configs/TR.rkt"]
   [outdir "./figures"]
-  [here "."])
+  [data-cache "./data-cache"])
 
 (install-configuration! TR-config)
 
@@ -58,6 +58,10 @@
      (add-missing-active-mutators
       (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir
                                                           mutant-mutators)))))
+
+(define (bt->id bt)
+  (list (blame-trail-mutant-id bt)
+        (blame-trail-trail-id bt)))
 
 (define success-color '(153 225 187))
 (define failure-color '(255 153 153))
@@ -140,17 +144,24 @@
 (when (member 'bt-lengths-table to-generate)
   (define bt-lengths-table
     (let ()
+      (define bt-length-distribution-for-mode
+        (simple-memoize
+         #:on-disk (build-path data-cache "bt-length-distributions.rktd")
+         (λ (mode-name)
+           (define bts-by-mutator/across-all-benchmarks
+             (get-bts-by-mutator-for-mode mode-name))
+           (bt-length-distributions-for
+            "yes"
+            (hash "yes"
+                  (append* (hash-values bts-by-mutator/across-all-benchmarks)))
+            #:normalize? #t
+            #:partition-by-success? #t))))
+
       (define (make-length-table-cell-plot mode-name)
-        (define bts-by-mutator/across-all-benchmarks
-          (get-bts-by-mutator-for-mode mode-name))
+        (define length-distribution (bt-length-distribution-for-mode mode-name))
         (define histogram
-          (bt-length-distribution-histogram-for
-           "yes"
-           (hash "yes"
-                 (append* (hash-values bts-by-mutator/across-all-benchmarks)))
-           #:normalize? #t
-           #:color-by-success? #t
-           #:colors (list success-color failure-color)))
+          (stacked-histogram length-distribution
+                             #:colors (list success-color failure-color)))
         (parameterize ([plot-x-ticks (ticks (linear-ticks-layout #:number 1)
                                             (linear-ticks-format))]
                        [plot-font-size 20]
@@ -201,9 +212,9 @@
                                mode))))
 
       (define column-spacing 10)
-      (define row-spacing 25)
+      (define row-spacing 50)
       (define plain-table
-        (vc-append row-spacing
+        (vc-append (/ row-spacing 2)
                    (vc-append 10
                               (cb-superimpose (first plot-labels) uniform-label-filler)
                               (hash-ref distributions-plots/by-mode "null"))
@@ -268,13 +279,10 @@
                             #:default empty
                             (values (blame-trail-mutant-id bt)
                                     bt))))))
-      (define (bt->id bt)
-        (list (blame-trail-mutant-id bt)
-              (blame-trail-trail-id bt)))
 
       (define direct-avo-%
         (simple-memoize
-         #:on-disk (build-path here "direct-avo-percents.rktd")
+         #:on-disk (build-path data-cache "direct-avo-percents.rktd")
          (λ (top-mode bottom-mode dump-to)
            (displayln @~a{@top-mode vs @bottom-mode})
            (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
@@ -341,7 +349,7 @@
           (append bts all-bts)))
       (define mode-success-%
         (simple-memoize
-         #:on-disk (build-path here "success-percents.rktd")
+         #:on-disk (build-path data-cache "success-percents.rktd")
          (λ (mode-name)
            (define bts (all-bts-for-mode mode-name))
            (define success-count (count satisfies-BT-hypothesis? bts))

@@ -1,6 +1,8 @@
 #lang at-exp rscript
 
-(provide bt-length-distribution-histogram-for)
+(provide bt-length-distribution-histogram-for
+         bt-length-distributions-for
+         bt-length)
 
 (require plot
          plot-util
@@ -17,40 +19,41 @@
 
 (define plot-tree? any/c)
 
-(define/contract (bt-length-distribution-histogram-for key data
-                                                       #:normalize? normalize?
-                                                       #:dump-to [dump-port #f]
-                                                       #:color-by-success? [color-by-success? #f]
-                                                       #:colors [success-colors '("green" "red")])
+(define (bt-length trail normalize?)
+  (define base-trail-length
+    (sub1 (length (blame-trail-mutant-summaries trail))))
+  (cond [(and normalize?
+              (> base-trail-length 0))
+         (define ordered-configs
+           (sort (blame-trail-mutant-summaries trail)
+                 <
+                 #:key mutant-summary-id))
+         (define first-mutant-config
+           (mutant-summary-config (first ordered-configs)))
+         (define last-mutant-config
+           (mutant-summary-config (last ordered-configs)))
+         (define number-of-components-typed
+           (for/sum ([{mod level} (in-hash first-mutant-config)]
+                     #:when (not (equal? (hash-ref last-mutant-config mod)
+                                         level)))
+             1))
+         number-of-components-typed]
+        [else base-trail-length]))
+
+(define/contract (bt-length-distributions-for key data
+                                              #:normalize? normalize?
+                                              #:dump-to [dump-port #f]
+                                              #:partition-by-success? [partition-by-success? #f])
   ({string?
    (hash/c string? (listof blame-trail?))
    #:normalize? boolean?}
    {#:dump-to (or/c output-port? #f)
-    #:color-by-success? boolean?
-    #:colors (listof any/c)}
+    #:partition-by-success? boolean?}
    . ->* .
-   plot-tree?)
+   (listof (list/c natural? (list/c real? real?))))
 
   (define (trail-length trail)
-    (define base-trail-length
-      (sub1 (length (blame-trail-mutant-summaries trail))))
-    (cond [(and normalize?
-                (> base-trail-length 0))
-           (define ordered-configs
-             (sort (blame-trail-mutant-summaries trail)
-                   <
-                   #:key mutant-summary-id))
-           (define first-mutant-config
-             (mutant-summary-config (first ordered-configs)))
-           (define last-mutant-config
-             (mutant-summary-config (last ordered-configs)))
-           (define number-of-components-typed
-             (for/sum ([{mod level} (in-hash first-mutant-config)]
-                       #:when (not (equal? (hash-ref last-mutant-config mod)
-                                           level)))
-               1))
-           number-of-components-typed]
-          [else base-trail-length]))
+    (bt-length trail normalize?))
 
   (define trails (hash-ref data key))
   (when dump-port
@@ -61,10 +64,10 @@
                             group))
                   dump-port))
 
-  (define-values {partitioner colors}
-    (if color-by-success?
-        (values satisfies-BT-hypothesis? success-colors)
-        (values (const #t) '("blue" "white"))))
+  (define partitioner
+    (if partition-by-success?
+        satisfies-BT-hypothesis?
+        (const #t)))
   (define trails-grouped-by-length
     (group-by trail-length trails))
   (define trails-by-length
@@ -90,8 +93,31 @@
         (cons (list 0 '(0 0))
               partitioned-trail-proportions-by-length/sorted)))
 
+  partitioned-trail-proportions-by-length/sorted/with-0)
+
+(define/contract (bt-length-distribution-histogram-for key data
+                                                       #:normalize? normalize?
+                                                       #:dump-to [dump-port #f]
+                                                       #:color-by-success? [color-by-success? #f]
+                                                       #:colors [success-colors '("green" "red")])
+  ({string?
+   (hash/c string? (listof blame-trail?))
+   #:normalize? boolean?}
+   {#:dump-to (or/c output-port? #f)
+    #:color-by-success? boolean?
+    #:colors (listof any/c)}
+   . ->* .
+   plot-tree?)
+
+  (define partitioned-trail-proportions-by-length/sorted/with-0
+    (bt-length-distributions-for key data
+                                 #:normalize? normalize?
+                                 #:dump-to dump-port
+                                 #:partition-by-success? color-by-success?
+                                 #:colors success-colors))
+
   (stacked-histogram partitioned-trail-proportions-by-length/sorted/with-0
-                     #:colors colors))
+                     #:colors success-colors))
 
 (define/contract (bt-length-distribution-plot-for key data
                                                   #:normalize? normalize?
