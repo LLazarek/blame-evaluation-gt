@@ -42,7 +42,8 @@
   [dyn-err-summaries-db-path "../dbs/code-mutations/dyn-err-summaries.rktdb"]
   [TR-config "../configurables/configs/TR.rkt"]
   [outdir "./figures"]
-  [data-cache "./data-cache"])
+  [data-cache "./data-cache"]
+  [venn-template "venn-template.svg"])
 
 (install-configuration! TR-config)
 
@@ -584,6 +585,144 @@
 
       (apply hc-append 40 plots)))
   (pict->png! blame-vs-exns-bars (build-path outdir "blame-vs-exns-bars.png"))
+  (void))
+
+(when (member 'blame-vs-exns-venn to-generate)
+  (struct utility-comparison (all-3-%
+
+                              top-only-%
+                              top-bot-%
+                              top-erasure-%
+
+                              bot-only-%
+                              bot-erasure-%
+
+                              erasure-only-%)
+    #:prefab)
+  (define venn-%s
+    (simple-memoize
+     #:on-disk (build-path data-cache "blame-vs-exns-venn-data.rktd")
+     (λ (top-mode bottom-mode)
+       (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
+       (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
+       (define erasure-bts-by-mutator (get-bts-by-mutator-for-mode "erasure-stack-first"))
+       (define erasure-bts-by-id (bts-by-id erasure-bts-by-mutator))
+       (define top-bts-by-mutator (get-bts-by-mutator-for-mode top-mode))
+       (define top-bts-by-id (bts-by-id top-bts-by-mutator))
+
+       (define all-bts-count (hash-count top-bts-by-id))
+       (define (trio-% trio-predicate)
+         (/ (for/sum ([{id top-bt} (in-hash top-bts-by-id)]
+                      #:when (trio-predicate top-bt
+                                             (hash-ref bottom-bts-by-id id)
+                                             (hash-ref erasure-bts-by-id id)))
+              1)
+            all-bts-count))
+       (define all-3-succeed-%
+         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
+                                   (? satisfies-BT-hypothesis?)
+                                   (? satisfies-BT-hypothesis?)} #t]
+                                 [{_ _ _} #f])))
+
+       (define top-only-%
+         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
+                                   (not (? satisfies-BT-hypothesis?))
+                                   (not (? satisfies-BT-hypothesis?))} #t]
+                                 [{_ _ _} #f])))
+       (define top-bot-%
+         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
+                                   (? satisfies-BT-hypothesis?)
+                                   (not (? satisfies-BT-hypothesis?))} #t]
+                                 [{_ _ _} #f])))
+       (define top-erasure-%
+         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
+                                   (not (? satisfies-BT-hypothesis?))
+                                   (? satisfies-BT-hypothesis?)} #t]
+                                 [{_ _ _} #f])))
+
+       (define bot-only-%
+         (trio-% (match-lambda** [{(not (? satisfies-BT-hypothesis?))
+                                   (? satisfies-BT-hypothesis?)
+                                   (not (? satisfies-BT-hypothesis?))} #t]
+                                 [{_ _ _} #f])))
+       (define bot-erasure-%
+         (trio-% (match-lambda** [{(not (? satisfies-BT-hypothesis?))
+                                   (? satisfies-BT-hypothesis?)
+                                   (? satisfies-BT-hypothesis?)} #t]
+                                 [{_ _ _} #f])))
+
+       (define erasure-only-%
+         (trio-% (match-lambda** [{(not (? satisfies-BT-hypothesis?))
+                                   (not (? satisfies-BT-hypothesis?))
+                                   (? satisfies-BT-hypothesis?)} #t]
+                                 [{_ _ _} #f])))
+
+       (utility-comparison all-3-succeed-%
+                           top-only-%
+                           top-bot-%
+                           top-erasure-%
+                           bot-only-%
+                           bot-erasure-%
+                           erasure-only-%))))
+
+  (for ([comparison (in-list '(["TR" "TR-stack-first"]
+                               ["transient-newest" "transient-stack-first"]
+                               ["transient-oldest" "transient-stack-first"]))])
+    (match-define (list top bot) comparison)
+    (define (->str %) (~r (* % 100) #:precision 1))
+    (match-define (utility-comparison (app ->str all-3-%)
+
+                                      (app ->str top-only-%)
+                                      (app ->str top-bot-%)
+                                      (app ->str top-erasure-%)
+
+                                      (app ->str bot-only-%)
+                                      (app ->str bot-erasure-%)
+
+                                      (app ->str erasure-only-%))
+      (apply venn-%s comparison))
+    (displayln
+     @~a{
+         Erasure                                @(rename-mode top)
+
+         @erasure-only-%          @top-erasure-%               @top-only-%
+
+
+
+                          @all-3-%
+
+
+                 @bot-erasure-%                @top-bot-%
+
+
+
+                          @bot-only-%
+                          @(rename-mode bot)
+         })
+    (newline)
+    (newline)
+    (displayln "--------------------------------------------------")
+
+    (define venn-outfile (build-path outdir @~a{@|top|-@|bot|-venn.svg}))
+    (copy-file venn-template venn-outfile #t)
+    (define (template-fill! field value)
+      (replace-in-file! venn-outfile
+                        (~a "&lt;" field "&gt;")
+                        value))
+    (template-fill! "top-name" (rename-mode top))
+    (template-fill! "bot-name" (rename-mode bot))
+    (for ([pattern (in-list     '(all
+                                  top-only top-bot top-erasure
+                                  bot-only bot-erasure
+                                  erasure-only))]
+          [%       (in-list (list all-3-%
+                                  top-only-% top-bot-% top-erasure-%
+                                  bot-only-% bot-erasure-%
+                                  erasure-only-%))])
+      (template-fill! pattern %))
+    (system @~a{convert '@venn-outfile' '@(path-replace-extension venn-outfile ".png")'})
+    (delete-file venn-outfile))
+
   (void))
 
 (when (member 'success-bars to-generate)
