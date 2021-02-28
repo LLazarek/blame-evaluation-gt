@@ -5,6 +5,40 @@ memory limit of 6GB. The complete experiment required
 over 30,000 hours of compute hours.
 
 
+\begin{wrapfigure}{r}{.40\textwidth}
+  \centering
+  \includegraphics[width=0.40\textwidth]{./plots/success-bars}
+  \caption{Success baselines: The estimated percentage of scenarios for which each mode succeeds in locating the bug.
+  }
+  \label{fig:success-bars}
+\end{wrapfigure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth]{./plots/avo-bars}
+  \caption{Usefulness comparisons: Each plot depicts a head-to-head comparison of the entitled mode against every other mode.
+  The portion above 0 (in green) is the estimated percentage of scenarios where the entitled mode is more useful than each of the other modes.
+  The portion below 0 (in red) is the estimated percentage of scenarios with the inverse situation.
+  The upper bound of error margin is 0.02\%.}
+  \label{fig:avo-bars}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.32\textwidth]{./plots/TR-TR-stack-first-venn}
+  \hfill
+  \includegraphics[width=0.32\textwidth]{./plots/transient-newest-transient-stack-first-venn}
+  \hfill
+  \includegraphics[width=0.32\textwidth]{./plots/transient-oldest-transient-stack-first-venn}
+
+  \caption{Blame usefulness analysis: Each diagram shows the breakdown of how three modes' successful scenarios overlap.
+  The percentage of scenarios covered by each circle are proportions for which the corresponding mode succeeds.
+  For example, in the breakdown of Natural, all three modes succeed on the same scenario 57.3\% of the time, only Natural and Natural exceptions succeed on 29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural alone succeeds on 9\%.
+  }
+  \label{fig:success-venns}
+\end{figure}
+
+
 Figure~\ref{fig:success-bars} summarizes the overall success rates of every mode.
 The success rates illustrate a few points that underly the rest of our analysis.
 The first notable piece of information from
@@ -67,48 +101,6 @@ no clear winner between Natural exceptions and Transient exceptions
 despite the theoretically advantageous additional checks of the Natural
 semantics.
 
-In order to better understand questions $Q_1$ to $Q_3$, figure~\ref{fig:success-venns} depicts a breakdown of the success of each semantics in comparison to Erasure.
-Specifically, the figure shows one Venn diagram per mode of the rational programmer that uses blame.
-Each diagram breaks breaks down the overlap in the success of the blame mode, its corresponding exception mode, and Erasure.
-For example, in the breakdown of Natural, the diagram shows that all three modes succeed on the same scenario 57.3\% of the time, only Natural and Natural exceptions succeed on 29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural alone succeeds on 9\%.
-This analysis highlights the success tradeoffs each semantics offers against Erasure, with and without blame, to answer questions about the tradeoffs in choosing to use blame or just exceptions for each semantics.
-For instance, the breakdown of Natural clearly illustrates that if choosing between Natural blame, Natural exceptions, and Erasure, Natural blame is the absolutely most successful: all of the successes of the other two modes are subsets of Natural's successful scenarios.
-On the other hand, Transient's blame modes are similar but not so clear-cut.
-
-\begin{figure}
-  \centering
-  \includegraphics[width=0.30\textwidth]{./plots/success-bars}
-  \caption{Success baselines: The estimated percentage of scenarios for which each mode succeeds in locating the bug.
-  }
-  \label{fig:success-bars}
-\end{figure}
-
-\begin{figure}
-  \centering
-  \includegraphics[width=0.9\textwidth]{./plots/avo-bars}
-  \caption{Usefulness comparisons: Each plot depicts a head-to-head comparison of the entitled mode against every other mode.
-  The portion above 0 (in green) is the estimated percentage of scenarios where the entitled mode is more useful than each of the other modes.
-  The portion below 0 (in red) is the estimated percentage of scenarios with the inverse situation.
-  The upper bound of error margin is 0.02\%.}
-  \label{fig:avo-bars}
-\end{figure}
-
-\begin{figure}
-  \centering
-  \includegraphics[width=0.32\textwidth]{./plots/TR-TR-stack-first-venn}
-  \hfill
-  \includegraphics[width=0.32\textwidth]{./plots/transient-newest-transient-stack-first-venn}
-  \hfill
-  \includegraphics[width=0.32\textwidth]{./plots/transient-oldest-transient-stack-first-venn}
-
-  \caption{Blame usefulness analysis: Each diagram shows the breakdown of how three modes' successful scenarios overlap.
-  The percentage of scenarios covered by each circle are proportions for which the corresponding mode succeeds.
-  For example, in the breakdown of Natural, all three modes succeed on the same scenario 57.3\% of the time, only Natural and Natural exceptions succeed on 29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural alone succeeds on 9\%.
-  }
-  \label{fig:success-venns}
-\end{figure}
-
-
 \begin{figure}
   \centering
   \includegraphics[width=0.8\textwidth]{./plots/bt-lengths-table}
@@ -121,11 +113,19 @@ On the other hand, Transient's blame modes are similar but not so clear-cut.
   \centering
   \includegraphics[width=0.9\textwidth]{./plots/bt-length-comparisons}
   \caption{Effort comparisons: Each plot depicts the distribution of scenarios with trail length differences ranging from -3 to 3.
-  A negative difference means that the top mode's trail is three steps shorter than the bottom mode's trail for the same scenario, and a positive difference is the reverse.
+  A negative difference means that the first mode's trail is three steps shorter than the second mode's trail for the same scenario, and a positive difference is the reverse.
   Only scenarios where both modes succeed are considered.
-  The \texttt{.2|.8} on the y-axis indicates that the axis is truncated between 0.2 and 0.8.}
+  The 10|85 on the y-axis indicates that the axis is truncated between 10 and 85\%.}
   \label{fig:effort-comparisons}
 \end{figure}
+
+In order to better understand questions $Q_1$ to $Q_3$, figure~\ref{fig:success-venns} depicts a breakdown of the success of each semantics in comparison to Erasure.
+Specifically, the figure shows one Venn diagram per mode of the rational programmer that uses blame.
+Each diagram breaks breaks down the overlap in the success of the blame mode, its corresponding exception mode, and Erasure.
+For example, in the breakdown of Natural, the diagram shows that all three modes succeed on the same scenario 57.3\% of the time, only Natural and Natural exceptions succeed on 29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural alone succeeds on 9\%.
+This analysis highlights the success tradeoffs each semantics offers against Erasure, with and without blame, to answer questions about the tradeoffs in choosing to use blame or just exceptions for each semantics.
+For instance, the breakdown of Natural clearly illustrates that if choosing between Natural blame, Natural exceptions, and Erasure, Natural blame is the absolutely most successful: all of the successes of the other two modes are subsets of Natural's successful scenarios.
+On the other hand, Transient's blame modes are similar but not so clear-cut.
 
 
 Turning to programmer effort, figure~\ref{fig:effort-table} shows the distribution of blame trail lengths
