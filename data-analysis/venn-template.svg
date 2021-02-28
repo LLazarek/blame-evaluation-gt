@@ -9,9 +9,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="181.84564mm"
-   height="215.7113mm"
-   viewBox="0 0 181.84564 215.7113"
+   width="161.21239mm"
+   height="172.77896mm"
+   viewBox="0 0 161.21239 172.77896"
    version="1.1"
    id="svg8"
    inkscape:export-filename="/home/lukas/venn.png"
@@ -29,8 +29,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.7"
-     inkscape:cx="6.4416405"
-     inkscape:cy="733.71746"
+     inkscape:cx="153.05575"
+     inkscape:cy="408.28125"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -55,14 +55,14 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(-11.144975,-52.407568)">
+     transform="translate(-15.895318,-62.826049)">
     <rect
-       style="opacity:1;fill:#ffffff;fill-opacity:0.51834863;stroke:#000000;stroke-width:0.41958135;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#ffffff;fill-opacity:0.51834866;stroke:#000000;stroke-width:0.35357025;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect195"
-       width="181.42606"
-       height="215.29172"
-       x="11.354766"
-       y="52.617359" />
+       width="160.85881"
+       height="172.42538"
+       x="16.072104"
+       y="63.002834" />
     <ellipse
        style="opacity:1;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.46499997;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="path10"
@@ -73,22 +73,22 @@
     <ellipse
        style="opacity:1;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.46499997;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="path10-3"
-       cx="126.99998"
+       cx="114.29998"
        cy="132.95831"
        rx="45.735119"
        ry="49.136902" />
     <ellipse
        style="opacity:1;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.46499997;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="path10-6"
-       cx="100.54166"
-       cy="197.97025"
+       cx="92.074982"
+       cy="174.15807"
        rx="45.735119"
        ry="49.136902" />
     <flowRoot
        xml:space="preserve"
        id="flowRoot35"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
-       transform="scale(0.26458333)"><flowRegion
+       transform="matrix(0.26458333,0,0,0.26458333,-0.37797619,5.2160712)"><flowRegion
          id="flowRegion37"
          style="font-size:24px"><rect
            id="rect39"
@@ -98,7 +98,7 @@
            y="255.37683"
            style="font-size:24px" /></flowRegion><flowPara
          id="flowPara41">Erasure</flowPara></flowRoot>    <flowRoot
-       transform="matrix(0.26458333,0,0,0.26458333,112.23833,-1.6477723)"
+       transform="matrix(0.26458333,0,0,0.26458333,112.23833,5.9117518)"
        xml:space="preserve"
        id="flowRoot35-7"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"><flowRegion
@@ -111,7 +111,7 @@
            y="255.37683"
            style="font-size:24px" /></flowRegion><flowPara
          id="flowPara41-5">&lt;top-name&gt;</flowPara></flowRoot>    <flowRoot
-       transform="matrix(0.26458333,0,0,0.26458333,99.765118,175.2451)"
+       transform="matrix(0.26458333,0,0,0.26458333,94.095475,149.54272)"
        xml:space="preserve"
        id="flowRoot35-6"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"><flowRegion
@@ -124,7 +124,7 @@
            y="255.37683"
            style="font-size:24px" /></flowRegion><flowPara
          id="flowPara41-1">&lt;bot-name&gt;</flowPara></flowRoot>    <flowRoot
-       transform="matrix(0.26458333,0,0,0.26458333,110.72642,55.675492)"
+       transform="matrix(0.26458333,0,0,0.26458333,103.1669,48.115968)"
        xml:space="preserve"
        id="flowRoot35-7-2"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"><flowRegion
@@ -148,7 +148,7 @@
            x="424.28571"
            y="612.51971" /></flowRegion><flowPara
          id="flowPara109">10%</flowPara></flowRoot>    <flowRoot
-       transform="matrix(0.26458333,0,0,0.26458333,89.34235,98.368788)"
+       transform="matrix(0.26458333,0,0,0.26458333,88.208421,93.455098)"
        xml:space="preserve"
        id="flowRoot35-7-2-3"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"><flowRegion
@@ -161,7 +161,7 @@
            y="255.37683"
            style="font-size:24px" /></flowRegion><flowPara
          id="flowPara41-5-9-6">&lt;top-bot&gt;%</flowPara></flowRoot>    <flowRoot
-       transform="matrix(0.26458333,0,0,0.26458333,70.745922,135.41045)"
+       transform="matrix(0.26458333,0,0,0.26458333,62.657233,127.09497)"
        xml:space="preserve"
        id="flowRoot35-7-2-2"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"><flowRegion
@@ -187,7 +187,7 @@
        xml:space="preserve"
        id="flowRoot155"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
-       transform="matrix(0.26458333,0,0,0.26458333,-1.0583334,3.7041668)"><flowRegion
+       transform="matrix(0.26458333,0,0,0.26458333,-7.8619048,-14.43869)"><flowRegion
          id="flowRegion157"><rect
            id="rect159"
            width="198.5714"
@@ -198,7 +198,7 @@
        xml:space="preserve"
        id="flowRoot163"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
-       transform="matrix(0.26458333,0,0,0.26458333,-1.285119,1.5119048)"><flowRegion
+       transform="matrix(0.26458333,0,0,0.26458333,-6.9547619,-9.4494045)"><flowRegion
          id="flowRegion165"><rect
            id="rect167"
            width="251.42857"
@@ -209,7 +209,7 @@
        xml:space="preserve"
        id="flowRoot171"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
-       transform="matrix(0.26458333,0,0,0.26458333,4.5357143,0)"><flowRegion
+       transform="matrix(0.26458333,0,0,0.26458333,-12.85119,-6.047619)"><flowRegion
          id="flowRegion173"><rect
            id="rect175"
            width="218.57143"
@@ -220,7 +220,7 @@
        xml:space="preserve"
        id="flowRoot179"
        style="font-style:normal;font-weight:normal;font-size:24px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
-       transform="matrix(0.26458333,0,0,0.26458333,8.0130952,4.0065478)"><flowRegion
+       transform="matrix(0.26458333,0,0,0.26458333,-1.8142858,-4.6869046)"><flowRegion
          id="flowRegion181"><rect
            id="rect183"
            width="142.85715"
