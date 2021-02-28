@@ -450,7 +450,8 @@
             (list (rename-mode other-mode) (~% top/other) (~% other/top))))
         (parameterize ([plot-x-tick-label-angle 40]
                        [plot-x-tick-label-anchor 'top-right]
-                       [plot-y-ticks (absolute-value-format (linear-ticks #:number 15))])
+                       [plot-y-ticks (absolute-value-format (linear-ticks #:number 15))]
+                       [plot-font-size 16])
           (plot-pict (two-sided-histogram comparison-data
                                           #:top-color success-color
                                           #:bot-color failure-color)
@@ -474,7 +475,7 @@
       (table/fill-missing plots
                           #:columns 3
                           #:column-spacing 10
-                          #:row-spacing 20)))
+                          #:row-spacing 80)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
   (void))
 
@@ -647,7 +648,8 @@
                    #:y-max (~% 1)
                    #:y-min (~% 0)
                    #:y-label "% of scenarios"
-                   #:x-label #f))))
+                   #:x-label #f
+                   #:width (* 1.25 (plot-width))))))
   (pict->png! success-bars (build-path outdir "success-bars.png"))
   (void))
 
