@@ -21,6 +21,9 @@
 (plot-font-size 14)
 (define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
+;; How to render percentages: within [0,1] or [0,100]
+(define (~% %) (* % 100))
+
 
 
 (require plot
@@ -127,14 +130,16 @@
       (define (make-length-table-cell-plot mode-name)
         (define length-distribution (bt-length-distribution-for-mode mode-name))
         (define histogram
-          (stacked-histogram length-distribution
+          (stacked-histogram (map (match-lambda [`(,len (,%1 ,%2))
+                                                 (list len (list (~% %1) (~% %2)))])
+                                  length-distribution)
                              #:colors (list success-color failure-color)))
         (parameterize ([plot-x-ticks (ticks (linear-ticks-layout #:number 1)
                                             (linear-ticks-format))]
                        [plot-y-far-ticks no-ticks])
           (plot-pict histogram
-                     #:y-min 0
-                     #:y-max 1
+                     #:y-min (~% 0)
+                     #:y-max (~% 1)
 
                      #:x-label #f
                      #:y-label "% of trails"
@@ -249,9 +254,13 @@
         (define Δ-distribution+placeholders
           (for/hash ([i (in-range -3 4)])
             (values i (hash-ref Δ-distribution i 0))))
-        (parameterize ([plot-y-transform (collapse-transform 0.1 0.8)]
+        (parameterize ([plot-y-transform (axis-transform-compose
+                                          (axis-transform-compose
+                                           (collapse-transform (~% 0.1) (~% 0.85))
+                                           (stretch-transform (~% 0) (~% 0.1) 2))
+                                          (stretch-transform (~% 0.85) (~% 1) 1/2))]
                        [plot-y-ticks (ticks-add (plot-y-ticks)
-                                                '(0.1 0.9))])
+                                                (map ~% '(0.025 0.05 0.075 0.1 0.15 0.85 0.9 0.95)))])
           (plot-pict (list
                       (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
                                  [color (in-list (list success-color
@@ -261,15 +270,15 @@
                                              (list Δ
                                                    ;; Need a placeholder for every Δ, even if
                                                    ;; it's not in this group
-                                                   (if (filter Δ) % 0))))
+                                                   (if (filter Δ) (~% %) 0))))
                         (discrete-histogram (sort group-data < #:key first)
                                             #:color color))
-                      (x-axis 0.2 #:ticks? #f #:alpha 0.7))
+                      (x-axis (~% 0.2) #:ticks? #f #:alpha 0.7))
                      #:title #f
                      #:y-label "% of mutually-successful scenarios"
                      #:x-label @~a{trail length difference}
-                     #:y-min 0
-                     #:y-max 1
+                     #:y-min (~% 0)
+                     #:y-max (~% 1)
                      #:x-min 0
                      #:x-max 7)))
 
@@ -400,18 +409,20 @@
                      [index (in-naturals)])
             (match-define (list top/other top/other-error-margin) (direct-avo-% top-mode other-mode #f))
             (match-define (list other/top other/top-error-margin) (direct-avo-% other-mode top-mode #f))
-            (list (rename-mode other-mode) top/other other/top)))
+            (list (rename-mode other-mode) (~% top/other) (~% other/top))))
         (parameterize ([plot-x-tick-label-angle 40]
                        [plot-x-tick-label-anchor 'top-right]
-                       [plot-y-ticks (absolute-value-format (linear-ticks))])
+                       [plot-y-ticks (absolute-value-format (linear-ticks #:number 15))])
           (plot-pict (two-sided-histogram comparison-data
                                           #:top-color success-color
                                           #:bot-color failure-color)
                      #:title (rename-mode top-mode)
                      #:y-label @~a{% of scenarios} ; where @top-mode is more useful than mode X (above) | vice versa (below)
                      #:x-label #f
-                     #:y-min -0.4
-                     #:y-max 0.4)))
+                     #:y-min (~% -0.4)
+                     #:y-max (~% 0.4)
+                     #:height (* 2 (plot-height))
+                     #:width (* 1.3 (plot-width)))))
 
       (define modes/ordered '("TR" "transient-newest" "transient-oldest"
                               "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
@@ -427,91 +438,6 @@
                           #:column-spacing 10
                           #:row-spacing 20)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
-  (void))
-
-(when (member 'blame-vs-exns-bars to-generate)
-  (define blame-vs-exns-bars
-    (let ()
-      (struct utility-comparison (bts-where-top-or-bottom->-erasure-%
-                                  bts-where-top->-bottom-sub-%
-                                  bts-where-bottom->-top-sub-%)
-        #:prefab)
-      (define utility-comparison-when-better-than-erasure
-        (simple-memoize
-         #:on-disk (build-path data-cache "blame-vs-exns-comparisons.rktd")
-         (λ (top-mode bottom-mode dump-to)
-           (displayln @~a{@top-mode vs @bottom-mode})
-           (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-           (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
-           (define erasure-bts-by-mutator (get-bts-by-mutator-for-mode "erasure-stack-first"))
-           (define erasure-bts-by-id (bts-by-id erasure-bts-by-mutator))
-           (define top-bts-by-mutator (get-bts-by-mutator-for-mode top-mode))
-           (define top-bts-by-id (bts-by-id top-bts-by-mutator))
-           (define top+bottom-bts-by-id/either->-erasure
-             (for*/hash ([{id top-bt} (in-hash top-bts-by-id)]
-                         [bottom-bt (in-value (hash-ref bottom-bts-by-id id))]
-                         [erasure-bt (in-value (hash-ref erasure-bts-by-id id))]
-                         #:when (and (or (satisfies-BT-hypothesis? top-bt)
-                                         (satisfies-BT-hypothesis? bottom-bt))
-                                     (not (satisfies-BT-hypothesis? erasure-bt))))
-               (values id (list top-bt bottom-bt))))
-           (define top-vs-bottom-bt-breakdown
-             (for/hash/fold ([{id top+bottom-bt} (in-hash top+bottom-bts-by-id/either->-erasure)])
-               #:combine +
-               #:default 0
-               (match (map satisfies-BT-hypothesis? top+bottom-bt)
-                 [(list #t #f) (values 'top->-bottom 1)]
-                 [(list #f #t) (values 'bottom->-top 1)]
-                 [else         (values 'bottom->-top 0)])))
-           (define top+bottom-bts-by-id/either->-erasure-count
-             (hash-count top+bottom-bts-by-id/either->-erasure))
-           (define bts-where-top-or-bottom->-erasure-%
-             (/ top+bottom-bts-by-id/either->-erasure-count
-                (hash-count top-bts-by-id)))
-           (if (zero? bts-where-top-or-bottom->-erasure-%)
-               (utility-comparison 0 0 0)
-               (utility-comparison
-                bts-where-top-or-bottom->-erasure-%
-                (/ (hash-ref top-vs-bottom-bt-breakdown 'top->-bottom 0)
-                   top+bottom-bts-by-id/either->-erasure-count)
-                (/ (hash-ref top-vs-bottom-bt-breakdown 'bottom->-top 0)
-                   top+bottom-bts-by-id/either->-erasure-count))))))
-
-      (define (utility-comparison-when-better-than-erasure-bar top-mode bottom-mode)
-        (define comparison
-          (utility-comparison-when-better-than-erasure top-mode
-                                                       bottom-mode
-                                                       #f))
-        (parameterize ([plot-x-ticks no-ticks]
-                       [plot-y-ticks (absolute-value-format (linear-ticks))])
-          (plot-pict (list (two-sided-histogram
-                            `(("hide me"
-                               ,(utility-comparison-bts-where-top->-bottom-sub-% comparison)
-                               ,(utility-comparison-bts-where-bottom->-top-sub-% comparison)))
-                            #:top-color success-color
-                            #:bot-color failure-color
-                            #:add-ticks? #f)
-                           (x-axis #:ticks? #f))
-                     #:title (rename-mode top-mode)
-                     #:y-label @~a{
-                                   % of filtered scenarios @;
-                                   (@(~r
-                                      (* 100.0
-                                         (utility-comparison-bts-where-top-or-bottom->-erasure-%
-                                          comparison))
-                                      #:precision 0)% of total)
-                                   }
-                     #:x-label #f
-                     #:y-min -0.05
-                     #:y-max 0.25)))
-      (define plots
-        (for/list ([comparison (in-list '(["TR" "TR-stack-first"]
-                                          ["transient-newest" "transient-stack-first"]
-                                          ["transient-oldest" "transient-stack-first"]))])
-          (apply utility-comparison-when-better-than-erasure-bar comparison)))
-
-      (apply hc-append 40 plots)))
-  (pict->png! blame-vs-exns-bars (build-path outdir "blame-vs-exns-bars.png"))
   (void))
 
 (when (member 'blame-vs-exns-venn to-generate)
@@ -678,10 +604,10 @@
       (parameterize ([plot-x-tick-label-angle 40]
                      [plot-x-tick-label-anchor 'top-right])
         (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes/ordered)])
-                                         (list (rename-mode mode-name) (mode-success-% mode-name)))
+                                         (list (rename-mode mode-name) (~% (mode-success-% mode-name))))
                                        #:color success-color)
-                   #:y-max 1
-                   #:y-min 0
+                   #:y-max (~% 1)
+                   #:y-min (~% 0)
                    #:y-label "% of scenarios"
                    #:x-label #f))))
   (pict->png! success-bars (build-path outdir "success-bars.png"))
