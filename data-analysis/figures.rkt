@@ -155,6 +155,31 @@
 
   (pict->png! usefulness-table (build-path outdir "usefulness-table.png")))
 
+(define/contract (add-multiline-labels picts
+                                       labels
+                                       label->lines
+                                       #:spacing [label-gap 10]
+                                       #:style [style null]
+                                       #:size [size 12])
+  ({(listof pict?) (listof any/c) (any/c . -> . (listof string?))}
+   {#:spacing real?
+    #:style any/c
+    #:size natural?}
+   . ->* .
+   (listof pict?))
+
+  (define (text* str) (text str style size))
+  (define label-picts
+    (for/list ([label (in-list labels)])
+      (apply vc-append
+             (map text* (label->lines label)))))
+  (define uniform-label-filler (ghost (foldl cc-superimpose (blank 0) label-picts)))
+  (for/list ([pict (in-list picts)]
+             [label-pict (in-list label-picts)])
+    (vc-append label-gap
+               (cb-superimpose label-pict uniform-label-filler)
+               pict)))
+
 (when (member 'bt-lengths-table to-generate)
   (define bt-lengths-table
     (let ()
@@ -178,15 +203,13 @@
                              #:colors (list success-color failure-color)))
         (parameterize ([plot-x-ticks (ticks (linear-ticks-layout #:number 1)
                                             (linear-ticks-format))]
-                       [plot-font-size 20]
-                       ;; [plot-y-ticks no-ticks]
                        [plot-y-far-ticks no-ticks])
           (plot-pict histogram
                      #:y-min 0
                      #:y-max 1
 
                      #:x-label #f
-                     #:y-label #f
+                     #:y-label "% of trails"
                      #:title #f
                      #:width (if (equal? mode-name "null")
                                  (* 2 (plot-width))
@@ -197,45 +220,35 @@
         (for/hash ([mode (in-list modes)])
           (values mode (make-length-table-cell-plot mode))))
 
-      (define (make-text str)
-        (match str
-          [(regexp #rx"([^ ]+) (.+)" (list _ first-word other-words))
-           (vc-append (text first-word null 40)
-                      (text other-words null 40))]
-          [else (text str
-                      null
-                      40)]))
       (define modes/ordered '("null"
                               "TR" "transient-newest" "transient-oldest"
                               "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
-      (define plot-labels
+      (define plots/ordered
         (for/list ([mode (in-list modes/ordered)])
-          (make-text (rename-mode mode))))
-      (define uniform-label-filler
-        (ghost
-         (for/fold ([pict (blank 0 0)])
-                   ([plot-label (in-list plot-labels)])
-           (cc-superimpose pict
-                           plot-label))))
-      (define plots
-        (for/list ([mode (in-list (rest modes/ordered))]
-                   [label (in-list (rest plot-labels))])
-          (vc-append 10
-                     (cb-superimpose label uniform-label-filler)
-                     (hash-ref distributions-plots/by-mode
-                               mode))))
+          (hash-ref distributions-plots/by-mode
+                               mode)))
+      (define (split-mode-name name)
+        (define split (string-split name))
+        (match split
+          [(list* first-word other-words)
+           (list first-word (string-join other-words))]
+          [other-split other-split]))
+      (define labeled-plots/ordered
+        (add-multiline-labels plots/ordered
+                              (map rename-mode modes/ordered)
+                              split-mode-name
+                              #:style (or (plot-font-face) (plot-font-family))
+                              #:size (plot-title-size)))
 
-      (define column-spacing 10)
+      (define column-spacing 30)
       (define row-spacing 50)
       (define plain-table
         (vc-append (/ row-spacing 2)
-                   (vc-append 10
-                              (cb-superimpose (first plot-labels) uniform-label-filler)
-                              (hash-ref distributions-plots/by-mode "null"))
-                   (table/fill-missing plots
-                            #:columns 3
-                            #:column-spacing column-spacing
-                            #:row-spacing row-spacing)))
+                   (first labeled-plots/ordered)
+                   (table/fill-missing (rest labeled-plots/ordered)
+                                       #:columns 3
+                                       #:column-spacing column-spacing
+                                       #:row-spacing row-spacing)))
       plain-table))
   (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png")))
 
@@ -308,37 +321,52 @@
         (define Δ-distribution+placeholders
           (for/hash ([i (in-range -3 4)])
             (values i (hash-ref Δ-distribution i 0))))
-        (parameterize ([plot-y-transform (collapse-transform 0.15 0.8)])
-          (plot-pict (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
-                                [color (in-list (list success-color "light gray" failure-color))])
-                       (define group-data (for/list ([{Δ %} (in-hash Δ-distribution+placeholders)])
-                                            (list Δ
-                                                  ;; Need a placeholder for every Δ, even if
-                                                  ;; it's not in this group
-                                                  (if (filter Δ) % 0))))
-                       (discrete-histogram (sort group-data < #:key first)
-                                           #:color color))
-                     #:title @~a{@(rename-mode top-mode) vs @(rename-mode other-mode)}
-                     #:y-label "% of scenarios"
-                     #:x-label @~a{length difference}
+        (parameterize ([plot-y-transform (collapse-transform 0.1 0.8)]
+                       [plot-y-ticks (ticks-add (plot-y-ticks)
+                                                '(0.1 0.9))])
+          (plot-pict (list
+                      (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
+                                 [color (in-list (list success-color
+                                                       '(242 242 242)
+                                                       failure-color))])
+                        (define group-data (for/list ([{Δ %} (in-hash Δ-distribution+placeholders)])
+                                             (list Δ
+                                                   ;; Need a placeholder for every Δ, even if
+                                                   ;; it's not in this group
+                                                   (if (filter Δ) % 0))))
+                        (discrete-histogram (sort group-data < #:key first)
+                                            #:color color))
+                      (x-axis 0.2 #:ticks? #f #:alpha 0.7))
+                     #:title #f
+                     #:y-label "% of mutually-successful scenarios"
+                     #:x-label @~a{trail length difference}
                      #:y-min 0
                      #:y-max 1
                      #:x-min 0
                      #:x-max 7)))
 
-      (define plots
-        (for/list ([comparison (in-list '(["TR" "TR-stack-first"]
-                                          ["TR" "transient-newest"]
-                                          ["TR" "transient-oldest"]
+      (define-values {plots labels/lines}
+        (for/lists {plots labels/lines}
+                   ([comparison (in-list '(["TR" "TR-stack-first"]
+                                           ["TR" "transient-newest"]
+                                           ["TR" "transient-oldest"]
 
-                                          ["transient-newest" "transient-oldest"]
-                                          ["transient-newest" "transient-stack-first"]
-                                          ["transient-oldest" "transient-stack-first"]))])
-          (apply direct-bt-length-comparison comparison)))
-      (table/fill-missing plots
+                                           ["transient-newest" "transient-oldest"]
+                                           ["transient-newest" "transient-stack-first"]
+                                           ["transient-oldest" "transient-stack-first"]))])
+          (match-define (list top-mode other-mode) comparison)
+          (values (direct-bt-length-comparison top-mode other-mode)
+                  (list (rename-mode top-mode) "vs" (rename-mode other-mode)))))
+      (define labeled-plots
+        (add-multiline-labels plots
+                              labels/lines
+                              identity
+                              #:style (or (plot-font-face) (plot-font-family))
+                              #:size (plot-title-size)))
+      (table/fill-missing labeled-plots
                           #:columns 3
                           #:column-spacing 15
-                          #:row-spacing 15)))
+                          #:row-spacing 50)))
   (pict->png! bt-length-comparisons (build-path outdir "bt-length-comparisons.png")))
 
 
@@ -384,6 +412,15 @@
                               #:gap gap
                               #:skip skip
                               #:add-ticks? add-ticks?))))
+
+(define (absolute-value-format original-ticks)
+  (ticks (ticks-layout original-ticks)
+         (λ (min max ticks)
+           (define absolute-value-ticks
+             (for/list ([tick (in-list ticks)])
+               (struct-copy pre-tick tick
+                            [value (abs (pre-tick-value tick))])))
+           ((ticks-format original-ticks) min max absolute-value-ticks))))
 
 (when (member 'avo-bars to-generate)
   (define avo-bars
@@ -437,7 +474,8 @@
             (match-define (list other/top other/top-error-margin) (direct-avo-% other-mode top-mode #f))
             (list (rename-mode other-mode) top/other other/top)))
         (parameterize ([plot-x-tick-label-angle 40]
-                       [plot-x-tick-label-anchor 'top-right])
+                       [plot-x-tick-label-anchor 'top-right]
+                       [plot-y-ticks (absolute-value-format (linear-ticks))])
           (plot-pict (two-sided-histogram comparison-data
                                           #:top-color success-color
                                           #:bot-color failure-color)
@@ -516,7 +554,8 @@
           (utility-comparison-when-better-than-erasure top-mode
                                                        bottom-mode
                                                        #f))
-        (parameterize ([plot-x-ticks no-ticks])
+        (parameterize ([plot-x-ticks no-ticks]
+                       [plot-y-ticks (absolute-value-format (linear-ticks))])
           (plot-pict (list (two-sided-histogram
                             `(("hide me"
                                ,(utility-comparison-bts-where-top->-bottom-sub-% comparison)
@@ -535,20 +574,15 @@
                                       #:precision 0)% of total)
                                    }
                      #:x-label #f
-                     #:y-min -0.4
-                     #:y-max 0.4)))
+                     #:y-min -0.05
+                     #:y-max 0.25)))
       (define plots
         (for/list ([comparison (in-list '(["TR" "TR-stack-first"]
                                           ["transient-newest" "transient-stack-first"]
                                           ["transient-oldest" "transient-stack-first"]))])
           (apply utility-comparison-when-better-than-erasure-bar comparison)))
 
-      (table/fill-missing (list* (first plots)
-                                 (blank 0)
-                                 (rest plots))
-                          #:columns 2
-                          #:column-spacing 40
-                          #:row-spacing 30)))
+      (apply hc-append 40 plots)))
   (pict->png! blame-vs-exns-bars (build-path outdir "blame-vs-exns-bars.png"))
   (void))
 
@@ -568,9 +602,16 @@
            (define success-count (count satisfies-BT-hypothesis? bts))
            (/ success-count (length bts)))))
 
+      (define modes/ordered '("TR"
+                              "TR-stack-first"
+                              "transient-newest"
+                              "transient-oldest"
+                              "transient-stack-first"
+                              "erasure-stack-first"
+                              "null"))
       (parameterize ([plot-x-tick-label-angle 40]
                      [plot-x-tick-label-anchor 'top-right])
-        (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes)])
+        (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes/ordered)])
                                          (list (rename-mode mode-name) (mode-success-% mode-name)))
                                        #:color success-color)
                    #:y-max 1
