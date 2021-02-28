@@ -294,12 +294,50 @@
           (match-define (list top-mode other-mode) comparison)
           (values (direct-bt-length-comparison top-mode other-mode)
                   (list (rename-mode top-mode) "vs" (rename-mode other-mode)))))
+      (define (text* str)
+        (text str
+              (or (plot-font-face) (plot-font-family))
+              (plot-title-size)))
+      (define (make-vs-aligned-pict parts)
+        (define (multiline-mode-name mode)
+          (match (string-split mode)
+            [(list first more ..1) (list first (string-join more))]
+            [single             single]))
+        (define (vs-table left-top right-top
+                          left-bot right-bot)
+          (define left-col (vl-append 5 (text* left-top) (text* left-bot)))
+          (define right-col (vl-append 5 (text* right-top) (text* right-bot)))
+          (define center-col (text* "vs"))
+          (define padded-left-col
+            (rc-superimpose left-col
+                            (ghost right-col)))
+          (define padded-right-col
+            (lc-superimpose right-col
+                            (ghost left-col)))
+          (ht-append 20 padded-left-col center-col padded-right-col))
+        (match-define (list left "vs" right) parts)
+        (define left-lines (multiline-mode-name left))
+        (define right-lines (multiline-mode-name right))
+        (match* {left-lines right-lines}
+          [{(list single) (list top bottom)}
+           (vs-table single top
+                     ""     bottom)]
+          [{(list left-top left-bot) (list right-top right-bot)}
+           (vs-table left-top right-top
+                     left-bot right-bot)]))
+      (define (pad-to-width pict w)
+        (define difference (- w (pict-width pict)))
+        (blank-pad pict
+                   #:left (/ difference 2.0)
+                   #:right (/ difference 2.0)))
       (define labeled-plots
-        (add-multiline-labels plots
-                              labels/lines
-                              identity
-                              #:style (or (plot-font-face) (plot-font-family))
-                              #:size (plot-title-size)))
+        (for/list ([plot (in-list plots)]
+                   [label-parts (in-list labels/lines)])
+          (vr-append 10
+                     (blank-pad (pad-to-width (make-vs-aligned-pict label-parts)
+                                              300)
+                                #:right 8)
+                     plot)))
       (table/fill-missing labeled-plots
                           #:columns 3
                           #:column-spacing 15
