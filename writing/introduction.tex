@@ -18,7 +18,7 @@ actions and for finding typos in code. Then their compilers remove types and
 rely on the built-in safety checks of the underlying language to catch any
 problems.
 
-This contrast between theoretical research and industrial applications of gradual typing raises the question 
+This contrast between theory and applications of gradual typing raises the question 
 \begin{quote}
  \it
  whether blame assignment adds any value to a gradually typed language,
@@ -33,21 +33,31 @@ community has thus far failed to offer a method for evaluating blame assignment.
 
 This paper's first contribution is {\em an automated method for evaluating the
 effectiveness of blame assignment strategies\/} in the gradual typing world.
-speaking, the method simulates a programmer who follows the Wadler-Findler
-slogan quoted above; its automation borrows elements of of Lazarek et
-al.~\cite{lksfd-popl-2020}'s recent work.\footnote{\citet{cc-snapl-19} use this
-tracing method to localize type errors reported by gradual typing systems based
-on inference.}  Such a \emph{rational programmer} can find impedance-mismatch
-bugs by adding types to a partially typed program (see
-section~\ref{sec:landscape}). That is, when the run-time system signals an
-impedance mismatch, a good blame message helps the programmer infer where to add
-an additional type specification because, by the basic theory, well-typed
-components cannot cause impedance mismatches. Otherwise, if the additional type
-does {\em not\/} cause a static type error, the program is run again to signal
-another violation. Then the programmer can heed blame one more time to add yet
-another type specification. Evaluating the quality of blame assignment thus
-becomes a question of whether the tracing the error messages finds the source of
-the mistake and how many steps it takes to get to this point.
+The top-level innovation is the idea of a {\em rational programmer\/}, that is,
+a programmer that acts only in response to available information (see section~\ref{sec:why-rational}). In the case
+of an impedance mismatch, the available information consists of the error
+message and the current state of the program. The rational programmer can hence
+use the former to change the latter---and this systematic, information-driven
+process can be implemented.\footnote{\citet{cc-snapl-19} use this tracing
+method to localize type errors reported by gradual typing systems based on
+inference.} Implementing it means overcoming three major challenges: injecting
+representative impedance mismatches; putting the various kinds of error
+information to comparable use; and sampling the huge space of possibilities
+properly (see section~\ref{sec:challenges}).
+
+% The method simulates a programmer who follows the Wadler-Findler slogan quoted
+% above; its automation borrows elements of of Lazarek et
+% al.~\cite{lksfd-popl-2020}'s recent work.  Such a \emph{rational programmer} can find impedance-mismatch
+% bugs by adding types to a partially typed program (see
+% section~\ref{sec:landscape}). That is, when the run-time system signals an
+% impedance mismatch, a good blame message helps the programmer infer where to
+% add an additional type specification because, by the basic theory, well-typed
+% components cannot cause impedance mismatches. Otherwise, if the additional type
+% does {\em not\/} cause a static type error, the program is run again to signal
+% another violation. Then the programmer can heed blame one more time to add yet
+% another type specification. Evaluating the quality of blame assignment thus
+% becomes a question of whether the tracing the error messages finds the source
+% of the mistake and how many steps it takes to get to this point.
 
 The paper's second contribution is a set of {\em results from applying the
 evaluation method to three distinct blame assignment strategies and
@@ -69,11 +79,9 @@ indicates problems with the expectations of theoreticians. The first problem is
 that the cost of Transient's blame can be huge. The second one concerns the
 difference between the methods; neither is {\it Natural\/} vastly better than
 {\it Transient\/} nor are the two blame assignment methods clearly preferable to
-{\it Erasure\/}. The third one casts doubt on the current the trade-off between
-the cost of blame-assignment systems and the quality of their blame messages.
-In turn, these problems suggests that, on one hand, the existing theory does not
-predict practice properly, and on the other hand, the existing practice needs to
-be supported by additional data. 
+{\it Erasure\/}.  In turn, these problems suggests that, on one hand, the
+existing theory does not predict practice properly, and on the other hand, the
+existing practice may need to find additional ways to collect data. 
 
 
 

@@ -1,0 +1,72 @@
+
+%% \begin{module}{name : lang}{color} ... \end{module}
+\newenvironment{module}[2]{
+\begin{minipage}[t]{6cm}
+\begin{main}[width=6cm]{#2}{#1}
+\begin{alltt}}{
+\end{alltt}
+\end{main}
+\end{minipage}}
+
+\newtcolorbox{main}[3][]{
+  colframe = #2!25,
+  colback  = #2!10,
+  coltitle = #2!20!black,  
+  title    = {#3},
+  #1,
+}
+\def\spacr{.25cm}
+
+\begin{figure}\footnotesize
+
+\centerline{\tt (define-type NPR Nonpositive-Real)}
+
+\vspace\spacr
+
+\begin{module}{server : racket}{blue}
+  (provide neg-abs)
+
+  (define (neg-abs x) (- x)))
+\end{module}\hfill\begin{module}{server-typed : typed/racket}{red}
+(provide neg-abs)
+
+(: neg-abs (Real -> NPR))
+(define (neg-abs x) (- x))
+\end{module}
+
+\vspace\spacr
+
+\begin{module}{layer : racket}{blue}
+(provide g)
+
+(require (submod ".." server))
+
+(define (g x)
+  (* 4 (neg-abs x))))
+\end{module}\hfill\begin{module}{layer : typed/racket}{red}
+(provide na-client)
+
+(require/typed
+ (submod ".." server)
+ [neg-abs (-> Real NPR)])
+
+(: na-client (-> Real NPR))
+(define (na-client x)
+  (* 4 (neg-abs x)))
+\end{module}
+
+\vspace\spacr
+
+\begin{center}
+\begin{module}{main : typed/racket}{red}
+(require/typed
+  (submod ".." layer-typed)
+  [na-client (-> Real NPR)])
+
+(define x (na-client -10))
+(displayln x)
+\end{module}
+\end{center}
+
+\caption{A simplistic debugging scenario} \label{fig:rational}
+\end{figure}

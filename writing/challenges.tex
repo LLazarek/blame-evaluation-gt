@@ -1,19 +1,5 @@
 %% -----------------------------------------------------------------------------
 
-The general challenge of evaluating blame is a methodological one. Unlike most
-current research on programming languages, the question seems to call for
-empirical research similar to that of human-computer interaction. At the same
-time, a significant evaluation result demands a large amount of
-data. As~\citet{lksfd-popl-2020} recently demonstrated, the way around this
-dilemma is to postulate the {\em rational programmer\/}---the equivalent of a
-{\it homo economicus\/} for programming languages---and to implement it as an algorithm.
-
-In the context of gradual typing, the rational programmer translates the
-Wadler-Findler slogan into a debugging method, searching for the source of the
-impedance mismatch in an incremental fashion. Measuring this simulated
-programmer's behavior on a large number of debugging scenarios yields data that
-is similar to data collected in an empirical, human-facing manner.
-
 The {\em first derivative challenge\/} is to find a representative collection of
 impedance mismatches. They must represent mistakes that programmers accidentally
 create and that the run-time checks of academic systems catch. In other words,
