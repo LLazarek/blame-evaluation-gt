@@ -18,6 +18,8 @@
 ;; (usefulness-table bt-lengths-table avo-matrix)
 (define to-generate '(bt-lengths-table avo-matrix))
 
+(plot-font-size 14)
+(define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
 
 
