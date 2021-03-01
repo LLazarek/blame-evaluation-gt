@@ -14,10 +14,10 @@ for our interesting debugging scenarios:
 
 \end{itemize}
 
-Furthermore, our experiment can compare the relative usefulness of blame
-between any two of the three semantics. 
+Furthermore, the experiment allows a comparison of the relative usefulness of blame
+information:
 \begin{itemize}
-\item[$Q_*$] Is blame for X more useful than blame for Y? (Where X and Y are any of Natural, Transient, or Erasure)
+\item[$Q_*$] Is blame for X more useful than blame for Y (for X, Y in Natural, Transient, or Erasure)?
 \end{itemize}
 
 
@@ -43,9 +43,9 @@ uses the Natural blame and exception trails to answer it.
 
 %% -----------------------------------------------------------------------------
 
-In detail we answer $Q_1$  by comparing the success of the 
+In detail the answer to $Q_1$ demands a comparison of the success of the 
 Natural blame and Natural exception trails for all interesting 
-debugging scenarios from section~\ref{sec:mutate}.
+debugging scenarios.
   The first step is to construct each
 mutant's scenario lattice and identify their interesting debugging
 scenarios.
@@ -65,8 +65,8 @@ is more useful than Natural exceptions. We
 obtain a positive answer for
 $Q_1$ when a root exists where the above is true since it is evidence that
 there is at least one interesting scenario that the rational programmer
-manages to debug because of blame. 
-The process is analogous for $Q_2$ and $Q_3$, employing the respective
+manages to debug with blame information. 
+The process is analogous for $Q_2$ and $Q_3$, using the respective
 modes of the rational programmer.
 
 For $Q_*$, the process is a bit more
