@@ -98,7 +98,7 @@
 %% for leaving margin notes in the paper write
 %% \yourinitials{...} 
 
-\def\notes#1{\expandafter\def\csname#1\endcsname##1{\marginpar{\raggedright\tiny $\bullet$ #1 says: ##1}}}
+\def\notes#1{\expandafter\def\csname#1\endcsname##1{\marginpar{\textcolor{red}{\raggedright\tiny $\bullet$ #1 says: ##1}}}}
 \notes{mf}
 \notes{cd}
 \notes{ll}

@@ -34,3 +34,15 @@ suite using these criteria while preserving its linguistic diversity
 yields ten suitable programs. Figure~\ref{table:benchmark-descriptions}
 displays the selected benchmark programs and describes their basic
 characteristic. 
+
+The definition of interesting debugging scenarios creates a powerful filter. All
+together, the listed mutators produce 16,800 mutants with at least one
+interesting debugging scenario across all benchmarks.  Broken down by benchmark,
+the mutators produce at least 40 interesting scenarios for every benchmark, and
+these scenarios originate from at least four different mutators per benchmark.
+Thus, the mutators result in a sizable and diverse population of scenarios for
+every benchmark.  Furthermore, every mutator contributes scenarios to at least
+one benchmark.  Some mutators apply only to a few benchmarks, because they
+target rather specific features; for instance, the class-focused mutators are
+mainly effective in a program that makes extensive use of object-oriented
+features.
