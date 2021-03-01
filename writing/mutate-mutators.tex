@@ -1,12 +1,13 @@
-Generating debugging scenarios from the benchmarks demands the design
-of novel mutators. Generally speaking, a
-mutator~\cite{jia2011analysis,demillo1978hints,lipton1971fault}
-performs a localized syntactic change to a code basis. For the
-evaluation of a blame strategy, the mutator must produce type-level
-mistakes that the run-time checks of gradual typing systems or the
-safety checks of the underlying language can detect. Once detected,
-the rational programmer can attempt to detect the mistake by gradually
-adding types to blamed modules.
+% -----------------------------------------------------------------------------
+
+A {\it mutator\/} performs a localized syntactic change to a code base. The
+result is a {\em mutant\/}.
+
+For the evaluation of a blame strategy, the mutator must produce type-level
+mistakes that the run-time checks of gradual typing systems or the safety
+checks of the underlying language can detect. Once detected, the rational
+programmer should be able to detect the mistake by gradually adding types to
+blamed modules.
 
 Figure~\ref{table:mutation-ops} describes the 16 mutators used for the
 experiment.  They are inspired by the authors decades-long experience

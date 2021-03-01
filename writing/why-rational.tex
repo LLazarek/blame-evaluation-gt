@@ -5,13 +5,80 @@ current research on programming languages, the question seems to call for
 empirical research similar to that of human-computer interaction. At the same
 time, a significant evaluation result demands a large amount of
 data. As~\citet{lksfd-popl-2020} recently demonstrated, the way around this
-dilemma is to postulate the {\em rational programmer\/}---the equivalent of a
-{\it homo economicus\/} for programming languages---and to implement it as an algorithm.
-
-In the context of gradual typing, the rational programmer translates the
-Wadler-Findler slogan into a debugging method, searching for the source of the
-impedance mismatch in an incremental fashion. Measuring this simulated
-programmer's behavior on a large number of debugging scenarios yields data that
-is similar to data collected in an empirical, human-facing manner.
+dilemma is to simulate a programmer's activities algorithmically on a large set
+of programming scenarios.
 
 \input{why-rational-case.tex}
+
+This paper dubs Lazarek et. alii's idea {\em rational programmer\/}. Like Stuart
+Mill's {\it homo economicus\/}, the rational programmer approximates the
+behavior of a software developer who reduces time spent on a task given the
+available information. In the context of gradual typing, the rational programmer
+has two pieces of information when an impedance mismatch signals exceptional
+behavior: the error message and the state of the program. Hence, the most
+rational procedure is to use the former to improve the latter. Put differently,
+a rational programmer translates the Wadler-Findler slogan into a debugging
+method, searching for the source of the impedance mismatch with additional type
+annotations. Measuring this simulated programmer's behavior on a large number of
+debugging scenarios yields data that is similar to data collected in an
+empirical, human-facing manner.
+
+The idea is most easily illustrated with an example from the Typed Racket
+world. In the context of Typed Racket, researchers speak of migratory
+typing. Imagine a code base consisting of dozens of modules in plain Racket.  A
+developer who modifies a module in this collection for maintenance purposes must
+study the module designs---reify the types that went into its creation---and to
+help future maintainers should report these insights as type annotations. Over
+time, the code base turns into a mix of typed and untyped modules.
+
+Now consider the concrete (and simplistic) example of figure~\ref{fig:rational}.
+Initially the code base consists of the two \dyncolor\ module on the left plus
+the \typecolor\ module at the bottom; \dyncolor\ indicates untyped, while
+\typecolor\ means typed. When a typed module imports an untyped module, it must
+assign types to the imported identifiers for the type checker's sake. Here {\tt
+main} specifies that {\tt na-client} consumes a {\tt Real} number and produces a
+non-positive one.\footnote{Typed Racket's type system reflects Racket's subset
+reasoning about numbers, not (only) machine-level
+representations~\cite{stathff-padl-12}.} A program execution ends in this error:
+\begin{verbatim}
+    na-client: broke its own contract
+      promised: (<=/c 0)
+      produced: 40
+      in: (-> any/c (<=/c 0))           
+      contract from: (interface for na-client)
+      blaming: (interface for na-client)
+       (assuming the contract is correct)
+\end{verbatim}
+The referenced contract is the compilation of the type of {\tt na-client}. The
+definitive hint is ``blaming: (interface for na-client)'' with the caveat
+``(assuming the contract is correct).''
+
+Assuming the rational programmer trust the type of {\tt na-client}, the next
+step is to inspect the {\tt layer} module and to equip it with type
+annotations. The result is the \typecolor\ module in the middle, and {\tt
+main}'s import is now re-directed there: {\tt (submod ".." layer)}. Running the
+program again yields this message:
+\begin{verbatim}
+    neg-abs: broke its own contract
+      promised: (<=/c 0)
+      produced: 10
+      in: (-> any/c (<=/c 0))
+      contract from: (interface for neg-abs)
+      blaming: (interface for neg-abs)
+       (assuming the contract is correct)
+\end{verbatim}
+The last step of the rational programmer is to assign types to the {\tt server}
+module. At this point the type checker objects to the conjecture type of {\tt
+neg-abs}---and the source of the impedance mismatch is found. How to fix it is a
+separate question.
+
+Like {\it homo economicus\/}, the rational programmer is an
+approximation.  People don't behave purely rationally as economic
+actors, and they also don't do so as software developers. The point is
+not to deny the existence of ``lucky hunches'' programmers or
+``tinkering works'' approaches and so on. It is also not to deny that
+equipping entire modules with types represents an always feasible
+approach.  But, the concept of studying the idea of an economically
+rational actor has produced benefits to political economics, and this
+paper suggests that implementing and studying the rational programmer
+will help language designers.

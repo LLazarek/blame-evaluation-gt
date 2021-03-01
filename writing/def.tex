@@ -103,3 +103,31 @@
 \notes{cd}
 \notes{ll}
 \notes{bg}
+
+
+%% \begin{module}{name : lang}{color} ... \end{module}
+\newenvironment{module}[2]{
+\begin{minipage}[t]{6cm}
+\begin{modulecolorbox}[width=6cm]{#2}{#1}
+\begin{alltt}}{
+\end{alltt}
+\end{modulecolorbox}
+\end{minipage}}
+
+%% \begin{modulecolorbox}[options-for-tcolorbox]{color}{title} ... \end{modulecolorbox}
+\newtcolorbox{modulecolorbox}[3][]{
+  colframe = #2!25,
+  colback  = #2!10,
+  coltitle = #2!20!black,  
+  title    = {#3},
+  #1,
+}
+
+
+%% space between layers of boxes 
+\def\spacr{.25cm}
+
+%% colors
+\def\typecolor{blue}
+\def\dyncolor{red}
+

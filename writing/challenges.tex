@@ -1,22 +1,40 @@
 %% -----------------------------------------------------------------------------
 
-The {\em first derivative challenge\/} is to find a representative collection of
-impedance mismatches. They must represent mistakes that programmers accidentally
-create and that the run-time checks of academic systems catch. In other words,
-the experiment calls for a collection of type mistakes in mix-typed programs
-that is representative of those ``in the wild.''  Unfortunately no such
-collection exists, and with good reason. The kind of mistakes needed are
-typically detected by unit or integration tests; even if it takes some time to
-find their sources, these mistakes do not make it into code repositories with
-appropriate commit messages.
+The rational programmer works like an algorithm. Implementing it demands a large
+number of representative debugging scenarios; a reconciliation of three
+different kinds of error messages; and a proper sampling strategy for the huge
+space of possibilities. A coincidental challenge is the disparity of gradually
+typed languages. To eliminate this variable from the comparison, this paper uses
+Racket, which is thus far the only language in which all three major soundness
+mechanisms are available in a reasonably robust and directly comparable manner;
+for the implementation of the transient semantics, see the parallel submission
+of an experience report~\cite{ttt21}.
+
+The {\em first challenge\/} is to find a representative collection of impedance
+mismatches. They must represent mistakes that programmers accidentally create
+and that the run-time checks of academic systems catch. In other words, the
+experiment calls for a collection of type mistakes in mix-typed programs that is
+representative of those ``in the wild.''  Unfortunately no such collection
+exists, and with good reason. The kind of mistakes needed are typically detected
+by unit or integration tests; even if it takes some time to find their sources,
+these mistakes do not make it into code repositories with appropriate commit
+messages.
 
 An alternative is to {\em generate a large and representative corpus of type
 mistakes \/} using mutation analysis~\cite{lipton1971fault, demillo1978hints,
-jia2011analysis}.  Conventional mutation analysis is useless, however. Mutation
+jia2011analysis}. Conventional mutation analysis is useless, however.  Mutation
 analysis traditionally aims to inject bugs that challenge test suites, and it
-discards those that yield ill-typed mutants as \emph{incompetent}.  Indeed,
+discards those that yield ill-typed mutants as \emph{incompetent}. Indeed,
 mutation analysis frameworks are fine-tuned to avoid them, and yet, it is
 precisely those that are needed for evaluating blame assignment strategies.
+
+Based on a related experience, Gopinath and Walkingshaw~\cite{gw-mutation} write,
+``existing mutation frameworks \ldots\ do not generate the kinds of mutations
+needed to best evaluate type annotations'' and, worse, ``it is surprisingly
+difficult to come up with mutants that actually describe subtle type faults.''
+While the goal of their work---to evaluate the quality of types in
+Python---is unrelated to the one here, the mechanism is related. And their
+judgment confirms the experience of the authors. 
 
 Thus, an experimental analysis of blame needs a mostly new set of mutators.
 Roughly speaking, the new mutators inject type errors into fully typed programs.
@@ -29,11 +47,11 @@ source of the impedance mismatch. About two thirds of the original mutators
 survived this first scrutiny testing. All of the remaining ones yield {\em
 interesting debugging scenarios\/} (see section~\ref{sub:mutate-interesting}).
 
-The {\em second derivative challenge\/} concerns the differences among the blame
-assignment of the three semantic variants.  While Natural assigns blame to {\em
-one\/} component, Transient assigns blame to a sequence of components. The
-Erasure semantics does not blame a component {\it per se\/}, but it comes with
-an exception location and a stack trace, which implicitly suggests parties to
+The {\em second challenge\/} concerns the differences among the blame assignment
+of the three semantic variants.  While Natural assigns blame to {\em one\/}
+component, Transient assigns blame to a sequence of components. The Erasure
+semantics does not blame a component {\it per se\/}, but it comes with an
+exception location and a stack trace, which implicitly suggests parties to
 blame.  The different strategies greatly affect the behavior of the rational
 programmer (and real programmers, too).
 
@@ -65,33 +83,37 @@ resources.  A practical execution has no option but to {\em sample the space of
 scenarios\/}, carefully ensuring that it still produces reproducible
 conclusions.
 
-Overcoming these challenges yields a systematic approach: 
-\begin{itemize}
+The next three sections explain how to overcome the three challenges
+in detail. 
 
-\item interesting mutators generate interesting type-level errors and thus
-debugging scenarios (section~\ref{sec:mutate});
+
+% Overcoming these challenges yields a systematic approach: 
+% \begin{itemize}
+
+% \item interesting mutators generate interesting type-level errors and thus
+% debugging scenarios (section~\ref{sec:mutate});
     
-\item an algorithm simulates the modes of the rational programmer on these
-scenarios (section~\ref{sec:rational}); and
+% \item an algorithm simulates the modes of the rational programmer on these
+% scenarios (section~\ref{sec:rational}); and
 
-\item a careful sampling of the space yields experimental
-data about the bug finding process (section~\ref{sec:sample}).
-\end{itemize}
-Getting all three aspects right is necessary to obtain a computationally
-feasible and statistically sound experiment.
+% \item a careful sampling of the space yields experimental
+% data about the bug finding process (section~\ref{sec:sample}).
+% \end{itemize}
+% Getting all three aspects right is necessary to obtain a computationally
+% feasible and statistically sound experiment.
 
-{\bf Note} A coincidental challenge is the disparity of gradually typed
-languages. While the three approaches to blame are well understood in theory,
-they have been implemented for rather different untyped languages and with
-vastly different type systems. To eliminate the effect of these differences, it
-is necessary to implement all three approaches in a single language so that an
-application of the evaluation method can use the same test programs, the same
-type system, and hence the same debugging scenarios.
+% {\bf Note} A coincidental challenge is the disparity of gradually typed
+% languages. While the three approaches to blame are well understood in theory,
+% they have been implemented for rather different untyped languages and with
+% vastly different type systems. To eliminate the effect of these differences, it
+% is necessary to implement all three approaches in a single language so that an
+% application of the evaluation method can use the same test programs, the same
+% type system, and hence the same debugging scenarios.
 
-The results in this paper are for a system that builds on Greenman and
-Felleisen's effort of comparing the performance of Natural and Transient in
-Racket~\cite{gf-icfp-2018}. The extended system uses the type system of Typed
-Racket and comes with a Transient semantics that faithfully implements the
-design and the blame assignment strategy proposed by~\cite{vss-popl-2017}. The
-Erasure semantics drops the type information and runs the programs as if they
-were plain Racket programs. The next section explains this system in detail.
+% The results in this paper are for a system that builds on Greenman and
+% Felleisen's effort of comparing the performance of Natural and Transient in
+% Racket~\cite{gf-icfp-2018}. The extended system uses the type system of Typed
+% Racket and comes with a Transient semantics that faithfully implements the
+% design and the blame assignment strategy proposed by~\cite{vss-popl-2017}. The
+% Erasure semantics drops the type information and runs the programs as if they
+% were plain Racket programs. The next section explains this system in detail.

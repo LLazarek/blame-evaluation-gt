@@ -1,0 +1,79 @@
+\def\spacrr{.95cm}
+\begin{figure*}[hb]
+
+\begin{minipage}[b]{6.1cm}
+\begin{module}{types : typed/racket}\typecolor
+(provide Entry Entries)
+
+(define-type Entry
+  (Pairof Symbol String))
+
+(define-type Entries
+  (Listof Entry))
+\end{module}
+
+\vspace\spacrr
+
+\begin{module}{typed-pack-lib : typed/racket}\typecolor
+(provide typed-pack)
+
+(require types)
+(require/typed pack-lib
+  [pack (-> JSON Entries)])
+
+(define typed-pack pack) 
+\end{module}
+
+\vspace\spacrr
+
+\begin{module}{crypto-pack-lib : typed/racket}\typecolor
+(provide crypto-pack) 
+
+(require types)
+(require/typed pack-lib
+ [pack (-> JSON Entries)])
+
+(: crypto-pack (-> JSON ...))
+(define (crypto-pack d)
+  (pack (encrypt d _ _ _)))
+\end{module}\end{minipage}\hfil\begin{minipage}[b]{6.1cm}
+\begin{module}{pack-lib : racket}\dyncolor
+(provide pack _ _ _)
+
+_ _ _  dependencies     _ _ _
+_ _ _  and definitions  _ _ _
+
+(define (pack d)
+  ;; process JSON data and 
+  ;; package as a dictionary
+  ;; (association list)
+  (make-hash _ _ _) ;; BUG!)
+\end{module}
+\begin{module}{client : racket}\dyncolor
+(require json)
+(require typed-pack-lib)
+(reqired crypto-pack-lib)
+
+_ _ _ other dependencies _ _ _
+_ _ _ and definitions    _ _ _
+          
+;; read data from files, pack 
+;; and share securely 
+
+(define public-data 
+  (typed-pack 
+   (read-json 
+    "public-records")))
+
+(define secret-data 
+  (crypto-pack 
+   (read-json 
+    "medical-records")))
+ 
+ _ _ _ rest of client _ _ _
+\end{module}
+\end{minipage}
+
+
+\caption{One mix-typed program, three interpretations} \label{fig:example}
+\end{figure*}
