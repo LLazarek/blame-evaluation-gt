@@ -10,16 +10,18 @@ of programming scenarios.
 
 \input{why-rational-case.tex}
 
-This paper dubs Lazarek et. alii's idea {\em rational programmer\/}. Like Stuart
+This paper dubs Lazarek et. all's idea {\em the rational programmer\/}. Like Stuart
 Mill's {\it homo economicus\/}, the rational programmer approximates the
 behavior of a software developer who reduces time spent on a task given the
 available information. In the context of gradual typing, the rational programmer
 has two pieces of information when an impedance mismatch signals exceptional
 behavior: the error message and the state of the program. Hence, the most
-rational procedure is to use the former to improve the latter. Put differently,
+rational procedure is to use the former to improve the latter. Specifically,
 a rational programmer translates the Wadler-Findler slogan into a debugging
-method, searching for the source of the impedance mismatch with additional type
-annotations. Measuring this simulated programmer's behavior on a large number of
+method, searching for the source of the impedance mismatch by adding type
+annotations to the parts of the program identified in the error.
+If the type checker rejects an annotation, the rational programmer has found the problem.
+Measuring this simulated programmer's behavior on a large number of
 debugging scenarios yields data that is similar to data collected in an
 empirical, human-facing manner.
 
@@ -32,7 +34,7 @@ help future maintainers should report these insights as type annotations. Over
 time, the code base turns into a mix of typed and untyped modules.
 
 Now consider the concrete (and simplistic) example of figure~\ref{fig:rational}.
-Initially the code base consists of the two \dyncolor\ module on the left plus
+Initially the code base consists of the two \dyncolor\ modules on the left plus
 the \typecolor\ module at the bottom; \dyncolor\ indicates untyped, while
 \typecolor\ means typed. When a typed module imports an untyped module, it must
 assign types to the imported identifiers for the type checker's sake. Here {\tt
@@ -50,14 +52,14 @@ representations~\cite{stathff-padl-12}.} A program execution ends in this error:
        (assuming the contract is correct)
 \end{verbatim}
 The referenced contract is the compilation of the type of {\tt na-client}. The
-definitive hint is ``blaming: (interface for na-client)'' with the caveat
-``(assuming the contract is correct).''
+definitive hint is ``{\tt blaming: (interface for na-client)}'' with the caveat
+``{\tt (assuming the contract is correct)}.''
 
-Assuming the rational programmer trust the type of {\tt na-client}, the next
+Assuming the rational programmer trusts the type of {\tt na-client}, the next
 step is to inspect the {\tt layer} module and to equip it with type
-annotations. The result is the \typecolor\ module in the middle, and {\tt
-main}'s import is now re-directed there: {\tt (submod ".." layer)}. Running the
-program again yields this message:
+annotations. This results in the \typecolor\ module in the middle, and {\tt
+main}'s import is now re-directed there by {\tt (submod ".." layer)}. Running the
+program again yields a new message:
 \begin{verbatim}
     neg-abs: broke its own contract
       promised: (<=/c 0)
@@ -78,7 +80,7 @@ actors, and they also don't do so as software developers. The point is
 not to deny the existence of ``lucky hunches'' programmers or
 ``tinkering works'' approaches and so on. It is also not to deny that
 equipping entire modules with types represents an always feasible
-approach.  But, the concept of studying the idea of an economically
+approach.  But the concept of studying the idea of an economically
 rational actor has produced benefits to political economics, and this
 paper suggests that implementing and studying the rational programmer
 will help language designers.

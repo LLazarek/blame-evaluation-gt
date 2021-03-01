@@ -26,7 +26,7 @@ and re-exports it as \texttt{typed-pack} asserting that it is a function that
 consumes {\tt JSON} and returns a list associating {\tt Symbol}s with {\tt
 String}s. In other words, it formalizes the comments in {\tt pack-lib}.
 
-\item[\texttt{crypto-pkac-lib}] (at the bottom left) also imports \texttt{pack}
+\item[\texttt{crypto-pack-lib}] (at the bottom left) also imports \texttt{pack}
 and assumes for it the same type as {\tt typed-pack-lib}. It applies the
 function in the definition of the exported {\tt crypto-pack} function, which
 encrypts its input before passing it to \texttt{pack}.
@@ -48,35 +48,35 @@ the run-time system checks that it is a function and wraps it in a protective
 proxy, which in turn, enforces the type of the function with run-time checks.
 In essence, this check protects typed modules when they call an untyped function
 because it may not produce the promised kind of value, as is the case here with
-{\tt pack} from {\tt pack-lib}. Analogously the run-time system wraps exported
-functions such as {\tt crypto-pack} of a typed modules in a proxy that checks
-its arguments.  This check protects functions exported from type modules against
+{\tt pack} from {\tt pack-lib}. Analogously the run-time system wraps each exported
+function of a typed module (such as {\tt crypto-pack}) in a proxy that checks
+its arguments.  This check protects functions exported from typed modules against
 applications in untyped code that supply the wrong kind of argument value.
 
-As this analysis implies, if the return-type check fails, the problem is with
+As this analysis implies, if a return-type check fails, the problem is with
 the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
-the argument-type check fails, responsibility lies with {\tt client}. Due to the
+an argument-type check fails, responsibility lies with {\tt client}. Due to the
 proxies wrapped around functions, Natural can easily track the responsible party
 for each check. Thus, in the example of figure~\ref{fig:example}, as
-\texttt{typed-pack} returns, the return-type check fails, and Natural blames
-\texttt{typed-pack-lib}.
+\texttt{pack} returns, the return-type check fails, and Natural blames
+\texttt{pack-lib}.
 
 Under {\it the Transient semantics\/}, typed code is compiled so that all entry
 points to functions check their arguments at run time and all function calls
 check their return values against the expected type~\cite{vss-popl-2017}.
 Furthermore, Transient uses \emph{shallow} checks, meaning they inspect only the
 top constructor of a value. Since retrieving a value from within a structure (or
-list, array, hash table etc.) is performed via a function call, the innards of a
+list, array, hash table etc.) is performed via a function call, the contents of a
 complex value are checked on a piecemeal basis.
 
 As a result, the call to \texttt{typed-pack} does {\em not\/} signal an error
 because it takes place in the untyped {\tt client} module, which is compiled in
-the usual manner. Because {\tt pack} is called in the {\tt crypto-pack-lib}
+the usual manner. Later, when {\tt pack} is called in the {\tt crypto-pack-lib}
 module, Transient's inlined checks make sure that the imported
-\texttt{pack} is a function and that the result of its call in is a list. This
-last check fails when \texttt{client} calls to {\tt crypto-pack}.
+\texttt{pack} is a function and that its result is a list. This
+last check fails in \texttt{client}'s call to {\tt crypto-pack}.
 
-In order to pinpoint the responsible party for failed checks, Transient
+In order to locate the responsible party for failed checks, Transient
 maintains a map from values to the boundaries between typed/untyped modules that
 they cross, plus the corresponding types. In the example, the map records that
 \texttt{pack} crosses from \texttt{pack-lib} to {\tt crypto-pack-lib} and
@@ -106,15 +106,14 @@ The following table summarizes the illustration:
 \begin{center}
 \begin{tabular}{l|ll}
                         &        \multicolumn{2}{|c}{the evaluation of} \\
-\relax                  & {\tt public-data}             & {\tt secret-data} in {\tt client}, \\
+\relax                  & {\tt public-data}               & {\tt secret-data} in {\tt client}, \\
 {under the $\cdot$ semantics yields} & & \\ \hline
 %% ----------------------------------------------------------------------------------------
-\qquad {\it Natural\/}   & error, blaming              & error, blaming \\
-     		   	 & \quad {\tt typed-pack-lib}  & \quad {\tt typed-pack-lib} \\
-\qquad {\it Transient\/} & no error   		       & error, blaming the {\tt pack-lib}/ \\
-      		  	 &    			       & \quad {\tt crypto-pack-lib} boundary \\
-\qquad {\it Erasure\/}   & no error 		       & no error \\
-       	    		 &   \multicolumn{2}{|c}{but {\em Erasure} does signal an error on list access}
+\qquad {\it Natural\/}   & error, blaming {\tt pack-lib}  & error, blaming {\tt pack-lib} \\
+     		   	 &                                & \\
+\qquad {\it Transient\/} & no error   		          & error, blaming the boundary \\
+      		  	 &    			          & \quad {\tt pack-lib}/{\tt crypto-pack-lib} \\
+\qquad {\it Erasure\/}   & no error 		          & no error \\
 \end{tabular}
 \end{center}
 %% -----------------------------------------------------------------------------

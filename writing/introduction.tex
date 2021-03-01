@@ -39,20 +39,20 @@ sec.~\ref{sec:why-rational}). In the case of an impedance mismatch, the
 available information consists of the error message and the current state of the
 program. The rational programmer can hence use the former to change the
 latter---and this systematic, information-driven process can be
-implemented.\footnote{\citet{cc-snapl-19} use this tracing method to localize
-type errors in inference-based gradual typing systems.}  Implementing it means
+implemented and tested at scale on real programs.\footnote{\citet{cc-snapl-19} use this tracing method to localize
+type errors in inference-based gradual typing systems.}  Testing it systematically requires
 overcoming major challenges: injecting representative impedance mismatches;
 putting the various kinds of error information to comparable use; and sampling
 the huge space of possibilities (see sec.~\ref{sec:challenges}).
 
 The paper's {\it second contribution\/} is a set of {\em results from applying
-the evaluation method to three distinct blame assignment strategies and
-approximately 72,200 cases\/} (see sec.~\ref{sec:results}): (1) {\it
-Transient\/}, i.e. Reticulated's tracking of typed/untyped boundaries; (2) {\it
-Natural\/}, i.e. the use of higher-order contract system and its blame
+the evaluation method to three distinct blame assignment strategies in
+approximately 72,200 different scenarios\/} (see sec.~\ref{sec:results}): (1)~{\it
+Transient\/}, i.e. Reticulated's tracking of typed/untyped boundaries~\cite{vss-popl-2017}; (2)~{\it
+Natural\/}, i.e. the use of a higher-order contract system and its blame
 assignment~\cite{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e. the approach of
 industrial systems, which forgo blame in favor of error messages from the safety
-checks of the underlying language.---The results (see
+checks of the underlying language. The results (see
 sec.~\ref{sec:discussion}) are at least somewhat surprising.  In principle
 they validate the conjectures behind the work of theoreticians.  First, a good
 blame assignment strategy helps with the search for impedance mismatches between
