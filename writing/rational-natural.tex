@@ -8,7 +8,7 @@ alternative (but see section~\ref{sec:conclusion}), and therefore the rational
 programmer extends the trail to a scenario that swaps out the untyped component
 for its typed counterpart.
 
-We can turn this description into a formal definition of the trail. 
+Here is a rigorous definition.
 \begin{quote}
 \it A \emph{Natural blame trail} is a sequence of scenarios $\conf_0,...\conf_n$ of
 a program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
@@ -22,14 +22,14 @@ trail that ends at an ill-typed scenarios successfully pinpoints the location of
 bugs. 
 \begin{quote}
 \it A Natural blame trail $\conf_0,...\conf_n$ in a lattice $\lattice{\system}$ is
-\emph{successful} iff its last scenario $\conf_n$ does not type check.  A Natural
+\emph{successful} iff (the program for) its last scenario $\conf_n$ does not type check.  A Natural
 blame trail $\conf_0,..,\conf_n$ in a lattice $\lattice{\system}$ is \emph{failing}
-iff $\conf_n$ type checks and the trail cannot be extended further.
+iff (the program for) $\conf_n$ type checks and the trail cannot be extended further.
 \end{quote}
-That is, failing Natural blame trails are those that have not reached a scenario that
-reveals the bug at compile time and their last scenario does not blame an untyped component. Thus
-the rational programmer gets no hints from the gradual type system on how to
-continue the search for the bug.
+That is, failing Natural blame trails are those that have not reached a scenario
+that reveals the bug at compile time and ends in a scenario that does not blame
+an untyped component during program execution. Thus the rational programmer gets
+no hints from the gradual type system on how to continue the search for the bug.
 
 While a successful Natural blame trail indicates that it 
 pays off to heed blame assignments during debugging the trail's root, it does not answer whether
@@ -40,7 +40,7 @@ location of the exception, might be as useful as typing the blamed one.
 To account for this situation, we devise a new mode of the Natural rational
 programmer that follows a migration process based on exceptions:
 \begin{quote}
-\it A Natural exception trail is a sequence of scenarios $\conf_0,...\conf_n$ of a
+\it A {\em Natural exception trail\/} is a sequence of scenarios $\conf_0,...\conf_n$ of a
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
 \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i = \{\exception{\system, \conf_i}\}$
 where $\exception{\system, \conf}$ denotes the location of the exception of $\conf$.

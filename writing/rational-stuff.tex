@@ -1,14 +1,13 @@
-
 %% -----------------------------------------------------------------------------
 
 \citet{tfgnvf-popl-2016} describe the set of all possible type migrations with a
 lattice. Formally, a program $\system$ is a set of modules $\set{\component}$.
-Let a configuration $\conf$ of $\system$ be the subset of $\set{\component}$ that
-comes with (possibly type-incorrect) annotations. These configurations of
-$\system$ are ordered by the subset relation and form a lattice
-$\lattice{\system}$ with $2^{\size{\system}}$ elements. The bottom scenario of
-$\lattice{\system}$ is $\emptyset$, the top one $\system$ itself. In between are
-the mixed-typed scenarios.
+Let a configuration $\conf$ of $\system$ be the subset of $\set{\component}$
+that comes with type annotations. These configurations of $\system$ are ordered
+by the subset relation and form a lattice $\lattice{\system}$ with
+$2^{\size{\system}}$ elements. The bottom scenario of $\lattice{\system}$ is
+$\emptyset$, the top one $\system$ itself; in between are the mixed-typed
+scenarios.
 
 Applying a mutator to module $\component^*$ of $\system$ acts like a homomorphism
 on the generated lattice. The two lattices differ only in the mutant of
@@ -20,10 +19,10 @@ The actions of the rational programmer create an ascending chain---dubbed a
 \emph{trail}---in $\lattice{\system}$.  The starting scenario $\conf_0$ of a
 trail---also referred to as the \emph{root} (of the trail)---is the initial
 interesting debugging scenario.  Starting from such a root, the rational
-programmer steps along a trail. If the scenario type-checks, the programmers runs
-the program until it raises a run time error.  The rational programmer uses the
-information in the error to decide which component(s) to equip with types. This
-choice constructs scenario $\conf_{i+1}$ from $\conf_{i}$ and thus creates a
-trail. The trail ends when programmer reaches a scenarios that contain the mutant
-module, because the type checker rejects it outright. At this point, the
-programmer has identified the source of the impedance mismatch.
+programmer steps along a trail. If the (program for this) scenario type-checks,
+the program is run until it raises a run-time error.  The rational programmer
+uses the information in the error to decide which component to equip with
+types. This choice constructs scenario $\conf_{i+1}$ from $\conf_{i}$ and thus
+creates a trail. The trail's construction ends when it reaches a scenarios that
+contain the mutant module because the type checker rejects its typed version
+outright.  At this point, the source of the impedance mismatch is identified.

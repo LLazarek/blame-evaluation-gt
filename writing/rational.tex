@@ -1,23 +1,23 @@
 %% -----------------------------------------------------------------------------
 
 Section~\ref{sec:why-rational} explains, and illustrates with an example, how a
-migratory type setting helps find the source of an impedance mismatch. Roughly
-speaking, it encourages the rational programmer equip a module with types if it
-is blamed in an error message. A sequence of such steps make up a portion of the
-migratory path in the lattice of type migration~\cite{tfgnvf-popl-2016} (see
-sec.~\ref{sub:stuff} for details). 
+migratory type setting helps with finding the source of an impedance
+mismatch. Roughly speaking, it encourages the rational programmer to equip a
+module with types if it is blamed in an error message. A sequence of such steps
+make up a portion of the migratory path in the lattice of type
+migration~\cite{tfgnvf-popl-2016} (see sec.~\ref{sub:stuff} for details).
 
 Unfortunately, the rational programmer receives different kinds of information
 and thus may construct different paths. As section~\ref{sec:landscape} shows,
 the three different semantics deal with the same program in three different
 ways, and the error messages point to different sources of a problem.
 
-Hence the research problem is how to view the actions of a rational programmer
+Hence the research problem is how to make the actions of a rational programmer
 comparable across all semantics. Sections~\ref{sub:natural}
 through~\ref{sub:erasure} describe the various rational programmers and explain
 to what extent their actions are comparable. Section\ref{sub:experiment}
 enhances comparability with the programmer-effort dimension. Finally, the last
-subsection can then state the experimental questions. 
+subsection states the experimental questions. 
 
 %% -----------------------------------------------------------------------------
 \def\rsub#1#2{\subsection{#2} \label{sub:#1} \input{rational-#1.tex}}
