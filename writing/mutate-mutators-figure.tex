@@ -4,30 +4,25 @@
 #1 $\rightarrow$ #2 
 \end{tabular}}
 
-\long\def\examplesplit#1 -> #2{
-  \begin{tabular}[t]{@{}l}
-#1\\
-$\rightarrow$  #2 
-\end{tabular}}
-
-
 \def\origin#1{%
   #1\\
   \hline}
 
-\def\originspecial{
-\origin{specialization of previous mutator~\cite{lksfd-popl-2020}}}
+% specialization of previous mutator~\cite{lksfd-popl-2020}
 
-\def\origingen{
-\origin{generilization of previous mutator~\cite{lksfd-popl-2020}}}
+\def\explanation{$\ddagger$ inherited from, $+$ specializes a, $++$
+generalizes one of \citet{lksfd-popl-2020}'s mutators}
 
-\def\originprevious{
-\origin{previous mutator~\cite{lksfd-popl-2020}}}
+\def\originspecial{\origin{$+$}}
 
+% {generalization of previous mutator~\cite{lksfd-popl-2020}}
 
-\def\originnew{
-\origin{new}}
+\def\origingen{\origin{$++$}}
 
+% {previous mutator~\cite{lksfd-popl-2020}}
+\def\originprevious{\origin{$\ddagger$}}
+
+\def\originnew{\origin{new}}
 
 \def\classpr#1{%
 \begin{minipage}[t]{4.3cm}
@@ -38,28 +33,21 @@ $\rightarrow$  #2
 \end{tabular}
 \end{minipage}}
 
-
 \def\classsuperclass#1{%
-\begin{minipage}[t]{3.5cm}
+\begin{minipage}[t]{3.9cm}
   \begin{tabular}[t]{@{}l}
-  {\tt (class #1} \\
-   \quad {\tt (super-new))} \\
+  {\tt (class #1} {\tt (super-new))}
 \end{tabular}
 \end{minipage}}
-
 
 \def\classsupernew#1{%
-\begin{minipage}[t]{3.5cm}
-  \begin{tabular}[t]{@{}l}
-  {\tt (class object\%} \\
-   \quad {\tt #1)} \\
-\end{tabular}
+\begin{minipage}{3.9cm}
+%  \begin{tabular}[t]{@{}l} {\tt (class object\% #1)} \end{tabular}
+{\tt (class a\% #1)}
 \end{minipage}}
 
-
-
 \begin{figure*}
-  \begin{tabular}{@{}p{2.1cm}@{\,\,}|@{\,\,}p{3.5cm}@{\,\,}|@{\,\,}p{5cm}@{\,\,}|@{\,\,}p{2.3cm}@{} }
+  \begin{tabular}{@{}p{2.1cm}@{\,\,}|@{\,\,}p{4.7cm}@{\,\,}|@{\,\,}p{5cm}@{\,\,}|@{\,\,}p{1.1cm}@{} }
     {\bf name} & {\bf description} & {\bf example} & {\bf origin}\\ \hline
 %% -----------------------------------------------------------------------------
 {\tt constant}
@@ -69,12 +57,12 @@ $\rightarrow$  #2
 
 {\tt deletion}
  & Deletes the result expression of a sequence.
- & \examplesplit{{\tt (begin x y z)}} -> {{\tt (begin x y)}} 
+ & \example{{\tt (begin x y z)}\\} -> {{\tt (begin x y)}} 
  & \originspecial 
 
 {\tt position}
   & Swaps two sub-expressions.
-  & \examplesplit{{\tt (f a 42 "b" 0)}} -> {{\tt (f a 42 0 "b")}}
+  & \example{{\tt (f a 42 "b" 0)}\\} -> {{\tt (f a 42 0 "b")}}
   & \origingen 
 
 {\tt list}
@@ -93,35 +81,35 @@ $\rightarrow$  #2
 
 {\tt method-id}
  & Swaps two method identifiers.
- & \examplesplit{{\tt (send o f x 42)}} -> {{\tt (send o g x 42)}} 
+ & \example{{\tt (send o f x 42)}\\} -> {{\tt (send o g x 42)}} 
  & \originnew   
 
 
 {\tt field-id}
  & Swaps two field identifiers.
- & \examplesplit{{\tt (get-field o f)}} -> {{\tt (get-field o g)}} 
+ & \example{{\tt (get-field o f)}\\} -> {{\tt (get-field o g)}} 
  & \originnew   
   
 
 {\tt class:init}
  & Swaps values of class initializers.
- & \examplesplit{{\tt (new c [a 5] [b "hello"])}} -> {{\tt (new c [a "hello"] [b 5])}} 
+ & \example{{\tt (new c [a 5] [b "hello"])}\\} -> {{\tt (new c [a "hello"] [b 5])}} 
  & \originnew   
 
 {\tt class:parent}
  & Replaces the parent of classes with {\tt object\%}.
-    & \examplesplit{\classsuperclass{foo\%}} -> {\classsuperclass{object\%}}
+    & \example{\classsuperclass{a\%}} -> {\\ \classsuperclass{object\%}}
  &  \originnew    
  
 
 {\tt class:public}
  & Makes a public method private and vice versa.
- & \examplesplit{\classpr{public}} -> {\classpr{private}}
+ & \example{\classpr{public}\\} -> {\classpr{private}}
  & \origingen  
 
 {\tt class:super}
  & Removes {\tt super-new} calls from class definitions.
- & \examplesplit{\classsupernew{(super-new)}} -> {\classsupernew{(void)}} 
+ & \example{\classsupernew{(super-new)}\\} -> {\classsupernew{(void)}} 
  & \originnew
 
 {\tt arithmetic}
@@ -136,15 +124,17 @@ $\rightarrow$  #2
 
 {\tt negate-cond}
  & Negates conditional test expressions.
- & \examplesplit{{\tt (if (= x 0) t e)}} -> {{\tt (if (not (= x 0)) t e)}}
+ & \example{{\tt (if (= x 0) t e)}\\} -> {{\tt (if (not (= x 0)) t e)}}
  & \originprevious
 
 {\tt force-cond}
  & Replaces conditional test expressions with {\tt \#t}.
- & \examplesplit{{\tt (if (= x 0) t e)}} -> {{\tt (if \#t t e)}}
+ & \example{{\tt (if (= x 0) t e)} \\} -> {{\tt (if \#t t e)}}
  & \originnew
 
-\end{tabular}
+\end{tabular}\\[1ex]
+
+\explanation
 
 \caption{Summary of mutators.} \label{table:mutation-ops}
 \end{figure*}
