@@ -11,29 +11,24 @@ blamed modules.
 
 Figure~\ref{table:mutation-ops} describes 16 mutators that satisfy this
 requirement.  For each mutator, the figure provides a short description and an
-example. The starting point is the mutator set of~\citet{lksfd-popl-2020}
-which in turn are borrowed from the vast literature on mutation
-testing~\cite{jia2011analysis}. But, only 2 of the previous mutators transfer
-as is to the context of this study, 1 is entirely ineffective and 5 need
-significant modifications. For the latter the authors relied on their
-decades-long experience of making type-level mistakes in Typed Racket, some of
-which take a non-trivial effort to debug.  In more detail, the relational
-mutator of ~\citet{lksfd-popl-2020} does not lead to type-level errors that
-Typed Racket's type system can detect, so it has been eliminated. Similarly,
-the original arithmetic mutator does not reliably lead to type errors, so it
-has been adapted to only make operator swaps that can affect the type of the
-result. For example, changing a `/` to `*` does not affect the type of an
-expression, but changing `*` to `/` may s division by zero is detectable by
-Typed Racket's type system.  In addition to careful tweaking of previous
-mutators, the final set of mutators comes with 9 new ones that collectively
-produce a sufficiently large and diverse set of type-level mistakes.  For
-example, unlike the traditional subexpression swap mutator, the {\tt -id}
-family of mutators apply in different contexts and utilize different pieces of
-non-local information about the identifiers in a program.
+example. As the explanation indicates, some specialize or
+generalize~\citet{lksfd-popl-2020}'s mutators, which in turn are borrowed from
+the vast literature on mutation testing~\cite{jia2011analysis}.\footnote{Many
+of~\citet{lksfd-popl-2020} mutators do not satisfy the constraints. For
+example, the relational mutator does not lead to type-level errors that Typed
+Racket's type system can detect, so it has been eliminated. Similarly, the
+original arithmetic mutator does not reliably lead to type errors, so it has
+been adapted to only make operator swaps that can affect the type of the
+result. Changing a `/` to `*` does not affect the type of an expression, but
+changing `*` to `/` may, because division by zero is detectable by Typed
+Racket's type system.}  Only two are directly inherited; many mutators are
+brand new. For the latter the authors relied on their decades-long experience
+of making type-level mistakes in Typed Racket, some of which take a non-trivial
+effort to debug.
 
 Most of the mutators are self-explanatory.  The first six apply to all
 gradually typed languages; the next six to those that include classes and
-objects.  The last four target distinguishing features of Typed Racket,
+objects. The last four target distinguishing features of Typed Racket,
 specifically is sophisticated type system. In particular, {\tt arithmetic}
 replaces a {\tt +} with a {\tt -} in an attempt to change the type of the
 arithmetic expression; {\tt +}'s result is a {\tt Positive-Integer} when all
