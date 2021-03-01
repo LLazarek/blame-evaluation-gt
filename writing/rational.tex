@@ -1,66 +1,27 @@
-Code migration is the raison d'\^etre of Typed Racket, which is why the community
-uses ``migratory typing'' instead of gradual typing. Roughly speaking a
-programmer uses a gradually typed language to incrementally add types to a code
-base. From this perspective, a code base consists of some number of components,
-say modules, and a programmer converts a component at a time from its untyped
-state to a typed one. 
+%% -----------------------------------------------------------------------------
 
-%% MF: I don't think we should honor the nonsense of ``true gt.''  We
-% are it as much as anyone!
-% 
-% \footnote{The method can be adapted to so-called true gradual typing
-% systems~\cite{svcb-snapl-2015} in a straightforward manner.}
+Section~\ref{sec:why-rational} explains, and illustrates with an example, how a
+migratory type setting helps find the source of an impedance mismatch. Roughly
+speaking, it encourages the rational programmer equip a module with types if it
+is blamed in an error message. A sequence of such steps make up a portion of the
+migratory path in the lattice of type migration~\cite{tfgnvf-popl-2016} (see
+sec.~\ref{sub:stuff} for details). 
 
-Based on this idea, migratory paths offer a concise setting for
-evaluating the effectiveness of a rational programmer for dealing with
-the interesting debugging scenarios from section ~\ref{sec:mutate}.
-Grouping debugging scenarios by mutation yields a set of programs that
-all contain the same mistake but differ in their type annotations.  In
-the setting of migratory typing, each scenario differs from another in
-which components are typed. Formally, a program $\system$ is a set of
-components $\set{\component}$, and a scenario $\conf$ is the typed
-subset of $\set{\component}$ . Hence, the scenarios of $\system$ are
-ordered by the subset relation and, naturally, form a lattice
-$\lattice{\system}$ with $2^{\size{\system}}$
-elements.\footnote{\citet{tfgnvf-popl-2016} use this lattice for
-performance evaluations.} The bottom scenario of $\lattice{\system}$
-is always $\emptyset$ and the top one is $\system$ itself. In between
-are all the mixed-typed scenarios.
+Unfortunately, the rational programmer receives different kinds of information
+and thus may construct different paths. As section~\ref{sec:landscape} shows,
+the three different semantics deal with the same program in three different
+ways, and the error messages point to different sources of a problem.
 
-In this context, the actions of the rational programmer map to an
-ascending chain---dubbed a \emph{trail}---in $\lattice{\system}$.  The
-starting scenario $\conf_0$ of a trail---also referred to as the
-\emph{root} (of the trail)---is the initial debugging scenario; only
-interesting (as described in~\ref{sec:mutate}) debugging scenarios
-serve as roots.  Intuitively, starting from such a root, the rational
-programmer steps along a trail, and at each step, reduces the current
-scenario to an ``easier'' next scenario to debug.  The easiest
-scenarios are those that the type checker rejects outright, because a
-type error pinpoints an impedance mismatch between the broken code of
-one component and its typed interface to others. At this point, the
-programmer has identified the broken component.  If the scenario
-type-checks, the programmers runs the program until it raises a run
-time error.  The rational programmer uses the error's blame
-assignment\footnote{Blame can result either directly from a run-time
-check or, in the absence of blame, from an exception that can be
-traced back to the component that causes it with the help of the stack
-trace.} to decide which component(s) to equip with types. This choice
-constructs scenario $\conf_{i+1}$ from $\conf_{i}$ and thus creates a trail.
-
-% The successor of a scenario on a trail has more typed component;
-% formally, configuration $\conf_{i+1}$ on the trail differs from its
-% predecessor $\conf_{i}$ in that more components are typed.
-
-The first three subsections specialize the trail-scenario idea to the
-three semantics of gradual typing. Once this machinery is in place,
-the fourth subsection presents a reformulation of the informal
-question on page~1 as precise experimental research questions. The
-final subsection adds a notion of programmer effort to the
-experimental setup. 
+Hence the research problem is how to view the actions of a rational programmer
+comparable across all semantics. Sections~\ref{sub:natural}
+through~\ref{sub:erasure} describe the various rational programmers and explain
+to what extent their actions are comparable.
 
 %% -----------------------------------------------------------------------------
 \def\rsub#1#2{\subsection{#2} \label{sub:#1} \input{rational-#1.tex}}
 
-\rsub{natural}   {Modes of the Natural Rational Programmer} 
-\rsub{transient} {Modes of the Transient Rational Programmer} 
-\rsub{erasure}   {Modes of the Erasure Rational Programmer} 
+\rsub{stuff}     {Stuff} 
+
+\rsub{natural}   {The Natural Rational Programmer} 
+\rsub{transient} {The Transient Rational Programmer} 
+\rsub{erasure}   {The Erasure Rational Programmer} 

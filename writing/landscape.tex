@@ -105,7 +105,7 @@ The following table summarizes the illustration:
 %% -----------------------------------------------------------------------------
 \begin{center}
 \begin{tabular}{l|ll}
-                                 \multicolumn{3}{c}{the evaluation of} \\
+                        &        \multicolumn{2}{|c}{the evaluation of} \\
 \relax                  & {\tt public-data}             & {\tt secret-data} in {\tt client}, \\
 {under the $\cdot$ semantics yields} & & \\ \hline
 %% ----------------------------------------------------------------------------------------
@@ -114,6 +114,7 @@ The following table summarizes the illustration:
 \qquad {\it Transient\/} & no error   		       & error, blaming the {\tt pack-lib}/ \\
       		  	 &    			       & \quad {\tt crypto-pack-lib} boundary \\
 \qquad {\it Erasure\/}   & no error 		       & no error \\
+       	    		 &   \multicolumn{2}{|c}{but {\em Erasure} does signal an error on list access}
 \end{tabular}
 \end{center}
 %% -----------------------------------------------------------------------------
