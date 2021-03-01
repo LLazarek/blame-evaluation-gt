@@ -1,85 +1,149 @@
 %% \example{ from text } -> {to text} 
 \long\def\example#1 -> #2{
-\begin{tabular}{l}
+  \begin{tabular}[t]{@{}l}
 #1 $\rightarrow$ #2 
-\end{tabular}
-\\ \hline}
+\end{tabular}}
+
+\long\def\examplesplit#1 -> #2{
+  \begin{tabular}[t]{@{}l}
+#1\\
+$\rightarrow$  #2 
+\end{tabular}}
+
+
+\def\origin#1{%
+  #1\\
+  \hline}
+
+\def\originspecial{
+\origin{specialization of previous mutator~\cite{lksfd-popl-2020}}}
+
+\def\origingen{
+\origin{generilization of previous mutator~\cite{lksfd-popl-2020}}}
+
+\def\originprevious{
+\origin{previous mutator~\cite{lksfd-popl-2020}}}
+
+
+\def\originnew{
+\origin{new}}
+
 
 \def\classpr#1{%
-\begin{minipage}[t]{5.1cm}
-  \begin{tabular}{l}
-  {\tt (class object} \\
-  \quad {\tt (define/#1 (m x) x))}
+\begin{minipage}[t]{4.3cm}
+  \begin{tabular}[t]{@{}l}
+  {\tt (class object\%} \\
+  \quad {\tt (define/#1 (m x)} \\
+   \quad \quad  {\tt x))}
 \end{tabular}
-\end{minipage}~\\}
+\end{minipage}}
+
+
+\def\classsuperclass#1{%
+\begin{minipage}[t]{3.5cm}
+  \begin{tabular}[t]{@{}l}
+  {\tt (class #1} \\
+   \quad {\tt (super-new))} \\
+\end{tabular}
+\end{minipage}}
+
+
+\def\classsupernew#1{%
+\begin{minipage}[t]{3.5cm}
+  \begin{tabular}[t]{@{}l}
+  {\tt (class object\%} \\
+   \quad {\tt #1)} \\
+\end{tabular}
+\end{minipage}}
+
+
 
 \begin{figure*}
-  \begin{tabular}{p{2.1cm} | p{5cm}  | p{5.5cm} }
-    {\bf name} & {\bf description} & {\bf example} \\ \hline
+  \begin{tabular}{@{}p{2.1cm}@{\,\,}|@{\,\,}p{3.5cm}@{\,\,}|@{\,\,}p{5cm}@{\,\,}|@{\,\,}p{2.3cm}@{} }
+    {\bf name} & {\bf description} & {\bf example} & {\bf origin}\\ \hline
 %% -----------------------------------------------------------------------------
 {\tt constant}
  & Swaps a constant with another of the same value but different type.
  & \example{5.6} -> {5.6+0.0i} 
+ & \originspecial 
 
 {\tt deletion}
  & Deletes the result expression of a sequence.
- & \example{{\tt (begin x y z)}} -> {{\tt (begin x y)}} 
+ & \examplesplit{{\tt (begin x y z)}} -> {{\tt (begin x y)}} 
+ & \originspecial 
 
 {\tt position}
   & Swaps two sub-expressions.
-  & \example{{\tt (f a 42 "b" 0)}} -> {\\ {\tt (f a 42 0 "b")}} 
+  & \examplesplit{{\tt (f a 42 "b" 0)}} -> {{\tt (f a 42 0 "b")}}
+  & \origingen 
 
 {\tt list}
  & Replaces {\tt append} with {\tt cons}.
- & \example{texttt{append}} -> {{\tt cons}} 
+ & \example{{\tt append}} -> {{\tt cons}} 
+ & \originnew 
 
 {\tt top-level-id}
  & Swaps identifiers defined in the same module.
  & \example{{\tt (f x 42)}} -> {{\tt (g x 42)}} 
+ & \originnew  
 
 {\tt imported-id}
  & Swaps identifiers imported from the same module.
  & \example{{\tt (f x 42)}} -> {{\tt (g x 42)}} 
+ & \originnew   
 
 {\tt method-id}
  & Swaps two method identifiers.
- & \example{{\tt (send o f x 42)}} -> {\\ {\tt (send o g x 42)}} 
+ & \examplesplit{{\tt (send o f x 42)}} -> {{\tt (send o g x 42)}} 
+ & \originnew   
+
 
 {\tt field-id}
  & Swaps two field identifiers.
- & \example{{\tt (get-field o f)}} -> {\\ {\tt (get-field o g)}} 
+ & \examplesplit{{\tt (get-field o f)}} -> {{\tt (get-field o g)}} 
+ & \originnew   
+  
 
 {\tt class:init}
-  & Swaps values of class initializers.
-  & \example{{\tt (new c [a 5] [b "hello"])}} -> {\\ {\tt (new c [a "hello"] [b 5])}} 
+ & Swaps values of class initializers.
+ & \examplesplit{{\tt (new c [a 5] [b "hello"])}} -> {{\tt (new c [a "hello"] [b 5])}} 
+ & \originnew   
 
 {\tt class:parent}
  & Replaces the parent of classes with {\tt object\%}.
- & \example{{\tt (class foo\% (super-new))}} -> {\\ {\tt (class object\% (super-new))}} 
+    & \examplesplit{\classsuperclass{foo\%}} -> {\classsuperclass{object\%}}
+ &  \originnew    
+ 
 
 {\tt class:public}
  & Makes a public method private and vice versa.
- & \example{\classpr{public}} -> {\\ \classpr{private}}
+ & \examplesplit{\classpr{public}} -> {\classpr{private}}
+ & \originnew  
 
 {\tt class:super}
  & Removes {\tt super-new} calls from class definitions.
- & \example{{\tt (class foo\% (super-new))}} -> {\\ {\tt (class foo\% (void))}} 
+ & \examplesplit{\classsupernew{(super-new)}} -> {\classsupernew{(void)}} 
+ & \originnew
 
 {\tt arithmetic}
  & Swaps arithmetic operators.
  & \example{{\tt +}} -> {{\tt -}}
+ & \origingen
 
 {\tt boolean}
  & Swaps {\tt and} and {\tt or}.
  & \example{{\tt and}} -> {{\tt or}}
+ & \originprevious
 
 {\tt negate-cond}
  & Negates conditional test expressions.
- & \example{{\tt (if (= x 0) t e)}} -> {\\ {\tt (if (not (= x 0)) t e)}}
+ & \examplesplit{{\tt (if (= x 0) t e)}} -> {{\tt (if (not (= x 0)) t e)}}
+ & \originprevious
 
 {\tt force-cond}
  & Replaces conditional test expressions with {\tt \#t}.
- & \example{{\tt (if (= x 0) t e)}} -> {\\ {\tt (if \#t t e)}}
+ & \examplesplit{{\tt (if (= x 0) t e)}} -> {{\tt (if \#t t e)}}
+ & \originnew
 
 \end{tabular}
 
