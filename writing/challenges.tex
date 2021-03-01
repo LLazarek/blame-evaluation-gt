@@ -10,15 +10,42 @@ mechanisms are available in a reasonably robust and directly comparable manner;
 for the implementation of the transient semantics, see the parallel submission
 of an experience report~\cite{ttt21}.
 
-The {\em first challenge\/} is to find a representative collection of impedance
-mismatches. They must represent mistakes that programmers accidentally create
-and that the run-time checks of academic systems catch. In other words, the
-experiment calls for a collection of type mistakes in mix-typed programs that is
-representative of those ``in the wild.''  Unfortunately no such collection
-exists, and with good reason. The kind of mistakes needed are typically detected
-by unit or integration tests; even if it takes some time to find their sources,
-these mistakes do not make it into code repositories with appropriate commit
-messages.
+The {\em first challenge\/} concerns the differences among the blame assignment
+of the three semantic variants.  While Natural assigns blame to {\em one\/}
+component, Transient assigns blame to a sequence of components. The Erasure
+semantics does not blame a component {\it per se\/}, but it comes with an
+exception location and a stack trace, which implicitly suggests parties to
+blame.  The different strategies greatly affect the behavior of the rational
+programmer (and real programmers, too).
+
+One way to overcome this challenge is to {\em equip the rational programmer with
+modes \/} that represent the alternative interpretations of blame.  For
+instance, one Transient mode may pick the oldest element of a blame set as
+the next component to add types because it corresponds to the earliest point in
+the program's evaluation that can discover an impedance mismatch.  Another mode
+may opt to treat the sequence as a stack and add types to its newest element.
+When both modes are equally successful in locating an impedance mismatch,
+measuring the rational programmer's effort may answer which mode is the most
+effective.
+
+Different blame information is also due to differences in the run-time checks
+that the three gradual typing systems perform. This observation suggests another
+mode for the rational programmer, namely, a mode that ignores the blame
+information completely and instead inspects only the information in the
+exceptions of the safety checks in the underlying languages.  This exception
+mode serves as the {\em baseline\/} for blame's value; if the programmer in this
+mode ``beats'' the others, blame systems might be useless.
+
+
+The {\em second challenge\/} is to find a representative collection of
+impedance mismatches. They must represent mistakes that programmers
+accidentally create and that the run-time checks of academic systems catch. In
+other words, the experiment calls for a collection of type mistakes in
+mix-typed programs that is representative of those ``in the wild.''
+Unfortunately no such collection exists, and with good reason. The kind of
+mistakes needed are typically detected by unit or integration tests; even if it
+takes some time to find their sources, these mistakes do not make it into code
+repositories with appropriate commit messages.
 
 An alternative is to {\em generate a large and representative corpus of type
 mistakes \/} using mutation analysis~\cite{lipton1971fault, demillo1978hints,
@@ -46,32 +73,6 @@ original mutators systematically produced programs that immediately revealed the
 source of the impedance mismatch. About two thirds of the original mutators
 survived this first scrutiny testing. All of the remaining ones yield {\em
 interesting debugging scenarios\/} (see section~\ref{sub:mutate-interesting}).
-
-The {\em second challenge\/} concerns the differences among the blame assignment
-of the three semantic variants.  While Natural assigns blame to {\em one\/}
-component, Transient assigns blame to a sequence of components. The Erasure
-semantics does not blame a component {\it per se\/}, but it comes with an
-exception location and a stack trace, which implicitly suggests parties to
-blame.  The different strategies greatly affect the behavior of the rational
-programmer (and real programmers, too).
-
-One way to overcome this challenge is to {\em equip the rational programmer with
-modes \/} that represent the alternative interpretations of blame.  For
-instance, one Transient mode may pick the oldest element of a blame set as
-the next component to add types because it corresponds to the earliest point in
-the program's evaluation that can discover an impedance mismatch.  Another mode
-may opt to treat the sequence as a stack and add types to its newest element.
-When both modes are equally successful in locating an impedance mismatch,
-measuring the rational programmer's effort may answer which mode is the most
-effective.
-
-Different blame information is also due to differences in the run-time checks
-that the three gradual typing systems perform. This observation suggests another
-mode for the rational programmer, namely, a mode that ignores the blame
-information completely and instead inspects only the information in the
-exceptions of the safety checks in the underlying languages.  This exception
-mode serves as the {\em baseline\/} for blame's value; if the programmer in this
-mode ``beats'' the others, blame systems might be useless.
 
 The {\em third challenge\/} is the explosive number of debugging scenarios that
 result from the combination of mutation-based scenario generation and mode-based
