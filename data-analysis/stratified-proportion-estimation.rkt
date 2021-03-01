@@ -58,8 +58,8 @@
         ("take5" . 128)
         ("tetris" . 256)))
 
-;; (blame-trail? . -> . boolean?)
-;; (benchmark? mutator . -> . (hash/c mutant? blame-trail?))
+;; (A . -> . boolean?) ; where A is typically blame-trail?
+;; (benchmark? mutator . -> . (hash/c mutant? A))
 ;; . -> .
 ;; proportion-estimate/c
 (define (strata-proportion-estimate predicate bts-by-mutant-for)

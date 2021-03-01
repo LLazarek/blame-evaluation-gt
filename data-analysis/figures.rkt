@@ -24,7 +24,15 @@
 ;; How to render percentages: within [0,1] or [0,100]
 (define (~% %) (* % 100))
 
+;; As the figures are written below, this will only take effect if the figures
+;; are *not* pulling data from a cache on disk
+(define collect-max-error-margin? #f)
 
+
+(define max-error-margin (box 0))
+(define (record-error-margin! e)
+  (when (> e (unbox max-error-margin))
+    (set-box! max-error-margin e)))
 
 (require plot
          (except-in pict-util line)
@@ -66,6 +74,19 @@
       (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir
                                                           mutant-mutators)))))
 
+(define make-bt-by-benchmark+mutant-getter-for-mode
+  (simple-memoize
+   (λ (mode-name)
+     (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
+     (λ (benchmark mutator)
+       (for/hash/fold ([bt (in-list (hash-ref bts-by-mutator mutator))]
+                       #:when (equal? (mutant-benchmark (blame-trail-mutant-id bt))
+                                      benchmark))
+         #:combine cons
+         #:default empty
+         (values (blame-trail-mutant-id bt)
+                 bt))))))
+
 
 (define bt-id? (list/c mutant? natural?))
 
@@ -81,6 +102,40 @@
   (for*/hash ([bts (in-hash-values bts-by-mutator)]
               [bt (in-list bts)])
     (values (bt->id bt) bt)))
+
+
+(define/contract (bt-wise-strata-proportion-estimate mode-names
+                                                     predicate)
+  (->i ([mode-names (non-empty-listof string?)]
+        [predicate {mode-names}
+                   ((and/c (non-empty-listof blame-trail?)
+                           (λ (l) (= (length l) (length mode-names))))
+                    . -> .
+                    boolean?)])
+       [result hash?])
+
+  (define (mode->bts-by-id mode)
+    (define bts-by-mutator (get-bts-by-mutator-for-mode mode))
+    (bts-by-id bts-by-mutator))
+
+  (match-define (cons top-mode other-modes) mode-names)
+  (define other-modes-bts-by-id (map mode->bts-by-id other-modes))
+
+  (define get-top-bts-by-benchmark+mutant
+    (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
+  (define get-bts-by-benchmark+mutant
+    (simple-memoize
+     (λ (benchmark mutator)
+       (define top-bts-by-mutant (get-top-bts-by-benchmark+mutant benchmark mutator))
+       (for/hash ([{mutant top-bts} (in-hash top-bts-by-mutant)])
+         (values mutant
+                 (for/list ([top-bt (in-list top-bts)])
+                   (define top-id (bt->id top-bt))
+                   (cons top-bt
+                         (map (λ (bts-by-id) (hash-ref bts-by-id top-id))
+                              other-modes-bts-by-id))))))))
+  (strata-proportion-estimate predicate
+                              get-bts-by-benchmark+mutant))
 
 
 (define success-color '(153 225 187))
@@ -110,6 +165,61 @@
     (vc-append label-gap
                (cb-superimpose label-pict uniform-label-filler)
                pict)))
+
+
+(define/contract (two-sided-histogram data
+                                      #:top-color [top-color (rectangle-color)]
+                                      #:bot-color [bot-color (rectangle-color)]
+                                      #:gap [gap (discrete-histogram-gap)]
+                                      #:skip [skip (discrete-histogram-skip)]
+                                      #:add-ticks? [add-ticks? #t])
+  ({(listof (list/c any/c real? real?))}
+   {#:top-color any/c
+    #:bot-color any/c
+    #:gap any/c
+    #:skip any/c
+    #:add-ticks? boolean?}
+   . ->* .
+   list?)
+  (list (discrete-histogram (map (match-lambda [(list name top _) (list name top)])
+                                 data)
+                            #:color top-color
+                            #:gap gap
+                            #:skip skip
+                            #:add-ticks? add-ticks?)
+        ;; lltodo: this is a workaround for a bug with discrete-histogram
+        ;; This doesn't work:
+        #;(plot (list (discrete-histogram '((a 5) (b 3)))
+                         (discrete-histogram '((a -2) (b -4)))
+                         (x-axis))
+                   #:y-min -5)
+        ;; while this does:
+        #;(plot (list (discrete-histogram '((a 5) (b 3)))
+                         (discrete-histogram '((a -2)) #:x-min 0)
+                         (discrete-histogram '((b -4)) #:x-min 1)
+                         (x-axis))
+                   #:y-min -5)
+        (for/list ([bar-sides (in-list data)]
+                   [i (in-naturals)])
+          (match-define (list name _ bottom) bar-sides)
+          (discrete-histogram `((,name ,(- bottom)))
+                              #:x-min i
+                              #:color bot-color
+                              #:gap gap
+                              #:skip skip
+                              #:add-ticks? add-ticks?))))
+
+(define (absolute-value-format original-ticks)
+  (ticks (ticks-layout original-ticks)
+         (λ (min max ticks)
+           (define absolute-value-ticks
+             (for/list ([tick (in-list ticks)])
+               (struct-copy pre-tick tick
+                            [value (abs (pre-tick-value tick))])))
+           ((ticks-format original-ticks) min max absolute-value-ticks))))
+
+
+
 
 (when (member 'bt-lengths-table to-generate)
   (define bt-lengths-table
@@ -188,19 +298,6 @@
 (when (member 'bt-length-comparisons to-generate)
   (define bt-length-comparisons
     (let ()
-      (define make-bt-by-benchmark+mutant-getter-for-mode
-        (simple-memoize
-         (λ (mode-name)
-           (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
-           (λ (benchmark mutator)
-             (for/hash/fold ([bt (in-list (hash-ref bts-by-mutator mutator))]
-                             #:when (equal? (mutant-benchmark (blame-trail-mutant-id bt))
-                                            benchmark))
-                            #:combine cons
-                            #:default empty
-                            (values (blame-trail-mutant-id bt)
-                                    bt))))))
-
       (define direct-bt-length-comparison-distribution
         (simple-memoize
          #:on-disk (build-path data-cache "direct-effort-comparison-distributions.rktd")
@@ -345,100 +442,25 @@
   (pict->png! bt-length-comparisons (build-path outdir "bt-length-comparisons.png")))
 
 
-
-(define/contract (two-sided-histogram data
-                                      #:top-color [top-color (rectangle-color)]
-                                      #:bot-color [bot-color (rectangle-color)]
-                                      #:gap [gap (discrete-histogram-gap)]
-                                      #:skip [skip (discrete-histogram-skip)]
-                                      #:add-ticks? [add-ticks? #t])
-  ({(listof (list/c any/c real? real?))}
-   {#:top-color any/c
-    #:bot-color any/c
-    #:gap any/c
-    #:skip any/c
-    #:add-ticks? boolean?}
-   . ->* .
-   list?)
-  (list (discrete-histogram (map (match-lambda [(list name top _) (list name top)])
-                                 data)
-                            #:color top-color
-                            #:gap gap
-                            #:skip skip
-                            #:add-ticks? add-ticks?)
-        ;; lltodo: this is a workaround for a bug with discrete-histogram
-        ;; This doesn't work:
-        #;(plot (list (discrete-histogram '((a 5) (b 3)))
-                         (discrete-histogram '((a -2) (b -4)))
-                         (x-axis))
-                   #:y-min -5)
-        ;; while this does:
-        #;(plot (list (discrete-histogram '((a 5) (b 3)))
-                         (discrete-histogram '((a -2)) #:x-min 0)
-                         (discrete-histogram '((b -4)) #:x-min 1)
-                         (x-axis))
-                   #:y-min -5)
-        (for/list ([bar-sides (in-list data)]
-                   [i (in-naturals)])
-          (match-define (list name _ bottom) bar-sides)
-          (discrete-histogram `((,name ,(- bottom)))
-                              #:x-min i
-                              #:color bot-color
-                              #:gap gap
-                              #:skip skip
-                              #:add-ticks? add-ticks?))))
-
-(define (absolute-value-format original-ticks)
-  (ticks (ticks-layout original-ticks)
-         (λ (min max ticks)
-           (define absolute-value-ticks
-             (for/list ([tick (in-list ticks)])
-               (struct-copy pre-tick tick
-                            [value (abs (pre-tick-value tick))])))
-           ((ticks-format original-ticks) min max absolute-value-ticks))))
-
 (when (member 'avo-bars to-generate)
   (define avo-bars
     (let ([modes (remove "null" modes)])
-      (define make-bt-by-benchmark+mutant-getter-for-mode
-        (simple-memoize
-         (λ (mode-name)
-           (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
-           (λ (benchmark mutator)
-             (for/hash/fold ([bt (in-list (hash-ref bts-by-mutator mutator))]
-                             #:when (equal? (mutant-benchmark (blame-trail-mutant-id bt))
-                                            benchmark))
-                            #:combine cons
-                            #:default empty
-                            (values (blame-trail-mutant-id bt)
-                                    bt))))))
-
       (define direct-avo-%
         (simple-memoize
          #:on-disk (build-path data-cache "direct-avo-percents.rktd")
          (λ (top-mode bottom-mode dump-to)
            (displayln @~a{@top-mode vs @bottom-mode})
-           (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-           (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
-           (define get-top-bts-by-benchmark+mutant
-             (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
-           (define (get-bts-by-benchmark+mutant benchmark mutator)
-             (define top-bts-by-mutant (get-top-bts-by-benchmark+mutant benchmark mutator))
-             (for/hash ([{mutant top-bts} (in-hash top-bts-by-mutant)])
-               (values mutant
-                       (for/list ([top-bt (in-list top-bts)])
-                         (define corresponding-bottom-bt (hash-ref bottom-bts-by-id (bt->id top-bt)))
-                         (list top-bt corresponding-bottom-bt)))))
            (define estimate
-             (strata-proportion-estimate (match-lambda
-                                           [(list top-bt bottom-bt)
-                                            (and (satisfies-BT-hypothesis? top-bt)
-                                                 (not (satisfies-BT-hypothesis? bottom-bt)))])
-                                         get-bts-by-benchmark+mutant))
+             (bt-wise-strata-proportion-estimate
+              (list top-mode bottom-mode)
+              (match-lambda
+                [(list top-bt bottom-bt)
+                 (and (satisfies-BT-hypothesis? top-bt)
+                      (not (satisfies-BT-hypothesis? bottom-bt)))])))
            (define p (hash-ref estimate 'proportion-estimate))
            (define error-margin (variance->margin-of-error (hash-ref estimate 'variance)
                                                            1.96))
-           (displayln error-margin)
+           (record-error-margin! error-margin)
            (list p error-margin))))
 
       (define (direct-avo-comparisons top-mode other-modes)
@@ -477,6 +499,9 @@
                           #:column-spacing 10
                           #:row-spacing 80)))
   (pict->png! avo-bars (build-path outdir "avo-bars.png"))
+  (when collect-max-error-margin?
+    (displayln @~a{Max error margin for avo-bars: @(unbox max-error-margin)})
+    (set-box! max-error-margin 0))
   (void))
 
 (when (member 'blame-vs-exns-venn to-generate)
@@ -493,61 +518,54 @@
     #:prefab)
   (define venn-%s
     (simple-memoize
-     #:on-disk (build-path data-cache "blame-vs-exns-venn-data.rktd")
+     #:on-disk (build-path data-cache "blame-vs-exns-venn-data-prop-estimate.rktd")
      (λ (top-mode bottom-mode)
-       (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-       (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
-       (define erasure-bts-by-mutator (get-bts-by-mutator-for-mode "erasure-stack-first"))
-       (define erasure-bts-by-id (bts-by-id erasure-bts-by-mutator))
-       (define top-bts-by-mutator (get-bts-by-mutator-for-mode top-mode))
-       (define top-bts-by-id (bts-by-id top-bts-by-mutator))
-
-       (define all-bts-count (hash-count top-bts-by-id))
        (define (trio-% trio-predicate)
-         (/ (for/sum ([{id top-bt} (in-hash top-bts-by-id)]
-                      #:when (trio-predicate top-bt
-                                             (hash-ref bottom-bts-by-id id)
-                                             (hash-ref erasure-bts-by-id id)))
-              1)
-            all-bts-count))
+         (define estimate (bt-wise-strata-proportion-estimate (list top-mode
+                                                                    bottom-mode
+                                                                    "erasure-stack-first")
+                                                              trio-predicate))
+         (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
+                                                          1.96))
+         (hash-ref estimate 'proportion-estimate))
        (define all-3-succeed-%
-         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
-                                   (? satisfies-BT-hypothesis?)
-                                   (? satisfies-BT-hypothesis?)} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
+                                      (? satisfies-BT-hypothesis?)
+                                      (? satisfies-BT-hypothesis?)) #t]
+                               [_ #f])))
 
        (define top-only-%
-         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
-                                   (not (? satisfies-BT-hypothesis?))
-                                   (not (? satisfies-BT-hypothesis?))} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
+                                      (not (? satisfies-BT-hypothesis?))
+                                      (not (? satisfies-BT-hypothesis?))) #t]
+                               [_ #f])))
        (define top-bot-%
-         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
-                                   (? satisfies-BT-hypothesis?)
-                                   (not (? satisfies-BT-hypothesis?))} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
+                                      (? satisfies-BT-hypothesis?)
+                                      (not (? satisfies-BT-hypothesis?))) #t]
+                               [_ #f])))
        (define top-erasure-%
-         (trio-% (match-lambda** [{(? satisfies-BT-hypothesis?)
-                                   (not (? satisfies-BT-hypothesis?))
-                                   (? satisfies-BT-hypothesis?)} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
+                                      (not (? satisfies-BT-hypothesis?))
+                                      (? satisfies-BT-hypothesis?)) #t]
+                               [_ #f])))
 
        (define bot-only-%
-         (trio-% (match-lambda** [{(not (? satisfies-BT-hypothesis?))
-                                   (? satisfies-BT-hypothesis?)
-                                   (not (? satisfies-BT-hypothesis?))} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (not (? satisfies-BT-hypothesis?))
+                                      (? satisfies-BT-hypothesis?)
+                                      (not (? satisfies-BT-hypothesis?))) #t]
+                               [_ #f])))
        (define bot-erasure-%
-         (trio-% (match-lambda** [{(not (? satisfies-BT-hypothesis?))
-                                   (? satisfies-BT-hypothesis?)
-                                   (? satisfies-BT-hypothesis?)} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (not (? satisfies-BT-hypothesis?))
+                                      (? satisfies-BT-hypothesis?)
+                                      (? satisfies-BT-hypothesis?)) #t]
+                               [_ #f])))
 
        (define erasure-only-%
-         (trio-% (match-lambda** [{(not (? satisfies-BT-hypothesis?))
-                                   (not (? satisfies-BT-hypothesis?))
-                                   (? satisfies-BT-hypothesis?)} #t]
-                                 [{_ _ _} #f])))
+         (trio-% (match-lambda [(list (not (? satisfies-BT-hypothesis?))
+                                      (not (? satisfies-BT-hypothesis?))
+                                      (? satisfies-BT-hypothesis?)) #t]
+                               [_ #f])))
 
        (utility-comparison all-3-succeed-%
                            top-only-%
@@ -615,23 +633,24 @@
     (system @~a{convert '@venn-outfile' '@(path-replace-extension venn-outfile ".png")'})
     (delete-file venn-outfile))
 
+  (when collect-max-error-margin?
+    (displayln @~a{Max error margin for venns: @(unbox max-error-margin)})
+    (set-box! max-error-margin 0))
   (void))
 
 (when (member 'success-bars to-generate)
   (define success-bars
     (let ()
-      (define (all-bts-for-mode mode-name)
-        (define bts-by-mutator (get-bts-by-mutator-for-mode mode-name))
-        (for/fold ([all-bts empty])
-                  ([{_ bts} (in-hash bts-by-mutator)])
-          (append bts all-bts)))
       (define mode-success-%
         (simple-memoize
-         #:on-disk (build-path data-cache "success-percents.rktd")
+         #:on-disk (build-path data-cache "success-percents-prop-estimate.rktd")
          (λ (mode-name)
-           (define bts (all-bts-for-mode mode-name))
-           (define success-count (count satisfies-BT-hypothesis? bts))
-           (/ success-count (length bts)))))
+           (define estimate (bt-wise-strata-proportion-estimate
+                             (list mode-name)
+                             (match-lambda [(list bt) (satisfies-BT-hypothesis? bt)])))
+           (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
+                                                            1.96))
+           (hash-ref estimate 'proportion-estimate))))
 
       (define modes/ordered '("TR"
                               "TR-stack-first"
@@ -651,5 +670,7 @@
                    #:x-label #f
                    #:width (* 1.25 (plot-width))))))
   (pict->png! success-bars (build-path outdir "success-bars.png"))
+  (when collect-max-error-margin?
+    (displayln @~a{Max error margin for success-bars: @(unbox max-error-margin)})
+    (set-box! max-error-margin 0))
   (void))
-
