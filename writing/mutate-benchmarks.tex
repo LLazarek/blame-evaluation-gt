@@ -1,18 +1,36 @@
 
-Over the past decade, \citet{gtnffvf-jfp-2019} have curated a collection of
-Typed Racket programs for systematically measuring the implementation's
-performance. The benchmark suite consists of fully typed, correct programs,
-written by a number of different authors, who have maintained and evolved these
-programs over several years. The programs range widely in size, complexity,
-purpose, and in programming style. The latter is mostly a reference to their
-reliance on many Typed Racket features: occurrence typing~\cite{tf-icfp-2010},
-types for mutable and immutable data structures~\cite{hpst-sfp-2010}, types for
-first-class classes and objects~\cite{tsdtf-oopsla-2012}, and types for Racket's
-numeric tower~\cite{stathff-padl-12}.
+Since this is the first empirical attempt to evaluate blame in gradual
+typing, there is no standard benchmark suite that we can use off-the-self.
+In addition, there is no exsitng benchmark suite of gradually typed
+programs with type-level mistakes that we could
+repurpose.\footnote{Recently ~\citet{cc-oopsla-20} created a
+Reticulated Python program collection to evaluate their technique for
+fixing mistakes in type annotations; unfortunately their collection does
+not come with type-level mistakes in the code proper.} In fact, the bar
+for testing the rational programmer is much higher than the existence of a
+collection of programs with type-level errors. Testing the rational
+programmer demands a currated collection of programs that take advantage
+of the sophisticated features of gradually typed languages such as Typed
+Racket. 
 
-Since mixing of typed and untyped code in Typed Racket takes place at the module
-level, the experiment calls for benchmarks with a decent number of modules and a
-variety of module dependency graphs. Filtering the benchmark suite using these
-criteria yields ten suitable programs. Figure~\ref{table:benchmark-descriptions}
+Over the past decade,  \citet{gtnffvf-jfp-2019} have curated such a
+collection of Typed Racket programs for systematically measuring the
+implementation's performance. The benchmark suite consists of fully typed,
+correct programs, written by a number of different authors, who have
+maintained and evolved these programs over several years. The programs
+range widely in size, complexity, purpose, origin and in programming
+style. The latter is mostly a reference to their reliance on many Typed
+Racket features: occurrence typing~\cite{tf-icfp-2010}, types for mutable
+and immutable data structures~\cite{hpst-sfp-2010}, types for first-class
+classes and objects~\cite{tsdtf-oopsla-2012}, and types for Racket's
+numeric tower~\cite{stathff-padl-12}. Hence they offer a diverse lignustic
+substrate suitable for injecting type-level errors and testing the
+rational programmer. 
+
+Since mixing of typed and untyped code in Typed Racket takes place at the
+module level, the experiment calls for benchmarks with a decent number of
+modules and a variety of module dependency graphs. Filtering the benchmark
+suite using these criteria while preserving its linguistic diversity
+yields ten suitable programs. Figure~\ref{table:benchmark-descriptions}
 displays the selected benchmark programs and describes their basic
 characteristic. 
