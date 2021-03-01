@@ -5,26 +5,18 @@
 \end{tabular}
 \\ \hline}
 
-\def\fromclass{%
-\begin{minipage}[t]{5cm}
-\begin{tabular}{l}
-{\tt (class object} \\
-\quad {\tt (define/public (m x) x))}
+\def\classpr#1{%
+\begin{minipage}[t]{5.1cm}
+  \begin{tabular}{l}
+  {\tt (class object} \\
+  \quad {\tt (define/#1 (m x) x))}
 \end{tabular}
 \end{minipage}~\\}
-
-\def\toclass{
-\begin{minipage}[t]{5.1cm}
-\begin{tabular}{l}
-{\tt (class object} \\
-\quad {\tt (define/private (m x) x))}
-\end{tabular}
-\end{minipage}}
 
 \begin{figure*}
   \begin{tabular}{p{2.1cm} | p{5cm}  | p{5.5cm} }
     {\bf name} & {\bf description} & {\bf example} \\ \hline
-%% ----------------------------------------------------------------------------------------------------------------------------------------------------------
+%% -----------------------------------------------------------------------------
 {\tt constant}
  & Swaps a constant with another of the same value but different type.
  & \example{5.6} -> {5.6+0.0i} 
@@ -67,7 +59,7 @@
 
 {\tt class:public}
  & Makes a public method private and vice versa.
- & \example{\fromclass} -> {\\ \toclass}
+ & \example{\classpr{public}} -> {\\ \classpr{private}}
 
 {\tt class:super}
  & Removes {\tt super-new} calls from class definitions.
