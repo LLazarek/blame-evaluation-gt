@@ -167,59 +167,6 @@
                pict)))
 
 
-(define/contract (two-sided-histogram data
-                                      #:top-color [top-color (rectangle-color)]
-                                      #:bot-color [bot-color (rectangle-color)]
-                                      #:gap [gap (discrete-histogram-gap)]
-                                      #:skip [skip (discrete-histogram-skip)]
-                                      #:add-ticks? [add-ticks? #t])
-  ({(listof (list/c any/c real? real?))}
-   {#:top-color any/c
-    #:bot-color any/c
-    #:gap any/c
-    #:skip any/c
-    #:add-ticks? boolean?}
-   . ->* .
-   list?)
-  (list (discrete-histogram (map (match-lambda [(list name top _) (list name top)])
-                                 data)
-                            #:color top-color
-                            #:gap gap
-                            #:skip skip
-                            #:add-ticks? add-ticks?)
-        ;; lltodo: this is a workaround for a bug with discrete-histogram
-        ;; This doesn't work:
-        #;(plot (list (discrete-histogram '((a 5) (b 3)))
-                         (discrete-histogram '((a -2) (b -4)))
-                         (x-axis))
-                   #:y-min -5)
-        ;; while this does:
-        #;(plot (list (discrete-histogram '((a 5) (b 3)))
-                         (discrete-histogram '((a -2)) #:x-min 0)
-                         (discrete-histogram '((b -4)) #:x-min 1)
-                         (x-axis))
-                   #:y-min -5)
-        (for/list ([bar-sides (in-list data)]
-                   [i (in-naturals)])
-          (match-define (list name _ bottom) bar-sides)
-          (discrete-histogram `((,name ,(- bottom)))
-                              #:x-min i
-                              #:color bot-color
-                              #:gap gap
-                              #:skip skip
-                              #:add-ticks? add-ticks?))))
-
-(define (absolute-value-format original-ticks)
-  (ticks (ticks-layout original-ticks)
-         (λ (min max ticks)
-           (define absolute-value-ticks
-             (for/list ([tick (in-list ticks)])
-               (struct-copy pre-tick tick
-                            [value (abs (pre-tick-value tick))])))
-           ((ticks-format original-ticks) min max absolute-value-ticks))))
-
-
-
 
 (when (member 'bt-lengths-table to-generate)
   (define bt-lengths-table
