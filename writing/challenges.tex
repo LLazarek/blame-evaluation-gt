@@ -23,16 +23,16 @@ and Transient semantics assign blame and discard  the information in the
 exception from the run-time check. Nevertheless, the exception
 information may be equally or even more useful to the rational programmer
 than blame. If this is the case blame may not play a critical role for the
-rational programmer.\footnote{Indeed, precisely because they do not
+rational programmer. Indeed, precisely because they do not
 account for confounding factors, ~\citet{lksfd-popl-2020} cannot draw any
 conclusions about the pragmatics of blame despite advertisements for the
 opposite. Their experiment can only conclude that so-called blame-shifting
-works but not that this is because of blame.}  
+works but not that this is because of blame. 
 
 One way to isolate blame from this confounding factor is to {\em equip the
 rational programmer with modes \/} that represent the different types of
 information the rational programmer takes into account when debugging a
-scenario. Specifically, the rational programmer comes with a blame and
+scenario. Specifically, the rational programmer comes with a blame mode and
 an exception mode. Only if the former succeeds debugging a program while
 the latter fails, it is safe to conclude that blame is indeed necessary
 for the rational programmer. Put differently, the exception mode serves as
@@ -41,7 +41,7 @@ the {\em baseline\/} for blame's value; if the programmer in this mode
 
 Besides the run-time checks, pure luck might also amplify the usefulness
 of blame. Thus a proper evaluation of blame needs to factor out any random
-effects. A random rational programmer mode offers the necessary baseline
+effects. A random rational programmer mode provides the necessary baseline
 using the same ingredients as for exceptions. 
 
 
@@ -54,7 +54,7 @@ implicitly suggests parties to blame.  The different strategies greatly
 affect the behavior of the rational programmer (and real programmers,
 too).
 
-With modes, different strategy map to different ways the rational
+With modes, different blame strategies map to different ways the rational
 programmer  interprets blame.  For instance, one Transient mode may pick
 the oldest element of a blame set as the next component to add types
 because it corresponds to the earliest point in the program's evaluation
