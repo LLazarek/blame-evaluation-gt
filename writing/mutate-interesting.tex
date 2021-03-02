@@ -10,15 +10,15 @@ information.
 Here is the rationale for these three conditions:
 \begin{enumerate}
 
-\item By definition, an impedance mismatch is a class between type ascription of
-one module to another module's exports. Hence, type checking fails for an
+\item By definition, an impedance mismatch is a clash between the type ascription of
+one module's imports and another module's exports. Hence, type checking fails for an
 interesting mutant module, and removing the types from this mutant module
 creates an impedance mismatch between it and the modules that import it,
 directly or indirectly. This impedance mismatch is of interest if, and only if,
 running the program leads to an exception---otherwise it goes unobserved and
 cannot be debugged.
 
-\item If the evaluation o mutant module immediately raises an exception because
+\item If the evaluation od a mutant module immediately raises an exception because
 of the changes, there is no work for the rational programmer. Indeed, if the
 stack trace contains source pointers to two modules, the scenario is still
 uninteresting. Every ordinary benchmark program comes with a {\tt main} module
@@ -27,7 +27,7 @@ trace.  Hence, the definition of interesting mutation insists on the presence of
 three different modules in the stack trace. This guarantees that the debugging
 scenario demands a sufficiently sophisticated effort, due to the interaction
 between the buggy module with its context.  In these cases, the rational
-programmer must examine at least modules to locate the source of the faulty
+programmer must examine at least two modules to locate the source of the faulty
 interaction.
 
 \item The goal of a comparative evaluation is to give the rational programmer a
