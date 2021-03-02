@@ -51,10 +51,10 @@ high-level conclusions about blame in the gradual typing setting.  First,
 run time type checks have a large positive impact. This is the case
 regardless of whether these checks issue blame or throw plain exceptions.
 Second, in many cases type checks that issue blame are more helpful than
-those that do not. However, our results indicate that in other cases blame
-is not critical and thus it is worth further investigation whether
+those that do not. However, our results indicate that blame
+is not critical in a majority of cases, and therefore it is worth further investigation whether
 disabling blame tracking for the sake of performance may be   an
-acceptable trade off. Third, from the three different blame strategies, the
+acceptable trade-off. Third, from the three different blame strategies, the
 Natural approach of Typed Racket fares better than the Transient approach
 of Reticulated Python, but only by a small margin. Since Natural offers complete
 and sound path-based blame while Transient offers incomplete but sound heap-based
@@ -67,9 +67,10 @@ Fifth, just as for Typed Racket, the experiment points to possible
 improvements for Reticulated Python. In particular, the experimental 
 data indicates that the usefulness of transient blame does not depend on
 whether  the rational programmer follows first or the last element from a
-blame set. Hence, given the performance issues of Transient we discuss further on, 
+blame set, and that using the last element seems to produce shorter trails.
+Hence, given the performance issues of Transient we discuss further on,
 a possible optimization is to limit the size of blame sets
-using timestamps.
+to only contain the latest entries using timestamps.
 
 There are a number of threats to the validity of our conclusions: (i) the
 representativeness of benchmarks; (ii) the relation between mutations and
