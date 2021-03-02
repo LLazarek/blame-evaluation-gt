@@ -6,8 +6,11 @@ result is a {\em mutant\/}.
 For the evaluation of a blame strategy, mutators must produce type-level
 mistakes that the run-time checks of gradual typing systems or the safety
 checks of the underlying language can detect. Once detected, the rational
-programmer should be able to locate the mistake by gradually adding types to
-blamed modules.
+programmer should be able to locate the mistake by gradually adding types
+to blamed modules. In other words, the suitability of the mutators hinges
+on their ability to generate interesting debugging scenarios (see
+sec.~\ref{sub:mutate-interesting}).
+
 
 Figure~\ref{table:mutation-ops} describes 16 mutators that satisfy these
 constraints. As the explanation indicates, some specialize or
@@ -20,7 +23,7 @@ errors; it had to be adapted to make only operator swaps that can affect the
 type of the result, e.g., changing `*` to `/`.}  Only two are directly
 inherited; many mutators are brand new. For the latter the authors relied on
 their decades-long experience of making type-level mistakes in Typed Racket,
-some of which take a non-trivial effort to debug.
+some of which take a non-trivial effort to debug. 
 
 Most of the mutators are self-explanatory.  The first six apply to all
 gradually typed languages; the next six to those that include classes and
@@ -30,5 +33,4 @@ replaces a {\tt +} with a {\tt -} in an attempt to change the type of the
 arithmetic expression; {\tt +}'s result is a {\tt Positive-Integer} when all
 arguments are positive integers, while {\tt -} yields {\tt
 Integer}~\cite{stathff-padl-12}. Similarly, the other three also aim to usurp
-Typed Racket's occurrence type system.
-
+Typed Racket's occurrence type system. 
