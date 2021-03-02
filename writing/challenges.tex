@@ -10,14 +10,15 @@ However, three major challenges remain:  the isolation of the effect of
 blame on the rational programmer across three different mechanisms; the
 collection of a large number of representative debugging scenarios;  and a
 proper sampling strategy for the huge space of possibilities. A
-coincidental challenge is the disparity of gradually typed languages. To
-eliminate this variable from the comparison, this paper uses Racket, which
-is thus far the only language in which all three major soundness
-mechanisms are available in a reasonably robust and directly comparable
-manner; for the implementation of the transient semantics, see the
-parallel submission of an experience report~\cite{ttt21}.
+coincidental challenge is the disparity of the implementations of
+gradually typed languages. To eliminate this variable from the comparison,
+this paper uses Racket, which is thus far the only language in which all
+three major soundness mechanisms are available in a reasonably robust and
+directly comparable manner; for the implementation of the transient
+semantics, see the parallel submission of an experience
+report~\cite{ttt21}.
 
-The {\em first challenge\/} stems from the interplay between blame and the
+The {\em first major challenge\/} stems from the interplay between blame and the
 run-time checks of a gradual type systems. When a check fails the Natural
 and Transient semantics assign blame and discard  the information in the
 exception from the run-time check. Nevertheless, the exception
@@ -44,15 +45,15 @@ of blame. Thus a proper evaluation of blame needs to factor out any random
 effects. A random rational programmer mode provides the necessary baseline
 using the same ingredients as for exceptions. 
 
+Modes also offer a solution to a derivative challenge; reconciling the
+differences among the blame assignment mechanisms of the three semantic variants.
+While Natural assigns blame to {\em one\/} component, Transient assigns
+blame to a sequence of components. The Erasure semantics does not blame a
+component {\it per se\/}, but it comes with an exception location and a
+stack trace, which implicitly suggests parties to blame.  The different
+strategies greatly affect the behavior of the rational programmer (and
+real programmers, too).
 
-Modes also offer a common vocabulary for the differences among the blame
-assignment of the three semantic variants.  While Natural assigns blame to
-{\em one\/} component, Transient assigns blame to a sequence of
-components. The Erasure semantics does not blame a component {\it per
-se\/}, but it comes with an exception location and a stack trace, which
-implicitly suggests parties to blame.  The different strategies greatly
-affect the behavior of the rational programmer (and real programmers,
-too).
 
 With modes, different blame strategies map to different ways the rational
 programmer  interprets blame.  For instance, one Transient mode may pick
@@ -60,13 +61,13 @@ the oldest element of a blame set as the next component to add types
 because it corresponds to the earliest point in the program's evaluation
 that can discover an impedance mismatch.  Another mode may opt to treat
 the sequence as a stack and add types to its newest element.  When both
-modes are equally successful in locating an impedance mismatch, measuring
-the rational programmer's effort may answer which mode is the most
-effective.
+modes are equally successful in locating an impedance mismatch,
+measuring the rational programmer's effort may answer which mode is the
+most effective.
 
 
 
-The {\em second challenge\/} is to find a representative collection of
+The {\em second major challenge\/} is to find a representative collection of
 programs with impedance mismatches. The latter must represent mistakes that programmers
 accidentally create and that the run-time checks of academic systems catch. In
 other words, the experiment calls for a collection of type mistakes in
@@ -103,7 +104,7 @@ source of the impedance mismatch. About two thirds of the original mutators
 survived this first scrutiny testing. All of the remaining ones yield {\em
 interesting debugging scenarios\/} (see section~\ref{sub:mutate-interesting}).
 
-The {\em third challenge\/} is the explosive number of debugging scenarios that
+The {\em third major challenge\/} is the explosive number of debugging scenarios that
 result from the combination of mutation-based scenario generation and mode-based
 analysis. All three factors---three different gradual typing systems, the large
 number of mutants, and the number of debugging modes---contribute possibly
