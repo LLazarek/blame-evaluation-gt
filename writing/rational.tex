@@ -1,23 +1,26 @@
 %% -----------------------------------------------------------------------------
 
-Section~\ref{sec:why-rational} explains, and illustrates with an example, how a
-migratory type setting helps with finding the source of an impedance
-mismatch. Roughly speaking, it encourages the rational programmer to equip a
-module with types if it is blamed in an error message. A sequence of such steps
-make up a portion of the migratory path in the lattice of type
-migration~\cite{tfgnvf-popl-2016} (see sec.~\ref{sub:stuff} for details).
+Section~\ref{sec:why-rational} explains, and illustrates with an example,
+how a migratory type setting helps with finding the source of an impedance
+mismatch. Roughly speaking, it encourages the rational programmer to
+equip a module with types if it is blamed in an error message. A sequence
+of such steps make up a portion of the migratory path in the lattice of
+type migration~\cite{tfgnvf-popl-2016}. The lattice, described in Section
+~\ref{sub:stuff},  serves as the common substrate for the definition modes
+of the rational programmer mentioned in section~\ref{sec:challenges}. 
 
-Unfortunately, the rational programmer receives different kinds of information
-and thus may construct different paths. As section~\ref{sec:landscape} shows,
-the three different semantics deal with the same program in three different
-ways, and the error messages point to different sources of a problem.
+Each mode receives different kinds of information and thus may construct
+different paths in the lattice. As discussed in~\ref{sec:challenges},
+evaluating blame relies on comparing modes of the rational programmer
+within the same semantics and across different semantics.  
 
 Hence the research problem is how to make the actions of a rational programmer
 comparable across all semantics. Sections~\ref{sub:natural}
-through~\ref{sub:erasure} describe the various rational programmers and explain
-to what extent their actions are comparable. Section\ref{sub:experiment}
+through~\ref{sub:erasure} describe the various mode of the rational programmer and explain
+to what extent they are comparable. Section\ref{sub:experiment}
 enhances comparability with the programmer-effort dimension. Finally, the last
-subsection states the experimental questions. 
+subsection states the experimental questions and gives an overview of the
+experimental process. 
 
 %% -----------------------------------------------------------------------------
 \def\rsub#1#2{\subsection{#2} \label{sub:#1} \input{rational-#1.tex}}
