@@ -1,0 +1,66 @@
+
+%% -----------------------------------------------------------------------------
+
+Every time the rational programmer debugs a program, it is validation for
+programming language researchers. It shows how their slogans and theorems help
+programmers connect the dots. The example of blame assignment mechanisms makes
+this point clearly. A blame-assignment mechanism provides information that,
+according to programming language research, points toward the source of the
+problem.
+
+By contrast, when the rational programmer fails, it questions programming
+language research. Specifically, it is indicative of the limited predictive
+power of programming language theory with respect to the use of languages in
+practice. Put differently, it suggests flaws in language design due to
+misleading predictions.
+
+In this way, the idea of a rational programmer implies an entire methodology for
+evaluating the design of programming languages. At this point, this study of
+methods supplies many questions whose answers might point to suitable evaluation
+methods: 
+
+\begin{enumerate} 
+
+\item Does a language design provide information that guides the actions of a
+ rational programmer?
+
+\item Does the underlying theory suggest actions to the rational programmer?
+
+\item Can this guidance be formulated as an algorithm on the program and the extra
+information?
+
+\item Does the underlying theory lead to a hypothesis about the effects of
+ these actions? 
+
+\item Can this hypothesis be tested with a large-scale automated experiment?
+
+\end{enumerate}
+
+Here is how the answers to these methodological questions imagines an evaluation
+method for blame-assignment mechanisms: 
+
+\begin{enumerate}
+
+\item The design of blame-assignment mechanisms explicitly advertises the blame
+information as helpful for debugging impedance mismatches.
+
+\item The error messages of blame-assignment mechanisms include suspect
+violations at the boundary of typed and untyped code fragments. The
+Wadler-Findler slogan suggests the problem is a lack of types, meaning the
+addition of types to the untyped fragment is the most natural action. 
+
+\item The step-by-step construction of paths based on error messages from
+gradual-typing checks is clearly amenable to implementation, modulo the
+ascription of types to modules.
+
+\item The theory theories implies that blame assignment constrains the search
+space that a developer must inspect to find the problem.
+
+\end{enumerate}
+Sadly, seeing an algorithm is different from using the algorithm to conduct a
+data-gathering experiments. The specific challenges are spelled out in the next
+section, and the following three sections explains ways of overcoming them. 
+
+
+
+
