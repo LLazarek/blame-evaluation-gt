@@ -1,44 +1,73 @@
 %% -----------------------------------------------------------------------------
 
-The rational programmer works like an algorithm. Implementing it demands a large
-number of representative debugging scenarios; a reconciliation of three
-different kinds of error messages; and a proper sampling strategy for the huge
-space of possibilities. A coincidental challenge is the disparity of gradually
-typed languages. To eliminate this variable from the comparison, this paper uses
-Racket, which is thus far the only language in which all three major soundness
-mechanisms are available in a reasonably robust and directly comparable manner;
-for the implementation of the transient semantics, see the parallel submission
-of an experience report~\cite{ttt21}.
+At first glance implementing the methodology of
+section~\ref{sec:why-rational} seems straightforward. The rational
+programmer is a simple algorithm and testing whether the rational
+programmer hypothesis holds amounts to running the algorithm on a
+collection of scenarios. 
 
-The {\em first challenge\/} concerns the differences among the blame assignment
-of the three semantic variants.  While Natural assigns blame to {\em one\/}
-component, Transient assigns blame to a sequence of components. The Erasure
-semantics does not blame a component {\it per se\/}, but it comes with an
-exception location and a stack trace, which implicitly suggests parties to
-blame.  The different strategies greatly affect the behavior of the rational
-programmer (and real programmers, too).
+However, three major challenges remain:  the isolation of the effect of
+blame on the rational programmer across three different mechanisms; the
+collection of a large number of representative debugging scenarios;  and a
+proper sampling strategy for the huge space of possibilities. A
+coincidental challenge is the disparity of gradually typed languages. To
+eliminate this variable from the comparison, this paper uses Racket, which
+is thus far the only language in which all three major soundness
+mechanisms are available in a reasonably robust and directly comparable
+manner; for the implementation of the transient semantics, see the
+parallel submission of an experience report~\cite{ttt21}.
 
-One way to overcome this challenge is to {\em equip the rational programmer with
-modes \/} that represent the alternative interpretations of blame.  For
-instance, one Transient mode may pick the oldest element of a blame set as
-the next component to add types because it corresponds to the earliest point in
-the program's evaluation that can discover an impedance mismatch.  Another mode
-may opt to treat the sequence as a stack and add types to its newest element.
-When both modes are equally successful in locating an impedance mismatch,
-measuring the rational programmer's effort may answer which mode is the most
+The {\em first challenge\/} stems from the interplay between blame and the
+run-time checks of a gradual type systems. When a check fails the Natural
+and Transient semantics assign blame and discard  the information in the
+exception from the run-time check. Nevertheless, the exception
+information may be equally or even more useful to the rational programmer
+than blame. If this is the case blame may not play a critical role for the
+rational programmer.\footnote{Indeed, precisely because they do not
+account for confounding factors, ~\citet{lksfd-popl-2020} cannot draw any
+conclusions about the pragmatics of blame despite advertisements for the
+opposite. Their experiment can only conclude that so-called blame-shifting
+works but not that this is because of blame.}  
+
+One way to isolate blame from this confounding factor is to {\em equip the
+rational programmer with modes \/} that represent the different types of
+information the rational programmer takes into account when debugging a
+scenario. Specifically, the rational programmer comes with a blame and
+an exception mode. Only if the former succeeds debugging a program while
+the latter fails, it is safe to conclude that blame is indeed necessary
+for the rational programmer. Put differently, the exception mode serves as
+the {\em baseline\/} for blame's value; if the programmer in this mode
+``beats'' the  blame one, a blame assignment mechanism might be useless.
+
+Besides the run-time checks, pure luck might also amplify the usefulness
+of blame. Thus a proper evaluation of blame needs to factor out any random
+effects. A random rational programmer mode offers the necessary baseline
+using the same ingredients as for exceptions. 
+
+
+Modes also offer a common vocabulary for the differences among the blame
+assignment of the three semantic variants.  While Natural assigns blame to
+{\em one\/} component, Transient assigns blame to a sequence of
+components. The Erasure semantics does not blame a component {\it per
+se\/}, but it comes with an exception location and a stack trace, which
+implicitly suggests parties to blame.  The different strategies greatly
+affect the behavior of the rational programmer (and real programmers,
+too).
+
+With modes, different strategy map to different ways the rational
+programmer  interprets blame.  For instance, one Transient mode may pick
+the oldest element of a blame set as the next component to add types
+because it corresponds to the earliest point in the program's evaluation
+that can discover an impedance mismatch.  Another mode may opt to treat
+the sequence as a stack and add types to its newest element.  When both
+modes are equally successful in locating an impedance mismatch, measuring
+the rational programmer's effort may answer which mode is the most
 effective.
 
-Different blame information is also due to differences in the run-time checks
-that the three gradual typing systems perform. This observation suggests another
-mode for the rational programmer, namely, a mode that ignores the blame
-information completely and instead inspects only the information in the
-exceptions of the safety checks in the underlying languages.  This exception
-mode serves as the {\em baseline\/} for blame's value; if the programmer in this
-mode ``beats'' the others, blame systems might be useless.
 
 
 The {\em second challenge\/} is to find a representative collection of
-impedance mismatches. They must represent mistakes that programmers
+programs with impedance mismatches. The latter must represent mistakes that programmers
 accidentally create and that the run-time checks of academic systems catch. In
 other words, the experiment calls for a collection of type mistakes in
 mix-typed programs that is representative of those ``in the wild.''
@@ -65,8 +94,8 @@ judgment confirms the experience of the authors.
 
 Thus, an experimental analysis of blame needs a mostly new set of mutators.
 Roughly speaking, the new mutators inject type errors into fully typed programs.
-Applying such a mutator to any typed component produces a mutatnt component.  A
-debugging scenario results from removing the types from the mutatnt. For the
+Applying such a mutator to any typed component produces a mutant component.  A
+debugging scenario results from removing the types from the mutant. For the
 design of such mutators, the authors relied on their own extensive programming
 experience though not without discovering a major pitfall: some of their
 original mutators systematically produced programs that immediately revealed the
@@ -86,35 +115,3 @@ conclusions.
 
 The next three sections explain how to overcome the three challenges
 in detail. 
-
-
-% Overcoming these challenges yields a systematic approach: 
-% \begin{itemize}
-
-% \item interesting mutators generate interesting type-level errors and thus
-% debugging scenarios (section~\ref{sec:mutate});
-    
-% \item an algorithm simulates the modes of the rational programmer on these
-% scenarios (section~\ref{sec:rational}); and
-
-% \item a careful sampling of the space yields experimental
-% data about the bug finding process (section~\ref{sec:sample}).
-% \end{itemize}
-% Getting all three aspects right is necessary to obtain a computationally
-% feasible and statistically sound experiment.
-
-% {\bf Note} A coincidental challenge is the disparity of gradually typed
-% languages. While the three approaches to blame are well understood in theory,
-% they have been implemented for rather different untyped languages and with
-% vastly different type systems. To eliminate the effect of these differences, it
-% is necessary to implement all three approaches in a single language so that an
-% application of the evaluation method can use the same test programs, the same
-% type system, and hence the same debugging scenarios.
-
-% The results in this paper are for a system that builds on Greenman and
-% Felleisen's effort of comparing the performance of Natural and Transient in
-% Racket~\cite{gf-icfp-2018}. The extended system uses the type system of Typed
-% Racket and comes with a Transient semantics that faithfully implements the
-% design and the blame assignment strategy proposed by~\cite{vss-popl-2017}. The
-% Erasure semantics drops the type information and runs the programs as if they
-% were plain Racket programs. The next section explains this system in detail.
