@@ -8,22 +8,31 @@ over 30,000 compute hours.
 
 
 \begin{figure}
-  \centering
   \includegraphics[width=0.40\textwidth]{./plots/success-bars}
-  \caption{Success rates: The estimated percentage of scenarios for which each mode succeeds in locating the bug.
+
+  \vspace{1em}
+  \begin{minipage}{0.95\textwidth}
+  The estimated percentage of scenarios for which each mode succeeds in locating the bug.
   The upper bound margin of error is 0.02\%.
-  }
+  \end{minipage}
+
+  \caption{Success rates.}
   \label{fig:success-bars}
 \end{figure}
 
 \begin{figure}
   \centering
   \includegraphics[width=\textwidth]{./plots/avo-bars}
-  \caption{Usefulness comparisons: Each plot depicts a head-to-head comparison of the entitled mode against every other mode.
+
+  \vspace{1em}
+  \begin{minipage}{0.95\textwidth}
+  Each plot depicts a head-to-head comparison of the entitled mode against every other mode.
   The portion above 0 (in green) is the estimated percentage of scenarios where the entitled mode is more useful than each of the other modes.
   The portion below 0 (in red) is the estimated percentage of scenarios with the inverse situation.
   The upper bound margin of error is 0.02\%.
-  }
+  \end{minipage}
+
+  \caption{Usefulness comparisons.}
   \label{fig:avo-bars}
 \end{figure}
 
@@ -35,11 +44,15 @@ over 30,000 compute hours.
   \hfill
   \includegraphics[width=0.32\textwidth]{./plots/transient-oldest-transient-stack-first-venn}
 
-  \caption{Blame usefulness analysis: Each diagram shows the breakdown of how three modes' successful scenarios overlap.
+  \vspace{1em}
+  \begin{minipage}{0.95\textwidth}
+  Each diagram shows the breakdown of how three modes' successful scenarios overlap.
   The percentage of scenarios covered by each circle are proportions for which the corresponding mode succeeds.
   For example, in the breakdown of Natural, all three modes succeed on the same scenario 57.3\% of the time, only Natural and Natural exceptions succeed on 29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural alone succeeds on 9\%.
   The upper bound margin of error is 0.02\%.
-  }
+  \end{minipage}
+
+  \caption{Blame usefulness analysis.}
   \label{fig:success-venns}
 \end{figure}
 
@@ -110,18 +123,29 @@ semantics.
 \begin{figure}
   \centering
   \includegraphics[width=\textwidth]{./plots/bt-lengths-table}
-  \caption{Programmer effort: Each plot depicts the distribution of trail
-  lengths for a given mode across all benchmarks.}
+
+  \vspace{1em}
+  \begin{minipage}{0.95\textwidth}
+  Each plot depicts the distribution of trail lengths for a given mode across all benchmarks.
+  \end{minipage}
+
+  \caption{Programmer effort.}
   \label{fig:effort-table}
 \end{figure}
 
 \begin{figure}
   \centering
   \includegraphics[width=\textwidth]{./plots/bt-length-comparisons}
-  \caption{Effort comparisons: Each plot depicts the distribution of scenarios with trail length differences ranging from -3 to 3.
+
+  \vspace{1em}
+  \begin{minipage}{0.95\textwidth}
+  Each plot depicts the distribution of scenarios with trail length differences ranging from -3 to 3.
   A negative difference means that the first mode's trail is three steps shorter than the second mode's trail for the same scenario, and a positive difference is the reverse.
   Only scenarios where both modes succeed are considered.
-  The 10|85 on the y-axis indicates that the axis is truncated between 10 and 85\%.}
+  The 10|85 on the y-axis indicates that the axis is truncated between 10 and 85\%.
+  \end{minipage}
+
+  \caption{Effort comparisons.}
   \label{fig:effort-comparisons}
 \end{figure}
 
