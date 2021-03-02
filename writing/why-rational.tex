@@ -12,26 +12,28 @@ of programming scenarios.
 
 This paper dubs Lazarek et. al's idea {\em the rational programmer\/}. Like Stuart
 Mill's {\it homo economicus\/}, the rational programmer approximates the
-behavior of a software developer who reduces time spent on a task given the
+behavior of a software developer who reduces time spent on a task by exploiting the
 available information. In the context of gradual typing, the rational programmer
 has two pieces of information when an impedance mismatch signals exceptional
 behavior: the error message and the state of the program. Hence, the most
 rational procedure is to use the former to improve the latter. Specifically,
 a rational programmer translates the Wadler-Findler slogan into a debugging
 method, searching for the source of the impedance mismatch by adding type
-annotations to the parts of the program identified in the error.
-If the type checker rejects an annotation, the rational programmer has found the problem.
-Measuring this simulated programmer's behavior on a large number of
-debugging scenarios yields data that is similar to data collected in an
-empirical, human-facing manner.
+annotations to the untyped parts of the program identified in the error.
+If the type checker rejects an annotation that is considered correct, the
+rational programmer has found the source of the problem.  Measuring this simulated
+programmer's behavior on a large number of debugging scenarios yields data that
+is similar to data collected in a human-facing study.
 
-The idea is most easily illustrated with an example from the Typed Racket
-world. In the context of Typed Racket, researchers speak of migratory
-typing. Imagine a code base consisting of dozens of modules in plain Racket.  A
-developer who modifies a module in this collection for maintenance purposes must
-study the module designs---reify the types that went into its creation---and to
-help future maintainers should report these insights as type annotations. Over
-time, the code base turns into a mix of typed and untyped modules.
+The idea is best illustrated with an example in Typed Racket's migratory type
+system. Imagine a code base with dozens of modules in plain Racket. A developer
+who opens a module for maintenance purposes must study the module's design and,
+as part of the process, is bound to re-construct the types that went into the
+module's creation.  To help future maintainers, the developer should report
+these insights as type annotations. Over time, the code base migrates into a mix
+of typed and untyped modules. As~\citet{tfffgksst-snapl-2017} reported, though,
+it is at least equally common that developers add typed modules that depend on
+the existing modules in the code base.
 
 Now consider the concrete (and simplistic) example of figure~\ref{fig:rational}.
 Initially the code base consists of the two \dyncolor\ modules on the left plus
@@ -58,8 +60,8 @@ definitive hint is ``{\tt blaming: (interface for na-client)}'' with the caveat
 Assuming the rational programmer trusts the type of {\tt na-client}, the next
 step is to inspect the {\tt layer} module and to equip it with type
 annotations. The result is the \typecolor\ module in the middle, and {\tt
-main}'s import is now re-directed there by {\tt (submod ".." layer)}. Running the
-program again yields a new message:
+main}'s import is now re-directed there by {\tt (submod ".." layer-typed)}. Running the
+modified program yields a different error message:
 \begin{verbatim}
     neg-abs: broke its own contract
       promised: (<=/c 0)
@@ -70,20 +72,21 @@ program again yields a new message:
        (assuming the contract is correct)
 \end{verbatim}
 The last step of the rational programmer is to assign types to the {\tt server}
-module. At this point the type checker objects to the conjecture type of {\tt
-neg-abs}---and the source of the impedance mismatch is found. How to fix it is a
-separate question.
+module and to re-direct the import of {\tt layer-typed} to {\tt (submod ".."
+server-typed)}. At this point the type checker objects to the conjectured type
+of {\tt neg-abs}---and the source of the impedance mismatch is found. How to fix
+it is a separate question.
 
-Like {\it homo economicus\/}, the rational programmer is an
-approximation.  People don't behave purely rationally as economic
-actors, and they also don't do so as software developers. The point is
-not to deny the existence of ``lucky hunches'' programmers or
-``tinkering works'' approaches and so on. It is also not to deny that
-equipping entire modules with types represents an always feasible
-approach.  But the concept of studying the idea of an economically
-rational actor has produced benefits to political economics, and this
-paper suggests that implementing and studying the rational programmer
-will help language designers.
+Like {\it homo economicus\/}, the rational programmer is an approximation.
+People do not behave in a purely rational manner as economic actors, and they
+also do not do so as software developers. The point is not to deny the existence
+of ``lucky hunches'' programmers or ``tinkering works'' approaches and so on. It
+is also not to deny that equipping entire modules with types represents an
+always feasible approach (though adding types at the expression level, say, as
+in TypeScript should be considered well within bounds).  {\em But\/}, the
+concept of studying the idea of an economically rational actor has produced
+benefits to the discipline of political economics, and this paper suggests that
+implementing and studying the rational programmer will help language designers.
 
 \subsection{How to Turn the Idea of the Rational Programmer into a Methodology} 
 \label{sub:methodology}
