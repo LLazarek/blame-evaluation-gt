@@ -7,7 +7,7 @@ in all of the to-be-evaluated semantics. An interesting mutation represents a
 {\em debugging scenario\/} that supplies the rational programmer with
 information.
 
-Let us consider the three conditions in order:
+Here is the rationale for these three conditions:
 \begin{enumerate}
 
 \item By definition, an impedance mismatch is a class between type ascription of
@@ -55,3 +55,15 @@ section~\ref{sec:discussion} for some further discussion of this choice.
  \label{fig:mutant-breakdown}
 \end{figure*}
 
+The definition of interesting debugging scenarios creates a powerful filter. All
+together, the listed mutators produce 16,800 mutants with at least one
+interesting debugging scenario across all benchmarks; see
+figure~\ref{fig:mutant-breakdown} for an overview. Broken down by benchmark, the
+mutators produce at least 40 interesting scenarios for every benchmark, and
+these scenarios originate from at least four different mutators per benchmark.
+Thus, the mutators result in a sizable and diverse population of scenarios for
+every benchmark.  Furthermore, every mutator contributes scenarios to at least
+one benchmark.  Some mutators apply only to a few benchmarks, because they
+target rather specific features; for instance, the class-focused mutators are
+mainly effective in a program that makes extensive use of object-oriented
+features.

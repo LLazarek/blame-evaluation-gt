@@ -9,22 +9,18 @@ checks of the underlying language can detect. Once detected, the rational
 programmer should be able to locate the mistake by gradually adding types to
 blamed modules.
 
-Figure~\ref{table:mutation-ops} describes 16 mutators that satisfy this
-requirement.  For each mutator, the figure provides a short description and an
-example. As the explanation indicates, some specialize or
+Figure~\ref{table:mutation-ops} describes 16 mutators that satisfy these
+constraints. As the explanation indicates, some specialize or
 generalize~\citet{lksfd-popl-2020}'s mutators, which in turn are borrowed from
 the vast literature on mutation testing~\cite{jia2011analysis}.\footnote{Many
-of~\citet{lksfd-popl-2020} mutators do not satisfy the constraints. For
-example, the relational mutator does not lead to type-level errors that Typed
-Racket's type system can detect, so it has been eliminated. Similarly, the
-original arithmetic mutator does not reliably lead to type errors, so it has
-been adapted to only make operator swaps that can affect the type of the
-result. Changing a `/` to `*` does not affect the type of an expression, but
-changing `*` to `/` may, because division by zero is detectable by Typed
-Racket's type system.}  Only two are directly inherited; many mutators are
-brand new. For the latter the authors relied on their decades-long experience
-of making type-level mistakes in Typed Racket, some of which take a non-trivial
-effort to debug.
+of~\citet{lksfd-popl-2020} mutators do not satisfy the constraints and had to
+be eliminated. For example, the relational mutator does not lead to type-level
+errors. Similarly, the arithmetic mutator does not reliably lead to type
+errors; it had to be adapted to make only operator swaps that can affect the
+type of the result, e.g., changing `*` to `/`.}  Only two are directly
+inherited; many mutators are brand new. For the latter the authors relied on
+their decades-long experience of making type-level mistakes in Typed Racket,
+some of which take a non-trivial effort to debug.
 
 Most of the mutators are self-explanatory.  The first six apply to all
 gradually typed languages; the next six to those that include classes and

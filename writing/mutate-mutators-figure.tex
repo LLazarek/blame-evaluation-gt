@@ -33,10 +33,10 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
 \end{tabular}
 \end{minipage}}
 
-\def\classsuperclass#1{%
-\begin{minipage}[t]{3.9cm}
+\def\classsuperclass#1#2{%
+\begin{minipage}[t]{4.2cm}
   \begin{tabular}[t]{@{}l}
-  {\tt (class #1} {\tt (super-new))}
+  {\tt (class #1} #2 {\tt (super-new))}
 \end{tabular}
 \end{minipage}}
 
@@ -47,88 +47,88 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
 \end{minipage}}
 
 \begin{figure*}
-  \begin{tabular}{@{}p{2.1cm}@{\,\,}|@{\,\,}p{4.7cm}@{\,\,}|@{\,\,}p{5cm}@{\,\,}|@{\,\,}p{1.1cm}@{} }
+  \begin{tabular}{@{}p{2.1cm}@{\,\,}|@{\,\,}p{5.01cm}@{\,\,}|@{\,\,}p{4.99cm}@{\,\,}|@{\,\,}p{1.1cm}@{} }
     {\bf name} & {\bf description} & {\bf example} & {\bf origin}\\ \hline
 %% -----------------------------------------------------------------------------
 {\tt constant}
- & Swaps a constant with another of the same value but different type.
+ & swaps a constant with another of the same value but different type
  & \example{5.6} -> {5.6+0.0i} 
  & \originspecial 
 
 {\tt deletion}
- & Deletes the result expression of a sequence.
- & \example{{\tt (begin x y z)}\\} -> {{\tt (begin x y)}} 
+ & deletes the final expression from a sequence
+ & \example{{\tt (begin x y z)}\\} -> {{\tt (begin x y)}}
  & \originspecial 
 
 {\tt position}
-  & Swaps two sub-expressions.
+  & swaps two sub-expressions
   & \example{{\tt (f a 42 "b" 0)}\\} -> {{\tt (f a 42 0 "b")}}
   & \origingen 
 
 {\tt list}
- & Replaces {\tt append} with {\tt cons}.
+ & replaces {\tt append} with {\tt cons}
  & \example{{\tt append}} -> {{\tt cons}} 
  & \originnew 
 {\tt top-level-id}
- & Swaps identifiers defined in the same module.
+ & swaps identifiers defined in the same module
  & \example{{\tt (f x 42)}} -> {{\tt (g x 42)}} 
  & \originnew  
 
 {\tt imported-id}
- & Swaps identifiers imported from the same module.
+ & swaps identifiers imported from the same module
  & \example{{\tt (f x 42)}} -> {{\tt (g x 42)}} 
  & \originnew   
 
 {\tt method-id}
- & Swaps two method identifiers.
+ & swaps two method identifiers
  & \example{{\tt (send o f x 42)}\\} -> {{\tt (send o g x 42)}} 
  & \originnew   
 
 
 {\tt field-id}
- & Swaps two field identifiers.
+ & swaps two field identifiers
  & \example{{\tt (get-field o f)}\\} -> {{\tt (get-field o g)}} 
  & \originnew   
   
 
 {\tt class:init}
- & Swaps values of class initializers.
+ & swaps values of class initializers
  & \example{{\tt (new c [a 5] [b "hello"])}\\} -> {{\tt (new c [a "hello"] [b 5])}} 
  & \originnew   
 
 {\tt class:parent}
- & Replaces the parent of classes with {\tt object\%}.
-    & \example{\classsuperclass{a\%}} -> {\\ \classsuperclass{object\%}}
+ & replaces the parent of classes with {\tt object\%}
+ & \example{\classsuperclass{a\%}{}} -> {\\ \classsuperclass{object\%}{\\ \quad}}
  &  \originnew    
  
 
 {\tt class:public}
- & Makes a public method private and vice versa.
+ & makes a public method private and vice versa
  & \example{\classpr{public}\\} -> {\classpr{private}}
  & \origingen  
 
 {\tt class:super}
- & Removes {\tt super-new} calls from class definitions.
+ & removes {\tt super-new} calls.
  & \example{\classsupernew{(super-new)}\\} -> {\classsupernew{(void)}} 
  & \originnew
 
 {\tt arithmetic}
- & Swaps arithmetic operators.
+ & swaps arithmetic operators
  & \example{{\tt +}} -> {{\tt -}}
  & \origingen
 
 {\tt boolean}
- & Swaps {\tt and} and {\tt or}.
+ & swaps {\tt and} and {\tt or}
  & \example{{\tt and}} -> {{\tt or}}
  & \originprevious
 
 {\tt negate-cond}
- & Negates conditional test expressions.
+ & negates conditional test expressions
  & \example{{\tt (if (= x 0) t e)}\\} -> {{\tt (if (not (= x 0)) t e)}}
  & \originprevious
 
 {\tt force-cond}
- & Replaces conditional test expressions with {\tt \#t}.
+ & replaces conditional test expressions with {\tt \#t}
  & \example{{\tt (if (= x 0) t e)} \\} -> {{\tt (if \#t t e)}}
  & \originnew
 
