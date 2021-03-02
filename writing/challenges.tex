@@ -1,31 +1,27 @@
 %% -----------------------------------------------------------------------------
 
-At first glance implementing the methodology of
-section~\ref{sec:why-rational} seems straightforward. The rational
-programmer is a simple algorithm and testing whether the rational
-programmer hypothesis holds amounts to running the algorithm on a
-collection of scenarios. 
+At first glance implementing the methodology of section~\ref{sec:why-rational}
+seems straightforward. The rational programmer is a simple algorithm and testing
+whether the rational programmer hypothesis holds amounts to running the
+algorithm on a collection of scenarios.
 
-However, three challenges remain:  comparing the effect of
-blame on the rational programmer across three different mechanisms; the
-collection of a large number of representative debugging scenarios;  and a
-proper sampling strategy for the huge space of possibilities. A
-coincidental challenge is the disparity of the implementations of
-gradually typed languages. To eliminate this variable from the comparison,
-this paper uses Racket, which is thus far the only language in which all
-three major soundness mechanisms are available in a reasonably robust and
-directly comparable manner; for the implementation of the transient
-semantics, see the parallel submission of an experience
-report~\cite{ttt21}.
+Three challenges remain, however: comparing the effect of blame on the rational
+programmer across three different mechanisms; the collection of a large number
+of representative debugging scenarios; and a proper sampling strategy for the
+huge space of possibilities. A coincidental challenge is the disparity of the
+implementations of gradually typed languages. To eliminate this variable, this
+authors use Racket, which is thus far the only language in which all three major
+soundness mechanisms are available in a reasonably robust and comparable manner;
+for the implementation of the transient semantics, see the parallel submission
+of an experience report~\cite{ttt21}.
 
 The {\em first challenge\/} stems from the differences between the blame
-assignment mechanisms of the three semantic variants.  While Natural
-assigns blame to {\em one\/} component, Transient assigns blame to a
-sequence of components. The Erasure semantics does not blame a component
-{\it per se\/}, but it comes with an exception location and a stack trace,
-which implicitly suggests parties to blame.  The different strategies
-greatly affect the behavior of the rational programmer (and real
-programmers, too).
+assignment mechanisms of the three semantic variants.  While Natural assigns
+blame to {\em one\/} component, Transient assigns blame to a sequence of
+components. The Erasure semantics does not blame components {\it per se\/}. But,
+it comes with an exception location and a stack trace, which implicitly suggests
+parties to blame.  Each strategy affects the behavior of the rational programmer
+differently (and real ones, too).
 
 One way to reconcile these differences is to {\em equip the rational
 programmer with modes \/} that represent the different types of
