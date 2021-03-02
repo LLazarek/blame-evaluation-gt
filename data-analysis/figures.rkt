@@ -615,7 +615,8 @@
                    #:y-min (~% 0)
                    #:y-label "% of scenarios"
                    #:x-label #f
-                   #:width (* 1.25 (plot-width))))))
+                   #:width (* 1.25 (plot-width))
+                   #:height (* 1.25 (plot-height))))))
   (pict->png! success-bars (build-path outdir "success-bars.png"))
   (when collect-max-error-margin?
     (displayln @~a{Max error margin for success-bars: @(unbox max-error-margin)})
