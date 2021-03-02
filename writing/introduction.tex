@@ -5,7 +5,7 @@ beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
 blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Academic systems
 (Reticulated Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
 Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}) come
-with sophisticated blame assignment strategies. Their academic creators embrace
+with sophisticated checking and blame assignment strategies (see sec.~\ref{sec:landscape}). Their academic creators embrace
 the idea that blame can help practicing programmers find impedance mismatches
 between the types they added to a software system and the behavior of the
 remaining untyped components.
@@ -38,12 +38,12 @@ a programmer that acts only in response to available information (see
 sec.~\ref{sec:why-rational}). In the case of an impedance mismatch, the
 available information consists of the error message and the current state of the
 program. The rational programmer can hence use the former to change the
-latter---and this systematic, information-driven process can be
-implemented and tested at scale on real programs.\footnote{\citet{cc-snapl-19} use this tracing method to localize
-type errors in inference-based gradual typing systems.}  Testing it systematically requires
-overcoming major challenges: injecting representative impedance mismatches;
-putting the various kinds of error information to comparable use; and sampling
-the huge space of possibilities (see sec.~\ref{sec:challenges}).
+latter---and this systematic, information-driven process can be implemented and
+tested at scale on real programs.  Turning this idea into a scientific
+experiment requires overcoming major challenges: injecting representative
+impedance mismatches; putting the various kinds of error information to
+comparable use; and sampling the huge space of possibilities (see
+sec.~\ref{sec:challenges} and, for details, secs.~\ref{sec:rational} through~\ref{sec:sample}).
 
 The paper's {\it second contribution\/} is a set of {\em results from applying
 the evaluation method to three distinct blame assignment strategies in
@@ -65,9 +65,5 @@ huge. The second one concerns the difference between the methods; neither is
 {\it Natural\/} vastly better than {\it Transient\/} nor are the two blame
 assignment methods clearly preferable to {\it Erasure\/}.  In turn, these
 problems suggests that, on one hand, the existing theory does not predict
-practice properly, and on the other hand, the existing practice may need to find
-additional ways to collect data.
-
-
-
-
+practice properly, and on the other hand, the existing practice may need to
+think of additional experiments to collect more data.
