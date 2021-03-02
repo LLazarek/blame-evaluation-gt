@@ -6,7 +6,7 @@ programmer is a simple algorithm and testing whether the rational
 programmer hypothesis holds amounts to running the algorithm on a
 collection of scenarios. 
 
-However, three major challenges remain:  the isolation of the effect of
+However, three major challenges remain:  comparing the effect of
 blame on the rational programmer across three different mechanisms; the
 collection of a large number of representative debugging scenarios;  and a
 proper sampling strategy for the huge space of possibilities. A
@@ -18,54 +18,56 @@ directly comparable manner; for the implementation of the transient
 semantics, see the parallel submission of an experience
 report~\cite{ttt21}.
 
-The {\em first major challenge\/} stems from the interplay between blame and the
-run-time checks of a gradual type systems. When a check fails the Natural
-and Transient semantics assign blame and discard  the information in the
-exception from the run-time check. Nevertheless, the exception
-information may be equally or even more useful to the rational programmer
-than blame. If this is the case blame may not play a critical role for the
-rational programmer. Indeed, precisely because they do not
+The {\em first challenge\/} stems from the differences between the blame
+assignment mechanisms of the three semantic variants.  While Natural
+assigns blame to {\em one\/} component, Transient assigns blame to a
+sequence of components. The Erasure semantics does not blame a component
+{\it per se\/}, but it comes with an exception location and a stack trace,
+which implicitly suggests parties to blame.  The different strategies
+greatly affect the behavior of the rational programmer (and real
+programmers, too).
+
+One way to reconcile these differences is to {\em equip the rational
+programmer with modes \/} that represent the different types of
+information the rational programmer takes into account when debugging a
+scenario. Intuitively, with the common vocabulary of modes, different
+blame strategies become different ways the rational programmer  interprets
+blame.  For instance, one Transient mode may pick the oldest element of a
+blame set as the next component to add types because it corresponds to the
+earliest point in the program's evaluation that can discover an impedance
+mismatch.  Another mode may opt to treat the sequence as a stack and add
+types to its newest element.  When both modes are equally successful in
+locating an impedance mismatch, measuring the rational programmer's effort
+may answer which mode is the most effective.
+
+
+However, attributing the success of the rational programmer to this or
+that blame mechanism demands a careful look at the interplay between blame
+and the run-time checks of each gradual type system. When a check fails
+the Natural and Transient semantics assign blame and discard  the
+information in the exception from the run-time check. Nevertheless, the
+exception information may be equally or even more useful to the rational
+programmer than blame. If this is the case blame may not play a critical
+role for the rational programmer. Indeed, precisely because they do not
 account for confounding factors, ~\citet{lksfd-popl-2020} cannot draw any
 conclusions about the pragmatics of blame despite advertisements for the
 opposite. Their experiment can only conclude that so-called blame-shifting
 works but not that this is because of blame. 
 
-One way to isolate blame from this confounding factor is to {\em equip the
-rational programmer with modes \/} that represent the different types of
-information the rational programmer takes into account when debugging a
-scenario. Specifically, the rational programmer comes with a blame mode and
-an exception mode. Only if the former succeeds debugging a program while
-the latter fails, it is safe to conclude that blame is indeed necessary
-for the rational programmer. Put differently, the exception mode serves as
-the {\em baseline\/} for blame's value; if the programmer in this mode
-``beats'' the  blame one, a blame assignment mechanism might be useless.
+Modes offer a uniform way to compare the different semantics and  isolate
+blame from the effect of the semantics's runtime checks. Specifically, the Natural and
+Transient rational programmer come with a blame mode and an exception
+mode. Only if the former succeeds debugging a program while the latter
+fails, it is safe to conclude that blame is indeed necessary for the
+rational programmer. Put differently, the exception mode serves as the
+{\em baseline\/} for blame's value within a given semantics; if the
+programmer in this mode ``beats'' the  blame one, a blame assignment
+mechanism might be useless.
 
 Besides the run-time checks, pure luck might also amplify the usefulness
 of blame. Thus a proper evaluation of blame needs to factor out any random
-effects. A random rational programmer mode provides the necessary baseline
-using the same ingredients as for exceptions. 
-
-Modes also offer a solution to a derivative challenge; reconciling the
-differences among the blame assignment mechanisms of the three semantic variants.
-While Natural assigns blame to {\em one\/} component, Transient assigns
-blame to a sequence of components. The Erasure semantics does not blame a
-component {\it per se\/}, but it comes with an exception location and a
-stack trace, which implicitly suggests parties to blame.  The different
-strategies greatly affect the behavior of the rational programmer (and
-real programmers, too).
-
-
-With modes, different blame strategies map to different ways the rational
-programmer  interprets blame.  For instance, one Transient mode may pick
-the oldest element of a blame set as the next component to add types
-because it corresponds to the earliest point in the program's evaluation
-that can discover an impedance mismatch.  Another mode may opt to treat
-the sequence as a stack and add types to its newest element.  When both
-modes are equally successful in locating an impedance mismatch,
-measuring the rational programmer's effort may answer which mode is the
-most effective.
-
-
+effects. A random rational programmer mode provides yet another necessary
+baseline using the same ingredients as for exceptions. 
 
 The {\em second major challenge\/} is to find a representative collection of
 programs with impedance mismatches. The latter must represent mistakes that programmers
