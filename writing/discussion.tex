@@ -79,7 +79,7 @@ scenarios; and (iv) our approach to sampling scenarios. The previous sections
 have described the various ways we attempt to mitigate these threats;
 we discuss two additional threats in the remainder of this section.
 
-
+%% -----------------------------------------------------------------------------
 \subsection{Threat: Is the Rational Programmer Realistic?}
 
 Like {\em homo economicus\/}, which decouples the actual behavior of a
@@ -111,70 +111,94 @@ the types are in most cases reasonably canonical.  We therefore conjecture that
 a rational programmer would in most cases come up with an equivalent type
 assignment for trail extension as our experimental setup describes.
 
+%% -----------------------------------------------------------------------------
+\subsection{Threat: Can the Experiment Improve Transient?} \label{sec:threat:transient}
 
-\subsection{Threat: Is our Transient Correct?}
-\label{sec:threat:transient}
+The results in section~\ref{sec:results} show that Transient produces empty
+blame sequences for 967 scenarios. In theory, empty sequence must not occur. An
+empty blame sequence means a lack of boundary crossings for the witness value.
+By implication, a typed module is blaming itself---something that can
+happen only if the type checker (or system) is unsound.
 
-As we discuss in section~\ref{sec:results}, Transient surprisingly
-produces
-an empty blame set in 967 scenarios.
-Such cases should never occur, at least in theory, because an empty set
- means the value has never crossed a boundary---if the value is indeed defined
- in the current module, then we have typed code blaming itself for a typed
- value as all the checks are inlined in typed code. Thus, the type checker must be unsound.
-After careful investigation of these empty blame cases, we found no soundness
- bugs in Transient Typed Racket.
-Instead, we found scenarios in which Transient lost track of the proper
- boundaries.
-These scenarios suggest ways to improve~\citet{vss-popl-2017}'s blame
-algorithm:
+An investigation of these empty blame cases reveals that Vitousek et al.'s
+Transient blame assignment can lose track of the proper boundaries.  Despite
+these losses, the number of failures is a small fraction of the overall number
+of debugging scenarios. It is unlikely that any improvements to Vitousek et
+al.'s strategy would change the overall conclusion about Transient blame.
+
+{\bf Note} These scenarios suggest ways to improve Transient's blame map as
+follows:
 \begin{itemize}
-  \item
-    Entries in a blame map must point to several parent entries.
-    For example, if the function \texttt{f} receives bad input in the call
-    \texttt{(filter f xs)}, then blame should point to both \texttt{filter}
-    and the \texttt{xs} list.
-  \item
-    The construction of blame map entries must be guided by type-like specifications
-     instead of relying on syntax.
-    Aliasing the built-in \texttt{filter} function should not change the shape
-     of the blame map.
-  \item
-    The initial blame map must reflect the initial type environment.
-    For instance, Typed Racket trusts that untyped core-library functions, such as \texttt{filter},
-     behave correctly; such assumptions should appear in the blame map.
-\end{itemize}
-\noindent{}Despite these known limitations, based on the relatively small
-number of debugging failures, we conjecture that these improvements
- to Transient blame-tracking do not affect our overall conclusions.
 
-A second apparent flaw in our Transient implementation is the high cost of blame.
-Whereas \citet{vss-popl-2017} report an average slowdown of 2.5x and
-worst-case of 5.4x on fully-typed benchmarks in Reticulated,
-some of our configurations exceed our 4 minute timeout or 6GB memory limit with transient blame.
-To put those limits into context, the fully typed and fully untyped benchmarks all complete in a few seconds with minimal memory usage, and none of the mixed Natural configurations hit these limits.
-Unfortunately, our high cost for Transient seems closer to the truth;
- there are at least three broad issues that skew the earlier results.
-First, the 2017 implementation of Reticulated fails to insert certain
- soundness checks\footnote{Missing check: \url{https://github.com/mvitousek/reticulated/issues/36}}
- and blame-map updates\footnote{Missing cast: \url{https://github.com/mvitousek/reticulated/issues/43}}
- from the paper.
-Second, Reticulated's type checker assigns the dynamic type to local
- variables in the "fully typed" benchmarks---often because the type system
- cannot articulate a more precise type.
-Code that ends up with the dynamic type has fewer constraints to check at run-time.
-Third, \citet{vss-popl-2017} use relatively small benchmarks.
-Four have since been retired from the official Python benchmark suite
- because they are too small, unrealistic, and unstable.\footnote{Release notes: \url{https://pyperformance.readthedocs.io/changelog.html}}
-On larger programs, Reticulated suffers from high overhead.
-For example, a Reticulated version of our simplest benchmark runs in
- ~40 seconds without blame, and with blame times out after 10 minutes.
+\item Entries in a blame map should point to {\em several\/} parent entries.
+ For example, if \texttt{f} receives bad input in the context of {\tt (filter f
+ xs)}, the entry should point to both \texttt{filter} and \texttt{xs}.
+
+\item The construction of entries must be guided by type-like specifications for
+ primitives instead of special cases for built-in functions. Aliasing such
+ function changes the blame map.
+
+%% I don't see what this really means or contributes to the first two bullets:
+
+ % \item The initial blame map must reflect the initial type environment.  For
+ % instance, Typed Racket trusts that untyped core-library functions behave
+ % correctly.
+
+\end{itemize}
+This small example is indicative of how rational-programmer experiments may
+provide feedback. 
+
+
+%% -----------------------------------------------------------------------------
+\subsection{Threat: Is the Transient Blame Assignment Mechanism Realistic?}
+\label{sec:threat:transient2}
+
+The results in section~\ref{sec:results} also show that the cost of Transient
+blame is quite high. Under the Transient semantics, some of the debugging
+scenarios exceed the 4-minute timeout or the 6GB-memory limit. To put those
+limits into context, the fully typed and fully untyped benchmarks all complete
+in a few seconds with minimal memory usage. Furthermore, none of the mixed
+Natural configurations hit these limits, and with the blame map turned off,
+the Transient semantics also runs these programs in a short amount of time and
+well within the memory limits. In short, even though the Transient rational
+programmer appears to do well in the experiment, the implementation of the
+Transient blame strategy might be unrealistic. 
+
+At first glance, these measurements seem to contradict the results
+of~\citet{vss-popl-2017}. They report an average slowdown of 2.5x and a
+worst-case of 5.4x on fully-typed benchmarks in Reticulated Python.
+Unfortunately, the high cost of Transient Racket seems closer to the truth.
+There are at least four broad issues that skew the earlier results:
+\begin{enumerate}
+
+\item The 2017 implementation of Reticulated fails to insert certain soundness
+checks\footnote{Missing check:
+\url{https://github.com/mvitousek/reticulated/issues/36}} and blame-map
+updates\footnote{Missing cast:
+\url{https://github.com/mvitousek/reticulated/issues/43}} from the paper.
+
+\item The types of almost all local variables in the "fully typed" benchmarks is
+{\tt Dynamic}, often due the impoverished nature of the type system, which does
+not allow the ascription of precise types.  Code that ends up with the type {\tt
+Dynamic} has fewer constraints to check at run-time---and much less information
+to track in the blame map.
+
+\item \citet{vss-popl-2017} use small benchmarks.  Four have since been retired
+from the official Python benchmark suite because they are too small,
+unrealistic, and unstable.\footnote{Release notes:
+\url{https://pyperformance.readthedocs.io/changelog.html}}
+
+\item On large programs, Reticulated suffers from high overhead.  For example, a
+Reticulated version of the simplest benchmark runs in ~40 seconds without blame,
+and with blame times out after 10 minutes. Typed Racket runs the same benchmark
+in a small fraction of the time.
+\end{enumerate}
+Future work on Transient blame is needed to make an informed decision. The
+evaluation process presented here can help guide this research. 
+
 
 %% NOTE: Vitousek's benchmarks are from the Python "pyperformance" suite.
 %%   The version notes in the docs talk about retiring benchmarks, but
 %%   you can also look at the current codebase and see what names from POPL'17
 %%   are missing: callsimple, callmethod, callmethodslots, & pystone
 %% <https://github.com/python/pyperformance/tree/master/pyperformance/benchmarks>
-
-
-
