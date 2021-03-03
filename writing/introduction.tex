@@ -47,25 +47,27 @@ impedance mismatches; putting the various kinds of error information to
 comparable use; and sampling the huge space of possibilities (see
 sec.~\ref{sec:challenges} and, for details, secs.~\ref{sec:rational} through~\ref{sec:sample}).
 
-The paper's {\it second contribution\/} is a set of {\em results from applying
-the evaluation method to three distinct blame assignment strategies in
-approximately 72,200 different scenarios\/} (see sec.~\ref{sec:results}): (1)~{\it
-Transient\/}, i.e. Reticulated's tracking of typed/untyped boundaries~\cite{vss-popl-2017}; (2)~{\it
-Natural\/}, i.e. Typed Racket's use of a higher-order contract system and its blame
-assignment~\cite{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e. the approach of
-industrial systems, which forgo blame in favor of error messages from the safety
-checks of the underlying language. The results (see
-sec.~\ref{sec:discussion}) are at least somewhat surprising.  In principle
-they validate the conjectures behind the work of theoreticians.  First, a good
-blame assignment strategy helps with the search for impedance mismatches between
-the specified types and the behavior of untyped components.  Second, Natural's
-wrapper-based blame tracking is more useful than Transient's ``collective
-blame'' tracking algorithm, which in turn is superior to Erasure. {\em But\/},
-the application of the method also indicates problems with the expectations of
-theoreticians. The first problem is that the cost of Transient's blame can be
-huge. The second one concerns the difference between the methods; neither is
-{\it Natural\/} vastly more useful than {\it Transient\/} nor are the two blame
-assignment methods always superior to {\it Erasure\/}.  In turn, these
+The paper's {\it second contribution\/} is a set of {\em results from
+applying the evaluation method to three distinct blame assignment
+strategies in approximately 72,200 different scenarios\/} (see
+sec.~\ref{sec:results}): (1)~{\it Transient\/}, i.e. Reticulated's
+tracking of typed/untyped boundaries~\cite{vss-popl-2017}; (2)~{\it
+Natural\/}, i.e. Typed Racket's use of a higher-order contract system and
+its blame assignment~\cite{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e.
+the approach of industrial systems, which forgo blame in favor of error
+messages from the safety checks of the underlying language. The results
+(see sec.~\ref{sec:discussion}) are at least somewhat surprising.  In
+principle they validate the conjectures behind the work of theoreticians.
+First, a good blame assignment strategy helps with the search for
+impedance mismatches between the specified types and the behavior of
+untyped components.  Second, Natural's wrapper-based blame tracking is
+more useful than Transient's ``collective blame'' tracking algorithm,
+which in turn is superior to Erasure. {\em But\/}, the application of the
+method also indicates problems with the expectations of theoreticians. The
+first problem concerns the difference between the methods; neither is {\it
+Natural\/} vastly more useful than {\it Transient\/} nor are the two
+blame assignment methods always superior to {\it Erasure\/}.  The second
+one is that the cost of Transient's blame can be huge.  In turn, these
 problems suggest that, on one hand, the existing theory does not predict
 practice properly, and on the other hand, the existing practice may need
 additional experiments to collect more data.
