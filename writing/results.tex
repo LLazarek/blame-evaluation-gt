@@ -78,7 +78,7 @@ While most blame trail failures follow the above pattern, a few do
 not.  Breaking down the failure reasons for Natural blame (1748 in
 total) reveals an additional cause. For a small set of debugging scenarios
 (40), Natural produces a run time type error blaming a non-buggy
-already-typed component. All these cases are due to known open issues with Typed
+already-typed module. All these cases are due to known open issues with Typed
 Racket and class contracts. 
 
 In Transient, similar to Natural, most failures are due to unhelpful
@@ -199,7 +199,7 @@ successfully debugging interesting scenarios (in green) for the random
 mode of the rational programmer is highly spread out, as
 expected. In contrast, in the other modes, successful effort coalesces at
 the left side of the plot, meaning that in most cases the programmer needs
-to type a single component to debug a scenario. 
+to type a single module to debug a scenario. 
 
 A second point of interest is that the exceptions of the Erasure semantics
 either help the rational programmer immediately or the rational programmer

@@ -10,10 +10,10 @@ $\emptyset$, the top one $\system$ itself; in between are the mixed-typed
 scenarios.
 
 Applying a mutator to module $\component^*$ of $\system$ acts like a homomorphism
-on the generated lattice. The two lattices differ only in the mutant of
+on the generated lattice. The two lattices differ only in the mutated
 $\component^*$. Given this formulation, debugging scenarios are those points in
-this new lattice that do not contain the mutant; at all other points, the type
-checker points out the type-level mistake in the mutant of $\component^*$.
+this new lattice that do not contain the mutated module; at all other points, the type
+checker points out the type-level mistake in the mutated $\component^*$.
 
 The actions of the rational programmer create an ascending chain---dubbed a
 \emph{trail}---in $\lattice{\system}$.  The starting scenario $\conf_0$ of a
@@ -21,8 +21,8 @@ trail---also referred to as the \emph{root} (of the trail)---is the initial
 debugging scenario.  Starting from such a root, the rational
 programmer steps along a trail. If the (program for this) scenario type-checks,
 the rational programmer runs the program until it raises a run-time error.  The rational programmer
-uses the information in the error to decide which component to equip with
+uses the information in the error to decide which module to equip with
 types. This choice constructs scenario $\conf_{i+1}$ from $\conf_{i}$ and thus
 creates a trail. The trail's construction ends when it reaches a scenario that
-contains the mutant module because the type checker rejects its typed version
+contains the mutated module because the type checker rejects its typed version
 outright.  At this point, the source of the impedance mismatch is identified.
