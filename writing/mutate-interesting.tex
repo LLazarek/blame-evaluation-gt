@@ -7,8 +7,9 @@ A type-level mutation is {\em interesting\/} (1) if the type checker rejects the
 Here is the rationale for these three conditions:
 \begin{enumerate}
 
-\item By definition, an impedance mismatch is a clash between the type ascription of one module's imports and another module's exports. Hence, type checking should fail for an interesting mutant.
-
+\item An impedance mismatch is a clash between the type ascription of one
+module's imports and another module's exports. Hence, type checking should fail
+for an interesting mutant.
 
 \item The goal of a comparative evaluation is to give the rational programmer a
 chance to debug the same scenario using different pieces of information.  In the

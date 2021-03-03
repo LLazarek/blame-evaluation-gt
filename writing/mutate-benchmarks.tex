@@ -1,19 +1,18 @@
 %% -----------------------------------------------------------------------------
 
-The bar for testing the rational programmer is high: it demands a
-collection of realistic programs that
+The benchmark programs for a rational-programmer experiment must 
 \begin{enumerate}
    
-  \item vary in size, complexity and purpose; 
+\item vary in size, complexity and purpose; 
     
-  \item  have a decent number of modules and a variety of module
-    dependency graphs (since mixing of typed and untyped code in Typed
-    Racket takes place at the module level);  
+\item have a decent number of modules and a variety of module dependency graphs
+ (since mixing of typed and untyped code in Typed Racket takes place at the
+ module level);
 
-  \item attempt to take  advantage of the sophisticated typing features of
-    a gradually typed language such as Typed Racket but;
+\item attempt to take  advantage of the sophisticated typing features of
+ a gradually typed language such as Typed Racket but;
 
-   \item  fail and contain type-level mistakes. 
+\item  fail and contain type-level mistakes. 
 \end{enumerate}
 \noindent
 No such benchmark suite exists.  Worse, no benchmark suite of
@@ -23,19 +22,16 @@ Python programs to evaluate their technique of fixing mistakes in type
 annotations. Their collection does not come with type-level mistakes
 in the code itself.} 
 
-
-However, over the past decade,  \citet{gtnffvf-jfp-2019} have curated a
-collection of Typed Racket programs for systematically measuring the
-implementation's performance. The benchmark suite consists of fully typed,
-correct programs, written by a number of different authors, who have
-maintained and evolved these programs over several years. The programs
-range widely in size, complexity, purpose, origin and in programming
-style. The latter is mostly a reference to their reliance on many Typed
-Racket features: occurrence typing~\cite{tf-icfp-2010}, types for mutable
-and immutable data structures~\cite{hpst-sfp-2010}, types for first-class
-classes and objects~\cite{tsdtf-oopsla-2012}, and types for Racket's
-numeric tower~\cite{stathff-padl-12}. 
-
+Fortunately, \citet{gtnffvf-jfp-2019} have curated a collection of Typed Racket
+programs for systematically measuring the implementation's performance. The
+benchmark suite consists of fully typed, correct programs, written by a number
+of different authors, who have maintained and evolved these programs over
+several years. The programs range widely in size, complexity, purpose, origin
+and in programming style. The latter is mostly a reference to their reliance on
+many Typed Racket features: occurrence typing~\cite{tf-icfp-2010}, types for
+mutable and immutable data structures~\cite{hpst-sfp-2010}, types for
+first-class classes and objects~\cite{tsdtf-oopsla-2012}, and types for Racket's
+numeric tower~\cite{stathff-padl-12}.
 
 Hence, even if they do not come with type-level errors, they offer a
 diverse linguistic substrate suitable for the careful introduction of

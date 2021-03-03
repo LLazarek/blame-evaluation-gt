@@ -9,7 +9,9 @@ programmer extends the trail to a scenario that swaps out the untyped
 module
 for its typed counterpart.
 
-Formally,
+% Formally, %% <-- MF: this is called a ``dangling def.'' and is considered bad style
+
+Here is a rigorous definition. 
 \begin{quote}
 \it A \emph{Natural blame trail} is a sequence of scenarios $\conf_0,...\conf_n$ of
 a program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
@@ -38,7 +40,7 @@ typing the top of a failed run-time type check's stack trace, dubbed the
 location of the exception, might be as useful as typing the blamed one.
 
 To account for this situation, a new mode of the Natural rational
-programmer follows a migration process based on exceptions:
+programmer follows a migration process based on exceptions.
 \begin{quote}
 \it A {\em Natural exception trail\/} is a sequence of scenarios $\conf_0,...\conf_n$ of a
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
