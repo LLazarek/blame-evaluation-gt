@@ -13,7 +13,7 @@ of an experience report~\cite{ttt21}.
 
 The {\em first challenge\/} stems from the differences between the blame
 assignment mechanisms of the three semantic variants.  While Natural assigns
-blame to {\em one\/} component, Transient assigns blame to a sequence of
+blame to {\em one\/} component, Transient assigns blame to a set of
 components. The Erasure semantics does not blame components {\it per se\/}, but
 it comes with an exception location and a stack trace, which implicitly suggests
 parties to blame.  Each strategy affects the behavior of the rational programmer
@@ -27,7 +27,7 @@ blame strategies become different ways the rational programmer  interprets
 blame.  For instance, one Transient mode may pick the oldest element of a
 blame set as the next component to add types because it corresponds to the
 earliest point in the program's evaluation that can discover an impedance
-mismatch.  Another mode may opt to treat the sequence as a stack and add
+mismatch.  Another mode may opt to treat the set as a stack and add
 types to its newest element.  If both modes are equally successful in
 locating an impedance mismatch, measuring the rational programmer's effort with each mode
 may answer which is the most effective.
