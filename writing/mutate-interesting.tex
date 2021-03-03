@@ -1,22 +1,29 @@
 %% -----------------------------------------------------------------------------
 
-A type-level mutation is {\em interesting\/} (1) if, upon removal of the type
-annotations, running the program raises a run-time error, (2) whose stack trace
-contains source locations from at least three modules, and (3) if this happens
-in all of the to-be-evaluated semantics. An interesting mutation represents a
-{\em debugging scenario\/} that supplies the rational programmer with
-information.
+A type-level mutation is {\em interesting\/} (1) if the type checker rejects the fully typed version of the mutant,
+(2) running the mutant with all type annotations removed raises a run-time error, and
+(3) that error's stack trace contains source locations from at least three modules.
 
 Here is the rationale for these three conditions:
 \begin{enumerate}
 
-\item By definition, an impedance mismatch is a clash between the type ascription of
-one module's imports and another module's exports. Hence, type checking fails for an
-interesting mutant module, and removing the types from this mutant module
-creates an impedance mismatch between it and the modules that import it,
-directly or indirectly. This impedance mismatch is of interest if, and only if,
-running the program leads to an exception---otherwise it goes unobserved and
-cannot be debugged.
+\item By definition, an impedance mismatch is a clash between the type ascription of one module's imports and another module's exports. Hence, type checking should fail for an interesting mutant.
+
+
+\item The goal of a comparative evaluation is to give the rational programmer a
+chance to debug the same scenario using different pieces of information.  In the
+case of gradual typing semantics, a meta-theorem due to Greenman and
+Felleisen~\cite{gf-icfp-2018} says that if a program raises an exception under
+Erasure, it also errors under all other semantics.  Hence, a comparison of blame
+information insists that an interesting mutant {\em raises a run-time exception
+under Erasure\/}.
+
+{\bf Note} While this choice favors Erasure over Transient and Natural and, for
+the same reason, Transient over Natural, some form of bias towards one or the
+other semantics is unavoidable. Tipping the scales in favor of the theoretically
+weakest semantics yields the most stable results. See
+section~\ref{sec:discussion} for some further discussion of this choice.
+
 
 \item If the evaluation of a mutant module immediately raises an exception because
 of the changes, there is no work for the rational programmer. Indeed, if the
@@ -27,22 +34,8 @@ trace.  Hence, the definition of interesting mutation insists on the presence of
 three different modules in the stack trace. This guarantees that the debugging
 scenario demands a sufficiently sophisticated effort, due to the interaction
 between the buggy module with its context.  In these cases, the rational
-programmer must examine at least two modules to locate the source of the faulty
+programmer must contend with at least two modules involved in a faulty
 interaction.
-
-\item The goal of a comparative evaluation is to give the rational programmer a
-chance to debug the same scenario using different pieces of information.  In the
-case of gradual typing semantics, a meta-theorem due to Greenman and
-Felleisen~\cite{gf-icfp-2018} says that if a program raises an exception under
-Erasure, it also errors under all other semantics.  Hence, a comparison of blame
-information insists that a debugging scenario {\em raises a run-time exception
-under Erasure\/}.
-
-{\bf Note} While this choice favors Erasure over Transient and Natural and, for
-the same reason, Transient over Natural, some form of bias towards one or the
-other semantics is unavoidable. Tipping the scales in favor of the theoretically
-weakest semantics yields the most stable results. See
-section~\ref{sec:discussion} for some further discussion of this choice.
 
 \end{enumerate}
 
@@ -55,29 +48,26 @@ section~\ref{sec:discussion} for some further discussion of this choice.
  \label{fig:mutant-breakdown}
 \end{figure*}
 
-The definition of interesting debugging scenarios creates a powerful filter. All
-together, the listed mutators produce 16,800 mutants with at least one
-interesting debugging scenario across all benchmarks; see
+The definition of interesting mutants creates a powerful filter. All
+together, the listed mutators produce 16,800 interesting mutants across all benchmarks; see
 figure~\ref{fig:mutant-breakdown} for an overview. Broken down by benchmark, the
-mutators produce at least 40 interesting scenarios for every benchmark, and
-these scenarios originate from at least four different mutators per benchmark.
+mutators produce at least 40 interesting mutants for every benchmark, and
+these mutants originate from at least four different mutators per benchmark.
 Thus, the mutators result in a sizable and diverse population of scenarios for
-every benchmark.  Furthermore, every mutator contributes scenarios to at least
+every benchmark.  Furthermore, every mutator contributes interesting mutants in at least
 one benchmark.  Some mutators apply only to a few benchmarks, because they
 target rather specific features; for instance, the class-focused mutators are
 mainly effective in a program that makes extensive use of object-oriented
 features.
 
-The definition of interesting scenarios is more than a filter for
-uninteresting mutants. It is also the guide for re-designing and refining
+The definition of interesting mutants is more than a filter for
+uninteresting mutants. It is also the guide for evaluating and refining
 mutators until they collectively produce a sizable and diverse population of
-interesting scenarios. For example, the {\tt wrap-cond} mutator casts the
-tests of conditional expressions to the {\tt Any} type and, hence,
-suppresses occurrence typing. However, an examination of the scenarios it
-produces through the lens of the definition of interesting scenarios
-reveals that none is interesting. The fully typed mutant does fails to
-typecheck but its variant without type annotations never raises a run-time
-error. In fact, it turns out 1/4 of the mutators originally designed for
-the experiment fail to live up to the standard of the definition while
-many of the rest of the mutators went thought rounds of tweaking
-to increase their potency.
+interesting mutants. For example, one early mutator idea casts the
+tests of conditional expressions to the {\tt Any} type to
+suppress occurrence typing. However, an examination of the mutants it
+produces through the lens of the definition of interesting mutants
+reveals that none is interesting because they never raise run-time errors.
+Indeed, the interesting standard guided countless iterations of adding,
+removing, and refining the mutators in figure~\ref{table:mutation-ops}
+to maximize interesting mutants.
