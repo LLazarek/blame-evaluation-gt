@@ -2,7 +2,7 @@
 
 Trails and their properties provide the tools for a rigorous examination of
 blame for Natural, Transient and Erasure. In line with the discussion so far,
-the experiment collects data to answer three initial questions for 
+the test bed collects data to answer three initial questions for 
 interesting debugging scenarios:
 \begin{itemize}
 \item[$Q_1$] Is blame useful in the context of Natural?
@@ -45,17 +45,17 @@ uses the Natural blame and exception trails to answer it, so $Q_1$ shows up in t
 In detail, the answer to $Q_1$ demands a comparison of the success of the Natural
 blame and Natural exception trails for all debugging scenarios.  The
 first step is to construct each mutant's scenario lattice and identify their
-debugging scenarios.  The experiment then extends the trails that start
+debugging scenarios.  The test bed then extends the trails that start
 from those roots according to the Natural-blame programmer.  If no scenarios can
-be added to the trail, the experiment checks whether the last scenario
+be added to the trail, the test bed checks whether the last scenario
 of the trail type-checks or not. If it does, the
 Natural-blame trail is successful; otherwise it is failing. 
 Figure~\ref{fig:process} summarizes this experimental process for
 one mode of the rational programmer and connects it with the mutations from
 section~\ref{sec:mutate}.
-The experiment repeats the process for the same roots with the other mode, Natural
+The process is repeated for the same roots with the other mode, Natural
 exceptions.
-After completing, the experiment
+After completing, the test bed
 reports the success/failure results of the trails to determine the proportion of
 scenarios where Natural blame is more useful than Natural exceptions.  Question
 $Q_1$ has a positive answer if a root exists where the above is true because it
@@ -66,8 +66,7 @@ for $Q_2$ and $Q_3$, using the respective modes of the rational programmer.
 \begin{figure}[bh]
   \centering
   \includegraphics[scale=0.36]{./Images/process}
-  \caption{The experimental process for one mode of the rational
-  programmer}
+  \caption{The experimental process for one mode of the rational programmer}
   \label{fig:process}
 \end{figure}
 
