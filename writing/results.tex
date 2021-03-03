@@ -1,9 +1,8 @@
 %% -----------------------------------------------------------------------------
 
-The experimental process from section~\ref{sec:rational} was run on the
-sampled debugging scenarios from section~\ref{sec:sample} on a machine
-with two Intel Xeon Gold 6258R processors (28 doubly-threaded cores each)
-and 500GB of memory.  Each debugging scenario had a 4 minute timeout and a
+A machine with two Intel Xeon Gold 6258R processors (28 doubly-threaded cores each)
+and 500GB of memory ran the experimental process from section~\ref{sec:rational} on the
+sampled debugging scenarios from section~\ref{sec:sample}.  Each debugging scenario had a 4 minute timeout and a
 memory limit of 6GB. The complete experiment required over 30,000 compute
 hours.
 
@@ -63,22 +62,23 @@ hours.
 
 
 Figure~\ref{fig:success-bars} summarizes the overall success rates of
-every mode.  The success rates illustrate a few points that underlie the
+every mode.\footnote{The random mode behaves the same for
+all three semantics, so this analysis considers it a single mode.}
+The success rates illustrate a few points that underlie the
 rest of our analysis.  The first notable piece of information from this
 figure is that every mode has failed debugging scenarios, not just
 Erasure. This should not come as a surprise to the astute reader.  Running
 a mode of the rational programmer on a scenario may result in an exception
 that carries no useful information about which module the programmer
 should type next. For instance the stack trace of the exception may not
-contain frames from any module of the program but only from the internals
-of the Typed Racket implementation. This situation can happen at any point
+contain frames from any untyped module of the program. This situation can happen at any point
 along a blame trail, causing it to fail.
 
 While most failures to debug scenarios follow the above pattern, a few do
-not.  Breaking down the reasons for failure for Natural blame (1748 in
+not.  Breaking down the failure reasons for Natural blame (1748 in
 total) reveals an additional cause. For a small set of debugging scenarios
-(40), Natural produces a run time type error blaming a non-buggy already
-typed component. All these cases are due to known open issues with Typed
+(40), Natural produces a run time type error blaming a non-buggy
+already-typed component. All these cases are due to known open issues with Typed
 Racket and class contracts. 
 
 In Transient, similar to Natural, most failures are due to unhelpful
@@ -89,16 +89,16 @@ scenarios hit the time and memory limits of our experiment
 cases where Transient reports an empty blame set, leaving the rational
 programmer without hints about how to proceed.
 Sections~\ref{sec:threat:transient} and ~\ref{sec:threat:transient2}
-explain how both of these causes of failure for Transient affect our
+explain both of these causes of failure for Transient in detail and how they affect our
 experiment. 
 
 The second key observation from figure~\ref{fig:success-bars} is that the
 modes that use blame all outperform those that do not.  In particular,
 Natural and both of Transient's blame modes succeed in around 95\% of the
 scenarios, while their corresponding exception modes succeed in around
-85\% of them and Erasure succeeds in only 60\%.  The only
-exception is that the Random programmer always succeeds; this reflects the
-fact that every scenario has finitely many modules, so Random programmer 
+85\% of them, and Erasure succeeds in only 60\%.  The only
+exception is that the random programmer always succeeds; this reflects the
+fact that every scenario has finitely many modules, so the random programmer 
 eventually types the buggy module.
 
 
@@ -172,8 +172,8 @@ questions $Q_1$ to $Q_3$, figure~\ref{fig:success-venns} depicts an
 analysis of the success of each semantics in comparison to Erasure.
 Specifically, the figure shows one Venn diagram per mode of the rational
 programmer that uses blame.  Each diagram shows the overlap of successful
-for a  the blame mode, its corresponding exception mode, and Erasure.  For
-example, for Natural, the leftmost diagram shows that all three modes
+scenarios for  the blame mode, its corresponding exception mode, and Erasure.  For
+example, the leftmost diagram (Natural) shows that all three modes
 succeed on 59.5\% of the  scenarios, only Natural and Natural exceptions
 succeed on 25.7\% of the scenarios, only Natural and Erasure succeed on
 2.1\%, and Natural alone succeeds on 9.7\%.  This analysis highlights
@@ -197,9 +197,7 @@ the workings of the rational programmer.
 There are two immediate take-aways from the figure. First, the effort for
 successfully debugging interesting scenarios (in green) for the random
 mode of the rational programmer is highly spread out, as
-expected.\footnote{The random mode distribution is indistinguishable for
-all three semantics and thus the figure~\ref{fig:effort-table} only shows
-one plot.} In contrast, in the other modes, successful effort coalesces at
+expected. In contrast, in the other modes, successful effort coalesces at
 the left side of the plot, meaning that in most cases the programmer needs
 to type a single component to debug a scenario. 
 
