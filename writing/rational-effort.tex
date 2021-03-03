@@ -1,31 +1,27 @@
 %% -----------------------------------------------------------------------------
 
 In addition to success and failure information for the various trails, the
-experiment software records the number of components a rational programmer has
+experiment records the number of components a rational programmer has
 to equip with types along each trail ($\lvert \conf_n \setminus \conf_0
-\rvert$). This number can serve as a metric. 
+\rvert$). This number can serve as an additional metric to compare modes.
 
-A comparison of the effort of different modes of the rational programmer can
-illuminate the comparison of the effectiveness of the three gradual typing
-systems. For example, consider a debugging scenario.  If, for instance, both
-Natural blame and Transient first blame trails are successful, the two modes of
-the rational programmer can compete to see which one debugs the interesting
+Comparing the effort of different modes of the rational programmer can
+illuminate the comparitive effectiveness of the three gradual typing
+systems. If, for instance, both
+Natural blame and Transient first blame trails are successful for the same scenario, the two modes of
+the rational programmer can compete to see which one debugs the
 scenario with less effort. In general, if the effort distribution for a mode of
 the rational programmer has a shorter tail and more volume around smaller values
 compared to the effort distribution of another mode, then the first mode is
 probably the more effective of the two.
 
-Measuring effort can also tell whether the observed effectiveness of the
-rational programmer is an artifact of pure chance or not.  Doing so means
-comparing the effort distribution for a mode of the rational programmer with
-another mode that ignores error information entirely and instead selects which
-component to type next randomly.  Since each mutant has a finite number of
-components, such random mode trails are naturally always successful. At the same
-time though, the Natural, Transient, and Erasure random modes exhibit a normal
-effort distribution across scenarios that should be distinct from the effort
-distribution for all other modes of the rational programmer if the effectiveness
-of the modes are not coincidental.
-
-
-
+Measuring effort can also reveal whether the observed effectiveness of the
+rational programmer is an artifact of pure chance or not.
+In particular, the effort distribution for a mode of the rational programmer can be compared with that of
+the random mode that ignores error information entirely and instead selects which
+component to type randomly.  Since each mutant has a finite number of
+components, random mode trails are always successful. However, the random mode's effort
+distribution will be thinly spread out across the range of trail lengths possible
+in the set of debugging scenarios.
+In contrast, the effort distribution of other modes should be quite different if their effectiveness is not coincidental.
 

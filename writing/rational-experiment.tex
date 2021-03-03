@@ -2,7 +2,7 @@
 
 Trails and their properties provide the tools for a rigorous examination of
 blame for Natural, Transient and Erasure. In line with the discussion so far,
-the experiment software collects data to answer three initial questions for 
+the experiment collects data to answer three initial questions for 
 interesting debugging scenarios:
 \begin{itemize}
 \item[$Q_1$] Is blame useful in the context of Natural?
@@ -23,7 +23,7 @@ information:
 Table~\ref{fig:experiment-outline} summarizes how each question relates to
 different kinds of trails/modes of the rational programmer. For example, experimental
 question $Q_1$ asks whether blame is valuable for Natural and the experiment
-uses the Natural blame and exception trails to answer it.
+uses the Natural blame and exception trails to answer it, so $Q_1$ shows up in the cells for Natural blame and Natural exceptions.
 
 \begin{figure}[ht]
 \center
@@ -42,20 +42,22 @@ uses the Natural blame and exception trails to answer it.
 
 %% -----------------------------------------------------------------------------
 
-In detail the answer to $Q_1$ demands a comparison of the success of the Natural
-blame and Natural exception trails for all interesting debugging scenarios.  The
+In detail, the answer to $Q_1$ demands a comparison of the success of the Natural
+blame and Natural exception trails for all debugging scenarios.  The
 first step is to construct each mutant's scenario lattice and identify their
-interesting debugging scenarios.  The experiment software extends the trails that start
-from such roots according to the Natural-blame programmer.  If no scenarios can
-be added to the trail, the experiment software checks whether the last scenario
-of the trail type-checks or not. If it does, the software records that the
-Natural-blame trail is successful; otherwise it is recorded as failing. The
-process is repeated for the same roots again but for the other mode, Natural
-exceptions.  Figure~\ref{fig:process} summarizes this experimental process for
+debugging scenarios.  The experiment then extends the trails that start
+from those roots according to the Natural-blame programmer.  If no scenarios can
+be added to the trail, the experiment checks whether the last scenario
+of the trail type-checks or not. If it does, the
+Natural-blame trail is successful; otherwise it is failing. 
+Figure~\ref{fig:process} summarizes this experimental process for
 one mode of the rational programmer and connects it with the mutations from
-section~\ref{sec:mutate}.  After completing the experiment, the experiment
-software reports the success/failure results of the trails to determine for each
-root whether Natural blame is more useful than Natural exceptions.  Question
+section~\ref{sec:mutate}.
+The experiment repeats the process for the same roots with the other mode, Natural
+exceptions.
+After completing, the experiment
+reports the success/failure results of the trails to determine the proportion of
+scenarios where Natural blame is more useful than Natural exceptions.  Question
 $Q_1$ has a positive answer if a root exists where the above is true because it
 is evidence that there is at least one interesting scenario that the rational
 programmer manages to debug with blame information.  The process is analogous
@@ -72,12 +74,12 @@ for $Q_2$ and $Q_3$, using the respective modes of the rational programmer.
 
 For $Q_*$, the process is a bit more involved. Answering this question calls for
 a comparison of the percentage of scenarios where one mode is more useful than
-the other and the inverse.  For instance, to decide whether blame for Natural is
-more useful than first blame for Transient, the software compares the percentage
-of interesting scenarios where Natural blame is more successful than Transient
-first blame with the percentage of interesting scenarios where Transient first
-blame is more successful than Natural blame.  Finally these steps are repeated
-one more time to compare Natural blame and Transient-last blame and get a
-complete picture of the comparative usefulness of blame in the two semantics.
+the other and the inverse.  For instance, deciding whether blame for Natural is
+more useful than first blame for Transient requires comparing the percentage
+of scenarios where Natural blame is more successful than Transient
+first blame with the percentage where Transient first
+blame is more successful than Natural blame. Repeating the whole process
+for every pair of modes produces a
+complete picture of the comparative usefulness of blame between all of the modes.
 
 
