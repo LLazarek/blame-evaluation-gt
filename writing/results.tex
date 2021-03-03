@@ -1,10 +1,11 @@
 %% -----------------------------------------------------------------------------
 
-We run the experimental process from section~\ref{sec:rational} on the
-sampled debugging scenarios from section~\ref{sec:sample} using a machine with two Intel Xeon Gold 6258R processors (28 doubly-threaded cores each) and 500GB of memory.
-Each debugging scenario had a 4 minute timeout and a
-memory limit of 6GB. The complete experiment required
-over 30,000 compute hours.
+The experimental process from section~\ref{sec:rational} was run on the
+sampled debugging scenarios from section~\ref{sec:sample} on a machine
+with two Intel Xeon Gold 6258R processors (28 doubly-threaded cores each)
+and 500GB of memory.  Each debugging scenario had a 4 minute timeout and a
+memory limit of 6GB. The complete experiment required over 30,000 compute
+hours.
 
 
 \begin{figure}
@@ -63,8 +64,8 @@ The first notable piece of information from
 this figure is that every mode has failed debugging scenarios, not just
 Erasure. This should
 not come as a surprise to the astute
-reader. After all, as we
-discuss above, some modes are more successful than others in certain
+reader. After all, as
+discussed above, some modes are more successful than others in certain
 scenarios. Indeed any mode can fail if no untyped module from the program is identified in the error.
 For example, running a scenario may result in an
 exception that carries no useful information about which
@@ -88,7 +89,7 @@ number of failures because scenarios hit the time and memory
 limits of our experiment (\textasciitilde770 scenarios).  Additionally, there are nearly 1,000 cases where
 Transient reports an empty blame set, leaving the rational programmer
 without hints about how to proceed.
-In section~\ref{sec:threat:transient}, we discuss how both of these causes of
+Section~\ref{sec:threat:transient} explains how both of these causes of
 failure for Transient affect our experiment. 
 
 The second key observation from figure~\ref{fig:success-bars} is that the modes that use blame all outperform those that do not.

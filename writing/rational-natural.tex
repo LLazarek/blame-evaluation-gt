@@ -37,8 +37,8 @@ blame is a critical piece of the rational programmer's process.  For instance,
 typing the top of stack trace of a failed run time type check, dubbed the
 location of the exception, might be as useful as typing the blamed one.
 
-To account for this situation, we devise a new mode of the Natural rational
-programmer that follows a migration process based on exceptions:
+To account for this situation, a new mode of the Natural rational
+programmer follows a migration process based on exceptions:
 \begin{quote}
 \it A {\em Natural exception trail\/} is a sequence of scenarios $\conf_0,...\conf_n$ of a
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
@@ -46,9 +46,9 @@ program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
 where $\exception{\system, \conf}$ denotes the location of the exception of $\conf$.
 \end{quote}
 
-Same as for success for a Natural blame trail, we define success for a
-Natural exception trail.
-Putting the definitions for the two modes together, we can now compare the usefulness of blame 
+The definition of success for a Natural exception trail follows that for
+a Natural blame trail.
+Together the definitions for the two modes allow the comparison of the usefulness of blame 
 with that for mere exceptions for debugging a scenario in the context of Natural semantics.
 \begin{quote}
 \it 
