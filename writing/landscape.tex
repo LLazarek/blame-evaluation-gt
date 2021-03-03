@@ -2,18 +2,17 @@
 
 The three blame strategies rely on three different ways of catching problems
 with types at run-time: {\em Natural\/}, {\em Transient\/}, and {\em
-Erasure\/}. This section summarizes these options with one illustrative example
-using Racket syntax. The informed reader may wish to merely scan the
-self-contained section.
+Erasure\/}. This self-contained section summarizes these options with one illustrative example
+using Racket syntax. The informed reader may wish to merely scan it.
 
 Consider the program sketch in figure~\ref{fig:example}. Each box represents a
 module: the top bar lists the name and whether it is using typed (\typecolor) or
-untyped (\dyncolor) syntax:
+untyped (\dyncolor) syntax.
 \begin{description}
 
 \item[\texttt{pack-lib}] (at the top right) represents a library that provides,
 among others, a function {\tt pack}. As the documentation says, this function
-consumes JSON data and packages it in a dictionary. by mistake, though, the
+consumes JSON data and packages it in a dictionary. By mistake, though, the
 function returns a hash table instead of the association list its documentation
 promises.
 
@@ -33,12 +32,12 @@ encrypts its input before passing it to \texttt{pack}.
 
 \item[\texttt{client}] (at the bottom right) uses {\tt pack}
 indirectly. Specifically, it goes through the two intermediary typed modules to
-import them. Imagine a programmer who relies on the types in the \typecolor\
+use it. Imagine a programmer who relies on the types in the \typecolor\
 modules as checked documentation but prototypes the client in an untyped manner.
 
 \end{description}
-Each of the three semantics assigns a different outcome to the client module and
-signals different kinds of errors. 
+Due to the mistake in {\tt pack-lib}, each of the three semantics assigns a
+different outcome to the client module and signals different kinds of errors.
 
 Under {\it the Natural semantics\/}, functions imported into and exported from
 typed modules are wrapped in proxies that enforce the static type discipline
@@ -58,7 +57,7 @@ the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
 an argument-type check fails, responsibility lies with {\tt client}. Due to the
 proxies wrapped around functions, Natural can easily track the responsible party
 for each check. Thus, in the example of figure~\ref{fig:example}, as
-\texttt{pack} returns, the return-type check fails, and Natural blames
+\texttt{pack} returns, the return-type check fails and Natural blames
 \texttt{pack-lib}.
 
 Under {\it the Transient semantics\/}, typed code is compiled so that all entry
@@ -77,7 +76,7 @@ module, Transient's inlined checks make sure that the imported
 last check fails in \texttt{client}'s call to {\tt crypto-pack}.
 
 In order to locate the responsible party for failed checks, Transient
-maintains a map from values to the boundaries between typed/untyped modules that
+maintains a map from values to the boundaries between typed and untyped modules that
 they cross, plus the corresponding types. In the example, the map records that
 \texttt{pack} crosses from \texttt{pack-lib} to {\tt crypto-pack-lib} and
 from {\tt crypto-pack-lib} to {\tt client} with the type that appears in the
@@ -93,10 +92,10 @@ Under {\it the Erasure semantics\/}, the compiler checks the specified types and
 then discards them when it generates code. The generated code includes run-time
 checks that ensure the dynamic safety of all operations as specified in the
 underlying untyped language. Hence, neither the call to {\tt typed-pack} nor the
-call to {\tt crypto-pack} signals an error due to the gradual type system. When,
-at some later point, {\tt client} tries to inspect the elements of the lists
+call to {\tt crypto-pack} signals an error due to the gradual type system. If
+at some later point {\tt client} tries to inspect the elements of the lists
 that \texttt{typed-pack} and {\tt crypto-pack} are supposed to produce, Racket's
-safety check signal a violation and point to some place in {\tt client}. The
+safety checks signal a violation and point to some place in {\tt client}. The
 information in this exception, plus its stack trace, may help the programmer
 find the source of the impedance mismatch between the specified return types of
 {\tt pack} in the two typed modules and the actual return value of {\tt pack}.

@@ -6,9 +6,8 @@ blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Academic systems
 (Reticulated Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
 Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}) come
 with sophisticated checking and blame assignment strategies (see sec.~\ref{sec:landscape}). Their academic creators embrace
-the idea that blame can help practicing programmers find impedance mismatches
-between the types they added to a software system and the behavior of the
-remaining untyped components.
+the idea that blame can help practicing programmers find impedance mismatches: disagreements
+between the types they added to a software system and its behavior.
 
 Industrial implementors of gradual typing systems have almost
 completely ignored blame assignment.  Systems such as Flow, Hack, or
@@ -18,7 +17,7 @@ respectively.} exploit types for IDE actions and for finding typos in
 code. Then their compilers remove types and rely on the built-in
 safety checks of the underlying language to catch any problems.
 
-This contrast between theory and applications of gradual typing raises the question 
+This contrast between theory and applications of gradual typing raises the question of
 \begin{quote}
  \it
  whether blame assignment adds any value to a gradually typed language,
@@ -64,6 +63,6 @@ theoreticians. The first problem is that the cost of Transient's blame can be
 huge. The second one concerns the difference between the methods; neither is
 {\it Natural\/} vastly better than {\it Transient\/} nor are the two blame
 assignment methods clearly preferable to {\it Erasure\/}.  In turn, these
-problems suggests that, on one hand, the existing theory does not predict
-practice properly, and on the other hand, the existing practice may need to
-think of additional experiments to collect more data.
+problems suggest that, on one hand, the existing theory does not predict
+practice properly, and on the other hand, the existing practice may need
+additional experiments to collect more data.

@@ -17,11 +17,15 @@ available information. In the context of gradual typing, the rational programmer
 has two pieces of information when an impedance mismatch signals exceptional
 behavior: the error message and the state of the program. Hence, the most
 rational procedure is to use the former to improve the latter. Specifically,
-a rational programmer translates the Wadler-Findler slogan into a debugging
+the rational programmer translates the Wadler-Findler slogan into a debugging
 method, searching for the source of the impedance mismatch by adding type
 annotations to the untyped parts of the program identified in the error.
 If the type checker rejects an annotation that is considered correct, the
-rational programmer has found the source of the problem.  Measuring this simulated
+rational programmer has found the source of the problem.
+Otherwise, the rational programmer concludes that the just-annotated parts are not the problem
+and re-runs the program;
+the Wadler-Findler slogan says the new version of the program must now blame a different location for the problem, which the rational programmer can check in the same fashion.
+Measuring this simulated
 programmer's behavior on a large number of debugging scenarios yields data that
 is similar to data collected in a human-facing study.
 
@@ -81,7 +85,7 @@ Like {\it homo economicus\/}, the rational programmer is an approximation.
 People do not behave in a purely rational manner as economic actors, and they
 also do not do so as software developers. The point is not to deny the existence
 of ``lucky hunches'' programmers or ``tinkering works'' approaches and so on. It
-is also not to deny that equipping entire modules with types represents an
+is also not to claim that equipping entire modules with types represents an
 always feasible approach (though adding types at the expression level, say, as
 in TypeScript should be considered well within bounds).  {\em But\/}, the
 concept of studying the idea of an economically rational actor has produced
