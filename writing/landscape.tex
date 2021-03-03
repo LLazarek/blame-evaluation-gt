@@ -45,12 +45,12 @@ with run-time checks and track responsibilities~\cite{tf-popl-2008,
 tfffgksst-snapl-2017}. Thus, when {\tt pack} is imported into a typed module,
 the run-time system checks that it is a function and wraps it in a protective
 proxy, which in turn, enforces the type of the function with run-time checks.
-In essence, this check protects typed modules when they call an untyped function
+In essence, these checks protect typed modules when they call an untyped function
 because it may not produce the promised kind of value, as is the case here with
 {\tt pack} from {\tt pack-lib}. Analogously the run-time system wraps each exported
 function of a typed module (such as {\tt crypto-pack}) in a proxy that checks
-its arguments.  This check protects functions exported from typed modules against
-applications in untyped code that supply the wrong kind of argument value.
+its arguments.  These checks protect functions exported from typed modules against
+applications in untyped code that supply the wrong kind of arguments.
 
 As this analysis implies, if a return-type check fails, the problem is with
 the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
@@ -78,8 +78,8 @@ last check fails in \texttt{client}'s call to {\tt crypto-pack}.
 In order to locate the responsible party for failed checks, Transient
 maintains a map from values to the boundaries between typed and untyped modules that
 they cross, plus the corresponding types. In the example, the map records that
-\texttt{pack} crosses from \texttt{pack-lib} to {\tt crypto-pack-lib} and
-from {\tt crypto-pack-lib} to {\tt client} with the type that appears in the
+\texttt{pack} crosses from \texttt{pack-lib} to {\tt typed-pack-lib} and
+from {\tt pack-lib} to {\tt crypto-pack-lib} with the type that appears in the
 {\tt required/typed} forms in the example. Since the failed check corresponds to
 the return type of \texttt{pack}, Transient blames the sources of the two
 boundary crossings, which in this particular case is \texttt{pack-lib}. In
@@ -103,15 +103,16 @@ find the source of the impedance mismatch between the specified return types of
 The following table summarizes the illustration:
 %% -----------------------------------------------------------------------------
 \begin{center}
-\begin{tabular}{l|ll}
+  \begin{tabular}{l|ll@{}}
                         &        \multicolumn{2}{|c}{the evaluation of} \\
 \relax                  & {\tt public-data}               & {\tt secret-data} in {\tt client}, \\
 {under the $\cdot$ semantics yields} & & \\ \hline
 %% ----------------------------------------------------------------------------------------
 \qquad {\it Natural\/}   & error, blaming {\tt pack-lib}  & error, blaming {\tt pack-lib} \\
      		   	 &                                & \\
-\qquad {\it Transient\/} & no error   		          & error, blaming the boundary \\
-      		  	 &    			          & \quad {\tt pack-lib}/{\tt crypto-pack-lib} \\
+\qquad {\it Transient\/} & no error   		          & error, blaming the boundary crossings \\
+      		  	 &    			          & \quad {\tt pack-lib} to {\tt typed-pack-lib} \\
+               &                     & \quad {\tt pack-lib} to {\tt crypto-pack-lib} \\
 \qquad {\it Erasure\/}   & no error 		          & no error \\
        	    		 &   \multicolumn{2}{|c}{but {\em Erasure} does signal an error on list access}
 \end{tabular}
