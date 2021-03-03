@@ -1,15 +1,11 @@
 %% -----------------------------------------------------------------------------
 
-At first glance implementing the method of section~\ref{sec:why-rational}
-seems straightforward. The rational programmer is a simple algorithm and testing
-whether the rational programmer hypothesis holds amounts to running the
-algorithm on a collection of scenarios.
-
-Three challenges remain, however: comparing the effect of blame on the rational
-programmer across three different mechanisms; the collection of a large number
-of representative debugging scenarios; and a proper sampling strategy for the
+While at first glance the method of section~\ref{sec:why-rational} seems straightforward to implement and test,
+three challenges remain. The first is comparing the effect of blame on the rational
+programmer across three different mechanisms; second is the collection of a large number
+of representative debugging scenarios; and third is finding a proper sampling strategy for the
 huge space of possibilities. A coincidental challenge is the disparity of the
-implementations of gradually typed languages. To eliminate this variable, this
+implementations of gradually typed languages. To eliminate this variable, the
 authors use Racket, which is thus far the only language in which all three major
 soundness mechanisms are available in a reasonably robust and comparable manner;
 for the implementation of the transient semantics, see the parallel submission
@@ -18,7 +14,7 @@ of an experience report~\cite{ttt21}.
 The {\em first challenge\/} stems from the differences between the blame
 assignment mechanisms of the three semantic variants.  While Natural assigns
 blame to {\em one\/} component, Transient assigns blame to a sequence of
-components. The Erasure semantics does not blame components {\it per se\/}. But,
+components. The Erasure semantics does not blame components {\it per se\/}, but
 it comes with an exception location and a stack trace, which implicitly suggests
 parties to blame.  Each strategy affects the behavior of the rational programmer
 differently (and real ones, too).
@@ -32,38 +28,37 @@ blame.  For instance, one Transient mode may pick the oldest element of a
 blame set as the next component to add types because it corresponds to the
 earliest point in the program's evaluation that can discover an impedance
 mismatch.  Another mode may opt to treat the sequence as a stack and add
-types to its newest element.  When both modes are equally successful in
-locating an impedance mismatch, measuring the rational programmer's effort
-may answer which mode is the most effective.
+types to its newest element.  If both modes are equally successful in
+locating an impedance mismatch, measuring the rational programmer's effort with each mode
+may answer which is the most effective.
 
 
 However, attributing the success of the rational programmer to this or
 that blame mechanism demands a careful look at the interplay between blame
 and the run-time checks of each gradual type system. When a check fails
-the Natural and Transient semantics assign blame and discard  the
+the Natural and Transient semantics assign blame instead of using the
 information in the exception from the run-time check. Nevertheless, the
 exception information may be equally or even more useful to the rational
-programmer than blame. If this is the case blame may not play a critical
+programmer than blame. If this is the case, then blame may not play a critical
 role for the rational programmer. Indeed, precisely because they do not
-account for confounding factors, ~\citet{lksfd-popl-2020} cannot draw any
-conclusions about the pragmatics of blame despite advertisements for the
-opposite. Their experiment can only conclude that so-called blame-shifting
+account for confounding factors, \citet{lksfd-popl-2020} cannot draw any
+conclusions about blame specifically despite advertisements for the
+opposite. Their experiment can conclude that so-called blame-shifting
 works but not that this is because of blame. 
 
 Modes offer a uniform way to compare the different semantics and  isolate
-blame from the effect of the semantics's runtime checks. Specifically, the Natural and
+blame from the effect of the semantics' runtime checks. Specifically, the Natural and
 Transient rational programmer come with a blame mode and an exception
-mode. Only if the former succeeds debugging a program while the latter
-fails, it is safe to conclude that blame is indeed necessary for the
+mode. If the former succeeds debugging a program while the latter
+fails, then it is safe to conclude that blame is indeed necessary for the
 rational programmer. Put differently, the exception mode serves as the
 {\em baseline\/} for blame's value within a given semantics; if the
-programmer in this mode ``beats'' the  blame one, a blame assignment
+programmer in this mode performs as well or better than the  blame one, a blame assignment
 mechanism might be useless.
 
-Besides the run-time checks, pure luck might also amplify the usefulness
-of blame. Thus a proper evaluation of blame needs to factor out any random
-effects too. A random rational programmer mode provides yet another necessary
-baseline using the same ingredients as for exceptions. 
+Besides the run-time checks, the usefulness of blame might be due to pure luck.
+Indeed, a proper evaluation of blame needs to consider the role of chance in blame assignment, too.
+A random rational programmer mode provides yet another necessary baseline using the same ingredients as for exceptions. 
 
 The {\em second challenge\/} is to find a representative collection of
 programs with impedance mismatches. The latter must represent mistakes that programmers
@@ -107,9 +102,9 @@ result from the combination of mutation-based scenario generation and mode-based
 analysis. All three factors---three different gradual typing systems, the large
 number of mutants, and the number of debugging modes---contribute possibly
 useful experimental data in a multiplicative manner. Hence, carried out naively,
-the experiment would demand an unacceptably large amount of computational
+the experiment would demand an infeasible amount of computational
 resources.  A practical execution has no option but to {\em sample the space of
-scenarios\/}, carefully ensuring that it still produces reproducible
+scenarios\/}, carefully ensuring that it still has reproducible
 conclusions.
 
 The next three sections explain how to overcome the three challenges

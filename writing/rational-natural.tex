@@ -3,38 +3,37 @@
 The Natural semantics assigns blame to exactly one boundary.  A blame assignment
 has the following specific meaning: the typed component may make incorrect type
 assumptions about the untyped component in its interface, or the correct
-interface exposes a bug in the untyped component. Our setup rules out the first
+interface exposes a bug in the untyped component (or its dependencies). Our setup rules out the first
 alternative (but see section~\ref{sec:conclusion}), and therefore the rational
 programmer extends the trail to a scenario that swaps out the untyped component
 for its typed counterpart.
 
-Here is a rigorous definition.
+Formally,
 \begin{quote}
 \it A \emph{Natural blame trail} is a sequence of scenarios $\conf_0,...\conf_n$ of
 a program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
-\conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =\{\blame{\system, \conf_i}\}$ where
+\conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =\{\blame{\system, \conf_i}\}$, where
 $\blame{\system, \conf}$ denotes the component that $\conf$ blames.
 \end{quote}
 
 When the buggy untyped component of a program is replaced by the typed counterpart,
-the type checker fails if this component causes the impedance mismatch. Hence, a
-trail that ends at an ill-typed scenarios successfully pinpoints the location of
-bugs. 
+the type checker fails because this component causes the impedance mismatch. Hence, a
+trail that ends at an ill-typed scenario successfully pinpoints the location of
+the bug. 
 \begin{quote}
 \it A Natural blame trail $\conf_0,...\conf_n$ in a lattice $\lattice{\system}$ is
 \emph{successful} iff (the program for) its last scenario $\conf_n$ does not type check.  A Natural
 blame trail $\conf_0,..,\conf_n$ in a lattice $\lattice{\system}$ is \emph{failing}
 iff (the program for) $\conf_n$ type checks and the trail cannot be extended further.
 \end{quote}
-That is, failing Natural blame trails are those that have not reached a scenario
-that reveals the bug at compile time and ends in a scenario that does not blame
-an untyped component during program execution. Thus the rational programmer gets
+That is, failing Natural blame trails are those that end in a scenario that does not reveal the bug statically, yet also does not blame
+an untyped component. Thus the rational programmer gets
 no hints from the gradual type system on how to continue the search for the bug.
 
 While a successful Natural blame trail indicates that it 
 pays off to heed blame assignments during debugging the trail's root, it does not answer whether
 blame is a critical piece of the rational programmer's process.  For instance,
-typing the top of stack trace of a failed run time type check, dubbed the
+typing the top of a failed run time type check's stack trace, dubbed the
 location of the exception, might be as useful as typing the blamed one.
 
 To account for this situation, a new mode of the Natural rational
@@ -48,8 +47,8 @@ where $\exception{\system, \conf}$ denotes the location of the exception of $\co
 
 The definition of success for a Natural exception trail follows that for
 a Natural blame trail.
-Together the definitions for the two modes allow the comparison of the usefulness of blame 
-with that for mere exceptions for debugging a scenario in the context of Natural semantics.
+Together, the definitions for the two modes allow the comparison of the usefulness of blame 
+with that of mere exceptions for debugging a scenario in the context of Natural semantics.
 \begin{quote}
 \it 
   Given a program $\system$ and a root $\conf_0$ in $\lattice{\system}$,
