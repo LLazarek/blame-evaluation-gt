@@ -73,12 +73,11 @@ module the programmer should type next, e.g. because the stack trace
 does not contain frames from any module of the program, or only typed modules. This situation
 can happen at any point along a blame trail (figure~\ref{fig:effort-table} dives into this below), causing it to fail.
 
-While most failures to debug scenarios follow the above pattern, a few do not.
-Breaking down the reasons for failure for Natural blame (1748 in total)
-reveals an additional cause. For a small set of
-debugging scenarios (40), Natural produces a run time type error
-blaming a non-buggy already typed
-component. We tracked down all these cases to known open issues with Typed
+While most failures to debug scenarios follow the above pattern, a few do
+not.  Breaking down the reasons for failure for Natural blame (1748 in
+total) reveals an additional cause. For a small set of debugging scenarios
+(40), Natural produces a run time type error blaming a non-buggy already
+typed component. All these cases are due to known open issues with Typed
 Racket and class contracts. 
 
 In Transient, similar to Natural,
@@ -186,12 +185,22 @@ the first try. Otherwise the rational programmer types an irrelevant
 module, runs the program again, and the same exception points again to the
 already typed module. 
 
-Figure~\ref{fig:effort-comparisons} provides head-to-head comparisons of effort.
-To directly compare effort between modes, we compute the difference in trail length between two modes for all scenarios where they both succeed.
-Hence, each plot in the figure shows the distribution of scenarios with length differences ranging from -3 (the first mode's trail is 3 steps shorter than the second's) to 3 (the first mode's trail is 3 steps longer than the second's).
-The figure offers several insights about the comparative effort for each mode that complement the insights about comparitive success from figure~\ref{fig:avo-bars}.
-First, Natural blame never produces shorter trails than Natural exceptions, and sometimes (albeit rarely) produces slightly longer ones.
-Second, Natural relatively often (around 10\% of the scenarios) produces shorter trails than both Transient blame modes, and they are sometimes significantly shorter.
-Third, Transient last blame often produces shorter trails than Transient first blame, which is a particularly interesting distinction in light of their nearly indistinguishable success rates.
-Finally, Transient's blame modes also share the characteristic with Natural that blame sometimes produces longer trails than their corresponding exception modes.
+Figure~\ref{fig:effort-comparisons} provides head-to-head comparisons of
+effort.  The effort comparison between modes boils down to the
+difference in trail length between two modes for all scenarios where they
+both succeed.  Hence, each plot in the figure shows the distribution of
+scenarios with length differences ranging from -3 (the first mode's trail
+is 3 steps shorter than the second's) to 3 (the first mode's trail is 3
+steps longer than the second's).  The figure offers several insights about
+the comparative effort for each mode that complement the insights about
+comparitive success from figure~\ref{fig:avo-bars}.  First, Natural blame
+never produces shorter trails than Natural exceptions, and sometimes
+(albeit rarely) produces slightly longer ones.  Second, Natural relatively
+often (around 10\% of the scenarios) produces shorter trails than both
+Transient blame modes, and they are sometimes significantly shorter.
+Third, Transient last blame often produces shorter trails than Transient
+first blame, which is a particularly interesting distinction in light of
+their nearly indistinguishable success rates.  Finally, Transient's blame
+modes also share the characteristic with Natural that blame sometimes
+produces longer trails than their corresponding exception modes.
 
