@@ -1,13 +1,16 @@
 
-Theoreticians of gradual typing have focused on blame theorems from the very
-beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
+Theoreticians of gradual typing have focused on blame theorems from the
+very beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
 [components]\footnote{The original authors got this word wrong.} can't be
-blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Academic systems
-(Reticulated Python~\cite{vsc-dls-2019, vss-popl-2017, vksb-dls-2014} and Typed
-Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010}) come
-with sophisticated checking and blame assignment strategies (see sec.~\ref{sec:landscape}). Their academic creators embrace
-the idea that blame can help practicing programmers find impedance mismatches: disagreements
-between the types they added to a software system and its behavior.
+blamed'' turned the theorem into a slogan~\cite{wf-esop-2009}. Academic
+systems (Reticulated Python~\cite{vsc-dls-2019, vss-popl-2017,
+vksb-dls-2014} and Typed
+Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010})
+come with sophisticated checking and blame assignment strategies (see
+sec.~\ref{sec:landscape}). Their academic creators embrace the idea that
+blame can help practicing programmers find impedance mismatches:
+disagreements between the type ascriptions of a software system and its
+behavior.
 
 Industrial implementors of gradual typing systems have almost
 completely ignored blame assignment.  Systems such as Flow, Hack, or
@@ -48,7 +51,7 @@ The paper's {\it second contribution\/} is a set of {\em results from applying
 the evaluation method to three distinct blame assignment strategies in
 approximately 72,200 different scenarios\/} (see sec.~\ref{sec:results}): (1)~{\it
 Transient\/}, i.e. Reticulated's tracking of typed/untyped boundaries~\cite{vss-popl-2017}; (2)~{\it
-Natural\/}, i.e. the use of a higher-order contract system and its blame
+Natural\/}, i.e. Typed Racket's use of a higher-order contract system and its blame
 assignment~\cite{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e. the approach of
 industrial systems, which forgo blame in favor of error messages from the safety
 checks of the underlying language. The results (see
@@ -61,8 +64,8 @@ blame'' tracking algorithm, which in turn is superior to Erasure. {\em But\/},
 the application of the method also indicates problems with the expectations of
 theoreticians. The first problem is that the cost of Transient's blame can be
 huge. The second one concerns the difference between the methods; neither is
-{\it Natural\/} vastly better than {\it Transient\/} nor are the two blame
-assignment methods clearly preferable to {\it Erasure\/}.  In turn, these
+{\it Natural\/} vastly more useful than {\it Transient\/} nor are the two blame
+assignment methods always superior to {\it Erasure\/}.  In turn, these
 problems suggest that, on one hand, the existing theory does not predict
 practice properly, and on the other hand, the existing practice may need
 additional experiments to collect more data.
