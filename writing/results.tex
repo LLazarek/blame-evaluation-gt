@@ -65,16 +65,16 @@ Figure~\ref{fig:success-bars} summarizes the overall success rates of
 every mode.\footnote{The random mode behaves the same for
 all three semantics, so this analysis considers it a single mode.}
 The success rates illustrate a few points that underlie the
-rest of our analysis.  The first notable piece of information from this
+rest of the analysis.  The first notable piece of information from this
 figure is that every mode has failed debugging scenarios, not just
 Erasure. This should not come as a surprise to the astute reader.  Running
-a mode of the rational programmer on a scenario may result in an exception
+a rational programmer mode on a scenario may result in an exception
 that carries no useful information about which module the programmer
 should type next. For instance the stack trace of the exception may not
-contain frames from any untyped module of the program. This situation can happen at any point
+contain frames from any untyped module of the program. This can happen at any point
 along a blame trail, causing it to fail.
 
-While most failures to debug scenarios follow the above pattern, a few do
+While most blame trail failures follow the above pattern, a few do
 not.  Breaking down the failure reasons for Natural blame (1748 in
 total) reveals an additional cause. For a small set of debugging scenarios
 (40), Natural produces a run time type error blaming a non-buggy
@@ -84,12 +84,13 @@ Racket and class contracts.
 In Transient, similar to Natural, most failures are due to unhelpful
 exception information (1851 for both Transient first and last blame).
 However, Transient also has a substantial number of failures because
-scenarios hit the time and memory limits of our experiment
+scenarios hit the time and memory limits of the experiment
 (\textasciitilde770 scenarios).  Additionally, there are nearly 1,000
 cases where Transient reports an empty blame set, leaving the rational
 programmer without hints about how to proceed.
 Sections~\ref{sec:threat:transient} and ~\ref{sec:threat:transient2}
-explain both of these causes of failure for Transient in detail and how they affect our
+explain both of these causes of failure for Transient in detail and how
+they affect the
 experiment. 
 
 The second key observation from figure~\ref{fig:success-bars} is that the
@@ -178,8 +179,7 @@ succeed on 59.5\% of the  scenarios, only Natural and Natural exceptions
 succeed on 25.7\% of the scenarios, only Natural and Erasure succeed on
 2.1\%, and Natural alone succeeds on 9.7\%.  This analysis highlights
 the success trade-offs each semantics offers against Erasure, with and
-without blame. Hence, it answers questions about how to choose to between
-blame or just exceptions for each semantics.  For instance, the analysis
+without blame. For instance, the analysis
 for Natural clearly illustrates that, when choosing between Natural blame,
 Natural exceptions, and Erasure, Natural blame is the absolutely most
 successful: all of the successes of the other two modes are subsets of
