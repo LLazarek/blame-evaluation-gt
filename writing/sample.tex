@@ -2,26 +2,25 @@
 
 %  from section~\ref{sec:mutate} (96,515,744)
 
-As is, the chosen mutators generate a huge number of debugging scenarios,
-approximately 1,000,000 for the chosen benchmark. This number of scenarios is
+As is, the chosen mutators generate a huge number of debugging scenarios:
+approximately 1 million for the chosen benchmarks. This number of scenarios is
 far too large to even identify the interesting ones among them.  Furthermore
-this population is heterogeneous; different scenarios come from different
-mutants and different mutants are the result of a different mutator and
-benchmark pair.
+this population is heterogeneous; scenarios come from different
+mutants, and the mutants are the result of different mutators applied to each
+benchmark.
 
-To make the experiment computationally feasible and statistically sound,
-stratified uniform random sampling with three levels of stratification becomes
-necessary.  The first two levels group mutants first by benchmark and then by
-mutator.  The set of the randomly selected mutants of each benchmark is
-checked to make sure that, per benchmark, the sample reflects the diversity of
+To become computationally feasible and statistically sound, the experiment employs
+stratified uniform random sampling with three levels of stratification.
+The first two levels group mutants first by benchmark and then by
+mutator, making sure that the sample within each benchmark reflects the diversity of
 mutants with respect to the mutators that generated them.  Specifically, the
-process samples 80 mutants with interesting scenarios per benchmark,
+experiment samples 80 interesting mutants per benchmark,
 evenly-distributed across all of the mutators that contribute mutants for the
-benchmark. Some benchmarks has less than  80 mutants with interesting scenarios
-in which case the process collects them all which results in a total of 756 mutants
-across all benchmarks.  
-At the third level, the sampling process draws 96 random interesting
-scenarios from each configuration lattice with replacement. In sum, the
-final sample consists of 72,200 interesting scenarios.
+benchmark. Some benchmarks have less than  80 mutants with interesting scenarios,
+in which case the only choice is to take them all.
+The result is a total of 756 interesting mutants across all benchmarks.
+Finally, the third level of sampling draws 96 random interesting debugging
+scenarios from each configuration lattice with replacement. The
+final sample thus consists of 72,192 interesting scenarios.
 
 
