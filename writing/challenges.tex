@@ -7,8 +7,8 @@ of representative debugging scenarios; and third is finding a proper sampling st
 huge space of possibilities. A coincidental challenge is the disparity of the
 implementations of gradually typed languages. To eliminate this variable, the
 authors use Racket, which is thus far the only language in which all three major
-soundness mechanisms are available in a reasonably robust and comparable manner;
-for the implementation of the transient semantics, see the parallel submission
+soundness mechanisms are available in a robust and comparable manner;
+for the implementation of Transient Typed Racket, see the parallel submission
 of an experience report~\cite{ttt21}.
 
 The {\em first challenge\/} stems from the differences between the blame
@@ -41,13 +41,13 @@ information in the exception from the run-time check. Nevertheless, the
 exception information may be equally or even more useful to the rational
 programmer than blame. If this is the case, then blame may not play a critical
 role for the rational programmer. Indeed, precisely because they do not
-account for confounding factors, \citet{lksfd-popl-2020} cannot draw any
+account for such confounding factors, \citet{lksfd-popl-2020} cannot draw any
 conclusions about blame specifically despite advertisements for the
 opposite. Their experiment can conclude that so-called blame-shifting
 works but not that this is because of blame. 
 
 Modes offer a uniform way to compare the different semantics and  isolate
-blame from the effect of the semantics' runtime checks. Specifically, the Natural and
+blame from the effect of the semantics' run-time checks. Specifically, the Natural and
 Transient rational programmer come with a blame mode and an exception
 mode. If the former succeeds debugging a program while the latter
 fails, then it is safe to conclude that blame is indeed necessary for the
