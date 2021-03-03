@@ -18,7 +18,7 @@ directly or indirectly. This impedance mismatch is of interest if, and only if,
 running the program leads to an exception---otherwise it goes unobserved and
 cannot be debugged.
 
-\item If the evaluation od a mutant module immediately raises an exception because
+\item If the evaluation of a mutant module immediately raises an exception because
 of the changes, there is no work for the rational programmer. Indeed, if the
 stack trace contains source pointers to two modules, the scenario is still
 uninteresting. Every ordinary benchmark program comes with a {\tt main} module
@@ -67,3 +67,17 @@ one benchmark.  Some mutators apply only to a few benchmarks, because they
 target rather specific features; for instance, the class-focused mutators are
 mainly effective in a program that makes extensive use of object-oriented
 features.
+
+The definition of interesting scenarios is more than a filter for
+uninteresting mutants. It is also the guide for re-designing and refining
+mutators until they collectively produce a sizable and diverse population of
+interesting scenarios. For example, the {\tt wrap-cond} mutator casts the
+tests of conditional expressions to the {\tt Any} type and, hence,
+suppresses occurrence typing. However, an examination of the scenarios it
+produces through the lens of the definition of interesting scenarios
+reveals that none is interesting. The fully typed mutant does fails to
+typecheck but its variant without type annotations never raises a run-time
+error. In fact, it turns out 1/4 of the mutators originally designed for
+the experiment fail to live up to the standard of the definition while
+many of the rest of the mutators went thought rounds of tweaking
+to increase their potency.
