@@ -1,19 +1,20 @@
 %% -----------------------------------------------------------------------------
 
-While at first glance the method of section~\ref{sec:why-rational} seems straightforward to implement and test,
-three challenges remain. The first is comparing the effect of blame on the rational
-programmer across three different mechanisms; second is the collection of a large number
-of representative debugging scenarios; and third is finding a proper sampling strategy for the
+While at first glance the method of section~\ref{sec:why-rational} seems
+straightforward to implement and test, three challenges remain. The first is
+comparing the effect of blame on the rational programmer across three different
+mechanisms; second is the collection of a large number of representative
+debugging scenarios; and third is finding a proper sampling strategy for the
 huge space of possibilities. A coincidental challenge is the disparity of the
 implementations of gradually typed languages. To eliminate this variable, the
 authors use Racket, which is thus far the only language in which all three major
-soundness mechanisms are available in a robust and comparable manner;
-for the implementation of Transient Typed Racket, see the parallel submission
-of an experience report~\cite{ttt21}.
+soundness mechanisms are available in a robust and comparable manner; for the
+implementation of Transient Typed Racket, see the parallel submission of an
+experience report~\cite{ttt21}.
 
 The {\em first challenge\/} stems from the differences between the blame
 assignment mechanisms of the three semantic variants.  While Natural assigns
-blame to {\em one\/} component, Transient assigns blame to a set of
+blame to {\em one\/} component, Transient assigns blame to a sequence of
 components. The Erasure semantics does not blame components {\it per se\/}, but
 it comes with an exception location and a stack trace, which implicitly suggests
 parties to blame.  Each strategy affects the behavior of the rational programmer
@@ -25,9 +26,9 @@ information the rational programmer takes into account when debugging a
 scenario. Intuitively, with the common vocabulary of modes, different
 blame strategies become different ways the rational programmer  interprets
 blame.  For instance, one Transient mode may pick the oldest element of a
-blame set as the next component to add types because it corresponds to the
+blame sequence as the next component to add types because it corresponds to the
 earliest point in the program's evaluation that can discover an impedance
-mismatch.  Another mode may opt to treat the set as a stack and add
+mismatch.  Another mode may opt to treat the sequence as a stack and add
 types to its newest element.  If both modes are equally successful in
 locating an impedance mismatch, measuring the rational programmer's effort with each mode
 may answer which is the most effective.
@@ -38,18 +39,18 @@ that blame mechanism demands a careful look at the interplay between blame
 and the run-time checks of each gradual type system. When a check fails
 the Natural and Transient semantics assign blame instead of using the
 information in the exception from the run-time check. Nevertheless, the
-exception information may be equally or even more useful to the rational
-programmer than blame. If this is the case, then blame may not play a critical
+exception information may be as useful to the rational
+programmer as a blame assignment. If this is the case, then blame may not play a critical
 role for the rational programmer. Indeed, precisely because they do not
 account for such confounding factors, \citet{lksfd-popl-2020} cannot draw any
-conclusions about blame specifically despite advertisements for the
-opposite. Their experiment can conclude that so-called blame-shifting
-works but not that this is because of blame. 
+conclusions about blame specifically, despite advertisements for the
+opposite. Their experiment may conclude only that so-called blame-shifting
+works, but they cannot attribute this conclusion to blame. 
 
 Modes offer a uniform way to compare the different semantics and  isolate
 blame from the effect of the semantics' run-time checks. Specifically, the Natural and
 Transient rational programmer come with a blame mode and an exception
-mode. If the former succeeds debugging a program while the latter
+mode. If the former succeeds in debugging a program while the latter
 fails, then it is safe to conclude that blame is indeed necessary for the
 rational programmer. Put differently, the exception mode serves as the
 {\em baseline\/} for blame's value within a given semantics; if the
@@ -76,7 +77,7 @@ jia2011analysis}. Conventional mutation analysis is useless, however.  Mutation
 analysis traditionally aims to inject bugs that challenge test suites, and it
 discards those that yield ill-typed mutants as \emph{incompetent}. Indeed,
 mutation analysis frameworks are fine-tuned to avoid them, and yet, it is
-precisely those that are needed for evaluating blame assignment strategies.
+precisely those mutators that are needed for evaluating blame assignment strategies.
 
 Based on a related experience, Gopinath and Walkingshaw~\cite{gw-mutation} write,
 ``existing mutation frameworks \ldots\ do not generate the kinds of mutations
@@ -86,16 +87,16 @@ While the goal of their work---to evaluate the quality of types in
 Python---is unrelated to the one here, the mechanism is related. And their
 judgment confirms the experience of the authors. 
 
-Thus, an experimental analysis of blame needs a mostly new set of mutators.
+An experimental analysis of blame needs a mostly new set of mutators.
 Roughly speaking, the new mutators inject type errors into fully typed programs.
 Applying such a mutator to any typed component produces a mutated component.  A
-debugging scenario results from removing the types from the mutated component. For the
-design of such mutators, the authors relied on their own extensive programming
-experience though not without discovering a major pitfall: some of their
-original mutators systematically produced programs that immediately revealed the
-source of the impedance mismatch. About four fifths of the original mutators
-survived this first scrutiny testing. All of the remaining ones yield {\em
-interesting debugging scenarios\/} (see section~\ref{sub:mutate-interesting}).
+debugging scenario results from removing the types from the mutated
+component. For the design of such mutators, the authors relied on their own
+extensive programming experience though not without discovering a major pitfall:
+some of their original mutators systematically produced programs that
+immediately revealed the source of the impedance mismatch.  All of the remaining
+ones yield {\em interesting debugging scenarios\/} (see
+sec.~\ref{sub:mutate-interesting}).
 
 The {\em third challenge\/} is the explosive number of debugging scenarios that
 result from the combination of mutation-based scenario generation and mode-based

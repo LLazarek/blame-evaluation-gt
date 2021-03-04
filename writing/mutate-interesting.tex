@@ -22,8 +22,8 @@ under Erasure\/}.
 {\bf Note} While this choice favors Erasure over Transient and Natural and, for
 the same reason, Transient over Natural, some form of bias towards one or the
 other semantics is unavoidable. Tipping the scales in favor of the theoretically
-weakest semantics yields the most stable results. See
-section~\ref{sec:discussion} for some further discussion of this choice.
+weakest semantics yields the most stable results. 
+Section~\ref{sec:discussion} includes some further discussion of this choice.
 
 
 \item If the evaluation of a mutated module immediately raises an exception because
@@ -45,7 +45,7 @@ interaction.
  \includegraphics[scale=0.33]{./plots/mutant-breakdown}
   Counts are cut off at 50.
 
-\caption{The mutators produce Interesting debugging scenarios across all benchmarks.} 
+\caption{The generated debugging scenarios across all benchmarks} 
  \label{fig:mutant-breakdown}
 \end{figure*}
 
@@ -61,14 +61,13 @@ target rather specific features; for instance, the class-focused mutators are
 mainly effective in a program that makes extensive use of object-oriented
 features.
 
-The definition of interesting mutants is more than a filter for
-uninteresting mutants. It is also the guide for evaluating and refining
-mutators until they collectively produce a sizable and diverse population of
-interesting mutants. For example, one early mutator idea casts the
-tests of conditional expressions to the {\tt Any} type to
-suppress occurrence typing. However, an examination of the mutants it
-produces through the lens of the definition of interesting mutants
-reveals that none is interesting because they never raise run-time errors.
-Indeed, the interesting standard guided countless iterations of adding,
-removing, and refining the mutators in figure~\ref{table:mutation-ops}
-to maximize interesting mutants.
+The definition of interesting mutants is more than a filter for uninteresting
+mutants. It is also the guide for evaluating and refining mutators until they
+collectively produce a sizable and diverse population of interesting
+mutants. Consider a candidate for the set of mutators that casts the tests of conditional
+expressions to the {\tt Any} type, which would suppress occurrence typing. An
+examination of its mutants through the lens of ``interesting'' reveals that none
+of them is interesting, because they never raise run-time errors. Hence Indeed,
+the interesting standard guided countless iterations of adding and removing
+mutators and of refining the chosen mutators in figure~\ref{table:mutation-ops}.
+

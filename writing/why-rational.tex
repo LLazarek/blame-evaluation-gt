@@ -2,7 +2,7 @@
 
 The general challenge of evaluating blame is a methodological one. Unlike most
 current research on programming languages, the question seems to call for
-empirical research similar to that of human-computer interaction. At the same
+empirical studies similar to those of human-computer interaction. At the same
 time, a significant evaluation result demands a large amount of
 data. As~\citet{lksfd-popl-2020} recently demonstrated, the way around this
 dilemma is to simulate a programmer's activities algorithmically on a large set
@@ -35,8 +35,8 @@ who opens a module for maintenance purposes must study the module's design and,
 as part of the process, is bound to re-construct the types that went into the
 module's creation.  To help future maintainers, the developer should report
 these insights as type annotations. Over time, the code base migrates into a mix
-of typed and untyped modules. As~\citet{tfffgksst-snapl-2017} reported, though,
-it is at least equally common that developers add typed modules that depend on
+of typed and untyped modules. As~\citet{tfffgksst-snapl-2017} report though,
+it is equally common that developers add typed modules that depend on
 the existing modules in the code base.
 
 Now consider the concrete (and simplistic) example of figure~\ref{fig:rational}.
@@ -64,8 +64,8 @@ definitive hint is ``{\tt blaming: (interface for na-client)}'' with the caveat
 Assuming the rational programmer trusts the type of {\tt na-client}, the next
 step is to inspect the {\tt layer} module and to equip it with type
 annotations. The result is the \typecolor\ module in the middle, and {\tt
-main}'s import is now re-directed there by {\tt (submod ".." layer-typed)}. Running the
-modified program yields a different error message:
+main}'s import is now re-directed there by {\tt (submod ".." layer-typed)}. As
+predicted by the theory, running the modified program yields a different error message:
 \begin{verbatim}
     neg-abs: broke its own contract
       promised: (<=/c 0)

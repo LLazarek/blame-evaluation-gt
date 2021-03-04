@@ -1,44 +1,42 @@
 %% -----------------------------------------------------------------------------
 
-A machine with two Intel Xeon Gold 6258R processors (28 doubly-threaded cores each)
-and 500GB of memory ran the experimental process from section~\ref{sec:rational} on the
-sampled debugging scenarios from section~\ref{sec:sample}.  Each debugging scenario had a 4 minute timeout and a
-memory limit of 6GB. The complete experiment required over 30,000 compute
-hours.
-
-
-\begin{wrapfigure}{r}{.40\textwidth}
-  \includegraphics[width=0.40\textwidth]{./plots/success-bars}
-
+\begin{wrapfigure}{r}{.40\textwidth} \footnotesize 
+  \vspace{-1.5em}
+  \includegraphics[width=0.38\textwidth]{./plots/success-bars}
   \vspace{1em}
-  \begin{minipage}{0.4\textwidth}
-  The estimated percentage of scenarios for which each mode succeeds in locating the bug.
-  The upper bound margin of error is 0.02\%.
+  \begin{minipage}{0.35\textwidth} \raggedright
+%   The estimated percentage of scenarios for which each mode succeeds in locating the bug.
+   The upper bound margin of error is 0.02\%.
   \end{minipage}
-
-  \caption{Success rates.}
-  \label{fig:success-bars}
+\vspace{-2em}
+  \caption{Percentage rates of success} \label{fig:success-bars}
 \end{wrapfigure}
 
-\begin{figure}
+The test bed for executing the experimental process utilizes a machine with two
+Intel Xeon Gold 6258R processors (28 doubly-threaded cores each) and 500GB of
+memory.  Each debugging scenario had a 4 minute timeout and a 6GB memory
+limit. Running the experiment on all debugging scenarios took over
+30,000 compute hours.
+
+\begin{figure} \footnotesize 
   \centering
   \includegraphics[width=\textwidth]{./plots/avo-bars}
 
   \vspace{1em}
   \begin{minipage}{0.95\textwidth}
-  Each plot depicts a head-to-head comparison of the entitled mode against every other mode.
-  The portion above 0 (in green) is the estimated percentage of scenarios where the entitled mode is more useful
-    than the other mode.
-  The portion below 0 (in red) is the estimated percentage of scenarios
-    where the entitled mode is less useful than the other mode.
-  The upper bound margin of error is 0.02\%.
+      Each plot depicts a head-to-head comparison of the mode named above the
+      plot vs. every other mode.  The (green) portion above 0 is the estimated
+      percentage of scenarios where the named mode is more useful than the
+      other.  The (red) portion below 0 is the estimated percentage of scenarios
+      where the named mode is less useful than the other.  The upper bound
+      margin of error is 0.02\%.
   \end{minipage}
 
-  \caption{Usefulness comparisons.}
+  \caption{Usefulness comparisons}
   \label{fig:avo-bars}
 \end{figure}
 
-\begin{figure}
+\begin{figure}\footnotesize 
   \centering
   \includegraphics[width=0.32\textwidth]{./plots/TR-TR-stack-first-venn}
   \hfill
@@ -48,22 +46,24 @@ hours.
 
   \vspace{1em}
   \begin{minipage}{0.95\textwidth}
-  Each diagram shows the overlap of the successful scenarios for three modes.  
-     For example, in the leftmost diagram, all three modes succeed on the
-    same scenario 57.3\% of the time, only Natural and Natural exceptions
-    succeed on 29.1\% of the scenarios, only Natural and Erasure succeed
-    on 2.1\%, and Natural alone succeeds on 9\%.  The upper bound margin
-    of error is 0.02\%.
+
+     Each diagram shows the overlap of the successful scenarios for three modes.
+     For example, in the leftmost diagram, all three modes succeed on the same
+     scenario 57.3\% of the time, only Natural and Natural exceptions succeed on
+     29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and
+     Natural alone succeeds on 9\%.  \\ The upper bound margin of error is 0.02\%.
+
   \end{minipage}
 
-  \caption{Blame usefulness analysis.}
+  \caption{Blame usefulness analysis}
   \label{fig:success-venns}
 \end{figure}
 
 
+% \footnote{The random mode behaves the same for all three semantics, so this analysis considers it a single mode.}
+
 Figure~\ref{fig:success-bars} summarizes the overall success rates of
-every mode.\footnote{The random mode behaves the same for
-all three semantics, so this analysis considers it a single mode.}
+every mode.
 The success rates illustrate a few points that underlie the
 rest of the analysis.  The first notable piece of information from this
 figure is that every mode has failed debugging scenarios, not just
@@ -80,17 +80,14 @@ total) reveals an additional cause. For a small set of debugging scenarios
 already-typed module. All these cases are due to known open issues with Typed
 Racket and class contracts. 
 
-In Transient, similar to Natural, most failures are due to unhelpful
-exception information (1851 for both Transient first and last blame).
-However, Transient also has a substantial number of failures because
-scenarios hit the time and memory limits of the experiment
-(\textasciitilde770 scenarios).  Additionally, there are nearly 1,000
-cases where Transient reports an empty blame set, leaving the rational
-programmer without hints about how to proceed.
-Sections~\ref{sec:threat:transient} and ~\ref{sec:threat:transient2}
-explain both of these causes of failure for Transient in detail and how
-they affect the
-experiment. 
+In Transient, similar to Natural, most failures are due to unhelpful exception
+information (1851 for both Transient first and last blame).  However, Transient
+also has a substantial number of failures because scenarios hit the time and/or
+memory limits of the experiment (\textasciitilde770 scenarios).  Additionally,
+there are nearly 1,000 cases where Transient reports an empty blame set, leaving
+the rational programmer without hints about how to proceed.
+Sections~\ref{sec:threat:transient} and ~\ref{sec:threat:transient2} address
+these causes of failure for Transient and how they affect the experiment.
 
 The second key observation from figure~\ref{fig:success-bars} is that the
 modes that use blame all outperform those that do not.  In particular,
@@ -101,13 +98,12 @@ exception is that the random programmer always succeeds; this reflects the
 fact that every scenario has finitely many modules, so the random programmer 
 eventually types the buggy module.
 
-
 Figure~\ref{fig:avo-bars} depicts a head-to-head comparison of every
 mode's performance against every other mode (except Random). The
 comparison  answers the four questions from section~\ref{sub:experiment}. 
 Each plot shows the proportion of scenarios where one mode performs
 better or worse than each other mode.  In particular, each bar above zero
-represents the proportion where the plot's entitled mode succeeds and the
+represents the proportion where the plot's named mode succeeds and the
 mode on the x-axis fails; the corresponding bar below zero represents the
 proportion of the inverse case.  For example, the plot titled ``Natural''
 shows that Natural outperforms Natural exceptions in about 12\% of the
@@ -134,56 +130,51 @@ Transient last blame are practically indistinguishable. Finally, there is
 no clear winner between Natural exceptions and Transient exceptions
 despite the theoretically advantageous additional checks of Natural.
 
-\begin{figure}
-  \centering
+\begin{figure} \footnotesize \centering
   \includegraphics[width=\textwidth]{./plots/bt-lengths-table}
 
   \vspace{1em}
   \begin{minipage}{0.95\textwidth}
-  Each plot depicts the distribution of trail lengths for a given mode across all benchmarks.
+    Each plot depicts the distribution of trail lengths for a given mode across all benchmarks.
   \end{minipage}
 
-  \caption{Programmer effort.}
-  \label{fig:effort-table}
+  \caption{Programmer effort} \label{fig:effort-table}
 \end{figure}
 
-\begin{figure}
-  \centering
+\begin{figure}\footnotesize \centering
   \includegraphics[width=\textwidth]{./plots/bt-length-comparisons}
 
   \vspace{1em}
   \begin{minipage}{0.95\textwidth}
-  Each plot depicts the distribution of scenarios with trail length
-    differences ranging from -3 to 3.  A -x difference denotes that
-    the first mode's trail is x steps shorter than the second mode's
-    trail for the same scenario, and a positive difference denotes the
-    inverse.  Only scenarios where both modes succeed are considered.  The
-    10|85 on the y-axis indicates that the axis is truncated between 10
-    and 85\%.
+
+    Each plot depicts the distribution of scenarios with trail length
+    differences ranging from -3 to 3.  A -x difference denotes that the first
+    mode's trail is x steps {\em shorter\/} than the second mode's trail for the
+    same scenario; a positive difference denotes the inverse.  Only
+    scenarios where both modes succeed are considered.  The 10|85 on the y-axis
+    indicates that the axis is truncated between 10 and 85\%.
+
   \end{minipage}
 
-  \caption{Effort comparisons.}
-  \label{fig:effort-comparisons}
+  \caption{Effort comparisons} \label{fig:effort-comparisons}
 \end{figure}
 
-In order to better understand the answers the experiment provides for
-questions $Q_1$ to $Q_3$, figure~\ref{fig:success-venns} depicts an
-analysis of the success of each semantics in comparison to Erasure.
+An alternative way to understand the answers for questions $Q_1$ to $Q_3$, is to
+analyze the success of each semantics in comparison to
+Erasure. Figure~\ref{fig:success-venns} depicts the results of this analysis.
 Specifically, the figure shows one Venn diagram per mode of the rational
 programmer that uses blame.  Each diagram shows the overlap of successful
-scenarios for  the blame mode, its corresponding exception mode, and Erasure.  For
-example, the leftmost diagram (Natural) shows that all three modes
-succeed on 59.5\% of the  scenarios, only Natural and Natural exceptions
-succeed on 25.7\% of the scenarios, only Natural and Erasure succeed on
-2.1\%, and Natural alone succeeds on 9.7\%.  This analysis highlights
-the success trade-offs each semantics offers against Erasure, with and
-without blame. For instance, the analysis
-for Natural clearly illustrates that, when choosing between Natural blame,
-Natural exceptions, and Erasure, Natural blame is the absolutely most
-successful: all of the successes of the other two modes are subsets of
-Natural's successful scenarios.  On the other hand, Transient's blame
-modes fare similarly but the choice is not so clear-cut.
-
+scenarios for the blame mode, its corresponding exception mode, and Erasure.
+For example, the leftmost diagram (Natural) shows that all three modes succeed
+on 59.5\% of the scenarios, only Natural and Natural exceptions succeed on
+25.7\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural
+alone succeeds on 9.7\%.  This analysis highlights the success trade-offs each
+semantics offers against Erasure, with and without blame. For instance, the
+analysis for Natural clearly illustrates that, when choosing between Natural
+blame, Natural exceptions, and Erasure, Natural blame is the absolutely most
+successful: all of the successes of the other two modes are subsets of Natural's
+successful scenarios.  On the other hand, Transient's blame modes fare similarly
+but the choice is not so clear-cut.
 
 Turning to programmer effort, figure~\ref{fig:effort-table} shows the
 distribution of blame trail lengths for the sampled interesting debugging
@@ -199,15 +190,15 @@ expected. In contrast, in the other modes, successful effort coalesces at
 the left side of the plot, meaning that in most cases the programmer needs
 to type a single module to debug a scenario. 
 
-A second point of interest is that the exceptions of the Erasure semantics
-either help the rational programmer immediately or the rational programmer
-fails to debug a scenario altogether (in red).  This is expected; adding
-type annotations to an Erasure program doesn't change it's behavior, so if
-the type checker doesn't reject the program with the new annotations, the
-rational programmer is stuck.  In other words, an exception from the
-runtime has to point to the buggy module with the first try. Otherwise the
-rational programmer types an irrelevant module, runs the program again,
-and the same exception points again to the already typed module. 
+Second, the exceptions of the Erasure semantics either help the rational
+programmer immediately or the rational programmer fails to debug a scenario
+altogether (in red).  This is expected; adding type annotations to an Erasure
+program does not change its behavior, so if the type checker does not reject the
+program with the new annotations, the rational programmer is stuck.  In other
+words, an exception from the runtime has to point to the buggy module with the
+first try. Otherwise the rational programmer types an irrelevant module, runs
+the program again, and the same exception points again to the already typed
+module.
 
 Figure~\ref{fig:effort-comparisons} provides head-to-head comparisons of
 effort.  The comparison between two modes boils down to the difference in
@@ -222,7 +213,7 @@ Natural blame never produces shorter trails than Natural exceptions, and
 sometimes (albeit rarely) produces slightly longer ones.  Hence, the
 experiment provides evidence that blame helps the rational programmer
 debug more scenarios but does not shorten the debugging process compared
-to exceptions. A second insight is that Natural relatively often (around 10\% of the
+to exceptions. Second, Natural relatively often (around 10\% of the
 scenarios) produces shorter trails than both Transient blame modes, and
 sometimes the trails are significantly shorter.  Third, Transient last
 blame often produces shorter trails than Transient first blame, which is a

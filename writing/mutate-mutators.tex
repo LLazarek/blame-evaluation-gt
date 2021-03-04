@@ -11,19 +11,21 @@ to blamed modules. In other words, the suitability of the mutators hinges
 on their ability to generate interesting debugging scenarios (see
 sec.~\ref{sub:mutate-interesting}).
 
+%% MF: I don't see what this contributes:
+% \footnote{Many of~\citet{lksfd-popl-2020} mutators do not satisfy the
+% constraints and had to be eliminated or significantly adapted. For example, the
+% relational mutator does not lead to type-level errors. Similarly, the
+% arithmetic mutator does not reliably lead to type errors; it had to be adapted
+% to make only operator swaps that can affect the type of the result, e.g.,
+% changing `*` to `/`.}
 
 Figure~\ref{table:mutation-ops} describes 16 mutators that satisfy these
-constraints. As the explanation indicates, some specialize or
+constraints. As the last column indicates, some specialize or
 generalize~\citet{lksfd-popl-2020}'s mutators, which in turn are borrowed from
-the vast literature on mutation testing~\cite{jia2011analysis}.\footnote{Many
-of~\citet{lksfd-popl-2020} mutators do not satisfy the constraints and had to
-be eliminated or significantly adapted. For example, the relational mutator does not lead to type-level
-errors. Similarly, the arithmetic mutator does not reliably lead to type
-errors; it had to be adapted to make only operator swaps that can affect the
-type of the result, e.g., changing `*` to `/`.}  Only two are directly
-inherited; many mutators are brand new. For the latter the authors relied on
-their decades-long experience of making type-level mistakes in Typed Racket,
-some of which take non-trivial effort to debug. 
+the vast literature on mutation testing~\cite{jia2011analysis}.  Only two are
+directly inherited; many mutators are brand new. For the latter, the authors
+relied on their decades-long experience of making type-level mistakes in Typed
+Racket, some of which take non-trivial effort to debug.
 
 Most of the mutators are self-explanatory.  The first six apply to all
 gradually typed languages; the next six to those that include classes and

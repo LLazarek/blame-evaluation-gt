@@ -1,3 +1,4 @@
+%% ------------------------------------------------------------------------------
 
 Theoreticians of gradual typing have focused on blame theorems from the
 very beginning~\cite{mf-toplas-2009, tf-dls-2006}. ``Well-typed
@@ -8,7 +9,7 @@ vksb-dls-2014} and Typed
 Racket~\cite{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010})
 come with sophisticated checking and blame assignment strategies (see
 sec.~\ref{sec:landscape}). Their academic creators embrace the idea that
-blame can help practicing programmers find impedance mismatches:
+blame can help practicing programmers find impedance mismatches, that is,
 disagreements between the type ascriptions of a software system and its
 behavior.
 
@@ -29,8 +30,8 @@ This contrast between theory and applications of gradual typing raises the quest
 Given the long-standing academic interest in blame and its complete absence in
 industrial systems, it comes as an even bigger surprise that the research
 literature and the industrial blog world do not discuss any possible answers.
-Instead, when language designers make relevant decisions, they seem to answer it
-one way or another without any scientific justification. Then again, the
+Instead, when language designers make decisions concerning this aspect, they seem
+to go one way or another without any scientific justification. Then again, the
 community has thus far failed to offer a method for evaluating blame assignment.
 
 This paper's {\em first contribution\/} is {\em a method for evaluating the
@@ -41,7 +42,7 @@ sec.~\ref{sec:why-rational}). In the case of an impedance mismatch, the
 available information consists of the error message and the current state of the
 program. The rational programmer can hence use the former to change the
 latter---and this systematic, information-driven process can be implemented and
-tested at scale on real programs.  Turning this idea into a scientific
+tested, at scale, on real programs.  Turning this idea into a scientific
 experiment requires overcoming major challenges: injecting representative
 impedance mismatches; putting the various kinds of error information to
 comparable use; and sampling the huge space of possibilities (see
@@ -49,7 +50,7 @@ sec.~\ref{sec:challenges} and, for details, secs.~\ref{sec:rational} through~\re
 
 The paper's {\it second contribution\/} is a set of {\em results from
 applying the evaluation method to three distinct blame assignment
-strategies in approximately 72,200 different scenarios\/} (see
+strategies in approximately 72,000 different scenarios\/} (see
 sec.~\ref{sec:results}): (1)~{\it Transient\/}, i.e. Reticulated's
 tracking of typed/untyped boundaries~\cite{vss-popl-2017}; (2)~{\it
 Natural\/}, i.e. Typed Racket's use of a higher-order contract system and
@@ -66,7 +67,7 @@ which in turn is superior to Erasure. {\em But\/}, the application of the
 method also indicates problems with the expectations of theoreticians. The
 first problem concerns the difference between the methods; neither is {\it
 Natural\/} vastly more useful than {\it Transient\/} nor are the two
-blame assignment methods always superior to {\it Erasure\/}.  The second
+blame assignment methods highly superior to {\it Erasure\/}.  The second
 one is that the cost of Transient's blame can be huge.  In turn, these
 problems suggest that, on one hand, the existing theory does not predict
 practice properly, and on the other hand, the existing practice may need

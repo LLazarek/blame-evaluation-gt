@@ -12,7 +12,7 @@ untyped (\dyncolor) syntax.
 
 \item[\texttt{pack-lib}] (at the top right) represents a library that provides,
 among others, a function {\tt pack}. As the documentation says, this function
-consumes JSON data and packages it in a dictionary. By mistake, though, the
+consumes JSON data and packages it in an association list (like a dictionary). By mistake, though, the
 function returns a hash table instead of the association list its documentation
 promises.
 
@@ -44,13 +44,11 @@ typed modules are wrapped in proxies that enforce the static type discipline
 with run-time checks and track responsibilities~\cite{tf-popl-2008,
 tfffgksst-snapl-2017}. Thus, when {\tt pack} is imported into a typed module,
 the run-time system checks that it is a function and wraps it in a protective
-proxy, which in turn, enforces the type of the function with run-time checks.
-In essence, these checks protect typed modules when they call an untyped function
-because it may not produce the promised kind of value, as is the case here with
-{\tt pack} from {\tt pack-lib}. Analogously the run-time system wraps each exported
-function of a typed module (such as {\tt crypto-pack}) in a proxy that checks
-its arguments.  These checks protect functions exported from typed modules against
-applications in untyped code that supply the wrong kind of arguments.
+proxy, which in turn, enforces the type of the function arguments with run-time checks.
+Analogously the run-time system wraps each exported function of a typed module
+(such as {\tt crypto-pack}) in a proxy that checks its arguments.  These checks
+protect functions exported from typed modules against applications in untyped
+code that supply the wrong kind of arguments.
 
 As this analysis implies, if a return-type check fails, the problem is with
 the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
@@ -58,7 +56,7 @@ an argument-type check fails, responsibility lies with {\tt client}. Due to the
 proxies wrapped around functions, Natural can easily track the responsible party
 for each check. Thus, in the example of figure~\ref{fig:example}, as
 \texttt{pack} returns, the return-type check fails and Natural blames
-\texttt{pack-lib}.
+\texttt{pack-lib} for both {\tt define}s in {\tt client}.
 
 Under {\it the Transient semantics\/}, typed code is compiled so that all entry
 points to functions check their arguments at run time and all function calls
@@ -66,7 +64,7 @@ check their return values against the expected type~\cite{vss-popl-2017}.
 Furthermore, Transient uses \emph{shallow} checks, meaning they inspect only the
 top constructor of a value. Since retrieving a value from within a structure (or
 list, array, hash table etc.) is performed via a function call, the contents of a
-complex value are checked on a piecemeal basis.
+complex value is checked on a piecemeal basis.
 
 As a result, the call to \texttt{typed-pack} does {\em not\/} signal an error
 because it takes place in the untyped {\tt client} module, which is compiled in
@@ -85,7 +83,7 @@ the return type of \texttt{pack}, Transient blames the sources of the two
 boundary crossings, which in this particular case is \texttt{pack-lib}. In
 general though, Transient blames more than one party. In fact, the theoretical
 work of~\citet{gfd-oopsla-2019} shows that for some programs Transient
-constructs a blame set that excludes responsible parties and includes modules
+constructs a blame sequence that excludes responsible parties and includes modules
 irrelevant to the failing check.
 
 Under {\it the Erasure semantics\/}, the compiler checks the specified types and

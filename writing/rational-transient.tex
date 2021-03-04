@@ -1,6 +1,6 @@
 %% -----------------------------------------------------------------------------
 
-The Transient semantics assigns blame to a set of modules. The blame
+The Transient semantics assigns blame to a sequence of modules. The blame
 assignment says that the value witnessing the impedance mismatch may have
 crossed the boundaries between elements in the set, and each crossing
 checked the value's type in a shallow manner.
@@ -8,30 +8,31 @@ checked the value's type in a shallow manner.
 This ambiguity in Transient blame raises the question of how the rational
 programmer should react when the language produces a blame set. Our answer
 is that the rational programmer has at least two reasonable options. The first
-one is to select the module that is added to the blame set first and
+one is to select the module that is added to the blame sequence first and
 assign types to only that one---after all, if fully checked, the types of this
 first module should be able to detect an impedance mismatch earlier in the
 evaluation of a program than the later ones. The second option is to select the
-module that is added to the blame set last, effectively interpreting the
-blame set as a boundary-aware stack.
+module that is added to the blame sequence last, effectively interpreting the
+blame sequence as a boundary-aware stack.
 
 These two modes of rationalizing give rise to two different notions of trail.
 
 \begin{quote}
-\it A \emph{Transient-first blame trail} is a sequence of scenarios
+\it A \emph{Transient-first blame trail}/\emph{Transient-last blame trail} is a sequence of scenarios
 $\conf_0,...\conf_n$ of $\system$ where for all $0 \leq i \leq n - 1$,
 $\conf_i \subset \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =
-\first{\mblame{\system, \conf_i}}$ where $\first{\mblame{\system, \conf}}$ is the
-first module Transient adds to the blame set for $\conf$.
+\first{\mblame{\system, \conf_i}}$ where $\first{\mblame{\system,
+\conf}}$/$\last{\mblame{\system, \conf}}$ is the
+first/last module, respectively,  that Transient adds to the blame sequence for $\conf$.
 \end{quote}
 
-\begin{quote}
-\it A \emph{Transient-last blame trail} is a sequence of scenarios
-$\conf_0,...\conf_n$ of $\system$ where for all $0 \leq i \leq n - 1$,
-$\conf_i \subset \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =
-  \last{\mblame{\system, \conf_i}}$ where $\last{\mblame{\system, \conf}}$ is the
-last module Transient adds to the blame set for $\conf$.
-\end{quote}
+% \begin{quote}
+% \it A  is a sequence of scenarios
+% $\conf_0,...\conf_n$ of $\system$ where for all $0 \leq i \leq n - 1$,
+% $\conf_i \subset \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =
+%   \last{\mblame{\system, \conf_i}}$ where $\last{\mblame{\system, \conf}}$ is the
+% last module Transient adds to the blame sequence for $\conf$.
+% \end{quote}
 
 The definition of \emph{Transient exception trails} is analogous to that for
 Natural. It is used to as a baseline for Transient-first and Transient-last

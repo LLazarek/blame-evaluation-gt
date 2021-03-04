@@ -19,13 +19,7 @@ information:
 \item[$Q_*$] Is blame for X more useful than blame for Y (for X, Y in Natural, Transient, or Erasure)?
 \end{itemize}
 
-
-Table~\ref{fig:experiment-outline} summarizes how each question relates to
-different kinds of trails/modes of the rational programmer. For example, experimental
-question $Q_1$ asks whether blame is valuable for Natural and the experiment
-uses the Natural blame and exception trails to answer it, so $Q_1$ shows up in the cells for Natural blame and Natural exceptions.
-
-\begin{figure}[ht]
+\begin{figure}[ht] \footnotesize
 \center
 {\begin{tabular}{l|c|c|c}
 %% ---------------------------------------------------------------------------------------------------------------
@@ -36,9 +30,14 @@ uses the Natural blame and exception trails to answer it, so $Q_1$ shows up in t
 {\bf Last blame}        &               &     $Q_3/Q_*$    &                 \\
 {\bf Exceptions}        &      $Q_1$    &     $Q_2/Q_3$    &      $Q_*$      \\
 \end{tabular}}
-  \caption{ Experimental questions and rational programmer modes.}
   \label{fig:experiment-outline}
 \end{figure}
+
+The above table summarizes how each question relates to
+different kinds of trails/modes of the rational programmer. For example,
+experimental question $Q_1$ asks whether blame is valuable for Natural and the
+experiment uses the Natural blame and exception trails to answer it, so $Q_1$
+shows up in the cells for Natural blame and Natural exceptions.
 
 %% -----------------------------------------------------------------------------
 
@@ -63,7 +62,7 @@ is evidence that there is at least one interesting scenario that the rational
 programmer manages to debug because of blame information.  The process is analogous
 for $Q_2$ and $Q_3$, using the respective modes of the rational programmer.
 
-\begin{figure}[bh]
+\begin{figure}[bh] \footnotesize
   \centering
   \includegraphics[scale=0.36]{./Images/process}
   \caption{The experimental process for one mode of the rational programmer}

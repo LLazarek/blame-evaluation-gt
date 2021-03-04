@@ -6,15 +6,14 @@ The benchmark programs for a rational-programmer experiment must
 \item vary in size, complexity and purpose; 
     
 \item have a decent number of modules and a variety of module dependency graphs
- (since mixing of typed and untyped code in Typed Racket takes place at the
+ (because mixing of typed and untyped code in Typed Racket takes place at the
  module level);
 
-\item attempt to take  advantage of the sophisticated typing features of
- a gradually typed language such as Typed Racket but;
+\item take advantage of the variety of typing features of a gradually typed
+ language; but
 
-\item  fail and contain type-level mistakes. 
+\item fail and contain type-level mistakes. 
 \end{enumerate}
-\noindent
 No such benchmark suite exists.  Worse, no benchmark suite of
 gradually typed programs with type-level mistakes exists at
 all.\footnote{\citet{cc-oopsla-20} created a collection of Reticulated
@@ -22,21 +21,20 @@ Python programs to evaluate their technique of fixing mistakes in type
 annotations. Their collection does not come with type-level mistakes
 in the code itself.} 
 
-Fortunately, \citet{gtnffvf-jfp-2019} have curated a collection of Typed Racket
-programs for systematically measuring the implementation's performance. The
-benchmark suite consists of fully typed, correct programs, written by a number
-of different authors, who have maintained and evolved these programs over
-several years. The programs range widely in size, complexity, purpose, origin
-and in programming style. The latter is mostly a reference to their reliance on
-many Typed Racket features: occurrence typing~\cite{tf-icfp-2010}, types for
-mutable and immutable data structures~\cite{hpst-sfp-2010}, types for
-first-class classes and objects~\cite{tsdtf-oopsla-2012}, and types for Racket's
-numeric tower~\cite{stathff-padl-12}.
+What exists is \citet{gtnffvf-jfp-2019}'s collection of Typed Racket programs
+for systematically measuring the implementation's performance. The benchmark
+suite consists of fully typed, correct programs, written by a number of
+different authors, who have maintained and evolved these programs over several
+years. The programs range widely in size, complexity, purpose, origin and in
+programming style. The latter is mostly a reference to their reliance on many
+Typed Racket features: occurrence typing~\cite{tf-icfp-2010}, types for mutable
+and immutable data structures~\cite{hpst-sfp-2010}, types for first-class
+classes and objects~\cite{tsdtf-oopsla-2012}, and types for Racket's numeric
+tower~\cite{stathff-padl-12}.
 
-Hence, even if they do not come with type-level errors, they offer a
-diverse linguistic substrate suitable for the careful introduction of
-type-level errors via mutations. Further filtering the benchmark suite to
-keep the benchmarks with the most sizeable and complex dependency graphs
-yields ten suitable programs while preserving the suite's linguistic
-diversity. Figure~\ref{table:benchmark-descriptions} displays the selected
+Hence, even if they do not come with type-level errors, they offer a diverse
+starter suite, suitable for the careful introduction of type-level errors via
+mutations. Further filtering the benchmark suite to keep the benchmarks with the
+most sizeable and complex dependency graphs yields ten suitable programs while
+preserving the suite's linguistic diversity. Figure~\ref{table:benchmark-descriptions} displays the selected
 benchmark programs and describes their basic characteristics.

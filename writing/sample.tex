@@ -2,12 +2,11 @@
 
 %  from section~\ref{sec:mutate} (96,515,744)
 
-As is, the chosen mutators generate a huge number of debugging scenarios:
-approximately 1 million for the chosen benchmarks. This number of scenarios is
-far too large to even identify the interesting ones among them.  Furthermore
-this population is heterogeneous; scenarios come from different
-mutants, and the mutants are the result of different mutators applied to each
-benchmark.
+As is, the chosen mutators generate approximately one million debugging
+scenarios for the chosen benchmarks. This number of scenarios is far too large
+to even identify the interesting ones among them.  Furthermore this population
+is heterogeneous; scenarios come from different mutants, and the mutants are the
+result of different mutators applied to each benchmark.
 
 To become computationally feasible and statistically sound, the experiment employs
 stratified uniform random sampling with three levels of stratification.
@@ -22,5 +21,10 @@ The result is a total of 756 interesting mutants across all benchmarks.
 Finally, the third level of sampling draws 96 random interesting debugging
 scenarios from each configuration lattice with replacement. The
 final sample thus consists of 72,192 interesting scenarios.
+
+%% MF: I don't get this number ^^^^
+% > (* 756 96)
+% 72576
+
 
 
