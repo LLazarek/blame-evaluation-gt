@@ -1,84 +1,31 @@
 %% -----------------------------------------------------------------------------
-%% \begin{itemize}
-%% \item Why does the data look like this?
-%%   - why tr fails
-%%     - bad runtime errors
-%%     - TR bug
-%%   - why transient fails
-%%     - bad runtime errors
-%%     - timeouts/ooms: give context wrt fully untyped/typed versions
-%%     - empty blame: trim Ben's prose
 
-%%   \item Any kind of dynamic checking has a large positive impact, whether blame or stacktraces are used.
-%%     \begin{itemize}
-%%     \item Both in terms of usefulness and programmer effort
-%%     \item Erasure extremely often fails to provide any helpful information.
-%%     \item That said, there are no long trails for Erasure.
-%%     \end{itemize}
+The results of the experiment suggests a number of high-level conclusions about
+blame strategies in the gradual typed world.  First, run-time type checks have a
+large positive impact, regardless of whether these checks assign blame or throw
+plain exceptions.  Second, error messages with blame assignments are more
+helpful than those without. The results also indicate, though, that blame is not
+critical in a majority of cases, and therefore they suggest investigating
+whether blame tracking is worth the performance cost.  Third, the Natural
+approach fares better than the Transient approach, but only by a small margin.
+Since Natural offers complete and sound path-based blame while Transient offers
+incomplete but sound heap-based blame~\cite{gfd-oopsla-2019}, the results call
+for a study concerning the relative strengths of the two models of blame.
+Fourth, given that Transient's sound but shallow run-time type checks do not
+seem to hamper debugging, a version of the Natural semantics of Typed Racket
+that disables some of its wrappers may offer an answer to the well-known
+performance issues of Natural~\cite{gtnffvf-jfp-2019}.  Fifth, given that both
+modes of the Transient rational programmer are equally successful and that
+Transient-last produces shorter trails, Reticulated Python could limit the size
+of blame sequences to the last few entries to reduce its serious performance
+problems (see below).
 
-%%   \item Blame helps significantly over just using stacktraces for both Natural and Transient.
-%%     \begin{itemize}
-%%     \item Natural's blame improves over exceptions by nearly 20\%
-%%     \item Transient's blame improves over exceptions half as much
-%%     \end{itemize}
-
-%%   \item Natural clearly offers the most utility, but Transient is not too far behind.
-%%     \begin{itemize}
-%%     \item Natural clearly improves over all other modes
-%%     \item Transient improves significantly over all other modes except Natural.
-%%     \item Keep in mind that our selection of scenarios is biased toward Erasure & Transient.
-%%     \end{itemize}
-    
-
-%%   \item Discussion of how confidence / margin of error should be interpreted wrt these results?
-
-
-%%    \item Threats to validity:
-%%         \begin{itemize}
-%%           \item Racket stack traces
-%%           \item Mutant sampling
-%%           \item Blame trails do not necessarily capture all aspects of error reporting
-%%           \item Transient blame adaptations
-%%           \item More?
-
-%%    \end{itemize}
-%% \end{itemize}       
-
-
-
-The analysis in the previous section suggests a number of interesting
-high-level conclusions about blame in the gradual typing setting.  First,
-run time type checks have a large positive impact. This is the case
-regardless of whether these checks issue blame or throw plain
-exceptions.  Second, in many cases type checks that issue blame are more
-helpful than those that do not. However, the results indicate that blame
-is not critical in a majority of cases, and therefore it is worth further
-investigation whether disabling blame tracking for the sake of performance
-may be   an acceptable trade-off. Third, from the three different blame
-strategies, the Natural approach of Typed Racket fares better than the
-Transient approach of Reticulated Python, but only by a small margin.
-Since Natural offers complete and sound path-based blame while Transient
-offers incomplete but sound heap-based blame~\cite{gfd-oopsla-2019}, the
-results call for a deeper understanding of the relative strengths of the
-two models for blame.  Fourth, given that Transient's sound but shallow
-run time type checks do not seem to hamper debugging, a version of Typed
-Racket that disables some of its wrappers may offer an answer to the
-well-known performance issues of Natural~\cite{gtnffvf-jfp-2019}.  Fifth,
-just as for Typed Racket, the experiment points to possible improvements
-for Reticulated Python. In particular, the experimental data indicates
-that the usefulness of transient blame does not depend on whether  the
-rational programmer follows first or the last element from a blame set,
-and that using the last element seems to produce shorter trails.  Hence,
-given the performance issues of Transient discussed further on, a possible
-optimization is to limit the size of blame sets to only contain the latest
-entries using timestamps.
-
-There are a number of threats to the validity of these conclusions: (i) the
-representativeness of benchmarks; (ii) the relation between mutations and
-real programming mistakes; (iii) the definition of interesting debugging
-scenarios; and (iv) the sampling strategy. The previous sections
-have described the various ways we attempt to mitigate these threats;
-the remainder of this section discusses three additional threats.
+The validity of these conclusions is threatened in several ways: (i) the
+representativeness of benchmarks; (ii) the relation between mutations and real
+programming mistakes; (iii) the definition of interesting debugging scenarios;
+and (iv) the sampling strategy. While these threats have been mitigated by the
+experimental setup, the remainder of this section discusses three additional
+ones.
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Is the Rational Programmer Realistic?}
@@ -87,63 +34,55 @@ Like {\em homo economicus\/}, which decouples the actual behavior of a
 participant in an economy for the sake of mathematical modeling, the model of a
 rational programmer decouples the actual debugging behavior of a software
 developer for the sake of a systematic, large-scale analysis. This decoupling
-comes with advantages and disadvantages. In the economic realm, mathematical models
-have provided some predictive insights into the market's behavior; but as
+comes with advantages and disadvantages. In the economic realm, mathematical
+models have provided some predictive insights into the market's behavior; but as
 behavioral economics has shown more recently, the mathematical abstraction of a
 rational actor makes predictions also quite unreliable in some situations.
-\footnote{It has also misled economists to focus on just the mathematics, though
-this problem is not relevant here.}  Just like an ordinary consumer or producer,
-an actual software developer is unlikely to stick to the exact strategy proposed
-here. When this happens, the predicted benefits of blame assignment may not
-materialize. Indeed, the authors' personal experience suggests such deviations, and
-it also suggests that deviating is a mistake. To make a true judgment of the
-usefulness of the rational-programmer idea, the community will need much more
-experience with this form of evaluation and relating the evaluation to the
-behavior of working programmers.
+\footnote{It has misled economists to focus on just mathematics, though
+this problem is not relevant here---tongue firmly in cheek.}  Just like an
+ordinary consumer or producer, an actual software developer is unlikely to stick
+to the exact strategy proposed here. When this happens, the predicted benefits
+of blame assignment may not materialize. Indeed, the authors' personal
+experience suggests such deviations, and it also suggests that deviating is a
+mistake. To make a true judgment of the usefulness of the rational-programmer
+idea, the community will need much more experience with this form of evaluation
+and relating the evaluation to the behavior of working programmers.
 
-Relatedly, the experimental setup hides the type choice a rational programmer must make. When the
-run-time checks signal an impedance mismatch in the real world, a programmer
-does not have a typed module ready to swap in. Instead, the programmer must
-come up with the next set of types---and this means the programmer must make
-choices. It is normally possible to assign consistent types to variables in a
-module in different ways. The creation and curation of the benchmarks over
-many years has driven home this lesson but, fortunately, it has also shown that
-the types are in most cases reasonably canonical.  The authors therefore conjecture that
-a rational programmer would in most cases come up with an equivalent type
-assignment in order to extend a trail as the experimental method describes.
+Relatedly, the experimental setup hides how a rational programmer ascribes types
+to extend a trail. When the run-time checks signal an impedance mismatch in the
+real world, a real-world programmer does not have a typed module ready to swap
+in. Instead, the programmer must come up with the next set of types, which means
+making choices. It is usually possible to consistently assign types to variables
+in a module in different ways. The maintenance of the benchmarks over many years
+has driven home this lesson but, fortunately, it has also shown that the types
+are in somewhat canonical.  The authors therefore conjecture that different
+real-world programmers would often come up with equivalent type assignments
+during debugging sessions. 
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Why Does Transient Lose Blame?} \label{sec:threat:transient}
 
-The results in section~\ref{sec:results} show that Transient produces empty
-blame sequences for 967 scenarios. In theory, empty set must not occur. An
-empty blame sequence means a lack of boundary crossings for the witness value.
-By implication, a typed module is blaming itself---something that can
-happen only if the type checker (or system) is unsound.
+The execution of the experiment reveals that Transient produces empty blame
+sequences for 967 scenarios. In theory, empty set must not occur. An empty blame
+sequence means a lack of boundary crossings for the witness value.  By
+implication, a typed module is blaming itself---something that can happen only
+if the type checker (or system) is unsound.
 
 An investigation of these empty blame cases reveals that Transient is not
 unsound but that Vitousek et al.'s Transient blame assignment loses track
-of the proper boundaries due to an incomplete population of the blame map.
+of the proper boundaries due to an incomplete initialization of the blame map.
 Despite these losses, the number of failures is a small fraction of the
 overall number of debugging scenarios. It is unlikely that any
 improvements to Vitousek et al.'s strategy would change the overall
 conclusion about Transient blame.
 
-{\bf Note} The scenarios where Transient returns no blame 
-suggest ways to improve its blame map:
-\begin{itemize}
-
-\item Entries in a blame map should point to {\em several\/} parent entries.
- For example, if \texttt{f} receives bad input in the context of {\tt (filter f
- xs)}, the entry should point to both \texttt{filter} and \texttt{xs}.
-
-\item The construction of entries must be guided by type-like specifications for
- primitives instead of special cases for built-in functions. Aliasing such
- function changes the blame map.
-
-\end{itemize}
-This small example is indicative of how rational-programmer experiments may
-provide actionable feedback for language design . 
+{\bf Note} The scenarios where Transient returns no blame suggest two ways to
+improve its blame map.  First, entries in a blame map should point to {\em
+several\/} parent entries.  For example, if \texttt{f} receives bad input in the
+context of {\tt (filter f xs)}, the entry should point to both \texttt{filter}
+and \texttt{xs}. Second, the construction of entries must be guided by type-like
+specifications for primitives instead of special cases for built-in
+functions. Aliasing such function changes the blame map.  
 
 
 %% -----------------------------------------------------------------------------
@@ -164,7 +103,7 @@ Transient blame strategy might be unrealistic.
 At first glance, these measurements seem to contradict the results
 of~\citet{vss-popl-2017}. They report an average slowdown of 2.5x and a
 worst-case of 5.4x on fully-typed benchmarks in Reticulated Python.
-Unfortunately, the high cost of Transient Racket seems closer to the truth.
+Unfortunately, the high cost of Shallow Racket seems closer to the truth.
 There are at least four broad issues that skew the earlier results:
 \begin{enumerate}
 
@@ -185,10 +124,11 @@ from the official Python benchmark suite because they are too small,
 unrealistic, and unstable.\footnote{Release notes:
 \url{https://pyperformance.readthedocs.io/changelog.html}}
 
-\item On large programs, Reticulated suffers from high overhead.  For example, a
-Reticulated version of the simplest benchmark runs in ~40 seconds without blame,
-and with blame times out after 10 minutes. Typed Racket runs the same benchmark
-in a small fraction of the time.
+\item On non-trivial programs, Reticulated Python suffers from the same high
+overhead as Shallow Racket.  It runs the simplest benchmark from the suite 
+in approximately 40 seconds without blame and times out after 10 minutes when
+the blame map is enabled.
+
 \end{enumerate}
 More work on Transient blame is needed to make an informed decision. 
 

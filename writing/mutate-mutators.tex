@@ -29,10 +29,11 @@ Racket, some of which take non-trivial effort to debug.
 
 Most of the mutators are self-explanatory.  The first six apply to all
 gradually typed languages; the next six to those that include classes and
-objects. The last four target distinguishing features of Typed Racket,
+objects. The last four target distinguishing features of Typed
+Racket's type system,
 specifically its sophisticated type system. For example, one mutation produced by {\tt arithmetic}
 replaces a {\tt +} with a {\tt -} in an attempt to change the type of the
 arithmetic expression; {\tt +}'s result is a {\tt Positive-Integer} when all
 arguments are positive integers, while {\tt -} yields {\tt
 Integer}~\cite{stathff-padl-12}. Similarly, the other three aim to confound
-Typed Racket's occurrence type system. 
+the occurrence type system. 

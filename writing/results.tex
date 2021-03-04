@@ -76,7 +76,7 @@ along a blame trail, causing it to fail.
 While most blame trail failures follow the above pattern, a few do
 not.  Breaking down the failure reasons for Natural blame (1748 in
 total) reveals an additional cause. For a small set of debugging scenarios
-(40), Natural produces a run time type error blaming a non-buggy
+(40), Natural produces a run-time type error blaming a non-buggy
 already-typed module. All these cases are due to known open issues with Typed
 Racket and class contracts. 
 
@@ -195,7 +195,7 @@ programmer immediately or the rational programmer fails to debug a scenario
 altogether (in red).  This is expected; adding type annotations to an Erasure
 program does not change its behavior, so if the type checker does not reject the
 program with the new annotations, the rational programmer is stuck.  In other
-words, an exception from the runtime has to point to the buggy module with the
+words, an exception from the run-time system has to point to the buggy module with the
 first try. Otherwise the rational programmer types an irrelevant module, runs
 the program again, and the same exception points again to the already typed
 module.

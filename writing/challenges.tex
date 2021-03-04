@@ -8,9 +8,9 @@ debugging scenarios; and third is finding a proper sampling strategy for the
 huge space of possibilities. A coincidental challenge is the disparity of the
 implementations of gradually typed languages. To eliminate this variable, the
 authors use Racket, which is thus far the only language in which all three major
-soundness mechanisms are available in a robust and comparable manner; for the
-implementation of Transient Typed Racket, see the parallel submission of an
-experience report~\cite{ttt21}.
+soundness mechanisms are available in a robust and comparable manner:
+Typed Racket implements Natural, Shallow Racket~\cite{ttt21}
+Transient, and plain Racket for Erasure. 
 
 The {\em first challenge\/} stems from the differences between the blame
 assignment mechanisms of the three semantic variants.  While Natural assigns
