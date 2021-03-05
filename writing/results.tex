@@ -1,16 +1,5 @@
 %% -----------------------------------------------------------------------------
 
-\begin{wrapfigure}{r}{.40\textwidth} \footnotesize 
-  \vspace{-1.5em}
-  \includegraphics[width=0.38\textwidth]{./plots/success-bars}
-  \vspace{1em}
-  \begin{minipage}{0.35\textwidth} \raggedright
-%   The estimated percentage of scenarios for which each mode succeeds in locating the bug.
-   The upper bound margin of error is 0.02\%.
-  \end{minipage}
-\vspace{-2em}
-  \caption{Percentage rates of success} \label{fig:success-bars}
-\end{wrapfigure}
 
 The test bed for executing the experimental process utilizes a machine with two
 Intel Xeon Gold 6258R processors (28 doubly-threaded cores each) and 500GB of
@@ -18,6 +7,7 @@ memory.  Each debugging scenario had a 4 minute timeout and a 6GB memory
 limit. Running the experiment on all debugging scenarios took over
 30,000 compute hours.
 
+\
 \begin{figure} \footnotesize 
   \centering
   \includegraphics[width=\textwidth]{./plots/avo-bars}
@@ -72,6 +62,20 @@ a rational programmer mode on a scenario may result in an exception
 that carries no useful information about which module to equip with types next. For instance the stack trace of the exception may not
 contain frames from any untyped module of the program. This can happen at any point
 along a blame trail, causing it to fail.
+
+\begin{wrapfigure}{r}{.40\textwidth} \footnotesize 
+  \vspace{-1.5em}
+  \includegraphics[width=0.38\textwidth]{./plots/success-bars}
+  \vspace{1em}
+  \begin{minipage}{0.35\textwidth} \raggedright
+%   The estimated percentage of scenarios for which each mode succeeds in locating the bug.
+   The upper bound margin of error is 0.02\%.
+  \end{minipage}
+\vspace{-2em}
+  \caption{Percentage rates of success} \label{fig:success-bars}
+\end{wrapfigure}
+
+
 
 While most blame trail failures follow the above pattern, a few do
 not.  Breaking down the failure reasons for Natural blame (1748 in
