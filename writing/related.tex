@@ -21,15 +21,15 @@ mistakes.
 The literature on gradual typing presents many semantics beyond the three used
 here and two additional blame strategies.  Pyret (pyret.org) assigns fixed-size
 data types the Natural semantics and functions a Transient semantics. The
-Forgetful~\cite{cl-icfp-2017} and the Amnesic~\cite{gfd-oopsla-2019} semantics
+Forgetful~\citep{cl-icfp-2017} and the Amnesic~\citep{gfd-oopsla-2019} semantics
 are similar to Transient but use wrappers instead of in-lined checks.
-Nom~\cite{mt-oopsla-2017} and other \emph{concrete\/}
-semantics~\cite{wnlov-popl-2010, rsfbv-popl-2015, rzv-ecoop-2015,
+Nom~\citep{mt-oopsla-2017} and other \emph{concrete\/}
+semantics~\citep{wnlov-popl-2010, rsfbv-popl-2015, rzv-ecoop-2015,
 rat-oopsla-2017} assume that every value comes with a type tag and use tag
 checks to supervise the interactions between typed and untyped code.  Monotonic
-references~\cite{svctg-esop-2015} and the semantics~\cite{tlt-popl-2019,
+references~\citep{svctg-esop-2015} and the semantics~\citep{tlt-popl-2019,
 etg-icfp-19, tt-scp-20, tgt-popl-18, tt-sas-17} derived with the Abstracting
-Gradual Typing technique~\cite{gct-popl-2016} are variants of Natural.  Among
+Gradual Typing technique~\citep{gct-popl-2016} are variants of Natural.  Among
 these representative semantics, only Amnesic and Nom present innovative blame
 strategies.  The experiment excludes these strategies because they seem to be
 merely theoretical constructions and/or impose severe restrictions on

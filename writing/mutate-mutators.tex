@@ -22,7 +22,7 @@ sec.~\ref{sub:mutate-interesting}).
 Figure~\ref{table:mutation-ops} describes 16 mutators that satisfy these
 constraints. As the last column indicates, some specialize or
 generalize~\citet{lksfd-popl-2020}'s mutators, which in turn are borrowed from
-the vast literature on mutation testing~\cite{jia2011analysis}.  Only two are
+the vast literature on mutation testing~\citep{jia2011analysis}.  Only two are
 directly inherited; many mutators are brand new. For the latter, the authors
 relied on their decades-long experience of making type-level mistakes in Typed
 Racket, some of which take non-trivial effort to debug.
@@ -35,5 +35,5 @@ specifically its sophisticated type system. For example, one mutation produced b
 replaces a {\tt +} with a {\tt -} in an attempt to change the type of the
 arithmetic expression; {\tt +}'s result is a {\tt Positive-Integer} when all
 arguments are positive integers, while {\tt -} yields {\tt
-Integer}~\cite{stathff-padl-12}. Similarly, the other three aim to confound
+Integer}~\citep{stathff-padl-12}. Similarly, the other three aim to confound
 the occurrence type system. 

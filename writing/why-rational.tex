@@ -47,7 +47,7 @@ assign types to the imported identifiers for the type checker's sake. Here {\tt
 main} specifies that {\tt na-client} consumes a {\tt Real} number and produces a
 non-positive one.\footnote{Typed Racket's type system reflects Racket's subset
 reasoning about numbers, not (only) machine-level
-representations~\cite{stathff-padl-12}.} A program execution ends in this error:
+representations~\citep{stathff-padl-12}.} A program execution ends in this error:
 \begin{verbatim}
     na-client: broke its own contract
       promised: (<=/c 0)

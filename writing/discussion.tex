@@ -9,12 +9,12 @@ critical in a majority of cases, and therefore they suggest investigating
 whether blame tracking is worth the performance cost.  Third, the Natural
 approach fares better than the Transient approach, but only by a small margin.
 Since Natural offers complete and sound path-based blame while Transient offers
-incomplete but sound heap-based blame~\cite{gfd-oopsla-2019}, the results call
+incomplete but sound heap-based blame~\citep{gfd-oopsla-2019}, the results call
 for a study concerning the relative strengths of the two models of blame.
 Fourth, given that Transient's sound but shallow run-time type checks do not
 seem to hamper debugging, a version of the Natural semantics of Typed Racket
 that disables some of its wrappers may offer an answer to the well-known
-performance issues of Natural~\cite{gtnffvf-jfp-2019}.  Fifth, given that both
+performance issues of Natural~\citep{gtnffvf-jfp-2019}.  Fifth, given that both
 modes of the Transient rational programmer are equally successful and that
 Transient-last produces shorter trails, Reticulated Python could limit the size
 of blame sequences to the last few entries to reduce its serious performance
