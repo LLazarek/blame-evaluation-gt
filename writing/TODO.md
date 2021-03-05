@@ -59,3 +59,18 @@ who look at both papers).
 
 
 12. I have not yet inspected the bibliography. ~~~ **Matthias**
+
+-----------------------------------------------------------------------------
+
+I looked at the TODOs and here is my initial answers: 
+
+7. What I meant here is that Ben’s error preorder theorem says that Natural’s checks find more errors than those of Transient. A corollary of that is that a program may lead to a contract violation in Natural but in Transient it may lead to a failure of the underlying safety checks of the language. This is the result of natural performing checks ``earlier’’ than Transient which translate to  Natural performs more checks. The theorem is about models with blame but it holds independently of whether dynamic type checks issue blame or stack traces. Given the above, the comparable effectiveness of Natural exceptions and Transient exceptions comes as a bit of an upset of the theoretical promises. 
+
+8. I am not sure. The issue is that with the statistics we know questions of degree do not generalize. The sentence is more of an admission that we didn’t do the generalization rather than that it is not possible — it should be and we should learn how to do that, so maybe this is a good place to start digging deeper into statistics.
+
+9. My take is that it is unclear what is the difference between taking a function from Integers to Integers and mutating its type so that it claims it is a function form Integers to Booleans VS mutating a function from Integers to Boleans so that it returns an Integer. In other words I don’t think we can connect the way we introduce an impedance mismatch, as in where we did the mutation, with how effective it is in causing certain behavior. I do think that mutations of types may give us different results than mutations of code but this is not because one is fundamentally different than the other but because it is much more probable to get certain impedance mismatches with type mutations rather than code mutations given a set of benchmarks. 
+
+
+10. My answer is yes. In fact we should do a proper analysis of all benchmarks to understand why the rational programmer behaves this or that way on this or that program. But I don’t know how to do that beyond a hand wavy qualitative analysis, which doesn’t scale even to all the mutants of quadT and quadU. So what I am thinking is that we should reverse engineer the problem: (i) we should construct programs with specific charactersitics in a controlled way; (ii) mutate them in a controlled manner and (iii) unleash the rational programmer on them and see what we get. If we hit something interesting we know why it is interesting. Then from that we can try to build metrics to identify the characteristics of the synthetic programs, locate matching real programs and confirm explicable patterns of behavior from the real data. 
+
+I think this is where I find the rational programmer idea a bit restrictive. Simulating a programmer is only part of this. A much better analogy is to think about wet lab work or the geneticist to Shriram’s zoologist. The rational programmer is an experimental process to get a readout from a model organism, the three systems are three strains of the organism engineered to have certain properties, the mutations are drugs that we throw in the mix and that we show interact with the three strains in some interesting way. The experiment asks how stable the readouts are as we change strains and drugs. I also think that theory, as apects of experience or expectation made precise, can help here guide experiments, just like we did with the rational programmer.
