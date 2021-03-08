@@ -20,7 +20,7 @@ two factors in my head `(* 756 96) = 72576` and then in Racket: **Done and pushe
 
 
 6. Figure 6 could benefit from an in-figure explanation of what we’re really
-looking at here. (Remember the lazy reviewer.) ~~~ **Lukas?**
+looking at here. (Remember the lazy reviewer.) ~~~ **Lukas?** -- addressed
 
 7. I do not understand the following sentence (bottom of page 19): "Finally, there is no clear winner between Natural exceptions and Transient
 exceptions despite the theoretically advantageous additional checks of Natural.”  
