@@ -3,7 +3,7 @@
 
 1. The latex run suggests that our paper uses the wrong citation format for
 ICFP. A stickler of a PC or reviewer might kill the paper on “type-checking
-grounds”. ~~~ **Lukas?**
+grounds”. ~~~ **Lukas?** -- addressed
 
 2. Will you re-do your blame-map implementation with weak hash tables and
 ephemerons? ETA? ~~~ **Ben?**
