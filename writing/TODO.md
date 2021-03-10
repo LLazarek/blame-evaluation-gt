@@ -3,24 +3,27 @@
 
 1. The latex run suggests that our paper uses the wrong citation format for
 ICFP. A stickler of a PC or reviewer might kill the paper on “type-checking
-grounds”. ~~~ **Lukas?** -- addressed
+grounds”. ~~~ **Lukas?** -- addressed -- resolved 
 
 2. Will you re-do your blame-map implementation with weak hash tables and
-ephemerons? ETA? ~~~ **Ben?**
+ephemerons? ETA? ~~~ **Ben?** ~~~ ready to go 
 
 3. Will you re-run the experiment after fixing the bug/s? ~~~ **Lukas**, with
 help from **Ben**.
 
+- try error-tracing after injection/optimization
+- if that doesn't work, ask Matthew 
+
+
 4. @Ben: I somehow can’t reconcile the timing/out-of-memory reports in the two
 parallel submissions. ~~~ **Ben?**
-
+	
 5. Section 7 states that we get 72,192 interesting scenarios. I multiplied the
 two factors in my head `(* 756 96) = 72576` and then in Racket: **Done and pushed.**
 
-
-
 6. Figure 6 could benefit from an in-figure explanation of what we’re really
 looking at here. (Remember the lazy reviewer.) ~~~ **Lukas?** -- addressed
+-- Matthias
 
 7. I do not understand the following sentence (bottom of page 19): "Finally, there is no clear winner between Natural exceptions and Transient
 exceptions despite the theoretically advantageous additional checks of Natural.”  
@@ -28,7 +31,12 @@ In what sense does the theory predict an advantage for Natural exception? ~~~ Ch
 really not blame.'' This reply doesn't make any sense to me. I don't even know
 how it connects to my question. ~~~ **Christos?**
 
+- wait for (3) to be resolved 
+
 8. Do we need to explain why the following is the case (top of page 21): "these proportions do not generalize to a representation of the full population.” **Christos?**
+
+- separate "guesses" 
+
 
 9. I am still struggling with our development of mutators. Shouldn’t
 we have developed mutators that mess up the type ascribed to a module’s code
