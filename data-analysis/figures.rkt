@@ -15,9 +15,8 @@
             mode-name))
 (define rename-benchmark values)
 
-;; (usefulness-table bt-lengths-table avo-matrix)
-(define to-generate '(bt-lengths-table avo-matrix))
-
+;; (bt-lengths-table bt-length-comparisons avo-bars blame-vs-exns-bars blame-vs-exns-venn success-bars)
+(define to-generate '(blame-vs-exns-venn))
 (plot-font-size 14)
 (define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
