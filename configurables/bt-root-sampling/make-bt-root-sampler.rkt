@@ -1,6 +1,7 @@
 #lang at-exp racket/base
 
-(provide make-bt-root-sampler/c)
+(provide make-bt-root-sampler/c
+         root-missing-blame-response/c)
 
 (require racket/contract/base
          racket/math

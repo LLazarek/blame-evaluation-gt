@@ -1,8 +1,8 @@
-#lang at-exp racket/base
+#lang at-exp racket
 
 (require "../../util/optional-contracts.rkt")
 (provide (contract-out [select-mutants mutant-selector/c]
-                       [pre-selected-mutant-samples-db (db-path-relative-to? configurables)]
+                       [pre-selected-mutant-samples-db (parameter/c (db-path-relative-to? configurables))]
                        [all-mutants-should-have-trails? boolean?]))
 
 (require "mutant-selector.rkt"

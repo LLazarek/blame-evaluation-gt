@@ -1,7 +1,6 @@
-#lang at-exp racket/base
+#lang at-exp racket
 
-(require racket/match
-         "../../configurations/config.rkt"
+(require "../../configurations/config.rkt"
          "../../experiment/mutant-factory-data.rkt"
          "../../util/mutant-util.rkt"
          "../../runner/mutation-runner.rkt"

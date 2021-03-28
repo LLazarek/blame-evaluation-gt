@@ -11,12 +11,12 @@
 
 (define mutator-function/c (any/c mutation-index? counter? . -> . mutated?))
 (define mutator-type? string?)
-(define mutator/c (or/c (struct/c mutator mutator-function/c mutator-type?)
-                        mutator-function/c))
+(define mutator/c (first-or/c (struct/c mutator mutator-function/c mutator-type?)
+                              mutator-function/c))
 (define (dependent-mutator/c . arg/cs)
   (struct/c dependent-mutator
             (dynamic->* #:mandatory-domain-contracts arg/cs
-                        #:range-contracts mutator-function/c)
+                        #:range-contracts (list mutator-function/c))
             mutator-type?))
 
 (provide (contract-out
@@ -52,7 +52,7 @@
                                  mutator/c)]
           ;; Composes the given mutators into one which applies each of the
           ;; mutators *in the given order*
-          [compose-mutators (mutator/c mutator/c ... . -> . mutator/c)]
+          [compose-mutators (mutator/c ... . -> . mutator/c)]
           [no-mutation mutator/c])
 
          (except-out (struct-out mutator) mutator-type)
@@ -245,8 +245,7 @@
 
 (define (compose-mutators . mutators)
   (λ (stx mutation-index counter)
-    ;; lltodo: this should handle 0 mutators by appending `no-mutation'
-    (apply-mutators stx mutators mutation-index counter)))
+    (apply-mutators stx (append mutators (list no-mutation)) mutation-index counter)))
 
 (module+ test
   (require racket

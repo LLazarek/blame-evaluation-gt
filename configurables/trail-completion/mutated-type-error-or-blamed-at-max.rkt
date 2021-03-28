@@ -4,7 +4,8 @@
          "../../experiment/mutant-factory-data.rkt"
          "../../util/mutant-util.rkt"
          "../../runner/mutation-runner.rkt"
-         "../../util/optional-contracts.rkt")
+         "../../util/optional-contracts.rkt"
+         "../../util/path-utils.rkt")
 
 (provide (contract-out [blame-trail-ended?
                         (dead-mutant-process/c

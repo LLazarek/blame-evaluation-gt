@@ -1,16 +1,16 @@
-#lang at-exp racket/base
+#lang at-exp racket
 
 (require "../../experiment/mutant-factory-data.rkt"
          (prefix-in db: "../../db/db.rkt")
+         "../../db/util.rkt"
          "../../util/optional-contracts.rkt"
          "../../configurations/configure-benchmark.rkt"
          "../../util/experiment-exns.rkt"
-         racket/format
-         racket/function
-         racket/runtime-path)
+         racket/runtime-path
+         "make-bt-root-sampler.rkt")
 
 (provide (contract-out [make-bt-root-sampler make-bt-root-sampler/c]
-                       [pre-selected-bt-root-db (parameter/c path-to-db?)]
+                       [pre-selected-bt-root-db (parameter/c (db-path-relative-to? configurables))]
                        [root-missing-blame-response root-missing-blame-response/c]))
 
 ;; A root that terminates in erasure (for pre-selection) may timeout in TR or Transient!

@@ -1,21 +1,19 @@
-#lang at-exp racket/base
+#lang at-exp racket
 
-(require racket/format
-         racket/function
-         racket/match
-         racket/port
-         racket/runtime-path
+(require racket/runtime-path
          syntax/parse
          (prefix-in db: "../../db/db.rkt")
+         "../../db/util.rkt"
          "../../util/program.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/read-module.rkt"
          "../../util/path-utils.rkt"
-         "../../util/experiment-exns.rkt")
+         "../../util/experiment-exns.rkt"
+         "instrument-module.rkt")
 
 (provide (contract-out
           [instrument-module module-instrumenter/c]
-          [transient-special-cases-db (db-path-relative-to? configurables)]))
+          [transient-special-cases-db (parameter/c (db-path-relative-to? configurables))]))
 
 (define-runtime-path configurables "..")
 (define default-transient-special-cases-db

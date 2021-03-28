@@ -5,15 +5,17 @@
          racket/match
          racket/runtime-path
          (prefix-in db: "../../db/db.rkt")
+         "../../db/util.rkt"
          "../../util/optional-contracts.rkt"
          "../../util/path-utils.rkt"
          "../../util/mutant-util.rkt"
-         "../../util/experiment-exns.rkt")
+         "../../util/experiment-exns.rkt"
+         "benchmark-runner.rkt")
 
 (provide (contract-out [rename make-pre-computed-result-benchmark-runner
                                make-benchmark-runner
                                make-benchmark-runner/c]
-                       [pre-computed-results-db (db-path-relative-to? configurables)]))
+                       [pre-computed-results-db (parameter/c (db-path-relative-to? configurables))]))
 
 (define-runtime-path configurables "..")
 (define default-pre-computed-results-db

@@ -21,7 +21,7 @@
           [get (path-string? . -> . db?)]
           [new! ({path-string?} {path-string?} . ->* . any)]
           [read ({db? any/c} {failure-result/c #:reader (path-string? . -> . any/c)} . ->* . any/c)]
-          [write! ({db? hash?} {#:writer (any/c . -> . any)} . -> . db?)]
+          [write! ({db? hash?} {#:writer (any/c . -> . any)} . ->* . db?)]
           [set! (db? any/c any/c . -> . any)]
           [keys (db? . -> . (listof any/c))]
 
