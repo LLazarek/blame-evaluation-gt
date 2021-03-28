@@ -137,6 +137,8 @@
                                           '?
                                           '<crashed>
                                           #f
+                                          #f
+                                          #f
                                           e)]))])
       (when interactive?
         (displayln "Running mutant..."))
@@ -187,6 +189,8 @@
                                          ([mutated-id mutated-id]
                                           [outcome outcome]
                                           [blamed blamed]
+                                          [errortrace-stack errortrace]
+                                          [context-stack context]
                                           [result-value result-value])))
                (cond [run?
                       (run-with-mutated-module
@@ -226,6 +230,8 @@
                               Blamed:  @blamed
                               }]
                          [else ""])
+                      Errortrace stack: @errortrace
+                      Cotnext stack:    @context
                       Result:  @result-value
                       })
                  rs)]))))
@@ -312,7 +318,9 @@
                       18
                       next
                       type-error
-                      "ai.rkt"
+                      ("ai.rkt")
+                      ()
+                      ()
                       #f)
         #hash(("ai.rkt" . types)
               ("benv.rkt" . none)

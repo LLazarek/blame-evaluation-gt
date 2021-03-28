@@ -1,6 +1,9 @@
 #lang at-exp racket/base
 
-(require "../util/optional-contracts.rkt")
+(require "../util/optional-contracts.rkt"
+         (except-in racket/contract
+                    contract-out
+                    define/contract))
 (provide (contract-out
           [run-with-limits
            ({(-> any)}

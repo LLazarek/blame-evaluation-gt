@@ -8,7 +8,6 @@
          run-outcome/c)
 
 (require racket/contract
-         racket/match
          racket/math
          "../util/path-utils.rkt")
 
@@ -27,6 +26,8 @@
                     mutated-id
                     outcome
                     blamed
+                    errortrace-stack
+                    context-stack
                     result-value)
   #:prefab)
 
@@ -42,28 +43,31 @@
 
 (define run-status/c
   (struct/dc run-status
-             [mutated-module  module-name?]
-             [index           natural?]
-             [mutated-id      {outcome}
-                              (if (equal? outcome index-exceeded-outcome)
-                                  #f
-                                  symbol?)]
-             [outcome         run-outcome/c]
-             [blamed          {outcome}
-                              (match outcome
-                                ['blamed
-                                 ;; This should really be `non-empty-listof`,
-                                 ;; but one limitation of transient is that
-                                 ;; sometimes it raises a blame error blaming
-                                 ;; nothing
-                                 (listof module-name-or-library-path?)]
-                                ['type-error
-                                 (list/c module-name-or-library-path?)]
-                                ['runtime-error
-                                 (listof module-name-or-library-path?)]
-                                [else
-                                 any/c])]
-             [result-value    any/c]))
+             [mutated-module    module-name?]
+             [index             natural?]
+             [mutated-id        {outcome}
+                                (if (equal? outcome index-exceeded-outcome)
+                                    #f
+                                    symbol?)]
+             [outcome           run-outcome/c]
+             [blamed            {outcome}
+                                (cond [(member outcome '(blamed type-error))
+                                       (listof module-name-or-library-path?)]
+                                      [(equal? outcome 'runtime-error)
+                                       ;; Some runtime errors come with blame, if the
+                                       ;; primitive has a real contract,
+                                       ;; and type errors identify a location too
+                                       (or/c (listof module-name-or-library-path?) #f )]
+                                      [else #f])]
+             [errortrace-stack  {outcome}
+                                (if (member outcome '(blamed runtime-error))
+                                    (listof module-name-or-library-path?)
+                                    #f)]
+             [context-stack     {outcome}
+                                (if (member outcome '(blamed runtime-error))
+                                    (listof module-name-or-library-path?)
+                                    #f)]
+             [result-value      any/c]))
 
 ;; run-status -> bool
 (define (index-exceeded? rs)

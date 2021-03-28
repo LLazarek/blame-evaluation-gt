@@ -463,8 +463,13 @@
          (process-Q-set-data the-process-q
                              new-factory)]
         [else
+         (define select-blamed-locations-to-follow
+           (configured:follow-blame))
+         (define selected-locations
+           (select-blamed-locations-to-follow result
+                                              config))
          (define config/blamed-region-ctc-strength-incremented
-           (increment-config-precision-for-all blamed/type-error-locations config
+           (increment-config-precision-for-all selected-locations config
                                                #:increment-types-error? #f))
          (define (spawn-the-blame-following-mutant a-process-q
                                                    #:timeout/s [timeout/s #f]
@@ -480,7 +485,6 @@
          (define will:keep-following-blame
            (make-blame-following-will/fallback
             (make-blame-disappearing-fallback dead-proc
-                                              blamed/type-error-locations
                                               spawn-the-blame-following-mutant)))
          (spawn-the-blame-following-mutant the-process-q)]))
 
@@ -497,10 +501,8 @@
           (* 2 (default-memory-limit/gb))))
 
 (define/contract (make-blame-disappearing-fallback dead-proc
-                                                   predecessor-blamed
                                                    respawn-mutant)
   (dead-mutant-process/c
-   blame-labels?
    ((process-Q/c factory/c)
     #:timeout/s (or/c #f number?)
     #:memory/gb (or/c #f number?)
@@ -612,7 +614,7 @@ Giving up.
            (try-get-type-error-module dead-proc))
        => (λ (blamed/type-error-locations)
             (log-factory debug
-                         "Following blame trail {~a} from [~a] via ~a..."
+                         "Following blame trail {~a} from [~a] using blame ~a..."
                          (blame-trail-id (dead-mutant-process-blame-trail dead-proc))
                          (dead-mutant-process-id dead-proc)
                          blamed/type-error-locations)

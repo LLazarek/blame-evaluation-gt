@@ -4,7 +4,7 @@
          make-mutated-program-runner
          mutate-module
          mutation-index-exception?
-         [struct-out run-status]
+         (struct-out run-status)
          run-status/c
          index-exceeded?
          current-mutated-program-exn-recordor)
@@ -25,8 +25,9 @@
          "../util/experiment-exns.rkt"
          "instrumented-runner.rkt"
          "error-extractors/extract-type-error-source.rkt"
-         (prefix-in racket-contracts:
-                    "../configurables/blame-following/natural-blame.rkt"))
+         "error-extractors/extract-errortrace-stack.rkt"
+         "error-extractors/extract-context-stack.rkt"
+         "error-extractors/extract-blamed-locations.rkt")
 
 (define-logger mutation-runner)
 
@@ -230,12 +231,19 @@
 
        [result run-status/c])
 
-  (define (make-status status-sym [blamed #f] [mutated-id #f] [result #f])
+  (define (make-status status-sym
+                       [blamed #f]
+                       [errortrace-stack #f]
+                       [context-stack #f]
+                       [mutated-id #f]
+                       [result #f])
     (run-status (mod->name module-to-mutate)
                 mutation-index
                 mutated-id
                 status-sym
                 blamed
+                errortrace-stack
+                context-stack
                 result))
   (with-handlers ([mutation-index-exception?
                    (λ (e) (make-status 'index-exceeded))])
@@ -247,33 +255,36 @@
                                    #:write-modules-to write-to-dir
                                    #:on-module-exists on-module-exists
                                    #:mutator mutate))
-    (define ((make-status* status-sym) [blamed #f] [result #f])
+    (define ((make-status* status-sym) [blamed #f]
+                                       [errortrace-stack #f]
+                                       [context-stack #f]
+                                       [result #f])
       (log-mutation-runner-debug @~a{Making run-status with outcome @status-sym blaming @blamed})
       (make-status status-sym
                    blamed
+                   errortrace-stack
+                   context-stack
                    mutated-id))
     (define format-mutant-info-for-error
       (thunk (format-mutant-info a-program
                                  module-to-mutate
                                  mutation-index)))
-    (define make-extract-blamed (configured:make-extract-blamed))
-    (define make-extract-runtime-error-location (configured:make-extract-runtime-error-location))
-    (log-mutation-runner-info
-     @~a{Making configured blamed and runtime-error location extractors with
-                make-extract-blamed: @make-extract-blamed
-                make-extract-runtime-error-location: make-extract-runtime-error-location})
     (define extract-blamed
-      (make-extract-blamed a-program
-                           program-config
-                           format-mutant-info-for-error))
+      (make-extract-blamed-locations a-program
+                                     program-config
+                                     format-mutant-info-for-error))
     (define extract-type-error-source
       (make-extract-type-error-source a-program
                                       program-config
                                       format-mutant-info-for-error))
-    (define extract-runtime-error-location
-      (make-extract-runtime-error-location a-program
-                                           program-config
-                                           format-mutant-info-for-error))
+    (define extract-errortrace-stack
+      (make-extract-errortrace-stack a-program
+                                     program-config
+                                     format-mutant-info-for-error))
+    (define extract-context-stack
+      (make-extract-context-stack a-program
+                                  program-config
+                                  format-mutant-info-for-error))
     (define exn:fail:contract:blame:transient?
       (try-dynamic-require-transient-blame-exn-predicate!))
     (define (runtime-error-with-blame? e)
@@ -285,16 +296,10 @@
       ;; Can't get the source of the blame from a transient error, it blows up
       ;; because the blame object is not actually a blame object.
       ;; So just short circuit if we have one of those.
-      (and exn:fail:contract:blame:transient?
-           (not (exn:fail:contract:blame:transient? e))
+      (and (or (not exn:fail:contract:blame:transient?)
+               (not (exn:fail:contract:blame:transient? e)))
            (exn:fail:contract:blame? e)
            (contract-from-runtime? (exn:fail:contract:blame-object e))))
-    (define extract-runtime-contract-error-blamed-location
-      ;; lltodo: this should really refer not to the configurable, but a common
-      ;; utility required by both
-      (racket-contracts:make-extract-blamed a-program
-                                            program-config
-                                            format-mutant-info-for-error))
     (define (report-unexpected-error name message e)
       (raise-experiment-user-error name
                                    @~a{
@@ -334,15 +339,21 @@
       (match e
         [(? runtime-error-with-blame?)
          ((make-status* 'runtime-error)
-          (extract-runtime-contract-error-blamed-location e))]
+          (extract-blamed e)
+          (extract-errortrace-stack e)
+          (extract-context-stack e))]
         [(? exn:fail:contract:blame?)
          ((make-status* 'blamed)
-          (extract-blamed e))]
+          (extract-blamed e)
+          (extract-errortrace-stack e)
+          (extract-context-stack e))]
         [(? exn:fail:syntax?) ; don't think should ever happen?
          ((make-status* 'syntax-error))]
         [(? exn:fail?)
          ((make-status* 'runtime-error)
-          (extract-runtime-error-location e))]
+          #f
+          (extract-errortrace-stack e)
+          (extract-context-stack e))]
         [else
          (report-unexpected-error 'handle-runtime-error
                                   "Unexpected non-`exn:fail?` error while running program."
@@ -396,7 +407,7 @@
            racket/runtime-path)
 
   (define-runtime-path test-config "../configurables/configs/test.rkt")
-  (define-runtime-path transient-config "../configurables/configs/transient-oldest.rkt")
+  (define-runtime-path transient-config "../configurables/configs/transient-oldest--errortrace.rkt")
   (install-configuration! test-config)
 
   (define-test (test/no-error run-thunk test-thunk)

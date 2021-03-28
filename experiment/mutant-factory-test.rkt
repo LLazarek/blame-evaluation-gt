@@ -106,7 +106,9 @@
                                    0
                                    'baz
                                    'runtime-error
+                                   #f
                                    (list e.rkt)
+                                   empty
                                    #f)
                        42
                        (blame-trail 95 '())
@@ -119,6 +121,8 @@
                                    'baz
                                    'completed
                                    #f
+                                   #f
+                                   #f
                                    #f)]))
 (define dead-e-proc/blame-e
   (struct-copy dead-mutant-process
@@ -128,6 +132,8 @@
                                    'baz
                                    'blamed
                                    (list e.rkt)
+                                   empty
+                                   empty
                                    #f)]))
 (define dead-e-proc/type-error-in-d
   (struct-copy dead-mutant-process
@@ -137,6 +143,8 @@
                                    'baz
                                    'type-error
                                    (list main.rkt)
+                                   #f
+                                   #f
                                    #f)]))
 (define dead-e-proc/oom/no-increased-limits
   (struct-copy dead-mutant-process
@@ -145,6 +153,8 @@
                                    0
                                    'baz
                                    'oom
+                                   #f
+                                   #f
                                    #f
                                    #f)]))
 
@@ -422,6 +432,8 @@
                                        0
                                        'baz
                                        'completed
+                                       #f
+                                       #f
                                        #f
                                        #f)]))
     (fallback/oom (make-mock-Q (make:m0-factory))

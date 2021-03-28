@@ -26,40 +26,6 @@
     #:module "mutant-sampling/use-pre-selected-samples.rkt"
     #:parameters [pre-selected-mutant-samples-db]))
 
-(define-configurable blame-following
-  #:provides [make-extract-blamed]
-
-  (define-implementation null
-    #:module "blame-following/null.rkt")
-
-  (define-implementation natural-blame
-    #:module "blame-following/natural-blame.rkt")
-
-  (define-implementation transient-oldest
-    #:module "blame-following/transient-blame.rkt"
-    #:fixed-parameters ([pick-transient-blamed (λ (bounds) (take-right bounds 1))]))
-  (define-implementation transient-newest
-    #:module "blame-following/transient-blame.rkt"
-    #:fixed-parameters ([pick-transient-blamed (λ (bounds) (take bounds 1))]))
-  (define-implementation transient-all
-    #:module "blame-following/transient-blame.rkt"
-    #:fixed-parameters ([pick-transient-blamed values]))
-
-  (define-implementation stack
-    #:module "blame-following/stack.rkt"))
-
-(define-configurable stack-location-selection
-  #:provides [make-extract-runtime-error-location]
-
-  (define-implementation top
-    #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
-    #:fixed-parameters ([pick-locations (λ (all) (take all 1))]))
-  (define-implementation all
-    #:module "../runner/error-extractors/extract-runtime-error-location.rkt"
-    #:fixed-parameters ([pick-locations values]))
-  (define-implementation null
-    #:module "../runner/error-extractors/null.rkt"))
-
 (define-configurable module-instrumentation
   #:provides [instrument-module]
 
@@ -82,6 +48,18 @@
   (define-implementation load-pre-computed-result
     #:module "benchmark-runner/load-pre-computed-result.rkt"
     #:parameters [pre-computed-results-db]))
+
+(define-configurable blame-following
+  #:provides [follow-blame]
+
+  (define-implementation null
+    #:module "blame-following/null.rkt")
+
+  (define-implementation pick-some
+    #:module "blame-following/pick-some.rkt"
+    #:parameters [selector:runtime-error-with-blame
+                  selector:runtime-error
+                  selector:blame]))
 
 (define-configurable trail-completion
   #:provides [blame-trail-ended?]
