@@ -7,6 +7,9 @@
          select-top-of-context
          select-all-context
 
+         select-top-of-errortrace/context-fallback/filter-typed
+         select-top-of-context/filter-typed
+
          select-all-blamed
          select-last-blamed
          select-first-blamed)
@@ -44,4 +47,17 @@
 (define (select-first-blamed config blamed errortrace context)
   (take1-or-empty blamed #:right? #f))
 
+
+(define (filter-typed stack config)
+  (filter (λ (mod) (equal? (hash-ref config mod 'none) 'none))
+          stack))
+(define (select-top-of-errortrace/context-fallback/filter-typed config blamed errortrace context)
+  (match* {(take1-or-empty (filter-typed errortrace config))
+           (take1-or-empty (filter-typed context    config))}
+    [{(? cons? top) _            } top]
+    [{'()           (? cons? top)} top]
+    [{'()           '()          } empty]))
+
+(define (select-top-of-context/filter-typed config blamed errortrace context)
+  (take1-or-empty (filter-typed context config)))
 
