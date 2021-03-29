@@ -10,7 +10,7 @@
          racket/contract/region
          syntax/parse/define)
 
-(define-for-syntax ENABLE-CONTRACTS #t)
+(define-for-syntax ENABLE-CONTRACTS #f)
 
 (define-simple-macro (optional:define/contract id/sig ctc . body)
   #:with [definer {~optional maybe-ctc}] (if ENABLE-CONTRACTS
