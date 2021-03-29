@@ -7,16 +7,16 @@
          "../../util/optional-contracts.rkt"
          "../../util/path-utils.rkt")
 
-(provide (contract-out [blame-trail-ended?
+(provide (contract-out [blame-trail-ended-normally?
                         (dead-mutant-process/c
                          blame-labels?
                          (symbol? string? . -> . any)
                          . -> .
                          boolean?)]))
 
-(define (blame-trail-ended? dead-proc
-                            blamed/type-error-locations
-                            log-factory-message)
+(define (blame-trail-ended-normally? dead-proc
+                                     locations-selected-as-blamed
+                                     log-factory-message)
   (match-define (dead-mutant-process (mutant _ mod index)
                                      config
                                      result
@@ -25,14 +25,20 @@
                                      _)
     dead-proc)
 
+  (define normal-trail-outcome?
+    (member (run-status-outcome result)
+            '(type-error
+              runtime-error
+              blame)))
   (define all-blamed-at-max-precision?
     (andmap (λ (blamed) (config-at-max-precision-for? blamed config))
-            blamed/type-error-locations))
+            locations-selected-as-blamed))
   (define buggy-mod-type-error?
-    (type-error-on-buggy-mod? blamed/type-error-locations result))
+    (type-error-on-buggy-mod? locations-selected-as-blamed result))
 
-  (define trail-ended? (or buggy-mod-type-error?
-                           all-blamed-at-max-precision?))
+  (define trail-ended? (and normal-trail-outcome?
+                            (or buggy-mod-type-error?
+                                all-blamed-at-max-precision?)))
 
   (cond [(and buggy-mod-type-error?
               (not all-blamed-at-max-precision?))
@@ -44,7 +50,7 @@
           @~a{
               Found a mutant with type error in the buggy module, @;
               but the module is not typed?
-              Type error location: @blamed/type-error-locations
+              Type error location: @locations-selected-as-blamed
 
               Mutant: @;
               @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}
@@ -59,7 +65,7 @@
               BT VIOLATION: @;
               Found mutant with blamed/type-error location at types @;
               that is not the buggy module.
-              Blamed: @~v[blamed/type-error-locations]
+              Blamed: @~v[locations-selected-as-blamed]
 
               Mutant: @;
               @mod @"@" @index [@id] {@(blame-trail-id the-blame-trail)}

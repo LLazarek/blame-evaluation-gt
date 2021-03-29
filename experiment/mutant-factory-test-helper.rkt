@@ -77,6 +77,8 @@
                                              'foo
                                              'blamed
                                              '("m0.rkt")
+                                             empty
+                                             empty
                                              #f))]
            [mutant1-path/1 "m11.rktd"
                            (format "~s\n"
@@ -85,6 +87,8 @@
                                                'foo
                                                'blamed
                                                '("m1.rkt")
+                                               empty
+                                               empty
                                                #f))]
            [mutant1-path/2 "m12.rktd"
                            (format "~s\n"
@@ -93,6 +97,8 @@
                                                'foo
                                                'type-error
                                                '("m1.rkt")
+                                               empty
+                                               empty
                                                #f))]
            [mutant2-path "m2.rktd"
                          (format "~s\n"
@@ -101,6 +107,8 @@
                                              'foo
                                              'type-error
                                              '("m2.rkt")
+                                             empty
+                                             empty
                                              #f))]
            [empty-file-path "empty-file.rktd"
                             ""]
@@ -118,6 +126,8 @@
                                                   'foo
                                                   'type-error
                                                   '("e.rkt")
+                                                  empty
+                                                  empty
                                                   #f)
                                       (hash "main.rkt" 'types
                                             "e.rkt" 'types

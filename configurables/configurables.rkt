@@ -62,10 +62,10 @@
                   selector:blame]))
 
 (define-configurable trail-completion
-  #:provides [blame-trail-ended?]
+  #:provides [blame-trail-ended-normally?]
 
-  (define-implementation any-type-error
-    #:module "trail-completion/any-type-error.rkt")
+  (define-implementation any-type-error/blamed-at-max
+    #:module "trail-completion/any-type-error-or-blamed-at-max.rkt")
 
   (define-implementation mutated-type-error/blamed-at-max
     #:module "trail-completion/mutated-type-error-or-blamed-at-max.rkt"))

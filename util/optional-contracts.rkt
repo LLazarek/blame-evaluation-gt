@@ -13,10 +13,9 @@
 (define-for-syntax ENABLE-CONTRACTS #t)
 
 (define-simple-macro (optional:define/contract id/sig ctc . body)
-  #:with [definer {~optional maybe-ctc}]
-  (if ENABLE-CONTRACTS
-      #'(define/contract ctc)
-      #'(define))
+  #:with [definer {~optional maybe-ctc}] (if ENABLE-CONTRACTS
+                                             #'(define/contract ctc)
+                                             #'(define))
   (definer id/sig {~? maybe-ctc} . body))
 
 

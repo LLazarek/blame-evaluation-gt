@@ -477,14 +477,15 @@
                                           0
                                           p-config
                                           #:suppress-output? #f))))
-     (λ (output) (test-equal? output
-                              "B
-(c 5)
-(d 1)
-(a -1)
-(b 1)
-4
-")))
+     (λ (output) (test-equal? (string-trim output)
+                              @~a{
+                                  B
+                                  (c 5)
+                                  (d 1)
+                                  (a -1)
+                                  (b 1)
+                                  4
+                                  })))
 
     (test/no-error
      (λ _ (with-output-to-string
@@ -493,14 +494,15 @@
                                           0
                                           p-config
                                           #:suppress-output? #f))))
-     (λ (output) (test-equal? output
-                              "B
-(c -5)
-(d 1)
-(a 1)
-(b 1)
--6
-")))
+     (λ (output) (test-equal? (string-trim output)
+                              @~a{
+                                  B
+                                  (c -5)
+                                  (d 1)
+                                  (a 1)
+                                  (b 1)
+                                  -6
+                                  })))
 
     (test/no-error
      (λ _ (run-with-mutated-module p
@@ -635,12 +637,14 @@
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
-                                   13 ;; runtime error -> blame on a.rkt
+                                   13 ;; runtime error in a.rkt
                                    p-config
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")])))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "a.rkt" _)]
+                                               [context-stack (list* "a.rkt" _)])))))
 
     (ignore (define mutator-that-changes-source-locations
               (λ (a-mod index #:in program)
@@ -768,7 +772,9 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")]))))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "a.rkt" _)]
+                                               [context-stack (list* "a.rkt" _)]))))))
   (test-begin
     #:name run-with-mutated-module/runtime-error-locations
     ;; #:before (setup-test-env!)
@@ -810,7 +816,9 @@
                                    #:memory/gb 1
                                    #:suppress-output? #f))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("c.rkt")])))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "c.rkt" _)]
+                                               [context-stack (list* "c.rkt" _)])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -819,7 +827,9 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("b.rkt")])))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "b.rkt" _)]
+                                               [context-stack (list* "b.rkt" _)])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -828,7 +838,9 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")])))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "a.rkt" _)]
+                                               [context-stack (list* "a.rkt" _)])))))
     (test/no-error
      (λ _ (run-with-mutated-module p
                                    a
@@ -837,7 +849,9 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")])))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "a.rkt" _)]
+                                               [context-stack (list* "a.rkt" _)])))))
 
 
     ;; Test errors that require errortrace to get the right location
@@ -864,7 +878,9 @@
                                    #:timeout/s 60
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("e.rkt")]))))))
+                                               [blamed #f]
+                                               [errortrace-stack (list* "e.rkt" _)]
+                                               [context-stack (list* "d.rkt" _)]))))))
 
 
   (test-begin
@@ -887,7 +903,9 @@
                                    #:memory/gb 1
                                    #:suppress-output? #t))
      (λ (r) (test-match r (struct* run-status ([outcome 'runtime-error]
-                                               [blamed '("a.rkt")])))))
+                                               [blamed '("a.rkt")]
+                                               [errortrace-stack (list* "a.rkt" _)]
+                                               [context-stack (list* "a.rkt" _)])))))
 
     ;; The handling for above needs to not trigger on -- and not blow up on --
     ;; actual contract violations from transient. This is an example that caught

@@ -18,4 +18,4 @@
               ; blame
               select-first-blamed)
   (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
-  (configure! trail-completion         mutated-type-error/blamed-at-max))
+  (configure! trail-completion         any-type-error/blamed-at-max))

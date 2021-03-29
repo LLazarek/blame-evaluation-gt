@@ -189,7 +189,7 @@
         mutated-expr/annotations-stripped))
 
 (define (strip-annotations mutated-expr)
-  (match (select-exprs-as-if-untyped mutated-expr)
+  (match (select-exprs-as-if-untyped (datum->syntax #f mutated-expr))
     [(list stripped-expr _ _)
      (match (syntax->list stripped-expr)
        [(list lone-subexpr)

@@ -11,4 +11,4 @@
   (configure! benchmark-runner         load-pre-computed-result "../dbs/code-mutations/pre-computed-mutant-results.rktdb")
   (configure! blame-following          null)
   (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
-  (configure! trail-completion         mutated-type-error/blamed-at-max))
+  (configure! trail-completion         any-type-error/blamed-at-max))

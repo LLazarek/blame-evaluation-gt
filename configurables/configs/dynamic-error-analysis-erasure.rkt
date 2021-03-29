@@ -18,4 +18,4 @@
               ; blame
               select-all-errortrace/context-fallback)
   (configure! bt-root-sampling         random-with-replacement)
-  (configure! trail-completion         mutated-type-error/blamed-at-max))
+  (configure! trail-completion         any-type-error/blamed-at-max))
