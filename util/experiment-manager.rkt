@@ -677,9 +677,10 @@
                 (loop)
                 'error)]
            [else
-            (printf "~a Sleeping for ~a min                   \r"
+            (printf "~a Sleeping for ~a min~nCurrent status:~n~a~n"
                     (date->string (current-date) #t)
-                    sleep-period)
+                    sleep-period
+                    (format-status host summary jobs))
             (sleep (* sleep-period 60))
             (loop)]))))
 
@@ -804,7 +805,7 @@
           (define prefix (if (zero? i) "" "\n         "))
           (match-define (list job-id status progress check-for-errors?) job)
           (display (~a prefix
-                       (fixed-width-format job-id 40)
+                       (fixed-width-format job-id 60)
                        "  "
                        (match* {status progress}
                          [{"-" 1} "✓"]

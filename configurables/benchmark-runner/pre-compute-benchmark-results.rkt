@@ -24,7 +24,8 @@
               #:once-each
               [("-c" "--config")
                'config
-               "Config for selecting which mutants to compute results for."
+               ("Config for selecting which mutants to compute results for."
+                "This program runs mutants in the minimum config, so TR is probably what you want.")
                #:collect ["path" take-latest #f]
                #:mandatory]
               [("-o" "--out-db")
