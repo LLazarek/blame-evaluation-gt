@@ -59,13 +59,14 @@
             (map erasure-context-bt->filtered-version bts))))
 
 (module+ main
-  (use-disk-data-cache? #f)
-  (define erasure-ctx-bts (get-bts-by-mutator-for-mode "erasure-stack-first--context"))
-  (define erasure-ctx-filtered-bts (erasure-context-bts->filtered-versions erasure-ctx-bts))
-  (get-bts-by-mutator-for-mode-backdoor
-   (match-lambda ["erasure-stack-first--context-filtered"
-                  erasure-ctx-filtered-bts]
-                 [else #f]))
+  ;;; Don't need any of this now that we have the erasure ctx filtered data
+  ;; (use-disk-data-cache? #f)
+  ;; (define erasure-ctx-bts (get-bts-by-mutator-for-mode "erasure-stack-first--context"))
+  ;; (define erasure-ctx-filtered-bts (erasure-context-bts->filtered-versions erasure-ctx-bts))
+  ;; (get-bts-by-mutator-for-mode-backdoor
+  ;;  (match-lambda ["erasure-stack-first--context-filtered"
+  ;;                 erasure-ctx-filtered-bts]
+  ;;                [else #f]))
 
   (generate-figure:success-bars '("erasure-stack-first--errortrace"
                                   "erasure-stack-first--errortrace-filtered"
