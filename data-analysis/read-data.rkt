@@ -9,15 +9,13 @@
          (struct-out blame-trail)
          (struct-out benchmark-data-files)
 
-         mutator-name?
-
-         transform-mutator-name)
+         mutator-name?)
 
 (require (prefix-in db: "../db/db.rkt")
-         "../configurables/configurables.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../experiment/blame-trail-data.rkt"
          "../util/mutant-util.rkt"
+         "data-adapter.rkt"
          racket/hash
          rscript)
 
@@ -133,7 +131,8 @@
                                            mutant-summaries)
                       (blame-trail (mutant benchmark-name mod-name index)
                                    id
-                                   mutant-summaries)])
+                                   (map adapt-mutant-summary
+                                        mutant-summaries))])
        trail-summaries))
 
 (define (mutator-names data)
@@ -148,7 +147,4 @@
               [{mutator-name indices} (in-hash (summary-valid-indices mod-summary))]
               [index (in-list indices)])
     (values (mutant benchmark mod index) mutator-name)))
-
-(define (transform-mutator-name mutator)
-  mutator)
 

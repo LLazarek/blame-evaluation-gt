@@ -168,6 +168,33 @@
      #t]
     [else #f]))
 
+(module+ test
+  (require ruinit
+           "data-adapter.rkt")
+  (test-begin
+    #:name satisfies-BT-hypothesis?
+    (satisfies-BT-hypothesis?
+     (blame-trail '#s(mutant "acquire" "board.rkt" 5659)
+                  87
+                  (map adapt-mutant-summary
+                       '(#s(mutant-summary 26565 #s(run-status "board.rkt" 5659 what-kind-of-spot type-error ("board.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . types) ("basics.rkt" . types) ("board.rkt" . types) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                         #s(mutant-summary 26454 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("board.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . types) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                         #s(mutant-summary 26345 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("auxiliaries.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                         #s(mutant-summary 26256 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("admin.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                         #s(mutant-summary 26167 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("state.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                         #s(mutant-summary 26093 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("basics.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                         #s(mutant-summary 26003 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("tree.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . none)))
+                         #s(mutant-summary 6350 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("strategy.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . none) ("tree.rkt" . none)))))))
+    (not (satisfies-BT-hypothesis?
+          (blame-trail '#s(mutant "acquire" "board.rkt" 5659)
+                       87
+                       (map adapt-mutant-summary
+                            '(#s(mutant-summary 26256 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("admin.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                              #s(mutant-summary 26167 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("state.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                              #s(mutant-summary 26093 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("basics.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
+                              #s(mutant-summary 26003 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("tree.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . none)))
+                              #s(mutant-summary 6350 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("strategy.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . none) ("tree.rkt" . none))))))))))
+
 (define ((add-to-list v) l) (cons v l))
 
 ;; string? (hash/c string? (listof blame-trail?))

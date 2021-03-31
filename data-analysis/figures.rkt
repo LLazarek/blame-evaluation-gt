@@ -30,7 +30,7 @@
 (define rename-benchmark values)
 
 ;; (bt-lengths-table bt-length-comparisons avo-bars blame-vs-exns-bars blame-vs-exns-venn success-bars)
-(define to-generate '(success-bars))
+(define to-generate '(bt-lengths-table))
 (plot-font-size 14)
 (define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
@@ -39,9 +39,9 @@
 
 ;; As the figures are written below, this will only take effect if the figures
 ;; are *not* pulling data from a cache on disk ...
-(define collect-max-error-margin? (make-parameter #f))
+(define collect-max-error-margin? (make-parameter #t))
 ;; ... i.e. this is not #t
-(define use-disk-data-cache? (make-parameter #t))
+(define use-disk-data-cache? (make-parameter #f))
 
 
 (define max-error-margin (box 0))
@@ -185,19 +185,37 @@
 
 
 (define (generate-figure:bt-lengths-table modes/ordered)
+  (define mode->max-trail-length
+    (match-lambda ["null" 13]
+                  [else 7]))
   (define bt-length-distribution-for-mode
     (simple-memoize
      #:on-disk (and (use-disk-data-cache?)
                     (build-path data-cache "bt-length-distributions.rktd"))
      (λ (mode-name)
-       (define bts-by-mutator/across-all-benchmarks
-         (get-bts-by-mutator-for-mode mode-name))
-       (bt-length-distributions-for
-        "yes"
-        (hash "yes"
-              (append* (hash-values bts-by-mutator/across-all-benchmarks)))
-        #:normalize? #t
-        #:partition-by-success? #t))))
+       (define bt-length/memo (simple-memoize bt-length))
+       (define (estimate-length-proportion length successful?)
+         (displayln @~a{Computing @mode-name @length @successful?})
+         (define estimate
+           (bt-wise-strata-proportion-estimate
+            (list mode-name)
+            (match-lambda [(list bt)
+                           (and (= (bt-length/memo bt #t) length)
+                                (if successful?
+                                    (satisfies-BT-hypothesis? bt)
+                                    (not (satisfies-BT-hypothesis? bt))))])))
+         (when (collect-max-error-margin?)
+           (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
+                                                            1.96)))
+         (displayln @~a{
+                        @"  "-> @(exact->inexact (~% (hash-ref estimate 'proportion-estimate)))%
+
+                        })
+         (hash-ref estimate 'proportion-estimate))
+       (for/list ([length (in-range (add1 (mode->max-trail-length mode-name)))])
+         (list length
+               (list (estimate-length-proportion length #t)
+                     (estimate-length-proportion length #f)))))))
 
   (define (make-length-table-cell-plot mode-name)
     (define length-distribution (bt-length-distribution-for-mode mode-name))
@@ -475,7 +493,10 @@
                                 "TR" "transient-newest" "transient-oldest"
                                 "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:bt-lengths-table modes/ordered)))
-    (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png")))
+    (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png"))
+    (when (collect-max-error-margin?)
+      (displayln @~a{Max error margin for bt-lengths-table: @(unbox max-error-margin)})
+      (set-box! max-error-margin 0)))
 
   (when (member 'bt-length-comparisons to-generate)
     (define bt-length-comparisons
@@ -488,7 +509,10 @@
                                    ["transient-newest" "transient-stack-first"]
                                    ["transient-oldest" "transient-stack-first"]))
         (generate-figure:bt-length-comparisons mode-comparisons)))
-    (pict->png! bt-length-comparisons (build-path outdir "bt-length-comparisons.png")))
+    (pict->png! bt-length-comparisons (build-path outdir "bt-length-comparisons.png"))
+    (when (collect-max-error-margin?)
+      (displayln @~a{Max error margin for bt-lengths-comparisons: @(unbox max-error-margin)})
+      (set-box! max-error-margin 0)))
 
 
   (when (member 'avo-bars to-generate)
