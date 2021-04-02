@@ -32,6 +32,27 @@
     (increment-config-precision-for name config
                                     #:increment-types-error? error-if-already-types?)))
 
+(define (serialize-config config)
+  (define ordered-mods (sort (hash-keys config) string<?))
+  (string->number
+   (list->string
+    (for/list ([mod (in-list ordered-mods)])
+      (match (hash-ref config mod)
+        ['types #\1]
+        ['none  #\0])))))
+(define (deserialize-config config-number
+                            #:reference [reference-config #f]
+                            #:modules [mods (hash-keys reference-config)])
+  (define ordered-mods (reverse (sort mods string<?)))
+  (define ordered-mod-chars (reverse (string->list (~a config-number))))
+  (for/hash ([mod (in-list ordered-mods)]
+             [char (in-sequences ordered-mod-chars
+                                 (in-cycle (in-value #\0)))])
+    (values mod
+            (match char
+              [#\1 'types]
+              [#\0 'none]))))
+
 (module+ test
   (require ruinit
            racket)
@@ -59,4 +80,20 @@
     (config-at-max-precision-for?
      "baz.rkt"
      (hash "baz.rkt" 'types
-           "bazzle.rkt" 'types))))
+           "bazzle.rkt" 'types)))
+
+  (test-begin
+    #:name serialize/deserialize-config
+    (test-equal? (serialize-config #hash(("a" . types) ("b" . none) ("c" . types)))
+                 101)
+    (test-equal? (serialize-config #hash(("a" . none) ("b" . none) ("c" . types)))
+                 1)
+    (test-equal? (serialize-config #hash(("a" . none) ("d" . types) ("c" . none)))
+                 1)
+    (ignore (define-simple-test (test-round-trip config)
+              (test-equal? (deserialize-config (serialize-config config)
+                                               #:reference config)
+                           config)))
+    (test-round-trip #hash(("a" . types) ("b" . none) ("c" . types)))
+    (test-round-trip #hash(("a" . none) ("b" . none) ("c" . types)))
+    (test-round-trip #hash(("a" . none) ("d" . types) ("c" . none)))))
