@@ -151,11 +151,15 @@
 
     (define select-mutants (configured:select-mutants))
     (define process-q
-      (for/fold ([process-q (make-process-Q (process-limit)
-                                            (factory (bench-info bench max-config)
-                                                     (hash)
-                                                     (hash)
-                                                     0))])
+      (for/fold ([process-q (make-process-Q
+                             (process-limit)
+                             (factory (bench-info bench max-config)
+                                      (hash)
+                                      (hash)
+                                      0)
+                             #:kill-older-than (let-values ([{max-timeout _}
+                                                             (increased-limits bench)])
+                                                 (+ max-timeout 30)))])
                 ([module-to-mutate-name mutatable-module-names]
                  #:when #t
                  [mutation-index (select-mutants module-to-mutate-name

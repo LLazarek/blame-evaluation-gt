@@ -1,9 +1,13 @@
 #lang at-exp racket
 
+;; lltodo: this and the functional Q implementation should share most of this
+;; code. Maybe even the imperative version can share much of it.
+
 (provide (contract-out
           [make-process-Q
            ({(and/c natural? (>/c 0))}
-            {any/c}
+            {any/c
+             #:kill-older-than (or/c positive-integer? #f)}
             . ->* .
             (and/c process-Q?
                    priority-process-Q?
@@ -20,7 +24,9 @@
                                       active-count
 
                                       waiting
-                                      waiting-count))
+                                      waiting-count
+
+                                      timeout))
 
 (define (priority-process-Q-set-data q v)
   (struct-copy priority-process-Q q
@@ -31,7 +37,13 @@
   (< (process-priority a)
      (process-priority b)))
 
-(define (make-process-Q process-limit [data-init #f])
+(struct active-process (info start-time))
+
+(define (make-process-Q process-limit [data-init #f]
+                        ;; These timeouts are enforced on a best-effort basis.
+                        ;; I.e. whenever we "notice" a process that has exceeded its timeout,
+                        ;; we kill it. But no guarantees about how quickly we will notice.
+                        #:kill-older-than [proc-timeout-secs #f])
   (priority-process-Q priority-process-Q-empty?
                  enq-process
                  wait
@@ -46,7 +58,9 @@
                  empty
                  0
                  (PQ:heap process-priority<)
-                 0))
+                 0
+
+                 proc-timeout-secs))
 
 (define (priority-process-Q-empty? q)
   (and (zero? (priority-process-Q-active-count q))
@@ -73,18 +87,20 @@
        (loop new-q)])))
 
 (define (sweep-dead/spawn-new-processes q)
+  (kill-timed-out-active-processes! q)
   (define-values {still-active dead}
-    (partition (λ (info)
-                 (equal? ((process-info-ctl info) 'status)
-                         'running))
+    (partition (λ (active-proc)
+                 (define ctl (process-info-ctl (active-process-info active-proc)))
+                 (equal? (ctl 'status) 'running))
                (priority-process-Q-active q)))
+  (define dead-proc-infos (map active-process-info dead))
   (define temp-q (struct-copy priority-process-Q q
                               [active still-active]
                               [active-count (length still-active)]))
   (define temp-q+wills
     (for/fold ([temp-q+wills temp-q])
-              ([dead-proc (in-list dead)])
-      ((process-info-will dead-proc) temp-q+wills dead-proc)))
+              ([dead-proc-info (in-list dead-proc-infos)])
+      ((process-info-will dead-proc-info) temp-q+wills dead-proc-info)))
   (define free-spawning-capacity
     (- (priority-process-Q-active-limit temp-q+wills)
        (priority-process-Q-active-count temp-q+wills)))
@@ -110,10 +126,22 @@
      (define start-process (process-thunk (PQ:find-min/max waiting)))
      (define the-process-info (start-process))
      (struct-copy priority-process-Q q
-                  [active (cons the-process-info active)]
+                  [active (cons (active-process the-process-info
+                                                (current-seconds))
+                                active)]
                   [active-count (add1 active-count)]
                   [waiting (PQ:delete-min/max waiting)]
                   [waiting-count (sub1 waiting-count)])]))
+
+(define (kill-timed-out-active-processes! q)
+  (define timeout (priority-process-Q-timeout q))
+  (when timeout
+    (define now (current-seconds))
+    (for ([an-active-process (in-list (priority-process-Q-active q))])
+      (define lifespan (- now (active-process-start-time an-active-process)))
+      (when (> lifespan timeout)
+        (define ctl (process-info-ctl (active-process-info an-active-process)))
+        (ctl 'kill)))))
 
 
 (module+ test
@@ -392,4 +420,38 @@
                         1
                         _
                         _
-                        2))))
+                        2)))
+
+  (test-begin
+    #:name process-timeouts
+    (ignore (define q (make-process-Q 2 empty #:kill-older-than 2))
+            (define will:record-output
+              (λ (q info)
+                (define output
+                  (string-trim
+                   (port->string
+                    (simple-process-info-stdout (process-info-data info)))))
+                (close-process-ports! info)
+                (process-Q-set-data q
+                                    (cons output
+                                          (process-Q-get-data q)))))
+            (define q0 (enq-process q
+                                    (λ _
+                                      (simple-process "sleep 1; echo hi" will:record-output))
+                                    0))
+            (define q1 (enq-process q0
+                                    (λ _
+                                      (simple-process "sleep 3; echo hi" will:record-output))
+                                    0)))
+    (test-= (priority-process-Q-waiting-count q1) 0)
+    (test-= (priority-process-Q-active-count q1) 2)
+
+    (ignore (define q1* (wait q1)))
+    (test-= (priority-process-Q-waiting-count q1*) 0)
+    (test-= (priority-process-Q-waiting-count q1) 0)
+    (test-= (priority-process-Q-active-count q1*) 0)
+    (test-= (priority-process-Q-active-count q1) 2)
+    (test-match (process-Q-get-data q1*)
+                (list-no-order "hi"
+                               ;; empty bc killed
+                               ""))))

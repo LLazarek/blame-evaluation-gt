@@ -43,7 +43,8 @@
   (define q
     (for/fold ([q (make-process-Q process-limit
                                   ; (listof mutant?)
-                                  empty)])
+                                  empty
+                                  #:kill-older-than (* 5 60))])
               ([mutant (in-list mutants-with-type-errors)])
       (find-interesting-scenarios-for-mutant mutant
                                              benchmark
