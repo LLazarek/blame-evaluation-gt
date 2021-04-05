@@ -30,7 +30,7 @@
 (define rename-benchmark values)
 
 ;; (bt-lengths-table bt-length-comparisons avo-bars blame-vs-exns-bars blame-vs-exns-venn success-bars)
-(define to-generate '(bt-lengths-table))
+(define to-generate '(bt-length-comparisons))
 (plot-font-size 14)
 (define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
@@ -267,44 +267,43 @@
   plain-table)
 
 (define (generate-figure:bt-length-comparisons mode-comparisons)
+  (define length-differences '(-inf.0 -3 -2 -1 0 1 2 3 +inf.0))
   (define direct-bt-length-comparison-distribution
     (simple-memoize
      #:on-disk (and (use-disk-data-cache?)
                     (build-path data-cache "direct-effort-comparison-distributions.rktd"))
      (λ (top-mode bottom-mode dump-to)
-       (define bottom-bts-by-mutator (get-bts-by-mutator-for-mode bottom-mode))
-       (define bottom-bts-by-id (bts-by-id bottom-bts-by-mutator))
-       (define get-top-bts-by-benchmark+mutant
-         (make-bt-by-benchmark+mutant-getter-for-mode top-mode))
-       (define/contract (get-bts-by-benchmark+mutant benchmark mutator)
-         (string? string? . -> . (hash/c mutant? (listof (list/c blame-trail? blame-trail?))))
+       (define bt-length/memo (simple-memoize bt-length))
+       (define (estimate-Δ-proportion Δ)
+         (displayln @~a{Computing @top-mode vs @bottom-mode @Δ})
+         (define estimate
+           (bt-wise-strata-proportion-estimate
+            (list top-mode bottom-mode)
+            (match-lambda [(list top-bt bot-bt)
+                           #:when (equal? Δ -inf.0)
+                           (and (satisfies-BT-hypothesis? top-bt)
+                                (not (satisfies-BT-hypothesis? bot-bt)))]
+                          [(list top-bt bot-bt)
+                           #:when (equal? Δ +inf.0)
+                           (and (not (satisfies-BT-hypothesis? top-bt))
+                                (satisfies-BT-hypothesis? bot-bt))]
+                          [(list top-bt bot-bt)
+                           (and (satisfies-BT-hypothesis? top-bt)
+                                (satisfies-BT-hypothesis? bot-bt)
+                                (= (- (bt-length/memo top-bt #t)
+                                      (bt-length/memo bot-bt #t))
+                                   Δ))])))
+         (when (collect-max-error-margin?)
+           (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
+                                                            1.96)))
+         (displayln @~a{
+                        @"  "-> @(exact->inexact (~% (hash-ref estimate 'proportion-estimate)))%
 
-         (define top-bts-by-mutant (get-top-bts-by-benchmark+mutant benchmark mutator))
-         (for/hash ([{mutant top-bts} (in-hash top-bts-by-mutant)])
-           (values mutant
-                   (for/list ([top-bt (in-list top-bts)])
-                     (define corresponding-bottom-bt (hash-ref bottom-bts-by-id (bt->id top-bt)))
-                     (list top-bt corresponding-bottom-bt)))))
-       (define Δ-counts
-         (for/hash/fold ([benchmark (in-list benchmarks)]
-                         #:when #t
-                         [mutator (in-list (configured:active-mutator-names))]
-                         #:when #t
-                         [{mutant bts} (in-hash (get-bts-by-benchmark+mutant benchmark mutator))]
-                         #:when #t
-                         [bt-pair (in-list bts)])
-           #:combine +
-           #:default 0
-           (match-define (list top bot) bt-pair)
-           (define length-difference
-             (- (bt-length top #t) (bt-length bot #t)))
-           (if (and (satisfies-BT-hypothesis? top)
-                    (satisfies-BT-hypothesis? bot))
-               (values length-difference 1)
-               (values 0 0))))
-       (define total-Δs (apply + (hash-values Δ-counts)))
-       (for/hash ([{Δ count} (in-hash Δ-counts)])
-         (values Δ (/ count total-Δs))))))
+                        })
+         (hash-ref estimate 'proportion-estimate))
+       (for/list ([Δ (in-list length-differences)])
+         (list Δ
+               (estimate-Δ-proportion Δ))))))
 
   (define (direct-bt-length-comparison top-mode other-mode)
     (define Δ-distribution (direct-bt-length-comparison-distribution top-mode other-mode #f))
@@ -317,37 +316,39 @@
                   (discrete-histogram '((-1 8) (-2 5))
                                       #:color "green")))
     ;; Actually, there just need to be placeholders for every x-value that I want
-    ;; to show up in the final plot
-    (define Δ-distribution+placeholders
-      (for/hash ([i (in-range -3 4)])
-        (values i (hash-ref Δ-distribution i 0))))
+    ;; to show up in the final plot, in every group (see below)
     (parameterize ([plot-y-transform (axis-transform-compose
                                       (axis-transform-compose
-                                       (collapse-transform (~% 0.1) (~% 0.85))
-                                       (stretch-transform (~% 0) (~% 0.1) 2))
-                                      (stretch-transform (~% 0.85) (~% 1) 1/2))]
+                                       (collapse-transform (~% 0.15) (~% 0.75))
+                                       (stretch-transform (~% 0) (~% 0.15) 2))
+                                      (stretch-transform (~% 0.75) (~% 1) 1/2))]
                    [plot-y-ticks (ticks-add (plot-y-ticks)
-                                            (map ~% '(0.025 0.05 0.075 0.1 0.15 0.85 0.9 0.95)))])
+                                            (map ~% '(0.025 0.05 0.075 0.1 0.125 0.15 0.75 0.8 0.85 0.9)))])
       (plot-pict (list
                   (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
                              [color (in-list (list success-color
                                                    '(242 242 242)
                                                    failure-color))])
-                    (define group-data (for/list ([{Δ %} (in-hash Δ-distribution+placeholders)])
-                                         (list Δ
+                    (define group-data (for/list ([{Δ %l} (in-dict Δ-distribution)])
+                                         (define display-Δ
+                                           (match Δ
+                                             [-inf.0 "-∞"]
+                                             [+inf.0 "+∞"]
+                                             [v v]))
+                                         (list display-Δ
                                                ;; Need a placeholder for every Δ, even if
                                                ;; it's not in this group
-                                               (if (filter Δ) (~% %) 0))))
-                    (discrete-histogram (sort group-data < #:key first)
+                                               (if (filter Δ) (~% (first %l)) 0))))
+                    (discrete-histogram group-data
                                         #:color color))
-                  (x-axis (~% 0.2) #:ticks? #f #:alpha 0.7))
+                  (x-axis (~% 0.15) #:ticks? #f #:alpha 0.7))
                  #:title #f
                  #:y-label "% of mutually-successful scenarios"
                  #:x-label @~a{trail length difference}
                  #:y-min (~% 0)
                  #:y-max (~% 1)
                  #:x-min 0
-                 #:x-max 7)))
+                 #:x-max (length Δ-distribution))))
 
   (define-values {plots labels/lines}
     (for/lists {plots labels/lines}
