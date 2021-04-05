@@ -111,7 +111,7 @@
        (>= (length (remove-duplicates context-mods-in-program)) 3))
      (log-find-scenarios-debug
       @~a{
-          @mutant @(serialize-config config) interesting?, ctx: @context : @3-unique-mods-on-stack?
+          ⇓ @(serialize-config config) interesting?, ctx: @context : @3-unique-mods-on-stack?
           })
      3-unique-mods-on-stack?]
     [else #f]))
@@ -145,8 +145,10 @@
           })
      (void)]))
 
+(define max-retries 10)
 (define (interesting-scenario-checker benchmark a-scenario
-                                      #:log-progress log-progress!)
+                                      #:log-progress log-progress!
+                                      #:retry-count [retry-count 0])
   (define benchmark-name (benchmark->name benchmark))
   (match-define (scenario mutant run-configuration) a-scenario)
 
@@ -174,7 +176,27 @@
       [(? other-outcome?)
        (log-progress! benchmark-name a-scenario #f)
        q]
-      [else q]))
+      [else
+       #:when (< retry-count max-retries)
+       (log-find-scenarios-info
+        @~a{
+            Retrying @benchmark-name @mutant @(serialize-config run-configuration) @;
+            (retry # @(add1 retry-count))
+            })
+       (process-Q-enq q
+                      (interesting-scenario-checker benchmark
+                                                    a-scenario
+                                                    #:log-progress log-progress!
+                                                    #:retry-count (add1 retry-count))
+                      2)]
+      [else
+       (log-find-scenarios-error
+        @~a{
+            No more retries for @;
+            @benchmark-name @mutant @(serialize-config run-configuration), @;
+            giving up
+            })
+       q]))
 
   (mutant-spawner run-configuration
                   will:record-outcome!))
