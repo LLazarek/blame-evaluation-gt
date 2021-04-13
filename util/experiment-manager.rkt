@@ -7,7 +7,9 @@
 (define-runtime-paths
   [store-path "../../experiment-data/experiment-manager"]
   [data-path "../../experiment-data/results/code-mutations"]
-  [dbs-path "../../experiment-data/dbs/code-mutations.tar.gz"])
+  [default-dbs-path "../../experiment-data/dbs/code-mutations"])
+
+(define db-installation-directory-name "code-mutations")
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -703,18 +705,29 @@
         (exit 1))
       (loop))))
 
+(define current-dbs-path (make-parameter default-dbs-path))
 (define (update-host! a-host)
-  (define host-dbs-dir
+  (define host-dbs-destination
     (build-path (get-field host-project-path a-host)
                 "blame-evaluation-gt"
                 "dbs"))
-  (define archive-name (basename dbs-path))
-  (define unpacked-db-dir-name
-    (for/fold ([name archive-name])
-              ([_ (in-range 2)])
-      (path-replace-extension name "")))
-  (define host-unpacked-db-dir-path
-    (build-path host-dbs-dir unpacked-db-dir-name))
+  (displayln "Zipping up dbs archive...")
+  (define-values {dbs-dir-parent dbs-dir-name} (basename (current-dbs-path) #:with-directory? #t))
+  (define archive-name (~a dbs-dir-name ".tar.gz"))
+  (parameterize ([current-directory dbs-dir-parent])
+    (unless (system @~a{tar -czhf @archive-name @dbs-dir-name})
+      (raise-user-error 'update-host!
+                        "Failed to zip dbs directory, giving up.")))
+  (displayln "Uploading dbs archive...")
+  (define host-db-archive-upload-path (build-path host-dbs-destination archive-name))
+  (unless (zero? (send a-host scp
+                       #:from-local (~a (build-path dbs-dir-parent archive-name))
+                       #:to-host (~a host-db-archive-upload-path)))
+    (raise-user-error 'update-host!
+                      @~a{Failed to upload db archive to @a-host}))
+
+  (define host-dbs-unpacked-dir-path (build-path host-dbs-destination
+                                                 db-installation-directory-name))
   (define host-repo-path
     (build-path (get-field host-project-path a-host)
                 "blame-evaluation-gt"))
@@ -724,32 +737,27 @@
   (define host-setup.rkt-path
     (build-path (get-field host-utilities-path a-host)
                 "setup.rkt"))
-  (displayln "Uploading latest dbs...")
-  (unless (zero? (send a-host scp
-                       #:from-local dbs-path
-                       #:to-host (~a (build-path host-dbs-dir archive-name))))
-    (raise-user-error 'update-host!
-                      @~a{Failed to upload db archive to @a-host}))
-  (displayln "Done.")
   (for ([msg (in-list '("Unpacking dbs..."
                         "Updating implementation..."
                         "Recompiling and checking status..."))]
-        [cmd (in-list (list @~a{
-                                rm -r '@host-unpacked-db-dir-path' && @;
-                                cd '@host-dbs-dir' && @;
-                                tar -xzvf '@archive-name' && @;
-                                echo "Done."
-                                }
-                            @~a{
-                                cd '@host-repo-path' && @;
-                                git pull && @;
-                                echo "Done."
-                                }
-                            @~a{
-                                @(get-field host-racket-path a-host) '@host-project-raco.rkt-path' -Cc && @;
-                                @(get-field host-racket-path a-host) '@host-setup.rkt-path' -v && @;
-                                echo "Done."
-                                }))])
+        [cmd (in-list
+              (list
+               @~a{
+                   rm -r '@host-dbs-unpacked-dir-path' && @;
+                   mkdir -p '@host-dbs-unpacked-dir-path' && @;
+                   tar -xzvf '@host-db-archive-upload-path' -C '@host-dbs-unpacked-dir-path' --strip-components=1 && @;
+                   echo "Done."
+                   }
+               @~a{
+                   cd '@host-repo-path' && @;
+                   git pull && @;
+                   echo "Done."
+                   }
+               @~a{
+                   @(get-field host-racket-path a-host) '@host-project-raco.rkt-path' -Cc && @;
+                   @(get-field host-racket-path a-host) '@host-setup.rkt-path' -v && @;
+                   echo "Done."
+                   }))])
     (displayln msg)
     (unless (send a-host
                   system/host
@@ -889,7 +897,8 @@
                            ['watch-for-stuck-jobs watch-for-stuck-jobs?]
                            ['queue Q-path]
                            ['resume-queue resume-Q/host]
-                           ['update (app (mapper host-by-name) update-targets)])
+                           ['update (app (mapper host-by-name) update-targets)]
+                           ['dbs-path _])
                args]
               #:once-each
               [("-s" "--status")
@@ -926,7 +935,13 @@
               [("-u" "--update")
                'update
                "Update the given hosts implementation of the experiment."
-               #:collect ["host" cons empty]]}
+               #:collect ["host" cons empty]]
+              [("-D" "--dbs")
+               'dbs-path
+               ("Install the given db set when updating a host's implementation."
+                "Only has an effect when -u is supplied."
+                @~a{Default: @(current-dbs-path)})
+               #:collect ["path" (set-parameter current-dbs-path) (current-dbs-path)]]}
  #:check [(or (not Q-path) (path-to-existant-file? Q-path))
           @~a{Unable to find queue spec at @Q-path}]
 
