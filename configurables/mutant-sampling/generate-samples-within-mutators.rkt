@@ -323,6 +323,7 @@
 (main
  #:arguments {[(hash-table ['config-path config-path]
                            ['summaries-db summaries-db-path]
+                           ['benchmark-summaries-db benchmark-summaries-db-path]
                            ['samples-db samples-db-path]
                            ['benchmarks-dir benchmarks-dir]
                            ['sample-size maybe-sample-size]
@@ -339,11 +340,17 @@
 
               [("-s" "--summaries-db")
                'summaries-db
-               ("Database in which to find benchmark mutant summaries.")
-               #:collect ["path"
-                          take-latest
-                          #f]
-               #:mandatory]
+               ("Database in which to find benchmark mutant summaries."
+                "Either this or -S must be supplied.")
+               #:collect ["path" take-latest #f]
+               #:mandatory-unless (λ (flags) (member 'benchmark-summaries-db flags))]
+              [("-S" "--benchmark-summaries-db")
+               'benchmark-summaries-db
+               ("Database in which to find benchmark summaries."
+                "Either this or -s must be supplied.")
+               #:collect ["path" take-latest #f]
+               #:mandatory-unless (λ (flags) (member 'summaries-db flags))]
+
               [("-o" "--samples-db")
                'samples-db
                ("Database in which to place benchmark mutant summaries."
@@ -380,8 +387,12 @@
                 "This is intended to allow incremental sample additions,"
                 "when sampling without replacement (see -r).")
                #:collect ["path" cons empty]]}
- #:check [(db:path-to-db? summaries-db-path)
+ #:check [(or (not summaries-db-path)
+              (db:path-to-db? summaries-db-path))
           @~a{Can't find db at @summaries-db-path}]
+ #:check [(or (not benchmark-summaries-db-path)
+              (db:path-to-db? benchmark-summaries-db-path))
+          @~a{Can't find db at @benchmark-summaries-db-path}]
 
  (install-configuration! config-path)
  (current-active-mutator-names (configured:active-mutator-names))
@@ -403,23 +414,31 @@
 
  (define excluded-sample-dbs (map db:get samples-to-exclude))
 
- (define samples-db (db:get samples-db-path))
- (define summaries-db (db:get summaries-db-path))
+ (define-values {benchmark-names benchmark->benchmark-summary}
+   (match* {summaries-db-path benchmark-summaries-db-path}
+     [{(? path-string?) #f}
+      (define summaries-db (db:get summaries-db-path))
+      (values (db:keys summaries-db)
+              (λ (bench-name)
+                (define module-summaries (db:read summaries-db bench-name))
+                (when benchmarks-dir
+                  (define bench (read-benchmark (build-path benchmarks-dir
+                                                            bench-name)))
+                  (for ([{module-name summary} (in-hash module-summaries)])
+                    (sanity-check-summary! summary
+                                           module-name
+                                           bench)))
+                (module-summaries->benchmark-summary module-summaries)))]
+     [{#f (? path-string?)}
+      (define bench-summaries-db (db:get benchmark-summaries-db-path))
+      (values (db:keys bench-summaries-db)
+              (λ (bench) (db:read bench-summaries-db bench)))]))
 
  (define data
-   (for/hash ([bench-name (in-list (db:keys summaries-db))])
+   (for/hash ([bench-name (in-list benchmark-names)])
      (displayln @~a{Sampling for @bench-name ...})
 
-     (define module-summaries (db:read summaries-db bench-name))
-     (when benchmarks-dir
-       (define bench (read-benchmark (build-path benchmarks-dir
-                                                 bench-name)))
-       (for ([{module-name summary} (in-hash module-summaries)])
-         (sanity-check-summary! summary
-                                module-name
-                                bench)))
-     (define benchmark-summary
-       (module-summaries->benchmark-summary module-summaries))
+     (define benchmark-summary (benchmark->benchmark-summary bench-name))
 
      (define excluded-samples-for-this-bench
        (flatten
@@ -436,4 +455,6 @@
        (benchmark-samples->module-samples benchmark-samples))
      (values bench-name
              samples-by-module)))
+
+ (define samples-db (db:get samples-db-path))
  (void (db:write! samples-db data)))
