@@ -35,7 +35,7 @@
 
 (define expected-TR-branch "transient-blame")
 (define expected-gtp-branch "master")
-(define expected-blgt-branch "mutations")
+(define expected-blgt-branch "dev")
 
 ;; ==================================================
 
