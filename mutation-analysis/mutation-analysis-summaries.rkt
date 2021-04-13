@@ -25,7 +25,7 @@
 (struct benchmark-summary
   (mutants-by-mutator ; (hash/c mutator-name? (listof mutant?))
    )
-  #:transparent)
+  #:prefab)
 
 ;; (hash/c module-name? summary?) -> benchmark-summary?
 (define (module-summaries->benchmark-summary module-summaries)
