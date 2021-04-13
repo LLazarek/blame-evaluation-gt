@@ -10,7 +10,7 @@
          "../configurables/configurables.rkt"
          (prefix-in db: "../db/db.rkt")
          "mutation-analysis-summaries.rkt"
-         "../util/for-first-star.rkt")
+         "../util/for.rkt")
 
 (define current-mutation-types (make-parameter #f))
 

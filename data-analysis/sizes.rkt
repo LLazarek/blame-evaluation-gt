@@ -4,6 +4,7 @@
          (prefix-in db: "../db/db.rkt")
          "../configurations/configure-benchmark.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"
+         "../util/for.rkt"
          "plot-common.rkt")
 
 (define-runtime-paths

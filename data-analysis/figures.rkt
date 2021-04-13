@@ -53,8 +53,8 @@
          (except-in pict-util line)
          (except-in pict pict?)
          pict-util/file
-         racket/hash
          "../configurables/configurables.rkt"
+         "../util/for.rkt"
 
          "plot-common.rkt"
          "read-data.rkt"

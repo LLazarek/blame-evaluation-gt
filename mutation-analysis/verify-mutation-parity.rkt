@@ -10,7 +10,7 @@
          "../mutate/mutate-program.rkt"
          "../process-q/priority.rkt"
          "../process-q/interface.rkt"
-         "../util/for-first-star.rkt"
+         "../util/for.rkt"
          "../util/binary-search.rkt"
          racket/runtime-path)
 
@@ -53,7 +53,7 @@
            "../runner/mutation-runner.rkt"
            "../util/program.rkt"
            "../util/path-utils.rkt"
-           "../util/for-first-star.rkt"
+           "../util/for.rkt"
            "../util/binary-search.rkt"
            "../util/mutant-util.rkt"
            (submod ".." common))

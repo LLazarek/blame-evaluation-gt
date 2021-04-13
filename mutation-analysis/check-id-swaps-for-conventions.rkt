@@ -3,7 +3,7 @@
 [require "../util/mutant-util.rkt"
          "../util/path-utils.rkt"
          "../util/program.rkt"
-         "../util/for-first-star.rkt"
+         "../util/for.rkt"
          "../configurations/configure-benchmark.rkt"
          "../configurables/configurables.rkt"
          "mutation-analysis-summaries.rkt"

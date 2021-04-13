@@ -52,23 +52,16 @@
             list?)]
           [absolute-value-format (ticks? . -> . ticks?)])
          pict?
-         add-to-list
-         for/hash/fold)
+         add-to-list)
 
 (require plot
-         plot-util
-         plot-util/quick/infer
          (except-in pict-util line)
-         (only-in pict vc-append text)
-         pict-util/file
-         "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../experiment/blame-trail-data.rkt"
          (prefix-in db: "../db/db.rkt")
          "../configurables/configurables.rkt"
          "../runner/mutation-runner-data.rkt"
 
-         "read-data.rkt"
-         syntax/parse/define)
+         "read-data.rkt")
 
 (define pict? any/c)
 (define mutator-name? string?)
@@ -233,20 +226,6 @@
               (for/and ([bt (in-list l)])
                 (equal? (blame-trail-mutant-id bt)
                         mutant))])))
-
-(define-simple-macro (for/hash/fold for-clauses
-                                    {~optional {~seq #:init initial-hash}
-                                               #:defaults ([initial-hash #'(hash)])}
-                                    #:combine combine
-                                    #:default default
-                                    body ...)
-  (for/fold ([result-hash initial-hash])
-            for-clauses
-    (define-values {key value} (let () body ...))
-    (hash-update result-hash
-                 key
-                 (λ (accumulator) (combine value accumulator))
-                 default)))
 
 ; See ctc above
 (define (two-sided-histogram data

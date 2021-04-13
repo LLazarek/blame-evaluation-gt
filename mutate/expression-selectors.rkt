@@ -251,7 +251,7 @@
                               (define/public (f x) x)
                               (: f : Number -> Number))))
 
-  (require "../util/for-first-star.rkt")
+  (require "../util/for.rkt")
   (test-begin
     #:name select-exprs-as-if-untyped/random-testing
     (not (for/first* ([i (in-range 1000)])
