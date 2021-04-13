@@ -12,6 +12,7 @@
          "../util/mutant-util.rkt"
          "../util/path-utils.rkt"
          "../configurables/configurables.rkt"
+         "../data-analysis/data-adapter.rkt"
          racket/runtime-path)
 
 (define-runtime-path benchmarks-dir "../../gtp-benchmarks/benchmarks")
@@ -280,6 +281,14 @@
                                     ([mutated-module mod-name]
                                      [index index]))]
                [config config]))
+     (values mod-name index config)]
+    [(and (? mutant-summary?)
+          (app adapt-mutant-summary
+               (struct* mutant-summary
+                        ([run-status (struct* run-status
+                                              ([mutated-module mod-name]
+                                               [index index]))]
+                         [config config]))))
      (values mod-name index config)]
     [(regexp @regexp{^\(mutant-info})
      (infer-debug-mutant-arguments (call-with-input-string infer-v read))]
