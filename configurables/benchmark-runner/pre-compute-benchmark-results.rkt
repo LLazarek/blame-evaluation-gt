@@ -1,7 +1,6 @@
 #lang at-exp rscript
 
-(require "load-pre-computed-result.rkt"
-         (prefix-in db: "../../db/db.rkt")
+(require (prefix-in db: "../../db/db.rkt")
          "../configurables.rkt"
          "../../configurations/configure-benchmark.rkt"
          "../../util/program.rkt"
@@ -13,29 +12,28 @@
 ;; db layout is:
 ;; bench-name? -> (hash/c mutant/c run-status?)
 
-(define-runtime-paths
-  [configurables-dir ".."])
-
 (main
- #:arguments {[(hash-table ['out-db results-db]
+ #:arguments {[(hash-table ['out-db results-db-path]
                            ['config config-path]
-                           _ ...)
+                           ['mutants-db-path mutants-db-path])
                bench-paths]
               #:once-each
               [("-c" "--config")
                'config
-               ("Config for selecting which mutants to compute results for."
+               ("Config for running the mutants."
                 "This program runs mutants in the minimum config, so TR is probably what you want.")
+               #:collect ["path" take-latest #f]
+               #:mandatory]
+              [("-m" "--mutants-db")
+               'mutants-db-path
+               ("Path to the db of mutants for which to compute results.")
                #:collect ["path" take-latest #f]
                #:mandatory]
               [("-o" "--out-db")
                'out-db
-               ("Path to the db to populate with pre-computed results."
-                @~a{Default: @(pre-computed-results-db)})
-               #:collect ["path"
-                          take-latest
-                          (path->string (build-path configurables-dir
-                                                    (pre-computed-results-db)))]]
+               ("Path to the db to populate with pre-computed results.")
+               #:collect ["path" take-latest #f]
+               #:mandatory]
               #:args bench-paths}
 
  #:check [(not (empty? bench-paths))
@@ -43,12 +41,16 @@
               This program takes as positional arguments the benchmark @;
               paths for which to compute mutant results.
               }]
+ #:check [(db:path-to-db? mutants-db-path)
+          @~a{Can't find db at @mutants-db-path}]
 
  (install-configuration! config-path)
 
- (unless (db:path-to-db? results-db)
-   (db:new! results-db))
- (define db (db:get results-db))
+ (define mutants-db (db:get mutants-db-path))
+
+ (unless (db:path-to-db? results-db-path)
+   (db:new! results-db-path))
+ (define results-db (db:get results-db-path))
 
  (for ([bench-path (in-list bench-paths)])
    (define the-benchmark (read-benchmark bench-path))
@@ -56,17 +58,16 @@
    (define config
      (for/hash ([{mod _} (in-hash (make-max-bench-config the-benchmark))])
        (values mod 'none)))
-   (match-define (and the-benchmark-configuration
-                      (struct* benchmark-configuration
-                               ([main main-path]
-                                [others others-paths])))
+   (match-define (struct* benchmark-configuration
+                          ([main main-path]
+                           [others others-paths]))
      (configure-benchmark the-benchmark config))
-   (define select-mutants (configured:select-mutants))
+   (define mutants-by-mod (db:read mutants-db bench-name))
 
    (displayln @~a{Computing result of @bench-name ...})
    (define mutant-results-hash
      (for*/hash ([mod-name (in-list (benchmark->mutatable-modules the-benchmark))]
-                 [index (select-mutants mod-name the-benchmark)])
+                 [index (in-list (hash-ref mutants-by-mod mod-name empty))])
        (display @~a{@mod-name @"@" @index                              @"\r"})
        (define module-to-mutate-path
          (pick-file-by-name (list* main-path others-paths)
@@ -84,5 +85,5 @@
                                         config
                                         #:timeout/s (default-timeout/s)
                                         #:memory/gb (default-memory-limit/gb)
-                                        #:suppress-output? #f))))
-   (db:set! db bench-name mutant-results-hash)))
+                                        #:suppress-output? #t))))
+   (db:set! results-db bench-name mutant-results-hash)))
