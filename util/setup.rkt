@@ -299,8 +299,8 @@
          #f]
         [(and expected-keys
               (not (set=? (db:keys (db:get path-to-db)) expected-keys)))
-         (define missing (set-subtract (db:keys (db:get path-to-db))
-                                       expected-keys))
+         (define missing (set-subtract expected-keys
+                                       (db:keys (db:get path-to-db))))
          (when display-failures?
            (displayln
             @~a{
