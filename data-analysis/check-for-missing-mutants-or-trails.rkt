@@ -7,7 +7,8 @@
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../util/debug-mutant.rkt"
          "../runner/mutation-runner.rkt"
-         "../experiment/blame-trail-data.rkt")
+         "../experiment/blame-trail-data.rkt"
+         "experiment-info.rkt")
 
 (define (check-mutants bench-name bench-data expected-samples log-path)
   (define expected-mutants
@@ -108,18 +109,6 @@
                                     #:config mode/config
                                     #:interactive? #f)))
 
-(define benchmarks-to-check
-  '("suffixtree"
-    "kcfa"
-    "snake"
-    "take5"
-    "acquire"
-    "tetris"
-    "synth"
-    "gregor"
-    "quadT"
-    "quadU"))
-
 (define-runtime-paths
   [me "check-for-missing-mutants-or-trails.rkt"])
 (main
@@ -200,7 +189,7 @@
         (define root-samples-db (db:get (pre-selected-bt-root-db)))
         (for ([dir-to-check (in-list dirs-to-check)])
           (displayln (~a "⟶ " dir-to-check))
-          (for ([bench-name (in-list benchmarks-to-check)])
+          (for ([bench-name (in-list benchmarks)])
             (when interactive?
               (display @~a{Checking @bench-name                     @"\r"}))
             (define bench-mutant-samples (db:read mutant-samples-db bench-name))
