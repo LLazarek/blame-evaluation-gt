@@ -77,7 +77,7 @@
               (estimate-proportion bts
                                    predicate
                                    (max max-bt-population-size
-                                        96))))
+                                        scenario-samples-per-mutant))))
           (combine-subgroup-estimates mutant-bucket-estimates)))
       (combine-subgroup-estimates mutator-bucket-estimates)))
   (combine-subgroup-estimates benchmark-bucket-estimates))

@@ -2,6 +2,7 @@
 
 (provide modes
          benchmarks
+         scenario-samples-per-mutant
          configured:active-mutator-names)
 
 (require "../configurables/configurables.rkt")
@@ -19,4 +20,6 @@
     "synth"
     "take5"
     "tetris"))
+
+(define scenario-samples-per-mutant 96)
 
