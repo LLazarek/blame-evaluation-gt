@@ -21,7 +21,7 @@
          "../runner/mutation-runner.rkt")
 
 (define-runtime-paths
-  [default-parameterizing-config "../configurables/configs/TR--context.rkt"])
+  [default-parameterizing-config "../configurables/configs/TR.rkt"])
 (define current-parameterizing-config (make-parameter default-parameterizing-config))
 
 (define working-dir (make-parameter "find-mutant-dynamic-errors-scratch"))
