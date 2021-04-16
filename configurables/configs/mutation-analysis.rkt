@@ -14,7 +14,7 @@
               ; runtime-error-with-blame
               select-all-blamed
               ; runtime-error
-              select-top-of-errortrace/context-fallback
+              select-top-of-context/filter-typed
               ; blame
               select-all-blamed)
   (configure! bt-root-sampling         random-with-replacement)

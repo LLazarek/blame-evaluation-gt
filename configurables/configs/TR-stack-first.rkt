@@ -12,10 +12,10 @@
   (configure! benchmark-runner         run-it)
   (configure! blame-following          pick-some
               ; runtime-error-with-blame
-              select-top-of-context
+              select-top-of-context/filter-typed
               ; runtime-error
-              select-top-of-context
+              select-top-of-context/filter-typed
               ; blame
-              select-top-of-context)
+              select-top-of-context/filter-typed)
   (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
   (configure! trail-completion         any-type-error/blamed-at-max))
