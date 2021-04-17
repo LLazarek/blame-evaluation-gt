@@ -67,18 +67,20 @@
 
 (define-runtime-paths
   [data-dirs "../../experiment-data/results/code-mutations"]
-  [dyn-err-summaries-db-path "../dbs/code-mutations/dyn-err-summaries.rktdb"]
-  [TR-config "../configurables/configs/TR--context.rkt"]
+  [mutant-summaries-db-path "../dbs/code-mutations/type-err-summaries.rktdb"]
+  [TR-config "../configurables/configs/TR.rkt"]
   [outdir "./figures"]
   [data-cache "./data-cache"]
   [venn-template "venn-template.svg"])
+
+(define plot-name-prefix (basename data-dirs))
 
 ;; for getting mutator names
 (install-configuration! TR-config)
 
 
 (define mutant-mutators
-  (read-mutants-by-mutator dyn-err-summaries-db-path))
+  (read-mutants-by-mutator mutant-summaries-db-path))
 (define get-bts-by-mutator-for-mode
   (simple-memoize
    (λ (mode-name)
@@ -486,6 +488,8 @@
 
 (module+ main
   (make-directory* outdir)
+  (define (pict->figure-png! pict name)
+    (pict->png! pict (build-path outdir (~a plot-name-prefix "-" name ".png"))))
 
   (when (member 'bt-lengths-table to-generate)
     (define bt-lengths-table
@@ -494,7 +498,7 @@
                                 "TR" "transient-newest" "transient-oldest"
                                 "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:bt-lengths-table modes/ordered)))
-    (pict->png! bt-lengths-table (build-path outdir "bt-lengths-table.png"))
+    (pict->figure-png! bt-lengths-table "bt-lengths-table")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for bt-lengths-table: @(unbox max-error-margin)})
       (set-box! max-error-margin 0)))
@@ -510,7 +514,7 @@
                                    ["transient-newest" "transient-stack-first"]
                                    ["transient-oldest" "transient-stack-first"]))
         (generate-figure:bt-length-comparisons mode-comparisons)))
-    (pict->png! bt-length-comparisons (build-path outdir "bt-length-comparisons.png"))
+    (pict->figure-png! bt-length-comparisons "bt-length-comparisons")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for bt-lengths-comparisons: @(unbox max-error-margin)})
       (set-box! max-error-margin 0)))
@@ -523,7 +527,7 @@
                                      "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:avo-bars modes/ordered
                                   (remove "null" modes))))
-    (pict->png! avo-bars (build-path outdir "avo-bars.png"))
+    (pict->figure-png! avo-bars "avo-bars")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for avo-bars: @(unbox max-error-margin)})
       (set-box! max-error-margin 0))
@@ -540,7 +544,7 @@
                                 "erasure-stack-first"
                                 "null"))
         (generate-figure:success-bars modes/ordered)))
-    (pict->png! success-bars (build-path outdir "success-bars.png"))
+    (pict->figure-png! success-bars "success-bars")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for success-bars: @(unbox max-error-margin)})
       (set-box! max-error-margin 0))
