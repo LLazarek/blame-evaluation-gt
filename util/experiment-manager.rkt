@@ -605,15 +605,25 @@
           (empty? (missing-completed-benchmarks summary)))]
     [else #f]))
 (define (download-completed-benchmarks! a-host summary)
-  (define (download-results! archive-name)
+  (define (download-results! archive-name
+                             #:include-configuration-outcomes? [include-configuration-outcomes? #f])
     (when (string=? archive-name "")
       (raise-user-error 'download-completed-benchmarks!
                         "Can't download results with empty archive name"))
     (define projdir (get-field host-project-path a-host))
-    (void (send a-host system/host @~a{
-                                       cd @projdir && @;
-                                       ./pack.sh experiment-output @archive-name @;
-                                       }))
+    (void (send a-host
+                system/host
+                @~a{
+                    cd @projdir && @;
+                    @(if include-configuration-outcomes?
+                         @~a{
+                             cp -r @;
+                             ./blame-evaluation-gt/dbs/code-mutations/configuration-outcomes @;
+                             ./experiment-output/configuration-outcomes &&@" "
+                             }
+                         "") @;
+                    ./pack.sh experiment-output @archive-name @;
+                    }))
     (define archive-name+ext (~a archive-name ".tar.gz"))
     (match (send a-host scp
                  #:from-host (build-path projdir archive-name+ext)
@@ -635,7 +645,8 @@
                      Missing: @(missing-completed-benchmarks summary)
                      Do you want to download the results anyway? 
                      }))
-     (download-results! config-name)]
+     (download-results! config-name
+                        #:include-configuration-outcomes? (equal? config-name "TR"))]
     [else
      #:when (user-prompt!
              @~a{
