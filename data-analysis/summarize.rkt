@@ -26,39 +26,78 @@
   (define stat:mutant-count
     (length (group-by blame-trail-mutant-id all-bts)))
   (define stat:outcome-counts (count-outcomes all-bts))
-  (define stat:blame-disappearances (blame-disappearances all-bts))
-  (define stat:runtime-err-inference-failures
-    (blame-disappearances stat:blame-disappearances
-                          #:outcome 'runtime-error))
-  (define stat:blame-but-none-in-program (blame-disappearances stat:blame-disappearances
-                                                               #:outcome 'blamed))
-  (define stat:resource-limits (summarize-resource-limit-occurrences stat:blame-disappearances))
+  (define stat:start-outcome-counts (start-outcome-counts all-bts))
+  (define stat:end-outcome-counts (end-outcome-counts all-bts))
+  (define stat:trails-ending-with-no-blame
+    (trails-ending-with (match-lambda** [{(struct* run-status ([blamed (or #f '())]
+                                                               [outcome 'blamed]))
+                                          _}
+                                         #t]
+                                        [{_ _} #f])
+                        all-bts))
+  (define stat:runtime-err-search-failures
+    (trails-ending-with (match-lambda** [{(struct* run-status ([context-stack ctx]
+                                                               [outcome 'runtime-error]))
+                                          config}
+                                         (for/and ([{mod level} (in-hash config)]
+                                                   #:when (member mod ctx))
+                                           (equal? level 'types))]
+                                        [{_ _} #f])
+                        all-bts))
+  (define stat:blame-but-none-in-program
+    (trails-ending-with (match-lambda** [{(struct* run-status ([blamed blamed]
+                                                               [outcome 'blamed]))
+                                          config}
+                                         (set-empty? (set-intersect blamed (hash-keys config)))]
+                                        [{_ _} #f])
+                        all-bts))
+  (define stat:resource-limits (summarize-resource-limit-occurrences all-bts))
   (define stat:0-length-bts (summarize-0-length-trails all-bts))
   (define stat:bt-failure-outcomes (summarize-bt-failure-outcomes all-bts))
 
   (define stat:bt-failures-blaming-typed-code (bt-failures-blaming-typed-code all-bts))
 
   (define stat:blamed-sizes (summarize-blamed-sizes all-bts))
+  (define stat:blamed-sizes-untyped (summarize-blamed-sizes all-bts #:filter-by-mod-level 'none))
 
   (hash 'total-bt-count stat:total-bt-count
         'total-mutant-count stat:mutant-count
         'outcomes stat:outcome-counts
-        'blame-disappearances stat:blame-disappearances
-        'stack-inference-failures stat:runtime-err-inference-failures
+        'start-outcomes stat:start-outcome-counts
+        'end-outcomes stat:end-outcome-counts
+        'trails-ending-with-empty-blamed stat:trails-ending-with-no-blame
+        'stack-search-failures stat:runtime-err-search-failures
         'blame-but-none-in-program stat:blame-but-none-in-program
         'resource-limits stat:resource-limits
         '0-length-bts stat:0-length-bts
         'bt-failure-outcomes stat:bt-failure-outcomes
         'bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code
-        'blamed-sizes stat:blamed-sizes))
+        'blamed-sizes stat:blamed-sizes
+        'blamed-sizes-untyped stat:blamed-sizes-untyped))
 
 (define (count-outcomes bts)
   (for/hash/fold ([bt (in-list bts)]
                   #:when #t
                   [mutant (in-list (blame-trail-mutant-summaries bt))])
-                 #:combine +
-                 #:default 0
+    #:combine +
+    #:default 0
     (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _) mutant)
+    (values outcome 1)))
+
+(define (start-outcome-counts bts)
+  (for/hash/fold ([bt (in-list bts)])
+    #:combine +
+    #:default 0
+    (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _)
+      (last (blame-trail-mutant-summaries bt)))
+    (values outcome 1)))
+
+(define (end-outcome-counts bts)
+  (for/hash/fold ([bt (in-list bts)])
+    #:combine +
+    #:default 0
+    (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _)
+      (first (blame-trail-mutant-summaries bt)))
     (values outcome 1)))
 
 (define (bt-failures-blaming-typed-code bts)
@@ -77,20 +116,17 @@
                         bt)]
                   [else #f]))))
 
-(define (blame-disappearances bts #:outcome [outcome #f])
-  (define (outcome-ok? o) (or (false? outcome) (equal? o outcome)))
-  (define blame-disappeared?
-    (match-lambda
-      [(struct* blame-trail
-                ([mutant-summaries
-                  (list* (mutant-summary _
-                                         (struct* run-status ([blamed (or #f '())]
-                                                              [outcome (? outcome-ok?)]))
-                                         _)
-                         _)]))
-       #t]
-      [else #f]))
-  (filter blame-disappeared? bts))
+(define (trails-ending-with predicate bts)
+  (filter (match-lambda
+            [(struct* blame-trail
+                      ([mutant-summaries
+                        (list* (mutant-summary _
+                                               rs
+                                               config)
+                               _)]))
+             (predicate rs config)]
+            [else #f])
+          bts))
 
 (define (summarize-0-length-trails bts)
   (define (0-length-trail-reason bt)
@@ -112,6 +148,13 @@
                        (struct* run-status ([outcome (and limit-type (or 'timeout 'oom))]))
                        _)
        (~a limit-type)]
+      [(mutant-summary _
+                       (struct* run-status ([outcome 'runtime-error]
+                                            [context-stack (? list? mods)]))
+                       config)
+       #:when (for/and ([blamed-mod (in-list mods)])
+                (equal? 'types (hash-ref config blamed-mod 'types)))
+       @~a{runtime-error with only typed mod(s) on stack}]
       [else "other?"]))
 
   (define (0-length? bt) (= (length (blame-trail-mutant-summaries bt)) 1))
@@ -123,25 +166,30 @@
                  (values reason bt)))
 
 (define (summarize-resource-limit-occurrences bts)
-  (hash 'timeout (blame-disappearances bts #:outcome 'timeout)
-        'oom (blame-disappearances bts #:outcome 'oom)))
+  (hash 'timeout (trails-ending-with
+                  (match-lambda** [{(struct* run-status ([outcome 'timeout])) _} #t]
+                                  [{_ _} #f])
+                  bts)
+        'oom (trails-ending-with
+              (match-lambda** [{(struct* run-status ([outcome 'oom])) _} #t]
+                              [{_ _} #f])
+              bts)))
 
 (define (summarize-bt-failure-outcomes bts)
   (for/hash/fold ([bt (in-list bts)]
                   #:when (not (satisfies-BT-hypothesis? bt)))
-                 #:combine cons
-                 #:default empty
-                 (match-define (struct* blame-trail
-                                        ([mutant-summaries
-                                          (list* (struct* mutant-summary
-                                                          ([run-status
-                                                            (struct* run-status
-                                                                     ([outcome outcome]))]))
-                                                 _)]))
-                   bt)
-                 (values outcome bt)))
+    #:combine cons
+    #:default empty
+    (match-define (struct* blame-trail
+                           ([mutant-summaries
+                             (list* (struct* mutant-summary
+                                             ([run-status (struct* run-status
+                                                                   ([outcome outcome]))]))
+                                    _)]))
+      bt)
+    (values outcome bt)))
 
-(define (summarize-blamed-sizes bts)
+(define (summarize-blamed-sizes bts #:filter-by-mod-level [mod-level #f])
   (for/hash/fold ([bt (in-list bts)]
                   #:when #t
                   [mutant (in-list (blame-trail-mutant-summaries bt))]
@@ -157,27 +205,34 @@
                                          [config config]))
                    mutant)
                  (define unique-blamed-mods (remove-duplicates blamed-mods))
-                 (define untyped-blamed-mods (set-intersect unique-blamed-mods
-                                                            (for/list ([{mod level} (in-hash config)]
-                                                                       #:when (equal? level 'none))
-                                                              mod)))
+                 (define untyped-blamed-mods
+                   (if mod-level
+                       (set-intersect unique-blamed-mods
+                                      (for/list ([{mod level} (in-hash config)]
+                                                 #:when (equal? level mod-level))
+                                        mod))
+                       unique-blamed-mods))
                  (values (length untyped-blamed-mods) mutant)))
 
 (define (format-summary summary)
   (match-define (hash-table ['total-bt-count stat:total-bt-count]
                             ['total-mutant-count stat:mutants]
                             ['outcomes stat:outcome-counts]
-                            ['blame-disappearances stat:blame-disappearances]
-                            ['stack-inference-failures stat:runtime-err-inference-failures]
+                            ['start-outcomes stat:start-outcome-counts]
+                            ['end-outcomes stat:end-outcome-counts]
+                            ['trails-ending-with-empty-blamed stat:trails-ending-with-empty-blamed]
+                            ['stack-search-failures stat:runtime-err-search-failures]
                             ['blame-but-none-in-program stat:blame-but-none-in-program]
-                            ['0-length-bts stat:0-length-bts]
                             ['resource-limits stat:resource-limits]
+                            ['0-length-bts stat:0-length-bts]
                             ['bt-failure-outcomes stat:bt-failure-outcomes]
                             ['bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code]
-                            ['blamed-sizes stat:blamed-sizes])
+                            ['blamed-sizes stat:blamed-sizes]
+                            ['blamed-sizes-untyped stat:blamed-sizes-untyped])
     summary)
-  (define blame-disappearances-count (length stat:blame-disappearances))
-  (define runtime-err-disappearances-count (length stat:runtime-err-inference-failures))
+  (define failing-trail-count (apply + (map length (hash-values stat:bt-failure-outcomes))))
+  (define trails-ending-with-empty-blamed-count (length stat:trails-ending-with-empty-blamed))
+  (define runtime-err-disappearances-count (length stat:runtime-err-search-failures))
   (define resource-limit-disappearances-count (apply + (map length (hash-values stat:resource-limits))))
   (define blamed-but-empty-count (length stat:blame-but-none-in-program))
   (define (summary->counts hash)
@@ -190,32 +245,37 @@
       Total mutants:                               @stat:mutants
       Total blame trails:                          @stat:total-bt-count
 
-      With outcome counts:                         @(pretty-format/indent stat:outcome-counts 45)
+      Total run outcome counts:                    @(pretty-format/indent stat:outcome-counts 45)
 
       Blamed mod list size counts:                 @(pretty-format/indent
                                                      (summary->counts stat:blamed-sizes)
                                                      45)
+      Blamed untyped mod list size counts:         @(pretty-format/indent
+                                                     (summary->counts stat:blamed-sizes-untyped)
+                                                     45)
 
-      # NOTE: in stack modes, the outcomes `blamed` and `runtime-error` indicate which kind of
-      # error happened, but the blame always comes from the stack. So "blaming" in below stats
-      # is not really the right word...
+      Trail starting outcome counts:               @(pretty-format/indent stat:start-outcome-counts 45)
+      Trail ending outcome counts:                 @(pretty-format/indent stat:end-outcome-counts 45)
+
+      Total blame trail failures:                  @failing-trail-count
+
       Blame trail failures by outcome:             @(pretty-format/indent
                                                      (summary->counts stat:bt-failure-outcomes)
                                                      45)
 
-      ... blaming typed code:                      @(length stat:bt-failures-blaming-typed-code)
+      Failed trails ending with...
+      blame on typed code:                         @(length stat:bt-failures-blaming-typed-code)
+      blame, but empty:                            @trails-ending-with-empty-blamed-count
+      blame outside program:                       @blamed-but-empty-count
+      runtime-error + empty (filtered) stack:      @runtime-err-disappearances-count
+      resource limits:                             @resource-limit-disappearances-count
 
-      Blame disappearances:                        @blame-disappearances-count
-        of which, due to stack inference failure:  @runtime-err-disappearances-count
-        of which, with blamed but none in program: @blamed-but-empty-count
-        of-which, due to resource limits:          @resource-limit-disappearances-count
-          breakdown:                               @(pretty-format/indent
-                                                     (summary->counts stat:resource-limits)
-                                                     45)
-      ... remaining:                               @(- blame-disappearances-count
+      ... remaining trail failures:                @(- failing-trail-count
+                                                       (length stat:bt-failures-blaming-typed-code)
+                                                       trails-ending-with-empty-blamed-count
                                                        runtime-err-disappearances-count
-                                                       resource-limit-disappearances-count
-                                                       blamed-but-empty-count)
+                                                       blamed-but-empty-count
+                                                       resource-limit-disappearances-count)
 
       0-length blame trails:                       @(pretty-format/indent
                                                      (summary->counts stat:0-length-bts)
