@@ -6,7 +6,7 @@
 
 (define-runtime-paths
   [store-path "../../experiment-data/experiment-manager"]
-  [data-path "../../experiment-data/results/code-mutations"]
+  [default-data-path "../../experiment-data/results/code-mutations"]
   [default-dbs-path "../../experiment-data/dbs/code-mutations"])
 
 (define db-installation-directory-name "code-mutations")
@@ -604,7 +604,7 @@
      (and (= (set-count (apply set config-names)) 1)
           (empty? (missing-completed-benchmarks summary)))]
     [else #f]))
-(define (download-completed-benchmarks! a-host summary)
+(define (download-completed-benchmarks! a-host summary download-directory)
   (define (download-results! archive-name
                              #:include-configuration-outcomes? [include-configuration-outcomes? #f])
     (when (string=? archive-name "")
@@ -627,9 +627,9 @@
     (define archive-name+ext (~a archive-name ".tar.gz"))
     (match (send a-host scp
                  #:from-host (build-path projdir archive-name+ext)
-                 #:to-local data-path)
+                 #:to-local download-directory)
       [0
-       (displayln @~a{Data from @a-host downloaded at @(build-path data-path archive-name+ext)})
+       (displayln @~a{Data from @a-host downloaded at @(build-path download-directory archive-name+ext)})
        (void)]
       [else
        (displayln @~a{Something went wrong downloading data for @a-host})
@@ -903,6 +903,7 @@
 (main
  #:arguments {[(hash-table ['status? status?]
                            ['download (app (mapper host-by-name) download-targets)]
+                           ['download-directory download-directory]
                            ['launch (app (mapper string->benchmark-spec) launch-targets)]
                            ['cancel (app (mapper string->benchmark-spec) cancel-targets)]
                            ['watch-for-stuck-jobs watch-for-stuck-jobs?]
@@ -926,6 +927,12 @@
                ("Resume overseeing the queue specified by -q, which see."
                 "Only has an effect with -q.")
                #:collect ["host" take-latest #f]]
+              [("-D" "--download-destination")
+               'download-directory
+               ("Download results to the given directory."
+                "Only has an effect when -d or -q supplied."
+                @~a{Default: @default-data-path})
+               #:collect ["path" take-latest default-data-path]]
               #:multi
               [("-d" "--download-results")
                'download
@@ -998,7 +1005,7 @@
        [(not (empty? download-targets))
         (for ([a-host (in-list download-targets)])
           (option-let* ([summary (summarize-experiment-status a-host)])
-                       (download-completed-benchmarks! a-host summary)))]
+                       (download-completed-benchmarks! a-host summary download-directory)))]
        [Q-path
         (define (dequeue-target!)
           (match (file->list Q-path)
@@ -1013,7 +1020,7 @@
             ['complete
              (option-let*
               ([complete-summary (summarize-experiment-status host)]
-               [_ (download-completed-benchmarks! host complete-summary)])
+               [_ (download-completed-benchmarks! host complete-summary download-directory)])
               'ok)]
             [else
              #:when (help!:continue?
