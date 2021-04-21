@@ -1,66 +1,98 @@
-Thank you to all the reviewers for the helpful feedback.
-
 The first part of our response addresses big themes in the reviews;
 the second part addresses all remaining concerns individually.
 
 
 What do the results say about blame for gradual typing in practice?
 ================================================================================
-The introduction says that the experimental results lead to the following conclusions about blame in practice:
+
+The introduction says that the experimental results lead to the
+following conclusions about blame _in practice_: 
+
 1. Blame helps locate impedance mismatches, though not immensely more than simple stacktraces, and
 2. Natural blame helps more than Transient, and Transient more than Erasure's stacktraces, *but*
 3. Natural blame is only marginally better than Transient in practice, and both not immensely better than Erasure's stacktraces.
-The phrase "in practice" refers to the way that blame behaves in real programs with an impedance mismatch, using real implementations of each semantics.
 
-In light of the data in figures 8, 9, and 10, the benefits of blame in in practice do not measure up to the expectations established by theory.
-Although blame does provide useful debugging information, the results suggest that in practice blame is only necessary to debug (as compared with simple exceptions) in a small fraction of scenarios.
-Furthermore, the theory suggests that Natural's blame should be more precise than Transient because Natural precisely tracks all possible interactions while Transient approximates (see [11]: Greenman et al. OOPSLA'19), but in practice Natural's blame has comparable utility to Transient.
+The phrase "in practice" refers to the way that blame behaves in real
+programs with an impedance mismatch, using real implementations of
+each semantics.
 
-The experiment in this paper reveals that mismatch, but it necessarily considers only a limited view of the space of possible impedance mismatch scenarios that might arise in reality.
-Section 11 points to another space of scenarios that deserves analysis: scenarios where mismatches arise due to mistakes in annotations rather than (or as well as) code.
-Indeed, review B astutely points out two more spaces worth exploring (programs where some components cannot be typed, and non-deterministic programs).
-<!-- As another example, the paper only considers scenarios known to be detectable by all three systems, but theory makes it clear that Natural and Erasure can detect some scenarios that Erasure cannot. -->
+In light of the data in figures 8, 9, and 10, the benefits of blame in
+practice do not measure up to the expectations established by theory.
+Concretely, blame does provide useful debugging information, but the
+results suggest that in practice blame is only necessary to debug (as
+compared with simple exceptions) in a small fraction of scenarios.
+
+- The theory suggests that Natural's blame should be more precise than
+  Transient because Natural precisely tracks all possible interactions
+  while Transient approximates (see [11]: Greenman et al. OOPSLA'19).
+
+- In practice, Natural's blame has utility comparable to Transient's.
+
+The experiment in this paper reveals that mismatch, but it necessarily
+considers only a limited view of the space of possible impedance
+mismatch scenarios that might arise in reality.
+
+Section 11 points to another space of scenarios that deserves
+analysis: scenarios where mismatches arise due to mistakes in type
+annotations rather than (or as well as) code.  Indeed, review B
+astutely points out two more spaces worth exploring:
+
+- programs where some components _cannot be typed_
+- non-deterministic programs, which inject ephemeral bugs. 
+
+<!-- As another example, the paper only considers scenarios known to
+be detectable by all three systems, but theory makes it clear that
+Natural and Erasure can detect some scenarios that Erasure cannot. --> 
+
 <!-- How common are those scenarios for impedance mismatch bugs? -->
 <!-- Does blame provide more benefit than simple exceptions in those scenarios? -->
+
 Additional experimentation is necessary to develop an understanding of these different spaces.
 
 
 The Rational Programmer vs Lazarek et al.
 ================================================================================
-Lazarek et al. (POPL'20) provide a kernel insight, which this paper develops into the novel Rational Programmer for evaluating blame in gradual typing as its first contribution.
-The key distinction is the idea of the rational programmer as an entity to study and how it can be parameterized by modes to enable cross-system comparison.
+
+Lazarek et al. (POPL'20) provide a kernel insight, which this paper
+develops into the novel idea of the Rational Programmer. It is the
+first paper to explain the idea properly and use the phrase. We
+therefore consider it its first contribution.
+
+The key distinction is the idea of the rational programmer as an
+entity to study and how it can be parameterized by modes to enable
+cross-system comparison.
 
 
 Mutators and benchmarks
 ================================================================================
-Some more description of the mutators and benchmarks the paper uses would clearly be useful, so we will expand the explanation and examples in the paper.
-For now, we have responded to the reviewers specific questions inline below.
+
+Some more description of the mutators and benchmarks the paper uses
+would clearly be useful, so we will expand the explanation and
+examples in the final paper.  For now, we have responded to the
+reviewers specific questions inline below.
 
 
 Failing blame trails
 ================================================================================
-The paper does not make clear enough how Natural blame can have failing scenarios, so we will update it to clarify.
-In short, Natural blame trails can by stymied by unhelpful run-time errors.
-Because debugging scenarios are only partially typed, some scenarios produce an error from the runtime (e.g. `+` receiving a non-number) before any of Natural's run-time type checks can discover a problem.
-Runtime errors do not carry blame, only stacktraces, so the only way to proceed (regardless of mode) is by using the stack information.
-If the stack proves unhelpful, then the trail fails.
-Such failures are the main source of failing blame trails in the `Natural blame` mode.
 
+The paper fails to clarify how Natural blame can have failing
+scenarios, so we will update it to clarify.  In short, Natural blame
+trails can by stymied by unhelpful run-time errors.
 
+Because debugging scenarios are only partially typed, some scenarios
+produce an error from the runtime (e.g. `+` receiving a non-number)
+before any of Natural's run-time type checks can discover a problem.
 
+Run-time errors do not carry blame, only stacktraces, so the only way
+to proceed (regardless of mode) is by using the stack information.  If
+the stack proves unhelpful, then the trail fails.  Such failures are
+the main source of failing blame trails in the `Natural blame` mode.
 
 Replies to individual points
 ==================================================================
 
 Review #45A
 ===========================================================================
-> the paper talks in the introduction of its top-level innovation being the idea of the rational programmer. But then they go on to say that the idea is actually taken from Lazarek. Which is it then?
-See above.
-
-
-> The table in section 2 looks rather ugly
-Thanks for letting us know, we will find a new way to present this information.
-
 
 > p5. one thing I wonder about is how this all hinges on the rational programmer not only taking the right action, but also taking it right? Is that exactly what the rational programmer idea presupposes? (I guess this reflects on your remark in Sec. 11 that one problem is with errors in the ascribed types themselves.).
 Yes, you hit the nail on the head. 
@@ -92,6 +124,7 @@ Indeed, 756 is a typo: it should be 752.
 
 Review #45B
 ===========================================================================
+
 >  - Which blame assignment strategy is "good" and which is not "good"?
 TODO
 
@@ -110,7 +143,10 @@ TODO
 > - It is not fully explained how the given mutators change programs.  For
 >   example, I cannot completely predict changes by the mutators deletion and
 >   class:super.
-In the specific case of `deletion`, the other most common place that this mutator applies are so-called "implicit begins": places where sequences are allowed implicitly by enclosing forms like `define` or `cond`.
+In the specific case of `deletion`, the other most common place that
+>   this mutator applies are so-called "implicit begins": places where
+>   sequences are allowed implicitly by enclosing forms like `define`
+>   or `cond`. 
 So here are two more examples of `deletion` mutations:
 ```
 (define (do-something) (step-1!) (step-2!))
@@ -131,6 +167,7 @@ In the case of `class:super`, the mutator simply replaces any occurrence of `sup
 >   However, the total number of mutants (i.e., configuration lattices) is 756
 >   and, from each lattice, 96 scenarios are sampled.  Thus, I guess 756*96 =
 >   72576 scenarios are used.  Why does this mismatch happen?
+
 Indeed, 756 is a typo: it should be 752.
 
 
@@ -138,14 +175,20 @@ Indeed, 756 is a typo: it should be 752.
 >   800).  Does this mean the debugging process may start with a mix-typed program
 >   and may not with a fully untyped one?  If so, why does the paper take such an
 >   approach?
-The bottom of the configuration lattice is fully untyped, so that is a possible starting scenario to be sampled.
+
+The bottom of the configuration lattice is completely untyped, so that
+is a possible starting scenario to be sampled.
 
 
 > - The paper often says that a blame system is (un)sound, but it is difficult for
 >   me to identify what it precisely means.
-The term refers to the soundness defined by [11] (Greenman et al. OOPSLA'19), but we agree that for clarity the paper should define it in addition to the reference.
-Intuitively, a blame system is sound if it can only blame components that have had control of the value witnessing a violation.
-In other words, the system cannot blame arbitrary components unrelated to the witness of a contract violation.
+
+The term refers to the soundness defined by [11] (Greenman et
+al. OOPSLA'19), but we agree that for clarity the paper should define
+it in addition to the reference.  Intuitively, a blame system is sound
+if it can only blame components that have had control of the value
+witnessing a violation.  In other words, the system cannot blame
+arbitrary components unrelated to the witness of a contract violation.
 
 
 > - The paragraph starting at line 1122 is quite difficult to understand for me.
@@ -158,13 +201,19 @@ TODO
 
 >   - What "sophisticated typing features" are considered (line 589)?  It would be
 >     crucial to confirm whether the proposed mutators are enough.
-The benchmarks employ many of Typed Racket's sophisticated feaures, most notably (from L641) occurrence typing, types for mutable and immutable data structures, types for first-class classes and objects, and types for Racket's numeric tower.
-We absolutely agree that it is crucial to analyze the mutators in light of these features;
-perhaps adding a breakdown of features by benchmark to section 6.3 would help clarify this?
+
+The benchmarks employ many of Typed Racket's sophisticated features,
+most notably (from L641) occurrence typing, types for mutable and
+immutable data structures, types for first-class classes and objects,
+and types for Racket's numeric tower.  We absolutely agree that it is
+crucial to analyze the mutators in light of these features; perhaps
+adding a breakdown of features by benchmark to section 6.3 would help
+clarify this?
 
 
 >   - The benchmarks are selected (line 647), but why?  The GPT benchmark suite of
 >     Racket provides more examples.
+
 The benchmarks in figure 5 are the ten largest dependency graphs of the GTP suite. 
 We will rephrase L646-648 to make this clearer.
 
@@ -175,7 +224,10 @@ We will rephrase L646-648 to make this clearer.
 >   needed.  Second, the benchmarks are supposed to be deterministic, which I find
 >   from the definitions of trails.  If it is the case, while I do not think these
 >   restrictions have to be lifted in the paper, it would be nice to expose them.
-You are absolutely right, we will clarify these assumptions about the benchmarks in the paper.
+
+You are absolutely right, we will clarify these assumptions about the
+benchmarks in the paper. They are inherited from the several
+publications on the gradual benchmark suite. 
 
 
 > - As an alternative of Transient first and last blame, perhaps determining
@@ -183,92 +235,121 @@ You are absolutely right, we will clarify these assumptions about the benchmarks
 >   added to the blame map) might be promising (if the blame map has a large
 >   population).  Have the authors considered it or another approach for Transient
 >   blame?
-We have since thought of a few alternative strategies, but not that one: good idea!
-Ultimately, Transient does not offer any interpretation of its blame, so the paper chooses first and last as two obvious reasonable choices.
+
+We have since thought of a few alternative strategies, but not that
+one: good idea!  Ultimately, Transient does not offer any
+interpretation of its blame, so the paper chooses first and last as
+two obvious reasonable choices.
 
 
 > - Perhaps it is valuable for followers to share the experience on developing
 >   mutators that are not interesting, .e.g., in the supplementary material.
+
 We agree and would be happy to do so.
 
 
 > - Why doesn't the paper adopt the author-year citation style?
+
 This was a mistake typesetting the paper, we will fix it.
 
 
 > - Page 7: How is the question (5) answered?
-Thanks for pointing out that this is confusing. 
-As it is, the rest of the paper is the implicit answer to (5), but we will clarify the prose.
+
+Thanks for pointing out that this is confusing.  As it is, the rest of
+the paper is the implicit answer to (5), but we will clarify the
+prose.
 
 
 > - L356 "despite advertisements for the opposite":  I cannot find what this means.
-This is meant to convey that although Lazarek et al. aim to evaluate blame, they fail to adequately account for confounding factors.
-We will reword for clarity.
+
+This is meant to convey that although Lazarek et al. aim to evaluate
+blame, they fail to adequately account for confounding factors.  We
+will reword for clarity.
 
 
 > - L370 "the latter must represent":  What does the "latter" specify?
-It refers to impedance mismatches from the end of the preceding sentence;
-we will clarify the wording here.
+
+It refers to impedance mismatches from the end of the preceding
+sentence; we will clarify the wording here.
 
 
 > - L424 "Let a configuration s of P":  Are configurations the same as scenarios?
-Scenarios are a specific kind of configuration (that doesn't type the buggy module).
-We will adjust these two paragraphs to make this more clear.
+
+Scenarios are a specific kind of configuration (that doesn't type the
+buggy module).  We will adjust these two paragraphs to make this more
+clear.
 
 
 > - L431 "type-level mistake":  Is it the same as a impedance mismatch?
-A type-level mistake is a mistake that causes an impedance mismatch at a boundary between typed and untyped code.
-We will clarify this point in the prose.
+
+A type-level mistake is a mistake that causes an impedance mismatch at
+a boundary between typed and untyped code.  We will clarify this point
+in the prose.
 
 
 > - Are failing Natural blame trails produced even for programs with impedance
 >   mismatch?  (This question is related to the above issue with Natural blame.)
+
 Yes, please see the start of this response.
 
 
 > - L556: It would be helpful to describe how to extend trails and how to
 >   determine if there is no scenario to be added.  (This comment is also related
 >   to the issue with Natural blame).
+
 Thanks, we will expand on this in the prose.
 
 
 > - L557: "if it does" --> "if it does not"?
+
 You're right, thanks, we will fix it.
 
 
 > - L685 "e.g., changing '*' to '/'":  Is this an example of the mutator that
 >   "does not reliably lead to type errors"?
-This is a refinement of the arithmetic mutator that does lead to type errors, because given two integers `*` always produces an integer, but `/` may produce a rational, which have different types in Typed Racket.
-We will clarify this comment in the footnote.
+
+This is a refinement of the arithmetic mutator that does lead to type
+errors, because given two integers `*` always produces an integer, but
+`/` may produce a rational, which have different types in Typed
+Racket.  We will clarify this comment in the footnote.
 
 
 > - L785 "the interesting standard guided countless iterations":  I fail to find
 >   what this intends.
-The measure of interesting mutants provided a standard by which we could judge potential mutators and iteratively develop an effective set of them.
-We will make this comment clearer.
+
+The measure of interesting mutants provided a standard by which we
+could judge potential mutators and iteratively develop an effective
+set of them.  We will make this comment clearer.
 
 
 > - What is the total number of failing trails in Transient?
-3594 out of 72192 trails fail for transient last blame, and 3591 for first.
+
+3594 out of 72192 trails fail for transient last blame, and 3591 for
+first.
 
 
 > - L1099 "as behavioral economics has shown more recently":  Is there a reference
 >   to be cited?
+
 TODO
 
 
 > - L1104 "deviating is a mistake":  Why?
-Our experience of ignoring blame as opposed to heeding it suggests that ignoring it is usually unwise.
+
+Our long experience of ignoring blame as opposed to heeding it
+suggests that ignoring it is usually unwise.
 
 
 > - L1154 "in the "fully typed" benchmarks":  Are these benchmarks on Python?
+
 The slowdowns the paper quotes here are from Python benchmarks.
 
 
 > - L1161 "the simplest benchmark":  Is this on Racket?  Which benchmark
 >   does it intend?
-This paragraph refers to a Python translation of the Racket `Sieve` benchmark;
-it is confusingly worded, we will adjust the phrasing.
+
+This paragraph refers to a Python translation of the Racket `Sieve`
+benchmark; it is confusingly worded, we will adjust the phrasing.
 
 
 > - L118: "(at the mid-level on the left)[] imports" (the comma is removed)
@@ -280,4 +361,5 @@ it is confusingly worded, we will adjust the phrasing.
 > - L970: "the experiment provides [an] evidence that"
 > - L1198 "But just because...":  It is difficult for me to find what this
 >   sentence wants to say.  Please consider rephrasing.
+
 Thanks for these comments, we will incorporate them to improve the prose.
