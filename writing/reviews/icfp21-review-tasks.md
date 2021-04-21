@@ -113,7 +113,7 @@ I would like the authors to respond to these concerns.
 ===> TODO
 - The conclusions of the second contribution described in the introduction
   (around lines 41-103) are confusing for me.
-===> TODO
+===> TODO, minor
   - Which blame assignment strategy is "good" and which is not "good"?
 ===> TODO
   - Why does the paper conclude that "the existing theory does not predict
@@ -176,7 +176,7 @@ I would like the authors to respond to these concerns.
 
 ### Other comments
 
-===> TODO
+===> TODO, minor
 - It seems that the experiment implicitly supposes a few assumptions on
   benchmarks.  First, the original benchmarks must be fully typed.  Thus more
   experiments on mix-typed programs where some components cannot be typed may be
@@ -203,7 +203,7 @@ I would like the authors to respond to these concerns.
 
 - L118: "(at the mid-level on the left)[] imports" (the comma is removed)
 
-===> TODO
+===> TODO, minor
 - Page 7: How is the question (5) answered?
 
 - L332 "soundness mechanisms":  What they mean is somewhat unclear.  Please
@@ -212,7 +212,7 @@ I would like the authors to respond to these concerns.
 - L347 "the rational programmer's effort": This was unclear at the first
   reading.  It would be nice to briefly explain it here.
 
-===> TODO
+===> TODO, minor
 - L356 "despite advertisements for the opposite":  I cannot find what this means.
 
 ===> TODO, minor
@@ -226,7 +226,7 @@ I would like the authors to respond to these concerns.
 
 - L451: "denotes the module [of P] that s blames"
 
-===> TODO, minor
+===> TODO
 - Are failing Natural blame trails produced even for programs with impedance
   mismatch?  (This question is related to the above issue with Natural blame.)
 
