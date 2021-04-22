@@ -73,11 +73,12 @@ Review #45A
 > p5. one thing I wonder about is how this all hinges on the rational programmer not only taking the right action, but also taking it right? Is that exactly what the rational programmer idea presupposes? (I guess this reflects on your remark in Sec. 11 that one problem is with errors in the ascribed types themselves.).
 
 Yes, you hit the nail on the head. 
-One of the central parts of the rational programmer is that it fixes decision of how to respond to a given scenario; 
+One of the central parts of the rational programmer is that it fixes the decision of how to respond to a given scenario; 
 so evaluating different ways of taking action boils down to defining and testing the corresponding rational programmers.
 
 
 > When the rational programmer "fixes" a module and reruns, the implicit assumption seems to be that he runs the program in the exact same way. That would make the most sense to me, but you do not seem to come out and say so.
+
 Yes you're right. Thanks, we will clarify this in the prose.
 
 
@@ -151,11 +152,12 @@ the stack proves unhelpful, then the trail fails.
 >   class:super.
 
 Thanks for the comment, we will expand the explanation and examples of mutators in the final paper.
-In the specific case of `deletion`, the other most common place that
-this mutator applies are so-called "implicit begins": places where
+In the specific case of `deletion`, the most common place that this mutator applies
+(beyond the literal `begin` expressions the example illustrates)
+are so-called "implicit begins": places where
 sequences are allowed implicitly by enclosing forms like `define`
 or `cond`.
-Here are two more examples of `deletion` mutations:
+Here are two more examples of `deletion` mutations for these situations:
 ```
 (define (do-something) (step-1!) (step-2!))
 ~>
@@ -168,7 +170,7 @@ Here are two more examples of `deletion` mutations:
       [else (void)])
 ```
 
-In the case of `class:super`, the mutator simply replaces any occurrence of `super-new` in the body of a class definition with `void`.
+In the case of `class:super`, the mutator simply removes calls to `super-new`, causing them to no longer instantiate the superclass.
 
 
 > - The paper says that the experiment uses 72,192 sampled scenarios (line 802).
@@ -218,14 +220,14 @@ most notably (from L641) occurrence typing, types for mutable and
 immutable data structures, types for first-class classes and objects,
 and types for Racket's numeric tower.  We absolutely agree that it is
 crucial to analyze the mutators in light of these features; perhaps
-adding a breakdown of features by benchmark to section 6.3 would help
+adding a breakdown of features per benchmark to section 6.3 would help
 clarify this?
 
 
 >   - The benchmarks are selected (line 647), but why?  The GPT benchmark suite of
 >     Racket provides more examples.
 
-The benchmarks in figure 5 are the ten largest dependency graphs of the GTP suite. 
+The benchmarks in figure 5 are the ten with the largest dependency graphs of the GTP suite.
 We will rephrase L646-648 to make this clearer.
 
 
