@@ -1,36 +1,60 @@
-The first part of our response addresses big themes in the reviews;
-the second part addresses all remaining concerns individually.
+The first part of our response addresses one selected theme from each review;
+the second part addresses all remaining comments and questions individually.
 
 
-What do the results say about blame for gradual typing in practice?
+What the experimental results say about the theory vs the practice of blame
 ================================================================================
 
-The introduction says that the experimental results lead to the
-following conclusions about blame _in practice_: 
+Theoretical work that compares different checking and blame strategies for
+gradual types (Greenman et al. ICFP 2018 and OOPSLA 2019) declares a clear
+winner: Natural. Natural is the only semantics that is strongly type sound,
+a complete monitor and, most importantly in the context of this paper, has
+sound and complete blame assignment. The latter means that Natural blames
+all and only those components that are relevant to a type impedance. In
+contrast Transient may fail to blame some relevant components and may
+blame irrelevant ones. 
 
-1. Blame helps locate impedance mismatches, though not immensely more than simple stacktraces, and
-2. Natural blame helps more than Transient, and Transient more than Erasure's stacktraces, *but*
-3. Natural blame is only marginally better than Transient in practice, and both not immensely better than Erasure's stacktraces.
+At first glance, the experiment of this paper seems to validate the
+theoretical conclusions:
 
-The phrase "in practice" refers to the way that blame behaves in real
-programs with an impedance mismatch, using real implementations of
-each semantics.
+1. Natural's blame assignment is as good as the theory predicts; 
+Natural blame helps locate impedance mismatches in almost all 
+debugging scenarios. The only exceptions are (i) due to bugs in Typed
+Racket and (ii) debugging scenarios that result in runtime errors with
+unhelpful stacktraces from the underlying checks of Racket rather than 
+Typed Racket's checks. 
 
-In light of the data in figures 8, 9, and 10, the benefits of blame in
-practice do not measure up to the expectations established by theory.
-Concretely, blame does provide useful debugging information, but the
-results suggest that in practice blame is only necessary to debug (as
-compared with simple exceptions) in a small fraction of scenarios.
+2. In general, Natural blame is better that Transient blame and both are
+better than Erasure's stacktraces. 
 
-- The theory suggests that Natural's blame should be more precise than
-  Transient because Natural precisely tracks all possible interactions
-  while Transient approximates (see [11]: Greenman et al. OOPSLA'19).
+However, a closer inspection of the empirical results reveals that 
+they paint a picture with gray zones that the black and white theoretical 
+results are  not refined enough to capture:
+   
+1. There is a small but substantial number of debugging scenarios where 
+Natural blame is not helpful but Transient blame is. These scenarios are
+not all due to bugs in Typed Racket. Hence, the theory that deems natural
+blame superior to that of Natural cannot explain them away.
 
-- In practice, Natural's blame has utility comparable to Transient's.
 
-The experiment in this paper reveals that mismatch, but it necessarily
-considers only a limited view of the space of possible impedance
-mismatch scenarios that might arise in reality.
+2. While the theory claims that language designers should select Natural and
+   its blames for maximum benefits, the results of the experiment indicate
+   that Transient and Erasure are good enough for locating impedance
+   mismatches in most cases. Hence, given the cost of Natural, the theory's answer
+   fails to provide good enough guidance to language designers.
+
+
+In sum the experiment in this paper reveals the mismatch between the theory and the practice
+of blame. The latter refers to blame's actual utility in real
+programs that run in a real implementation rather than artificial
+examples in an idealized model. 
+
+As a result, there are two intertwined directions forward: 
+
+1. Revisiting the theory of blame to match the practice of blame.
+
+2. Analyzing further the practice of blame beyond the scenarios this paper
+   considers.
 
 Section 11 points to another space of scenarios that deserves
 analysis: scenarios where mismatches arise due to mistakes in type
@@ -40,53 +64,18 @@ astutely points out two more spaces worth exploring:
 - programs where some components _cannot be typed_
 - non-deterministic programs, which inject ephemeral bugs. 
 
-<!-- As another example, the paper only considers scenarios known to
-be detectable by all three systems, but theory makes it clear that
-Natural and Erasure can detect some scenarios that Erasure cannot. --> 
 
-<!-- How common are those scenarios for impedance mismatch bugs? -->
-<!-- Does blame provide more benefit than simple exceptions in those scenarios? -->
-
-Additional experimentation is necessary to develop an understanding of these different spaces.
-
-
-The Rational Programmer vs Lazarek et al.
+What is the origin of the rational programmer
 ================================================================================
 
-Lazarek et al. (POPL'20) provide a kernel insight, which this paper
-develops into the novel idea of the Rational Programmer. It is the
-first paper to explain the idea properly and use the phrase. We
-therefore consider it its first contribution.
+Lazarek et al. (POPL'20) provide the kernel insight that one can simulate
+an idealized programmer on a large corpus of programs to test the behavior
+of a language feature. This paper hones this kernel into an experimental
+framework that allows the isolation of confounding factors and,
+furthermore, the comparison between different semantics for a feature in
+the form of different but comparable experimental modes. The paper
+christens the experimental framework the Rational Programmer.
 
-The key distinction is the idea of the rational programmer as an
-entity to study and how it can be parameterized by modes to enable
-cross-system comparison.
-
-
-Mutators and benchmarks
-================================================================================
-
-Some more description of the mutators and benchmarks the paper uses
-would clearly be useful, so we will expand the explanation and
-examples in the final paper.  For now, we have responded to the
-reviewers specific questions inline below.
-
-
-Failing blame trails
-================================================================================
-
-The paper fails to clarify how Natural blame can have failing
-scenarios, so we will update it to clarify.  In short, Natural blame
-trails can by stymied by unhelpful run-time errors.
-
-Because debugging scenarios are only partially typed, some scenarios
-produce an error from the runtime (e.g. `+` receiving a non-number)
-before any of Natural's run-time type checks can discover a problem.
-
-Run-time errors do not carry blame, only stacktraces, so the only way
-to proceed (regardless of mode) is by using the stack information.  If
-the stack proves unhelpful, then the trail fails.  Such failures are
-the main source of failing blame trails in the `Natural blame` mode.
 
 Replies to individual points
 ==================================================================
