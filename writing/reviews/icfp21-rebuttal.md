@@ -215,13 +215,14 @@ For more details, there is a parallel submission by the same set of authors desc
 >   - What "sophisticated typing features" are considered (line 589)?  It would be
 >     crucial to confirm whether the proposed mutators are enough.
 
-The benchmarks employ many of Typed Racket's sophisticated features,
-most notably (from L641) occurrence typing, types for mutable and
-immutable data structures, types for first-class classes and objects,
-and types for Racket's numeric tower.  We absolutely agree that it is
-crucial to analyze the mutators in light of these features; perhaps
-adding a breakdown of features per benchmark to section 6.3 would help
-clarify this?
+Broadly speaking, this phrase refers to features beyond basic functions and
+primitive data. In terms of this paper's evaluation, the benchmarks employ many
+of Typed Racket's sophisticated features (with those listed on L641 being the
+most notable).
+
+We absolutely agree that it is crucial to analyze the mutators in light of these
+features; perhaps adding a breakdown of features per benchmark to the analysis
+of section 6.3 would help clarify this?
 
 
 >   - The benchmarks are selected (line 647), but why?  The GPT benchmark suite of
