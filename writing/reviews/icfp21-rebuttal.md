@@ -1,81 +1,84 @@
-The first part of our response addresses one selected theme from each review;
-the second part addresses all remaining comments and questions individually.
+The first part of our response addresses one major comment from each
+reviewer.
+
+What is the origin of the rational programmer
+================================================================================
+
+Reviewer A says:
+> the paper talks in the introduction of its top-level innovation being the
+> idea of the rational programmer. But then they go on to say that the idea
+> is actually taken from Lazarek. Which is it then?
+
+Lazarek et al. (POPL'20) provide the kernel insight that one can simulate
+an idealized programmer on a large corpus of programs to test the behavior
+of a language feature. This paper hones this kernel into an experimental
+framework. With the framework we can now:
+1. isolate confounding factors. 
+2. compare different semantics for gradual type boundaries in the form of 
+   experimental modes.  
+The paper christens this experimental framework the Rational Programmer.
 
 
 What the experimental results say about the theory vs the practice of blame
 ================================================================================
 
+Reviewer B says:
+> The conclusions of the second contribution described in the introduction
+>  (around lines 41-103) are confusing for me.
+
+
 Theoretical work that compares different checking and blame strategies for
 gradual types (Greenman et al. ICFP 2018 and OOPSLA 2019) declares a clear
-winner: Natural. Natural is the only semantics that is strongly type sound,
-a complete monitor and, most importantly in the context of this paper, has
-sound and complete blame assignment. The latter means that Natural blames
-all and only those components that are relevant to a type impedance. In
-contrast Transient may fail to blame some relevant components and may
-blame irrelevant ones. 
+winner: Natural. Natural is the only semantics that is strongly type
+sound, a complete monitor and, most importantly in the context of this
+paper, Natural blames all and only those components that are relevant to a
+type impedance mismatch (sound and complete blame). In contrast Transient
+may fail to blame some relevant components and may blame irrelevant ones.
+Hence, theory predicts that Natural is superior to Transient and Transient
+is superior to Erasure. 
 
-At first glance, the experiment of this paper seems to validate the
-theoretical conclusions:
+At first glance, our experiments seem to validate these predictions:
 
-1. Natural's blame assignment is as good as the theory predicts; 
-Natural blame helps locate impedance mismatches in almost all 
-debugging scenarios. The only exceptions are (i) due to bugs in Typed
-Racket and (ii) debugging scenarios that result in runtime errors with
-unhelpful stacktraces from the underlying checks of Racket rather than 
-Typed Racket's checks. 
+1. When Natural issues blame it is helpful in almost all debugging
+   scenarios. The problem is that many debugging scenarios result in
+   runtime errors with unhelpful stacktraces from the underlying checks of
+   Racket rather than Typed Racket boundary checks. 
 
-2. In general, Natural blame is better that Transient blame and both are
-better than Erasure's stacktraces. 
+2. Natural blame looks better that Transient blame and both look better
+   than Erasure's stacktraces. 
 
-However, a closer inspection of the empirical results reveals that 
-they paint a picture with gray zones that the black and white theoretical 
-results are  not refined enough to capture:
+However, a close inspection of the empirical data reveals that 
+ a gray-shaded picture not the black and white print of theory:
    
-1. There is a small but substantial number of debugging scenarios where 
-Natural blame is not helpful but Transient blame is. These scenarios are
-not all due to bugs in Typed Racket. Hence, the theory that deems natural
-blame superior to that of Natural cannot explain them away.
+1. There are some debugging scenarios where Natural blame is not helpful
+   but Transient blame is. The theory cannot explain these scenarios.
 
 
-2. While the theory claims that language designers should select Natural and
-   its blames for maximum benefits, the results of the experiment indicate
-   that Transient and Erasure are good enough for locating impedance
-   mismatches in most cases. Hence, given the cost of Natural, the theory's answer
-   fails to provide good enough guidance to language designers.
+2. While the theory claims that language designers should select Natural
+   and its blame for maximum benefits, the data indicates that both
+   Transient blame and Erasure stacktrace often suffice. Hence, given the
+   cost of Natural (Takikawa et al. POPL 2016), the theory's suggestion
+   has shown to be of questionable value.
 
+In sum our experiments reveal the mismatch between the theory and the
+practice of blame. The latter refers to blame's actual utility in real
+programs that run in a real implementation rather than artificial examples
+in an idealized model. 
 
-In sum the experiment in this paper reveals the mismatch between the theory and the practice
-of blame. The latter refers to blame's actual utility in real
-programs that run in a real implementation rather than artificial
-examples in an idealized model. 
-
-As a result, there are two intertwined directions forward: 
+As a result, there are two intertwined directions going forward: 
 
 1. Revisiting the theory of blame to match the practice of blame.
 
-2. Analyzing further the practice of blame beyond the scenarios this paper
-   considers.
-
-Section 11 points to another space of scenarios that deserves
-analysis: scenarios where mismatches arise due to mistakes in type
-annotations rather than (or as well as) code.  Indeed, review B
-astutely points out two more spaces worth exploring:
-
-- programs where some components _cannot be typed_
-- non-deterministic programs, which inject ephemeral bugs. 
+2. Empirically analyzing the practice of blame beyond the scenarios this
+   paper considers. Section 11 points to another space of scenarios that
+   deserves analysis: scenarios where mismatches arise due to mistakes in
+   type annotations rather than (or as well as) code.  Indeed, review B
+   astutely points out two more directions worth exploring in this
+   space:
+    - programs where some components _cannot be typed_;
+    - non-deterministic programs. 
 
 
-What is the origin of the rational programmer
-================================================================================
-
-Lazarek et al. (POPL'20) provide the kernel insight that one can simulate
-an idealized programmer on a large corpus of programs to test the behavior
-of a language feature. This paper hones this kernel into an experimental
-framework that allows the isolation of confounding factors and,
-furthermore, the comparison between different semantics for a feature in
-the form of different but comparable experimental modes. The paper
-christens the experimental framework the Rational Programmer.
-=======
 
 Replies to individual points
 ==================================================================
@@ -85,9 +88,10 @@ Review #45A
 
 > p5. one thing I wonder about is how this all hinges on the rational programmer not only taking the right action, but also taking it right? Is that exactly what the rational programmer idea presupposes? (I guess this reflects on your remark in Sec. 11 that one problem is with errors in the ascribed types themselves.).
 
-Yes, you hit the nail on the head. 
-One of the central parts of the rational programmer is that it fixes the decision of how to respond to a given scenario; 
-so evaluating different ways of taking action boils down to defining and testing the corresponding rational programmers.
+Yes, you hit the nail on the head.  One of the central parts of the
+rational programmer is that it fixes the decision of how to respond to a
+given scenario; so evaluating different ways of taking action boils down
+to defining and testing the corresponding rational programmers.
 
 
 > When the rational programmer "fixes" a module and reruns, the implicit assumption seems to be that he runs the program in the exact same way. That would make the most sense to me, but you do not seem to come out and say so.
@@ -99,9 +103,12 @@ Yes you're right. Thanks, we will clarify this in the prose.
 > that has more type-level mistakes than before. It does not seem to me this part of the code
 > itself will now fail, but that changing the conditions makes certain previously excluded paths in the code feasible.
 
-Thanks for pointing this out, we will expand the explanation and examples of mutators in the final paper.
-In the specific cases of `negate-cond` and `force-cond`, these mutators lead to type-level mistakes when the program uses occurrence typing. 
-For example, they could both lead to a mistake in a program like this:
+Thanks for pointing this out, we will expand the explanation and examples
+of mutators in the final paper.  In the specific cases of `negate-cond`
+and `force-cond`, these mutators lead to type-level mistakes when the
+program uses occurrence typing.  For example, they could both lead to a
+mistake in a program like this:
+
 ```
 (: use-int  (-> Integer Void))
 (: use-bool (-> Boolean Void))
@@ -121,8 +128,7 @@ Review #45B
 
 >  - Which blame assignment strategy is "good" and which is not "good"?
 
-TODO - Christos will do it.
-
+In this context, good means Natural and Transient. We will rephrase. 
 
 >  - At first glance, the conclusion in lines 55-56 (starting with "Second, ...")
 >    seems to contradict that in line 99-100 (starting with "neither is ...").  It would
@@ -134,8 +140,12 @@ Thanks for the feedback, we will rephrase the conclusion.
 > - The paper often mixes gradual typing and migratory typing.  It is unclear how
 >   it distinguishes them.
 
-The paper uses the two terms interchangeably after the introduction, because the distinction between the two does not change the evaluation method.
-Specifically, in the gradual typing setting the components are smaller than whole modules, and there are more possible intermediate types (incorporating Dyn) between untyped and fully-typed, both of which just end up making the configuration lattice larger.
+The paper uses the two terms interchangeably after the introduction,
+because the distinction between the two does not change the evaluation
+method.  Specifically, in the gradual typing setting the components are
+smaller than whole modules, and there are more possible intermediate types
+(incorporating Dyn) between untyped and fully-typed, both of which just
+end up making the configuration lattice much much larger.
 
 
 > - In principle, Natural blame should always point out the faulty components
@@ -148,29 +158,28 @@ Specifically, in the gradual typing setting the components are smaller than whol
 > - Are failing Natural blame trails produced even for programs with impedance
 >   mismatch?  (This question is related to the above issue with Natural blame.)
 
-We agree that the paper needs a bit more explanation to clarify how Natural blame can have failing
-scenarios, we will update it in the final paper.  In short, Natural blame
-trails can by stymied by unhelpful run-time errors.
-
-Because debugging scenarios are only partially typed, some scenarios
-produce an error from the runtime (e.g. `+` receiving a non-number)
-before any of Natural's run-time type checks can discover a problem.
-Run-time errors do not carry blame, only stacktraces, so the only way
-to proceed (regardless of mode) is by using the stack information.  If
-the stack proves unhelpful, then the trail fails.
+We agree that the paper needs a bit more explanation to clarify how
+Natural blame can have failing scenarios, we will update it in the final
+paper.  In short, Natural blame trails can by stymied by unhelpful
+run-time errors from Racket. Because debugging scenarios are only
+partially typed, some scenarios produce an error from the runtime (e.g.
+`+` receiving a non-number) before any of Natural's run-time type checks
+can discover a problem.  Runtime errors do not carry blame, only
+stacktraces.
 
 
 > - It is not fully explained how the given mutators change programs.  For
 >   example, I cannot completely predict changes by the mutators deletion and
 >   class:super.
 
-Thanks for the comment, we will expand the explanation and examples of mutators in the final paper.
-In the specific case of `deletion`, the most common place that this mutator applies
-(beyond the literal `begin` expressions the example illustrates)
-are so-called "implicit begins": places where
-sequences are allowed implicitly by enclosing forms like `define`
-or `cond`.
-Here are two more examples of `deletion` mutations for these situations:
+Thanks for the comment, we will expand the explanation and examples of
+mutators in the final paper.  In the specific case of `deletion`, the most
+common place that this mutator applies (beyond the literal `begin`
+expressions the example illustrates) are so-called "implicit begins":
+places where sequences are allowed implicitly by enclosing forms like
+`define` or `cond`.  Here are two more examples of `deletion` mutations
+for these situations: 
+
 ```
 (define (do-something) (step-1!) (step-2!))
 ~>
@@ -183,7 +192,8 @@ Here are two more examples of `deletion` mutations for these situations:
       [else (void)])
 ```
 
-In the case of `class:super`, the mutator simply removes calls to `super-new`, causing them to no longer instantiate the superclass.
+In the case of `class:super`, the mutator simply removes calls to
+`super-new`, causing the class to no longer instantiate the superclass.
 
 
 > - The paper says that the experiment uses 72,192 sampled scenarios (line 802).
@@ -199,19 +209,20 @@ Indeed, 756 is a typo: it should be 752.
 >   and may not with a fully untyped one?  If so, why does the paper take such an
 >   approach?
 
-The bottom of the configuration lattice is completely untyped, so that
-is a possible starting scenario to be sampled.
-
+The debugging process can start with the fully untyped program but it
+doesn't have to. The lattice contains the completely untyped program (bottom
+configuration) and we sample from all the configurations where
+the buggy module is untyped (including the fully untyped one). 
 
 > - The paper often says that a blame system is (un)sound, but it is difficult for
 >   me to identify what it precisely means.
 
-The term refers to the soundness defined by [11] (Greenman et
-al. OOPSLA'19), but we agree that for clarity the paper should define
-it in addition to the reference.  Intuitively, a blame system is sound
-if it can only blame components that have had control of the value
-witnessing a violation.  In other words, the system cannot blame
-arbitrary components unrelated to the witness of a contract violation.
+The term refers to blame soundness from Greenman et al. (OOPSLA'19), but
+we agree that for clarity the paper should define it in addition to the
+reference.  Intuitively, a blame system is sound if it can only blame
+components that have had control of the value witnessing a violation.  In
+other words, the system cannot blame arbitrary components unrelated to the
+witness of a contract violation.
 
 
 > - The paragraph starting at line 1122 is quite difficult to understand for me.
@@ -220,29 +231,30 @@ arbitrary components unrelated to the witness of a contract violation.
 >   - To understand the idea on the improvements of Transit, more explanations
 >     on the usage of blame maps in Transient would be needed.
 
-We will improve the prose in this section to make it clearer, thank you for pointing it out.
-The paper is referring here to the incomplete population of the blame map described by Greenman et al. ([11]: OOPSLA'19) .
-For more details, there is a parallel submission by the same set of authors describing the implementation of Transient in depth.
 
+ We will improve the prose in this paper to clarify. Thank you for
+ pointing this out.  The paper is referring here to the incomplete
+ population of the blame map described by Greenman et al. ([11]:
+ OOPSLA'19). 
+
+ For the details of how we have implemented the blame map and its
+ population, there is a parallel experience report submission by the same
+ set of authors describing the implementation of Transient in depth. 
 
 >   - What "sophisticated typing features" are considered (line 589)?  It would be
 >     crucial to confirm whether the proposed mutators are enough.
 
-Broadly speaking, this phrase refers to features beyond basic functions and
-primitive data. In terms of this paper's evaluation, the benchmarks employ many
-of Typed Racket's sophisticated features (with those listed on L641 being the
-most notable).
-
-We absolutely agree that it is crucial to analyze the mutators in light of these
-features; perhaps adding a breakdown of features per benchmark to the analysis
-of section 6.3 would help clarify this?
+The features we have in mind appear in line 641. We will add a breakdown
+of features per benchmark to the analysis of section 6.3. Our mutators do
+target all of these. 
 
 
 >   - The benchmarks are selected (line 647), but why?  The GPT benchmark suite of
 >     Racket provides more examples.
 
-The benchmarks in figure 5 are the ten with the largest dependency graphs of the GTP suite.
-We will rephrase L646-648 to make this clearer.
+The benchmarks in figure 5 are the ten with the largest dependency graphs
+of the GTP suite. We selected those because small benchmarks have
+short blame trails. We will rephrase L646-648 to make this clearer.
 
 
 > - It seems that the experiment implicitly supposes a few assumptions on
@@ -277,7 +289,8 @@ We agree and would be happy to do so.
 
 > - Why doesn't the paper adopt the author-year citation style?
 
-This was a mistake typesetting the paper, we will fix it.
+This was a mistake typesetting the paper, we have fixed it. It didn't
+affect the length of the paper
 
 
 > - Page 7: How is the question (5) answered?
@@ -330,9 +343,10 @@ You're right, thanks, we will fix it.
 >   "does not reliably lead to type errors"?
 
 This is a refinement of the arithmetic mutator that does lead to type
-errors, because given two integers `*` always produces an integer, but
-`/` may produce a rational, which have different types in Typed
-Racket.  We will clarify this comment in the footnote.
+errors, because given two integers `*` always produces an integer, but `/`
+may produce a rational, which have different types in Typed Racket's
+sophisticated numeric tower (St-Amour et al. PADL 2011).  We will clarify
+this comment in the footnote.
 
 
 > - L785 "the interesting standard guided countless iterations":  I fail to find
@@ -352,8 +366,12 @@ first.
 > - L1099 "as behavioral economics has shown more recently":  Is there a reference
 >   to be cited?
 
-The best reference we might use here is Kahnemann's popular book entitled "Thinking Fast and Slow", which explains the problem well.
-Notably with respect to this work, the book criticizes classical (mathematical) economic theory for assuming that people act rationally all of the time, which demonstrates how our work is complementary to human studies; both are necessary.
+The best reference we might use here is Kahnemann's popular book entitled
+"Thinking Fast and Slow", which explains the problem well.  Notably with
+respect to this work, the book criticizes classical (mathematical)
+economic theory for assuming that people act rationally all of the time,
+which demonstrates how our work is complementary to human studies and
+theory. All are necessary.
 
 
 > - L1104 "deviating is a mistake":  Why?
