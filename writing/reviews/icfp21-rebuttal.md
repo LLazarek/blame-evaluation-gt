@@ -63,30 +63,6 @@ entity to study and how it can be parameterized by modes to enable
 cross-system comparison.
 
 
-Mutators and benchmarks
-================================================================================
-
-Some more description of the mutators and benchmarks the paper uses
-would clearly be useful, so we will expand the explanation and
-examples in the final paper.  For now, we have responded to the
-reviewers specific questions inline below.
-
-
-Failing blame trails
-================================================================================
-
-The paper fails to clarify how Natural blame can have failing
-scenarios, so we will update it to clarify.  In short, Natural blame
-trails can by stymied by unhelpful run-time errors.
-
-Because debugging scenarios are only partially typed, some scenarios
-produce an error from the runtime (e.g. `+` receiving a non-number)
-before any of Natural's run-time type checks can discover a problem.
-
-Run-time errors do not carry blame, only stacktraces, so the only way
-to proceed (regardless of mode) is by using the stack information.  If
-the stack proves unhelpful, then the trail fails.  Such failures are
-the main source of failing blame trails in the `Natural blame` mode.
 
 Replies to individual points
 ==================================================================
@@ -95,6 +71,7 @@ Review #45A
 ===========================================================================
 
 > p5. one thing I wonder about is how this all hinges on the rational programmer not only taking the right action, but also taking it right? Is that exactly what the rational programmer idea presupposes? (I guess this reflects on your remark in Sec. 11 that one problem is with errors in the ascribed types themselves.).
+
 Yes, you hit the nail on the head. 
 One of the central parts of the rational programmer is that it fixes decision of how to respond to a given scenario; 
 so evaluating different ways of taking action boils down to defining and testing the corresponding rational programmers.
@@ -107,6 +84,8 @@ Yes you're right. Thanks, we will clarify this in the prose.
 > It would help if you could explain how a mutator like negate-cond actually leads to a program
 > that has more type-level mistakes than before. It does not seem to me this part of the code
 > itself will now fail, but that changing the conditions makes certain previously excluded paths in the code feasible.
+
+Thanks for pointing this out, we will expand the explanation and examples of mutators in the final paper.
 In the specific cases of `negate-cond` and `force-cond`, these mutators lead to type-level mistakes when the program uses occurrence typing. 
 For example, they could both lead to a mistake in a program like this:
 ```
@@ -118,6 +97,7 @@ For example, they could both lead to a mistake in a program like this:
 ```
 
 > How do you arrive at the number 72192 in Section 7? It is not equal to 756 times 96.
+
 Indeed, 756 is a typo: it should be 752.
 
 
@@ -126,28 +106,56 @@ Review #45B
 ===========================================================================
 
 >  - Which blame assignment strategy is "good" and which is not "good"?
-TODO
+
+TODO - Christos will do it.
 
 
 >  - At first glance, the conclusion in lines 55-56 (starting with "Second, ...")
 >    seems to contradict that in line 99-100 (starting with "neither is ...").  It would
 >    be nicer to address them in a clearer manner.
+
 Thanks for the feedback, we will rephrase the conclusion.
 
 
 > - The paper often mixes gradual typing and migratory typing.  It is unclear how
 >   it distinguishes them.
-TODO
+
+The paper uses the two terms interchangeably after the introduction, because the distinction between the two does not change the evaluation method.
+Specifically, in the gradual typing setting the components are smaller than whole modules, and there are more possible intermediate types (incorporating Dyn) between untyped and fully-typed, both of which just end up making the configuration lattice larger.
+
+
+> - In principle, Natural blame should always point out the faulty components
+>   by the Wadler-Findler slogan.  However, the experiment shows it is not the
+>   case.  Why?  Is it the same reason as in Lazarek et al.?  (Perhaps it is due
+>   to a gap between theory and practice, but exposing a reason is crucial.)
+
+(Combining this question with the related one from below next.)
+
+> - Are failing Natural blame trails produced even for programs with impedance
+>   mismatch?  (This question is related to the above issue with Natural blame.)
+
+We agree that the paper needs a bit more explanation to clarify how Natural blame can have failing
+scenarios, we will update it in the final paper.  In short, Natural blame
+trails can by stymied by unhelpful run-time errors.
+
+Because debugging scenarios are only partially typed, some scenarios
+produce an error from the runtime (e.g. `+` receiving a non-number)
+before any of Natural's run-time type checks can discover a problem.
+Run-time errors do not carry blame, only stacktraces, so the only way
+to proceed (regardless of mode) is by using the stack information.  If
+the stack proves unhelpful, then the trail fails.
 
 
 > - It is not fully explained how the given mutators change programs.  For
 >   example, I cannot completely predict changes by the mutators deletion and
 >   class:super.
+
+Thanks for the comment, we will expand the explanation and examples of mutators in the final paper.
 In the specific case of `deletion`, the other most common place that
->   this mutator applies are so-called "implicit begins": places where
->   sequences are allowed implicitly by enclosing forms like `define`
->   or `cond`. 
-So here are two more examples of `deletion` mutations:
+this mutator applies are so-called "implicit begins": places where
+sequences are allowed implicitly by enclosing forms like `define`
+or `cond`.
+Here are two more examples of `deletion` mutations:
 ```
 (define (do-something) (step-1!) (step-2!))
 ~>
@@ -196,7 +204,10 @@ arbitrary components unrelated to the witness of a contract violation.
 >   - What does the paper mean by "incomplete population of the blame map"?
 >   - To understand the idea on the improvements of Transit, more explanations
 >     on the usage of blame maps in Transient would be needed.
-TODO
+
+We will improve the prose in this section to make it clearer, thank you for pointing it out.
+The paper is referring here to the incomplete population of the blame map described by Greenman et al. ([11]: OOPSLA'19) .
+For more details, there is a parallel submission by the same set of authors describing the implementation of Transient in depth.
 
 
 >   - What "sophisticated typing features" are considered (line 589)?  It would be
@@ -287,12 +298,6 @@ a boundary between typed and untyped code.  We will clarify this point
 in the prose.
 
 
-> - Are failing Natural blame trails produced even for programs with impedance
->   mismatch?  (This question is related to the above issue with Natural blame.)
-
-Yes, please see the start of this response.
-
-
 > - L556: It would be helpful to describe how to extend trails and how to
 >   determine if there is no scenario to be added.  (This comment is also related
 >   to the issue with Natural blame).
@@ -331,7 +336,8 @@ first.
 > - L1099 "as behavioral economics has shown more recently":  Is there a reference
 >   to be cited?
 
-TODO
+The best reference we might use here is Kahnemann's popular book entitled "Thinking Fast and Slow", which explains the problem well.
+Notably with respect to this work, the book criticizes classical (mathematical) economic theory for assuming that people act rationally all of the time, which demonstrates how our work is complementary to human studies; both are necessary.
 
 
 > - L1104 "deviating is a mistake":  Why?
