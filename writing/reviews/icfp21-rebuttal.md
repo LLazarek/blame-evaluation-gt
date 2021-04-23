@@ -1,6 +1,6 @@
 The first part of our response addresses one major comment from each review.
 
-What is the origin of the rational programmer
+The origin of the rational programmer
 ================================================================================
 
 Review A says:
@@ -14,13 +14,14 @@ of a language feature. This paper hones this kernel into an experimental
 framework. With the framework we can now:
 
 1. isolate confounding factors;
-2. compare different semantics for gradual type boundaries in the form of 
-   experimental modes.  
+2. compare different semantics for gradual type boundaries in the form of
+   experimental modes.
 
 The paper christens this experimental framework the Rational Programmer.
-We have already revised the prose accordingly. 
+We have already revised the prose accordingly.
 
-What the experimental results say about the theory vs the practice of blame
+
+What the results say about the theory vs practice of blame
 ================================================================================
 
 Review B says:
@@ -39,7 +40,7 @@ winner: Natural.
 - By contrast, _Transient_ may fail to blame some relevant components and may
   blame irrelevant ones.
 
-- Erasure doesn't even assign checks to type boundaries. 
+- _Erasure_ doesn't even assign checks to type boundaries.
 
 Hence, theory predicts that Natural is superior to Transient and Transient is
 superior to Erasure.
@@ -51,9 +52,9 @@ Our experiments only appear to validate these predictions:
 2. Natural blame looks better that Transient blame and both look better than
    Erasure's stacktraces.
 
-However, a close inspection of the empirical data reveals that 
- a gray-shaded picture not the black and white print of theory:
-   
+However, a close inspection of the empirical data reveals a gray-shaded picture
+instead of the black and white print of theory:
+
 1. One problem is that many debugging scenarios result in runtime errors with
    unhelpful stacktraces from the underlying checks of Racket rather than Typed
    Racket boundary checks.
@@ -65,13 +66,13 @@ However, a close inspection of the empirical data reveals that
    Natural and its blame for maximum benefits, the data indicates that both
    Transient blame information and Erasure stacktraces often suffice.  Given the
    large cost of Natural (Takikawa et al. POPL 2016), theory has has shown
-   itself to be of questionable value -- at this time. 
+   itself to be of questionable value -- at this time.
 
-In sum our experiments reveal a mismatch between theory and practice where blame
+In sum, our experiments reveal a mismatch between theory and practice where blame
 may or may not matter for real programs running on real implementations. This is
-in contrast to theoretical papers, which symbol-push small terms thru a reduction 
-semantics in a tiny model of PLs (even if these models exhibit all essential 
-attributes). 
+in contrast to theoretical papers, which symbol-push small terms through a reduction
+semantics in a tiny model of PLs (even if these models exhibit all essential
+attributes).
 
 As a result, we expect to invest in two intertwined research efforts going forward:
 
@@ -85,13 +86,20 @@ As a result, we expect to invest in two intertwined research efforts going forwa
    Indeed, the review astutely points out two more directions worth exploring:
 
     - programs where some components _cannot be typed_;
-    - non-deterministic programs. 
+    - non-deterministic programs.
+
+
 
 Replies to individual points
 ==================================================================
 
 Review #45A
 ===========================================================================
+
+> The table in section 2 looks rather ugly
+
+We will find another way to present the information.
+
 
 > p5. one thing I wonder about is how this all hinges on the rational programmer not only taking the right action, but also taking it right? Is that exactly what the rational programmer idea presupposes? (I guess this reflects on your remark in Sec. 11 that one problem is with errors in the ascribed types themselves.).
 
@@ -135,7 +143,18 @@ Review #45B
 
 >  - Which blame assignment strategy is "good" and which is not "good"?
 
-In this context, good means Natural and Transient. We will rephrase. 
+In this context, good means Natural and Transient. We will rephrase.
+
+
+>  - Why does the paper conclude that "the existing theory does not predict
+>    practice properly"?  Figure 8 shows that the theory (Natural) works well.
+>  - What does the paper mean by "The existing practice may need additional
+>    experiments"?  I have not found any evidence that confirms this claim in the
+>    paper.
+>  - What does "practice" means here?
+
+We hope the start of the response addresses these questions adequately.
+
 
 >  - At first glance, the conclusion in lines 55-56 (starting with "Second, ...")
 >    seems to contradict that in line 99-100 (starting with "neither is ...").  It would
@@ -152,7 +171,7 @@ because the distinction between the two does not change the evaluation
 method.  Specifically, in the gradual typing setting the components are
 smaller than whole modules, and there are more possible intermediate types
 (incorporating Dyn) between untyped and fully-typed, both of which just
-end up making the configuration lattice much much larger.
+end up making the configuration lattice much larger.
 
 
 > - In principle, Natural blame should always point out the faulty components
@@ -165,14 +184,13 @@ end up making the configuration lattice much much larger.
 > - Are failing Natural blame trails produced even for programs with impedance
 >   mismatch?  (This question is related to the above issue with Natural blame.)
 
-We agree that the paper needs a bit more explanation to clarify how
-Natural blame can have failing scenarios, we will update it in the final
-paper.  In short, Natural blame trails can by stymied by unhelpful
-run-time errors from Racket. Because debugging scenarios are only
-partially typed, some scenarios produce an error from the runtime (e.g.
-`+` receiving a non-number) before any of Natural's run-time type checks
-can discover a problem.  Runtime errors do not carry blame, only
-stacktraces.
+We agree that the paper needs a bit more explanation to clarify how Natural
+blame can have failing scenarios, we will update it in the final paper. In
+short, Natural blame trails can by stymied by unhelpful errors from Racket's
+runtime. Because debugging scenarios are only partially typed, some scenarios
+produce an error from the runtime (e.g. `+` receiving a non-number) before any
+of Natural's run-time type checks can discover a problem. Errors from the
+runtime do not carry blame, only stacktraces.
 
 
 > - It is not fully explained how the given mutators change programs.  For
@@ -185,7 +203,7 @@ common place that this mutator applies (beyond the literal `begin`
 expressions the example illustrates) are so-called "implicit begins":
 places where sequences are allowed implicitly by enclosing forms like
 `define` or `cond`.  Here are two more examples of `deletion` mutations
-for these situations: 
+for these situations:
 
 ```
 (define (do-something) (step-1!) (step-2!))
@@ -218,8 +236,9 @@ Indeed, 756 is a typo: it should be 752.
 
 The debugging process can start with the fully untyped program but it
 doesn't have to. The lattice contains the completely untyped program (bottom
-configuration) and we sample from all the configurations where
-the buggy module is untyped (including the fully untyped one). 
+configuration) and we sample trail roots from all the configurations where
+the buggy module is untyped (including the fully untyped one).
+
 
 > - The paper often says that a blame system is (un)sound, but it is difficult for
 >   me to identify what it precisely means.
@@ -238,22 +257,21 @@ witness of a contract violation.
 >   - To understand the idea on the improvements of Transit, more explanations
 >     on the usage of blame maps in Transient would be needed.
 
+We will improve the prose in this paper to clarify. Thank you for pointing this
+out. The paper is referring here to the incomplete population of the blame map
+described by Greenman et al. (OOPSLA'19).
 
- We will improve the prose in this paper to clarify. Thank you for
- pointing this out.  The paper is referring here to the incomplete
- population of the blame map described by Greenman et al. ([11]:
- OOPSLA'19). 
+For the details of how we have implemented the blame map and its population,
+there is a parallel experience report submission by the same set of authors
+describing the implementation of Transient in depth.
 
- For the details of how we have implemented the blame map and its
- population, there is a parallel experience report submission by the same
- set of authors describing the implementation of Transient in depth. 
 
 >   - What "sophisticated typing features" are considered (line 589)?  It would be
 >     crucial to confirm whether the proposed mutators are enough.
 
-The features we have in mind appear in line 641. We will add a breakdown
-of features per benchmark to the analysis of section 6.3. Our mutators do
-target all of these. 
+The features we have in mind appear in line 641. We will add a breakdown of
+features per benchmark to the analysis of section 6.3 to clarify that our
+mutators target all of these.
 
 
 >   - The benchmarks are selected (line 647), but why?  The GPT benchmark suite of
@@ -272,8 +290,8 @@ short blame trails. We will rephrase L646-648 to make this clearer.
 >   restrictions have to be lifted in the paper, it would be nice to expose them.
 
 You are absolutely right, we will clarify these assumptions about the
-benchmarks in the paper. They are inherited from the several
-publications on the gradual benchmark suite. 
+benchmarks in the paper. They are inherited from the other
+publications on the gradual benchmark suite.
 
 
 > - As an alternative of Transient first and last blame, perhaps determining
