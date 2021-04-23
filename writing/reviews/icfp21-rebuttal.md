@@ -68,11 +68,10 @@ instead of the black and white print of theory:
    large cost of Natural (Takikawa et al. POPL 2016), theory has has shown
    itself to be of questionable value -- at this time.
 
-In sum, our experiments reveal a mismatch between theory and practice where blame
-may or may not matter for real programs running on real implementations. This is
-in contrast to theoretical papers, which symbol-push small terms through a reduction
-semantics in a tiny model of PLs (even if these models exhibit all essential
-attributes).
+In sum, our experiments reveal a mismatch between the theory and the
+practice of blame, where practice refers to blame's actual utility in real
+programs that run in a real implementation rather than artificial examples
+in an idealized model.
 
 As a result, we expect to invest in two intertwined research efforts going forward:
 
