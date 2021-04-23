@@ -13,11 +13,13 @@ Lazarek et al. (POPL'20) provide the kernel insight that one can simulate
 an idealized programmer on a large corpus of programs to test the behavior
 of a language feature. This paper hones this kernel into an experimental
 framework. With the framework we can now:
-1. isolate confounding factors. 
+
+1. isolate confounding factors;
 2. compare different semantics for gradual type boundaries in the form of 
    experimental modes.  
-The paper christens this experimental framework the Rational Programmer.
 
+The paper christens this experimental framework the Rational Programmer.
+We have already revised the prose accordingly. 
 
 What the experimental results say about the theory vs the practice of blame
 ================================================================================
@@ -26,59 +28,65 @@ Reviewer B says:
 > The conclusions of the second contribution described in the introduction
 >  (around lines 41-103) are confusing for me.
 
-
 Theoretical work that compares different checking and blame strategies for
 gradual types (Greenman et al. ICFP 2018 and OOPSLA 2019) declares a clear
-winner: Natural. Natural is the only semantics that is strongly type
-sound, a complete monitor and, most importantly in the context of this
-paper, Natural blames all and only those components that are relevant to a
-type impedance mismatch (sound and complete blame). In contrast Transient
-may fail to blame some relevant components and may blame irrelevant ones.
-Hence, theory predicts that Natural is superior to Transient and Transient
-is superior to Erasure. 
+winner: Natural.
 
-At first glance, our experiments seem to validate these predictions:
+- _Natural_ is the only semantics that is type sound in the conventional sense,
+  completely monitors boundaries, and, most importantly here, blames all and
+  only those components that are relevant to a type impedance mismatch (sound
+  and complete blame).
 
-1. When Natural issues blame it is helpful in almost all debugging
-   scenarios. The problem is that many debugging scenarios result in
-   runtime errors with unhelpful stacktraces from the underlying checks of
-   Racket rather than Typed Racket boundary checks. 
+- By contrast, _Transient_ may fail to blame some relevant components and may
+  blame irrelevant ones.
 
-2. Natural blame looks better that Transient blame and both look better
-   than Erasure's stacktraces. 
+- Erasure doesn't even assign checks to type boundaries. 
+
+Hence, theory predicts that Natural is superior to Transient and Transient is
+superior to Erasure.
+
+Our experiments only appear to validate these predictions:
+
+1. When Natural issues blame it is helpful in almost all debugging scenarios.
+
+2. Natural blame looks better that Transient blame and both look better than
+   Erasure's stacktraces.
 
 However, a close inspection of the empirical data reveals that 
  a gray-shaded picture not the black and white print of theory:
    
-1. There are some debugging scenarios where Natural blame is not helpful
-   but Transient blame is. The theory cannot explain these scenarios.
+1. One problem is that many debugging scenarios result in runtime errors with
+   unhelpful stacktraces from the underlying checks of Racket rather than Typed
+   Racket boundary checks.
 
+1. Additionally, for some debugging scenarios Natural blame is not helpful but
+   Transient blame is. The theory cannot explain these scenarios at this point.
 
-2. While the theory claims that language designers should select Natural
-   and its blame for maximum benefits, the data indicates that both
-   Transient blame and Erasure stacktrace often suffice. Hence, given the
-   cost of Natural (Takikawa et al. POPL 2016), the theory's suggestion
-   has shown to be of questionable value.
+2. Finally, while the theory claims that language designers should select
+   Natural and its blame for maximum benefits, the data indicates that both
+   Transient blame information and Erasure stacktraces often suffice.  Given the
+   large cost of Natural (Takikawa et al. POPL 2016), theory has has shown
+   itself to be of questionable value -- at this time. 
 
-In sum our experiments reveal the mismatch between the theory and the
-practice of blame. The latter refers to blame's actual utility in real
-programs that run in a real implementation rather than artificial examples
-in an idealized model. 
+In sum our experiments reveal a mismatch between theory and practice where blame
+may or may not matter for real programs running on real implementations. This is
+in contrast to theoretical papers, which symbol-push small terms thru a reduction 
+semantics in a tiny model of PLs (even if these models exhibit all essential 
+attributes). 
 
-As a result, there are two intertwined directions going forward: 
+As a result, we expect to invest in two intertwined research efforts going forward:
 
 1. Revisiting the theory of blame to match the practice of blame.
 
 2. Empirically analyzing the practice of blame beyond the scenarios this
    paper considers. Section 11 points to another space of scenarios that
    deserves analysis: scenarios where mismatches arise due to mistakes in
-   type annotations rather than (or as well as) code.  Indeed, review B
-   astutely points out two more directions worth exploring in this
-   space:
+   type annotations rather than (or as well as) code.
+
+   Indeed, the review astutely points out two more directions worth exploring:
+
     - programs where some components _cannot be typed_;
     - non-deterministic programs. 
-
-
 
 Replies to individual points
 ==================================================================
