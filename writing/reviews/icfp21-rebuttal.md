@@ -1,10 +1,9 @@
-The first part of our response addresses one major comment from each
-reviewer.
+The first part of our response addresses one major comment from each review.
 
 What is the origin of the rational programmer
 ================================================================================
 
-Reviewer A says:
+Review A says:
 > the paper talks in the introduction of its top-level innovation being the
 > idea of the rational programmer. But then they go on to say that the idea
 > is actually taken from Lazarek. Which is it then?
@@ -24,7 +23,7 @@ We have already revised the prose accordingly.
 What the experimental results say about the theory vs the practice of blame
 ================================================================================
 
-Reviewer B says:
+Review B says:
 > The conclusions of the second contribution described in the introduction
 >  (around lines 41-103) are confusing for me.
 
