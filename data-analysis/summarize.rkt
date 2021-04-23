@@ -7,7 +7,8 @@
          "../util/for.rkt"
 
          "plot-common.rkt"
-         "read-data.rkt")
+         "read-data.rkt"
+         "bt-length-distributions.rkt")
 
 (define summary/c
   (hash/c symbol? any/c))
@@ -28,6 +29,8 @@
   (define stat:outcome-counts (count-outcomes all-bts))
   (define stat:start-outcome-counts (start-outcome-counts all-bts))
   (define stat:end-outcome-counts (end-outcome-counts all-bts))
+  (define stat:bts-switching-runtime-error->blame (blame-switch-bts all-bts))
+  (define stat:runtime-error-only-bts (runtime-error-only-bts all-bts))
   (define stat:trails-ending-with-no-blame
     (trails-ending-with (match-lambda** [{(struct* run-status ([blamed (or #f '())]
                                                                [outcome 'blamed]))
@@ -36,7 +39,7 @@
                                         [{_ _} #f])
                         all-bts))
   (define stat:runtime-err-search-failures
-    (trails-ending-with (match-lambda** [{(struct* run-status ([context-stack ctx]
+    (trails-ending-with (match-lambda** [{(struct* run-status ([context-stack (? list? ctx)]
                                                                [outcome 'runtime-error]))
                                           config}
                                          (for/and ([{mod level} (in-hash config)]
@@ -65,6 +68,8 @@
         'outcomes stat:outcome-counts
         'start-outcomes stat:start-outcome-counts
         'end-outcomes stat:end-outcome-counts
+        'bts-switching-runtime-error->blame stat:bts-switching-runtime-error->blame
+        'runtime-error-only-bts stat:runtime-error-only-bts
         'trails-ending-with-empty-blamed stat:trails-ending-with-no-blame
         'stack-search-failures stat:runtime-err-search-failures
         'blame-but-none-in-program stat:blame-but-none-in-program
@@ -74,6 +79,12 @@
         'bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code
         'blamed-sizes stat:blamed-sizes
         'blamed-sizes-untyped stat:blamed-sizes-untyped))
+
+(define (lengths-summary bts)
+  (define (len bt) (bt-length bt #t))
+  (for/hash ([group (in-list (group-by len bts))])
+    (values (len (first group))
+            (length group))))
 
 (define (count-outcomes bts)
   (for/hash/fold ([bt (in-list bts)]
@@ -99,6 +110,28 @@
     (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _)
       (first (blame-trail-mutant-summaries bt)))
     (values outcome 1)))
+
+(define mutant-outcome (compose1 run-status-outcome mutant-summary-run-status))
+(define (blame-switch-bts bts)
+  (filter (λ (bt) (match (blame-trail-mutant-summaries bt)
+                    [(list _ ...
+                           (app mutant-outcome (== 'blamed))
+                           _ ...
+                           (app mutant-outcome (== 'runtime-error)))
+                     #t]
+                    [else #f]))
+          bts))
+
+(define (runtime-error-only-bts bts)
+  (filter (λ (bt)
+            (match (blame-trail-mutant-summaries bt)
+              [(list (app mutant-outcome (or (== 'runtime-error) (== 'type-error)))
+                     (app mutant-outcome (== 'runtime-error)) ..1)
+               #t]
+              [(list (app mutant-outcome (== 'runtime-error)))
+               #t]
+              [else #f]))
+          bts))
 
 (define (bt-failures-blaming-typed-code bts)
   (filter-not false?
@@ -220,6 +253,8 @@
                             ['outcomes stat:outcome-counts]
                             ['start-outcomes stat:start-outcome-counts]
                             ['end-outcomes stat:end-outcome-counts]
+                            ['bts-switching-runtime-error->blame stat:bts-switching-runtime-error->blame]
+                            ['runtime-error-only-bts stat:runtime-error-only-bts]
                             ['trails-ending-with-empty-blamed stat:trails-ending-with-empty-blamed]
                             ['stack-search-failures stat:runtime-err-search-failures]
                             ['blame-but-none-in-program stat:blame-but-none-in-program]
@@ -256,6 +291,14 @@
 
       Trail starting outcome counts:               @(pretty-format/indent stat:start-outcome-counts 45)
       Trail ending outcome counts:                 @(pretty-format/indent stat:end-outcome-counts 45)
+      Trails start w/ runtime-err, end w/ blame:   @(length stat:bts-switching-runtime-error->blame)
+      ... lengths:                                 @(pretty-format/indent
+                                                     (lengths-summary stat:bts-switching-runtime-error->blame)
+                                                     45)
+      Trails consisting of only runtime-errs:      @(length stat:runtime-error-only-bts)
+      ... lengths:                                 @(pretty-format/indent
+                                                     (lengths-summary stat:runtime-error-only-bts)
+                                                     45)
 
       Total blame trail failures:                  @failing-trail-count
 
