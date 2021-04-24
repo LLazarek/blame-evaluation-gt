@@ -127,7 +127,11 @@ Review #45A
 We will find another way to present the information.
 
 
-> p5. one thing I wonder about is how this all hinges on the rational programmer not only taking the right action, but also taking it right? Is that exactly what the rational programmer idea presupposes? (I guess this reflects on your remark in Sec. 11 that one problem is with errors in the ascribed types themselves.).
+> p5. one thing I wonder about is how this all hinges on the rational programmer
+> not only taking the right action, but also taking it right? Is that exactly
+> what the rational programmer idea presupposes? (I guess this reflects on your
+> remark in Sec. 11 that one problem is with errors in the ascribed types
+> themselves.).
 
 Yes, you hit the nail on the head.  One of the central parts of the
 rational programmer is that it fixes the decision of how to respond to a
@@ -135,20 +139,23 @@ given scenario; so evaluating different ways of taking action boils down
 to defining and testing the corresponding rational programmers.
 
 
-> When the rational programmer "fixes" a module and reruns, the implicit assumption seems to be that he runs the program in the exact same way. That would make the most sense to me, but you do not seem to come out and say so.
+> When the rational programmer "fixes" a module and reruns, the implicit
+> assumption seems to be that he runs the program in the exact same way. That
+> would make the most sense to me, but you do not seem to come out and say so.
 
 Yes you're right. Thanks, we will clarify this in the prose.
 
 
-> It would help if you could explain how a mutator like negate-cond actually leads to a program
-> that has more type-level mistakes than before. It does not seem to me this part of the code
-> itself will now fail, but that changing the conditions makes certain previously excluded paths in the code feasible.
+> It would help if you could explain how a mutator like negate-cond actually
+> leads to a program that has more type-level mistakes than before. It does not
+> seem to me this part of the code itself will now fail, but that changing the
+> conditions makes certain previously excluded paths in the code feasible.
 
-Thanks for pointing this out, we will expand the explanation and examples
-of mutators in the final paper.  In the specific cases of `negate-cond`
-and `force-cond`, these mutators lead to type-level mistakes when the
-program uses occurrence typing.  For example, they could both lead to a
-mistake in a program like this:
+Thanks for pointing this out, we will expand the explanation and examples of
+mutators in the final paper. In the specific cases of `negate-cond` and
+`force-cond`, these mutators lead to type-level mistakes when the program uses
+occurrence typing. For example, they could both lead to a mistake in a program
+like this:
 
 ```
 (: use-int  (-> Integer Void))
@@ -315,9 +322,9 @@ short blame trails. We will rephrase L646-648 to make this clearer.
 >   from the definitions of trails.  If it is the case, while I do not think these
 >   restrictions have to be lifted in the paper, it would be nice to expose them.
 
-You are absolutely right, we will clarify these assumptions about the
-benchmarks in the paper. They are inherited from the other
-publications on the gradual benchmark suite.
+You are absolutely right, we will clarify these assumptions about the benchmarks
+in the paper. They are inherited from the other publications on the gradual
+benchmark suite.
 
 
 > - As an alternative of Transient first and last blame, perhaps determining
@@ -475,7 +482,7 @@ implementation of Transient in depth.
 > code. Similarly Transient Last could be Transient Late, but you would have to
 > see whether this terminology really fits.
 
-Thanks, we will consider this alternative name for the final paper.
+Thanks, we will consider these alternative names for the final paper.
 
 
 > My only issue at this point is that the reader is left with numnbers only,
@@ -486,6 +493,6 @@ Thanks, we will consider this alternative name for the final paper.
 > part of the paper.
 
 This is a good idea, thanks. In the final paper we will try to incorporate one
-or more examples that illustrate the difference in trail between the three
+or more examples that illustrate the difference in trails between the three
 mechanisms.
 
