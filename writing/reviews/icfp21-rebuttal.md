@@ -427,3 +427,41 @@ benchmark; it is confusingly worded, we will adjust the phrasing.
 >   sentence wants to say.  Please consider rephrasing.
 
 Thanks for these comments, we will incorporate them to improve the prose.
+
+
+
+Review #45C
+===========================================================================
+
+> My only concern at this point is that we need to believe that the authors have
+> implemented the Transiet semantics correctly in Racket, though no details are
+> offered. The paper refers to another submission, so perhaps some details can
+> be found in there.
+
+TODO
+
+
+> I am wondering whether the approach that the paper calls Transient First could
+> be regarded as Transient Early, since it points to an earlier part of the
+> code. Similarly Transient Last could be Transient Late, but you would have to
+> see whether this terminology really fits.
+
+TODO
+
+
+> The only thing that I am concerned about at this point is that, later in the
+> paper, it is shown that "most cases the programmer need to type a single
+> module to debug a scenario," which makes me wonder whether the authors did not
+> generate difficult enough scenarios. If that is the case, what is the problem?
+
+TODO
+
+
+> My only issue at this point is that the reader is left with numnbers only,
+> while I think a reader would like to see selected examples, for example about
+> which blame labels have been provided by Natural and which by Transient, so to
+> see that one approach took a longer path, as well as similar examples the
+> reader can learn from. Numbers do not seem to teach the whole story in this
+> part of the paper.
+
+TODO

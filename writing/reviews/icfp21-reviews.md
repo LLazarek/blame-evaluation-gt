@@ -223,3 +223,31 @@ I would like the authors to respond to these concerns.
 
 - L1198 "But just because...":  It is difficult for me to find what this
   sentence wants to say.  Please consider rephrasing.
+
+
+
+Review #45C
+===========================================================================
+
+Overall merit
+-------------
+B. I support accepting this paper but will not champion it.
+
+Reviewer expertise
+------------------
+Y. Knowledgeable
+
+Paper summary
+-------------
+This paper provides a methodology for sistematically analyze blame assignment strategies in gradual typing, and reports on applying this methodology to a benchmark.
+
+Comments for author
+-------------------
+Thank you for submitting a very well-written paper. It reads well and made my job easier. 
+I like the research questions that the paper addresses-- there are a lot of unsubstantiated claims about blame that we take for granted. 
+I think it could be easy to misjudge this paper, as in "We kind of knew that blame was useful". To that I reply "Can you point out a scientific reference for that?". We should appreciate these types of studies. Also, when we write grant proposals we are glad to be able to point out a systematic study rather than say "Well.. everybody knows".   
+The paper begins with a good recap on the three major blame approaches applied on a concrete example. The table at the end of section 2 is a helpful summary overall. Section 4 spells out the challenges for the reader, and also justfies the use of Racket for this study. I think that the authors are correct, in that Racket is currently the most appropriate system for conducting a study of the like: solid system, lots of programs, and has been used for similar studies such as that of the POPL 2016 paper on evaluating gradual typing performance. My only concern at this point is that we need to believe that the authors have implemented the Transiet semantics correctly in Racket, though no details are offered. The paper refers to another submission, so perhaps some details can be found in there. 
+Section 5 proceeds to describe the technical part of the methodology. It is based on the lattice from Takikawa et al. [25] (all possible combinations of typed/untyped modules). Then the paper characterizes the actions of a programmer trying to find type mismatches. It does so with the notion of a "rational programmer", which is a very interesting approach. Its mathematical formalization is based on the points in this lattice that are hit during the search for a type mismatch. These mathematical characterizations are very simple (not in a negative way), I like that they are fitting so naturally. 
+I am wondering whether the approach that the paper calls Transient First could be regarded as Transient Early, since it points to an earlier part of the code. Similarly Transient Last could be Transient Late, but you would have to see whether this terminology really fits.  
+Section 6 describes the benchmark that has been used for the study, which I am satisfied with, as programs vary in size, features being used, and other aspects. One of the challenges is to generate realistic blame scenarios. To this aim, the paper applies the idea of mutations, previously adopted in other contexts. Fig 6 gives a summary of the mutations applied-- they seem reasonable, and a lot of the mutations are new. The only thing that I am concerned about at this point is that, later in the paper, it is shown that "most cases the programmer need to type a single module to debug a scenario," which makes me wonder whether the authors did not generate difficult enough scenarios. If that is the case, what is the problem? 
+Sections 8 and 9 report on the finding of the paper. These include statements that blame is useful, that Natural often produces shorter trails than Transient, and others. My only issue at this point is that the reader is left with numnbers only, while I think a reader would like to see selected examples, for example about which blame labels have been provided by Natural and which by Transient, so to see that one approach took a longer path, as well as similar examples the reader can learn from. Numbers do not seem to teach the whole story in this part of the paper.
