@@ -13,7 +13,8 @@ an idealized programmer on a large corpus of programs to test the behavior
 of a language feature. This paper hones this kernel into an experimental
 framework. With the framework we can now:
 
-1. isolate confounding factors;
+1. isolate confounding factors, such as whether the utility of blame is due
+   to blame tracking or just due the checks;
 2. compare different semantics for gradual type boundaries in the form of
    experimental modes.
 
@@ -86,6 +87,32 @@ As a result, we expect to invest in two intertwined research efforts going forwa
 
     - programs where some components _cannot be typed_;
     - non-deterministic programs.
+
+
+Are the debugging scenarios difficult?
+================================================================================
+
+Review C says:
+> The only thing that I am concerned about at this point is that, later in the
+> paper, it is shown that "most cases the programmer need to type a single
+> module to debug a scenario," which makes me wonder whether the authors did not
+> generate difficult enough scenarios. If that is the case, what is the problem?
+
+The bugs that we inject are non-trivial. To provide some evidence, we sampled a
+few (~24,000) scenarios from three middle-of-the-road benchmarks (acquire,
+take5, kcfa) and the median stack has 7 program modules, with the sizes ranging
+from 3 to 10. This indicates that these bugs involve significant interaction
+among different parts of the program.
+
+One could argue that the benchmark programs are too small, because they consist
+of about 10-14 modules. This is a decent size but not a truly large one, so
+perhaps even larger benchmark programs are called for, though we conjecture that
+results will remain roughly the same because the programming style is
+representative (it includes a good number of higher-order idioms, for both
+functions and classes; it includes a fair number of call-back scenarios across
+module boundaries and storage of objects to be called later -- after the storage
+call returns -- but again not too many).
+
 
 
 
@@ -438,7 +465,9 @@ Review #45C
 > offered. The paper refers to another submission, so perhaps some details can
 > be found in there.
 
-TODO
+Our implementation of Transient is faithful to Reticulated Python; the parallel
+experience report submission by the same set of authors describes the
+implementation of Transient in depth.
 
 
 > I am wondering whether the approach that the paper calls Transient First could
@@ -446,15 +475,7 @@ TODO
 > code. Similarly Transient Last could be Transient Late, but you would have to
 > see whether this terminology really fits.
 
-TODO
-
-
-> The only thing that I am concerned about at this point is that, later in the
-> paper, it is shown that "most cases the programmer need to type a single
-> module to debug a scenario," which makes me wonder whether the authors did not
-> generate difficult enough scenarios. If that is the case, what is the problem?
-
-TODO
+Thanks, we will consider this alternative name for the final paper.
 
 
 > My only issue at this point is that the reader is left with numnbers only,
@@ -464,4 +485,7 @@ TODO
 > reader can learn from. Numbers do not seem to teach the whole story in this
 > part of the paper.
 
-TODO
+This is a good idea, thanks. In the final paper we will try to incorporate one
+or more examples that illustrate the difference in trail between the three
+mechanisms.
+
