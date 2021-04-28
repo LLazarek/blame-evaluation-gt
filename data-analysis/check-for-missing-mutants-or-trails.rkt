@@ -33,7 +33,7 @@
          (displayln
           @~a{
               @bench-name mutant sets differ: @;
-              @(if (zero? extra-mutant-count) "" (~a extra-mutant-count "extra and")) @;
+              @(if (zero? extra-mutant-count) "" (~a extra-mutant-count " extra and")) @;
               @(length missing-mutants) missing:
               })
          (missing-mutant-reasons missing-mutants
