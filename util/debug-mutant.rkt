@@ -57,7 +57,8 @@
                       #:run-process-async? [run-via-process-async? #f]
                       #:write-modules-to [dump-dir-path #f]
                       #:suppress-output? [suppress-output? (not interactive?)]
-                      #:config [config-name "TR"])
+                      #:config [config-name "TR"]
+                      #:print-exn? [print-exn? interactive?])
   (define experiment-config (build-path config-dir (~a config-name ".rkt")))
   (unless (file-exists? experiment-config)
     (raise-user-error
@@ -194,17 +195,21 @@
                                           [context-stack context]
                                           [result-value result-value])))
                (cond [run?
-                      (run-with-mutated-module
-                       the-program
-                       the-module-to-mutate
-                       index
-                       config
-                       #:timeout/s (* 2 60)
-                       #:memory/gb 3
-                       #:modules-base-path (find-program-base-path the-program)
-                       #:write-modules-to dump-dir-path*
-                       #:on-module-exists 'replace
-                       #:suppress-output? suppress-output?)]
+                      (parameterize ([current-mutated-program-exn-recordor
+                                      (if print-exn?
+                                          (λ (e) ((error-display-handler) "" e))
+                                          (current-mutated-program-exn-recordor))])
+                        (run-with-mutated-module
+                         the-program
+                         the-module-to-mutate
+                         index
+                         config
+                         #:timeout/s (* 2 60)
+                         #:memory/gb 3
+                         #:modules-base-path (find-program-base-path the-program)
+                         #:write-modules-to dump-dir-path*
+                         #:on-module-exists 'replace
+                         #:suppress-output? suppress-output?))]
                      [run-via-process?
                       (define-values {ctl outfile errfile cleanup-and-get-results}
                         (run-via-process-async))
@@ -232,7 +237,7 @@
                               }]
                          [else ""])
                       Errortrace stack: @errortrace
-                      Cotnext stack:    @context
+                      Context stack:    @context
                       Result:  @result-value
                       })
                  rs)]))))
