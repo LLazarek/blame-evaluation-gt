@@ -62,6 +62,7 @@
 
   (define stat:blamed-sizes (summarize-blamed-sizes all-bts))
   (define stat:blamed-sizes-untyped (summarize-blamed-sizes all-bts #:filter-by-mod-level 'none))
+  (define stat:root-stack-sizes (summarize-root-context-sizes all-bts))
 
   (hash 'total-bt-count stat:total-bt-count
         'total-mutant-count stat:mutant-count
@@ -78,7 +79,8 @@
         'bt-failure-outcomes stat:bt-failure-outcomes
         'bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code
         'blamed-sizes stat:blamed-sizes
-        'blamed-sizes-untyped stat:blamed-sizes-untyped))
+        'blamed-sizes-untyped stat:blamed-sizes-untyped
+        'root-stack-sizes stat:root-stack-sizes))
 
 (define (lengths-summary bts)
   (define (len bt) (bt-length bt #t))
@@ -128,7 +130,7 @@
               [(list (app mutant-outcome (or (== 'runtime-error) (== 'type-error)))
                      (app mutant-outcome (== 'runtime-error)) ..1)
                #t]
-              [(list (app mutant-outcome (== 'runtime-error)))
+              [(list (app mutant-outcome (== 'runtime-error)) ...)
                #t]
               [else #f]))
           bts))
@@ -247,6 +249,17 @@
                        unique-blamed-mods))
                  (values (length untyped-blamed-mods) mutant)))
 
+(define (summarize-root-context-sizes bts)
+  (for/hash/fold ([bt (in-list bts)])
+    #:combine +
+    #:default 0
+    (match (blame-trail-mutant-summaries bt)
+      [(list _ ... (struct* mutant-summary
+                            ([run-status (struct* run-status
+                                                  ([context-stack (? list? stack)]))])))
+       (values (length stack) 1)]
+      [else (values 'N/A 1)])))
+
 (define (format-summary summary)
   (match-define (hash-table ['total-bt-count stat:total-bt-count]
                             ['total-mutant-count stat:mutants]
@@ -263,7 +276,8 @@
                             ['bt-failure-outcomes stat:bt-failure-outcomes]
                             ['bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code]
                             ['blamed-sizes stat:blamed-sizes]
-                            ['blamed-sizes-untyped stat:blamed-sizes-untyped])
+                            ['blamed-sizes-untyped stat:blamed-sizes-untyped]
+                            ['root-stack-sizes stat:root-stack-sizes])
     summary)
   (define failing-trail-count (apply + (map length (hash-values stat:bt-failure-outcomes))))
   (define trails-ending-with-empty-blamed-count (length stat:trails-ending-with-empty-blamed))
@@ -299,6 +313,7 @@
       ... lengths:                                 @(pretty-format/indent
                                                      (lengths-summary stat:runtime-error-only-bts)
                                                      45)
+      ... mutants for those trails:                @(remove-duplicates (map blame-trail-mutant-id stat:runtime-error-only-bts))
 
       Total blame trail failures:                  @failing-trail-count
 
@@ -322,6 +337,10 @@
 
       0-length blame trails:                       @(pretty-format/indent
                                                      (summary->counts stat:0-length-bts)
+                                                     45)
+
+      Root stack sizes:                            @(pretty-format/indent
+                                                     stat:root-stack-sizes
                                                      45)
       })
 
