@@ -14,11 +14,11 @@
   (hash/c symbol? any/c))
 
 ;; path-to-existant-directory? . -> . summary/c
-(define (summarize data-dir)
+(define (summarize data-dir summaries-db-path)
   (define blame-trails-by-mutator/across-all-benchmarks
     (directory->blame-trails-by-mutator/across-all-benchmarks
      data-dir
-     #:summaries-db (mutation-analysis-summaries-db)))
+     #:summaries-db summaries-db-path))
 
   (define all-bts (append* (hash-values blame-trails-by-mutator/across-all-benchmarks)))
 
@@ -327,7 +327,9 @@
 
 (main
  #:arguments ([(hash-table ['config   config-path]
-                           ['summaries-db _]
+                           ['summaries-db summaries-db-path]
+                           ['mutant-samples-db mutant-samples-db-path]
+                           ['root-samples-db root-samples-db-path]
                            ['run-checks? run-checks?]
                            ['dump-values values-to-dump])
                data-dirs]
@@ -337,14 +339,23 @@
                ("Config for obtaining active mutator names.")
                #:collect {"path" take-latest #f}
                #:mandatory]
-              [("-s" "--mutant-summaries")
+              [("-S" "--mutant-summaries")
                'summaries-db
-               ("Path to the db containing summaries of the mutants in the data."
-                @~a{Default: @(mutation-analysis-summaries-db)})
-               #:collect {"path"
-                          (set-parameter mutation-analysis-summaries-db)
-                          (mutation-analysis-summaries-db)}
+               ("Path to the db containing summaries of the mutants in the data.")
+               #:collect {"path" take-latest #f}
                #:mandatory]
+              [("-s" "--mutant-samples")
+               'mutant-samples-db
+               ("Path to the db containing mutant samples."
+                "Mandatory when -C provided.")
+               #:collect {"path" take-latest #f}
+               #:mandatory-unless (λ (flags) (not (member 'run-checks? flags)))]
+              [("-r" "--bt-root-samples")
+               'root-samples-db
+               ("Path to the db containing bt root samples."
+                "Mandatory when -C provided.")
+               #:collect {"path" take-latest #f}
+               #:mandatory-unless (λ (flags) (not (member 'run-checks? flags)))]
               [("-C" "--check")
                'run-checks?
                ("Run integrity checks in addition to summarizing the data.")
@@ -361,7 +372,7 @@
 
  (for ([data-dir (in-list data-dirs)])
    (displayln @~a{-------------------- @(basename data-dir) --------------------})
-   (define summary (summarize data-dir))
+   (define summary (summarize data-dir summaries-db-path))
    (displayln (format-summary summary))
    (newline)
    (when run-checks?
@@ -372,7 +383,7 @@
        (system* "/usr/bin/fish"
                 "-c"
                 @~a{
-                    rt check-for-missing-mutants-or-trails.rkt -s ../dbs/code-mutations/mutant-samples.rktdb -S @(mutation-analysis-summaries-db) -r ../dbs/code-mutations/pre-selected-bt-roots.rktdb -p '@data-dir'
+                    rt check-for-missing-mutants-or-trails.rkt -s @mutant-samples-db-path -S @summaries-db-path -r @root-samples-db-path -p '@data-dir'
                     }))
      (parameterize ([current-output-port errors-output]
                     [current-error-port errors-output])
