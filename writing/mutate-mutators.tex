@@ -27,6 +27,20 @@ directly inherited; many mutators are brand new. For the latter, the authors
 relied on their decades-long experience of making type-level mistakes in Typed
 Racket, some of which take non-trivial effort to debug.
 
+\begin{wrapfigure}{r}{.50\textwidth} \footnotesize
+\hspace{0.2cm}
+\begin{module}{}\typecolor
+(: int-f  (-> Integer Void))
+(: bool-f (-> Boolean Void))
+(: x      (U Integer Boolean))
+(if (integer? x)
+  (int-f x)
+  (bool-f x))
+\end{module}
+\caption{Example program using occurrence typing}
+\label{fig:negate-cond-example}
+\end{wrapfigure}
+
 Most of the mutators are self-explanatory.  The first six apply to all
 gradually typed languages; the next six to those that include classes and
 objects. The last four target distinguishing features of Typed
@@ -36,4 +50,6 @@ replaces a {\tt +} with a {\tt -} in an attempt to change the type of the
 arithmetic expression; {\tt +}'s result is a {\tt Positive-Integer} when all
 arguments are positive integers, while {\tt -} yields {\tt
 Integer}~\citep{stathff-padl-12}. Similarly, the other three aim to confound
-the occurrence type system. 
+the occurrence type system. For example, the {\tt negate-cond} mutator can
+create interesting mistakes in programs like figure~\ref{fig:negate-cond-example}.
+
