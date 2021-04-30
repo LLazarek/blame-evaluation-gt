@@ -51,7 +51,7 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
     {\bf name} & {\bf description} & {\bf example} & {\bf origin}\\ \hline
 %% -----------------------------------------------------------------------------
 {\tt constant}
- & swaps a constant with another of the same value but different type
+ & swaps a constant with another of different type
  & \example{5.6} -> {5.6+0.0i} 
  & \originspecial 
 
@@ -69,6 +69,7 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
  & replaces {\tt append} with {\tt cons}
  & \example{{\tt append}} -> {{\tt cons}} 
  & \originnew 
+
 {\tt top-level-id}
  & swaps identifiers defined in the same module
  & \example{{\tt (f x 42)}} -> {{\tt (g x 42)}} 
@@ -84,12 +85,10 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
  & \example{{\tt (send o f x 42)}\\} -> {{\tt (send o g x 42)}} 
  & \originnew   
 
-
 {\tt field-id}
  & swaps two field identifiers
  & \example{{\tt (get-field o f)}\\} -> {{\tt (get-field o g)}} 
  & \originnew   
-  
 
 {\tt class:init}
  & swaps values of class initializers
@@ -98,9 +97,8 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
 
 {\tt class:parent}
  & replaces the parent of classes with {\tt object\%}
- & \example{\classsuperclass{a\%}{}} -> {\\ \classsuperclass{object\%}{\\ \quad}}
+ & \example{\classsuperclass{a\%}{}\\} -> { \classsuperclass{object\%}{\\ \quad}}
  &  \originnew    
- 
 
 {\tt class:public}
  & makes a public method private and vice versa
@@ -108,7 +106,7 @@ generalizes one of \citet{lksfd-popl-2020}'s mutators}
  & \origingen  
 
 {\tt class:super}
- & removes {\tt super-new} calls.
+ & removes {\tt super-new} calls
  & \example{\classsupernew{(super-new)}\\} -> {\classsupernew{(void)}} 
  & \originnew
 
