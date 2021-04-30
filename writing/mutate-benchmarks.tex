@@ -3,9 +3,9 @@
 The benchmark programs for a rational-programmer experiment must 
 \begin{enumerate}
    
-\item vary in size, complexity and purpose; 
+\item vary in size, complexity and purpose;\footnote{A finer point worth noting is that since the rational programmer assumes observable changes in program behavior are due to its actions, the programs should be deterministic.}
     
-\item have a decent number of modules and a variety of module dependency graphs
+\item have a decent number of type-able modules and a variety of module dependency graphs
  (because mixing of typed and untyped code in Typed Racket takes place at the
  module level);
 
@@ -19,7 +19,7 @@ gradually typed programs with type-level mistakes exists at
 all.\footnote{\citet{cc-oopsla-20} created a collection of Reticulated
 Python programs to evaluate their technique of fixing mistakes in type
 annotations. Their collection does not come with type-level mistakes
-in the code itself.} 
+in the code itself.}
 
 What exists is \citet{gtnffvf-jfp-2019}'s collection of Typed Racket programs
 for systematically measuring the implementation's performance. The benchmark
