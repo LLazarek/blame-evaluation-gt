@@ -65,7 +65,7 @@ Assuming the rational programmer trusts the type of {\tt na-client}, the next
 step is to inspect the {\tt layer} module and to equip it with type
 annotations. The result is the \typecolor\ module in the middle, and {\tt
 main}'s import is now re-directed there by {\tt (submod ".." layer-typed)}. As
-predicted by the theory, running the modified program yields a different error message:
+predicted by the theory, running the modified program (in the same way as before) yields a different error message:
 \begin{verbatim}
     neg-abs: broke its own contract
       promised: (<=/c 0)
