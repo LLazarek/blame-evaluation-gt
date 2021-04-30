@@ -6,8 +6,7 @@ assumptions about the untyped module in its interface, or the correct
 interface exposes a bug in the untyped module (or its dependencies). Our setup rules out the first
 alternative (but see sec.~\ref{sec:conclusion}), and therefore the rational
 programmer extends the trail to a scenario that swaps out the untyped
-module
-for its typed counterpart.
+module for its typed counterpart.
 
 % Formally, %% <-- MF: this is called a ``dangling def.'' and is considered bad style
 
@@ -15,9 +14,26 @@ Here is a rigorous definition.
 \begin{quote}
 \it A \emph{Natural blame trail} is a sequence of scenarios $\conf_0,...\conf_n$ of
 a program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
-\conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i =\{\blame{\system, \conf_i}\}$, where
-$\blame{\system, \conf}$ denotes the module (of $\system$) that $\conf$ blames.
+\conf_{i+1}$ and
+\[ \conf_{i+1} \setminus \conf_i = %
+\left\{ %
+\begin{tabular}{ll} %
+$\{\blame{\system, \conf_i}\}$      & if $\conf_i$ produces blame \\ %
+$\{\exception{\system, \conf_i}\}$  & otherwise \\ %
+\end{tabular} %
+\]
+where $\blame{\system, \conf}$ denotes the module (of $\system$) that $\conf$ blames,
+and $\exception{\system, \conf}$ denotes the first untyped location in the stacktrace produced by $\conf$.
 \end{quote}
+
+This definition rests on the two options for $\conf_{i+1} \setminus \conf_i$.
+The first part reflects the rational programmer's use of blame to extend the
+trail. However, blame may not be available in some scenarios. The second part
+accounts for those scenarios that produce errors from the runtime system before
+any impedance mismatch can be detected. For example, the fully untyped
+configuration can only produce such an error (e.g. from {\tt +} receiving a
+string). Exceptions from the runtime do not carry blame, so
+the rational programmer proceeds using the accompanying stacktrace instead.
 
 When the buggy untyped module of a program is replaced by the typed counterpart,
 the type checker fails because this module causes the impedance mismatch. Hence, a
@@ -40,12 +56,11 @@ typing the top of a failed run-time type check's stack trace, dubbed the
 location of the exception, might be as useful as typing the blamed one.
 
 To account for this situation, a new mode of the Natural rational
-programmer follows a migration process based on exceptions.
+programmer follows a migration process based on entirely on exceptions.
 \begin{quote}
 \it A {\em Natural exception trail\/} is a sequence of scenarios $\conf_0,...\conf_n$ of a
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
-\conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i = \{\exception{\system, \conf_i}\}$
-where $\exception{\system, \conf}$ denotes the location of the exception of $\conf$.
+\conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i = \{\exception{\system, \conf_i}\}$.
 \end{quote}
 
 The definition of success for a Natural exception trail follows that for
