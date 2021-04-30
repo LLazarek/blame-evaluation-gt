@@ -59,16 +59,16 @@ the approach of industrial systems, which forgo blame in favor of error
 messages from the safety checks of the underlying language. The results
 (see sec.~\ref{sec:discussion}) are at least somewhat surprising.  In
 principle they validate the conjectures behind the work of theoreticians.
-First, a good blame assignment strategy helps with the search for
+First, a blame assignment strategy helps with the search for
 impedance mismatches between the specified types and the behavior of
 untyped components.  Second, Natural's wrapper-based blame tracking is
 more useful than Transient's ``collective blame'' tracking algorithm,
 which in turn is superior to Erasure. {\em But\/}, the application of the
-method also indicates problems with the expectations of theoreticians. The
-first problem concerns the difference between the methods; neither is {\it
-Natural\/} vastly more useful than {\it Transient\/} nor are the two
-blame assignment methods highly superior to {\it Erasure\/}.  The second
-one is that the cost of Transient's blame can be huge.  In turn, these
+method also indicates problems with the expectations of theoreticians. First,
+in contrast with the large theoretrical differences between the methods,
+{\it Natural\/} is only marginally more useful than {\it Transient\/}, and neither of the two
+blame assignment methods are highly superior to {\it Erasure\/}.  Second,
+the cost of Transient's blame can be huge.  In turn, these
 problems suggest that, on one hand, the existing theory does not properly
 predict practice (i.e. the behavior of blame in real systems with real programs),
 and on the other hand, the existing practice may need
