@@ -102,7 +102,7 @@ Transient blame strategy might be unrealistic.
 
 At first glance, these measurements seem to contradict the results
 of~\citet{vss-popl-2017}. They report an average slowdown of 2.5x and a
-worst-case of 5.4x on fully-typed benchmarks in Reticulated Python.
+worst-case of 5.4x on the fully-typed Python benchmarks in Reticulated Python.
 Unfortunately, the high cost of Shallow Racket seems closer to the truth.
 There are at least four broad issues that skew the earlier results:
 \begin{enumerate}
@@ -125,7 +125,7 @@ unrealistic, and unstable.\footnote{Release notes:
 \url{https://pyperformance.readthedocs.io/changelog.html}}
 
 \item On non-trivial programs, Reticulated Python suffers from the same high
-overhead as Shallow Racket.  It runs the simplest benchmark from the suite 
+overhead as Shallow Racket.  It runs the simplest benchmark from the GTP suite (translated into Python)
 in approximately 40 seconds without blame and times out after 10 minutes when
 the blame map is enabled.
 
