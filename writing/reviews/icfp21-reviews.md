@@ -251,3 +251,97 @@ Section 5 proceeds to describe the technical part of the methodology. It is base
 I am wondering whether the approach that the paper calls Transient First could be regarded as Transient Early, since it points to an earlier part of the code. Similarly Transient Last could be Transient Late, but you would have to see whether this terminology really fits.  
 Section 6 describes the benchmark that has been used for the study, which I am satisfied with, as programs vary in size, features being used, and other aspects. One of the challenges is to generate realistic blame scenarios. To this aim, the paper applies the idea of mutations, previously adopted in other contexts. Fig 6 gives a summary of the mutations applied-- they seem reasonable, and a lot of the mutations are new. The only thing that I am concerned about at this point is that, later in the paper, it is shown that "most cases the programmer need to type a single module to debug a scenario," which makes me wonder whether the authors did not generate difficult enough scenarios. If that is the case, what is the problem? 
 Sections 8 and 9 report on the finding of the paper. These include statements that blame is useful, that Natural often produces shorter trails than Transient, and others. My only issue at this point is that the reader is left with numnbers only, while I think a reader would like to see selected examples, for example about which blame labels have been provided by Natural and which by Transient, so to see that one approach took a longer path, as well as similar examples the reader can learn from. Numbers do not seem to teach the whole story in this part of the paper.
+
+
+
+Review #45D [R1]
+===========================================================================
+
+Overall merit
+-------------
+B. I support accepting this paper but will not champion it.
+
+Reviewer expertise
+------------------
+X. Expert
+
+Paper summary
+-------------
+This paper describes a methodology for evaluating different blame
+assignment strategies in gradually typed languages by using an automated
+"rational programmer," which uses blame information or other error
+outputs to attempt to locate the sources of runtime type errors in
+gradually typed programs by sequentially replacing untyped modules by
+their typed equivalents. This occurs in a framework of lattices of
+different configurations of gradually typed programs, from typed to
+untyped, which have been mutated to introduce an error in untyped code
+that would be detectable statically if it were typed. The blame strategy
+is evaluated based on whether the rational programmer can use its output
+to find the source of the error, and in how many steps.
+
+The paper also applies this methodology to evaluate and compare several
+semantics for gradual typing: the natural, transient, and erasure
+semantics, and within the first two, versions equipped with blame
+tracking and those that simply error and produce stack traces. The
+result is that both natural and transient, with and without blame, are
+better than erasure at debugging programs; both systems with blame
+tracking outperform the systems without, but the systems without blame
+tracking still significantly assist the rational programmer in finding
+the source of the error. The paper concludes by considering threats to
+the validity of the results: issues in the behavior of the
+transient+blame approach, the realism of the rational programmer, and
+the realism of its assumption that correct types for modules can always
+be produced.
+
+Comments for author
+-------------------
+I really enjoyed this paper. The core results of a methodology for
+evaluating blame assignment strategies, comparing them to each other,
+and comparing their presence vs. absence, could become an important tool
+in designing gradual type systems, and is a tool that has been sorely
+needed in the past. The results it reports on are both important and
+interesting: they validate the utility of blame tracking and they allow
+a direct comparison between two very different blame tracking systems.
+This work also characterizes the importance of /having/ blame tracking
+in the first place, which is an under-explored and important question
+for researchers and developers wanting to expand sound gradual typing
+into domains where the overhead of blame tracking may be untenable.
+
+The paper is well written and clear in its methodology, results, and
+limitations. I only have a few concerns about its characterization of
+some of the related work. Most importantly, Section 9.3 makes some
+strong claims about the behavior of Reticulated Python and the transient
+semantics that I'm not sure hold up.
+
+First, the performance figures cited from [38] (worst case 5.4x
+slowdown) are used incorrectly: those numbers are about transient
+/without/ blame (see Section 6.2 of [38]), and given that "with the
+blame map turned off, the Transient semantics also runs these programs
+in a short amount of time and well within the memory limits" there
+appears to be no contradiction here. When blame /is/ enabled, [38]
+reports a worst-case 18x slowdown, which may be more in line with the
+results reported in this work, and as a result it's not actually clear
+that the earlier results are skewed in a way that demands explanation.
+
+Claim (2), that local variables in Reticulated Python are dynamically
+typed because no types are ascribed to them, is false; Reticulated
+Python uses a local type inference system to give types to local
+variables (see Section 3.1.3 of [36]).
+
+Claim (4) that "on large programs, Reticulated suffers from high
+overhead" is unsubstantiated here or in cited prior work, and is also
+unclear -- overhead compared to what? The text compares it (vaguely) to
+Typed Racket (without specifying which semantics), but this isn't a
+useful comparison given the different baseline performance of Racket and
+CPython. It's not clear if the point is that performance of this
+benchmark in blame-free Reticulated is seriously slow compared to
+regular Python, or if the program itself is just slow in Python (in
+which case, what's the relevance to this paper?).
+
+The characterization of the Monotonic semantics for references [22] as a
+variant of natural isn't correct--its exception-raising and blame
+behavior for references (though not for functions) is quite different
+from that of Natural. For example, a monotonic reference imported from
+untyped code into two incompatible typed contexts will error
+immediately, before being used.
+
