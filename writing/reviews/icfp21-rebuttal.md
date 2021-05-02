@@ -515,8 +515,8 @@ Yes you are right, this is our mistake: we meant to use the number with blame
 here. After looking at the plot in Section 6.2 of [38] we believe the right
 numbers are 6.2x and 17.2x (the 18x is an upper bound).
 
-These numbers are still orders-of-magnitude better than Shallow. We believe this
-gap needs an explanation.
+These numbers, however, are still orders-of-magnitude better than Shallow. Hence, 
+we believe this gap needs an explanation.
 
 
 > Claim (2), that local variables in Reticulated Python are dynamically
@@ -524,17 +524,18 @@ gap needs an explanation.
 > Python uses a local type inference system to give types to local
 > variables (see Section 3.1.3 of [36]).
 
-Correct, Reticulated uses local type inference. We need to acknowledge this
-fact. Our overall claim stands, however, because Reticulated's inference often
+You are right and we should had been more precise here. Reticulated does attempt to 
+infer types for local variables. However, our experience indicates Reticulated's inference often
 picks the dynamic type for local variables.
 
 This behavior came as a surprise to us too, and we had to manually inspect the
 output of `retic --mgd-transient --print file.py` for several benchmarks to
 convince ourselves.
 
-Section 5.4.4 of Greenman's dissertation presents a tiny example where
-Reticulated infers `Dyn` for a local variable.
+Section 5.4.4 of Greenman's dissertation presents a tiny example that
+explains how Reticulated can infer `Dyn` for a local variable.
 
+chrdimo: is it worth it expanding on this here?
 
 > Claim (4) that "on large programs, Reticulated suffers from high
 > overhead" is unsubstantiated here or in cited prior work, and is also
@@ -546,18 +547,25 @@ Reticulated infers `Dyn` for a local variable.
 > regular Python, or if the program itself is just slow in Python (in
 > which case, what's the relevance to this paper?).
 
-You are right, the prose here does not explain the comparison here well.
-Especially, Typed Racket has no place in this bullet.
+Thank for pointing this out. The prose here does not explain clearly our
+evidence for this claim.
 
-First off, our goal was to run Reticulated on one large benchmark to see if it
-ever had a huge "timeout-level" slowdown.
+First off, the overall goal was to run Reticulated (with and without blame) on one 
+large benchmark to see if it ever had a huge "timeout-level" slowdown,
+similar to the ones we observe in our ``rational programmer'' experiment.
 
-To this end, we converted our fully-typed `sieve` benchmark from Racket to
+To this end, we converted our fully-typed `sieve` benchmark from TR to
 Reticulated. Then we ran this fully-typed Reticulated program twice: without
 blame and with blame. Adding blame gave a huge slowdown.
 
-This little experiment suggests that Reticulated does not have any crucial
-implementation techniques that Shallow Racket is missing.
+This little experiment suggests that Reticulated does not employ any crucial
+implementation techniques that can mitigate the slowdown we observe with Shallow Racket.
+
+chrdimo: Is the translation faithful in terms of types? 
+
+chrdimo: I think there is a valid point here that the claim comes out as
+too strong but what we have a single data point. I think we should also
+admit this and say that we will tone down the claim. 
 
 
 > The characterization of the Monotonic semantics for references [22] as a
@@ -567,6 +575,10 @@ implementation techniques that Shallow Racket is missing.
 > untyped code into two incompatible typed contexts will error
 > immediately, before being used.
 
-Indeed this characterization is not right, monotonic is more than a mere variant
-of Natural. We will fix this description in the final paper.
+Indeed this characterization is not right, when it comes to boxes
+monotonic is more than a mere variant of Natural. We will fix this
+description in the final paper.
+
+chrdimo: Is monotonic implemented? What happens with hashes, objects and
+other containers?  
 
