@@ -563,7 +563,7 @@ crucial implementation techniques that can mitigate the slowdown we
 observe with Shallow Racket. Of course, all we have is a single data
 point, and this must come thru more clearly in our prose. We would
 hope that this submission and the parallel submission on Shallow
-Racket's construction inspires the Reticulaed team to report data on
+Racket's construction inspires the Reticulated team to report data on
 larger benchmarks than the ones in their published papers.
 
 > The characterization of the Monotonic semantics for references [22] as a
