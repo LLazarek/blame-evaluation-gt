@@ -545,7 +545,7 @@ convince ourselves.
 > regular Python, or if the program itself is just slow in Python (in
 > which case, what's the relevance to this paper?).
 
-Thank for pointing this out. The prose here does not explain clearly our
+Thank you for pointing this out. The prose here does not explain clearly our
 evidence for this claim.
 
 The goal was to run Reticulated (with and without blame) on one
