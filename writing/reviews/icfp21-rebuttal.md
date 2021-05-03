@@ -561,10 +561,11 @@ slowdown.
 This little experiment suggests that Reticulated does not employ any
 crucial implementation techniques that can mitigate the slowdown we
 observe with Shallow Racket. Of course, all we have is a single data
-point, and this must come thru more clearly in our prose. We would
-hope that this submission and the parallel submission on Shallow
-Racket's construction inspires the Reticulated team to report data on
-larger benchmarks than the ones in their published papers.
+point, and this must come through more clearly in our prose.
+
+We hope that this submission and the parallel submission on Shallow
+Racket's construction will inspire further investigation of Transient as a
+viable production-level approach.
 
 > The characterization of the Monotonic semantics for references [22] as a
 > variant of natural isn't correct--its exception-raising and blame
