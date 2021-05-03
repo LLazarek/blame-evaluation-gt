@@ -524,18 +524,16 @@ we believe this gap needs an explanation.
 > Python uses a local type inference system to give types to local
 > variables (see Section 3.1.3 of [36]).
 
-You are right and we should had been more precise here. Reticulated does attempt to 
-infer types for local variables. However, our experience indicates Reticulated's inference often
-picks the dynamic type for local variables.
+You are right and we should have been more precise here. Reticulated
+does attempt to infer types for local variables. However, our
+experience indicates Reticulated's inference often picks type Dynamic
+for local variables. Section 5.4.4 of Greenman's dissertation presents
+a tiny example that explains how Reticulated can infer `Dyn` for a
+local variable.
 
-This behavior came as a surprise to us too, and we had to manually inspect the
+This behavior came as a surprise to us too. We manually inspected the
 output of `retic --mgd-transient --print file.py` for several benchmarks to
 convince ourselves.
-
-Section 5.4.4 of Greenman's dissertation presents a tiny example that
-explains how Reticulated can infer `Dyn` for a local variable.
-
-chrdimo: is it worth it expanding on this here?
 
 > Claim (4) that "on large programs, Reticulated suffers from high
 > overhead" is unsubstantiated here or in cited prior work, and is also
@@ -550,23 +548,23 @@ chrdimo: is it worth it expanding on this here?
 Thank for pointing this out. The prose here does not explain clearly our
 evidence for this claim.
 
-First off, the overall goal was to run Reticulated (with and without blame) on one 
-large benchmark to see if it ever had a huge "timeout-level" slowdown,
-similar to the ones we observe in our ``rational programmer'' experiment.
+The goal was to run Reticulated (with and without blame) on one
+reasonably large benchmark to see if it ever had a huge
+"timeout-level" slowdown, similar to the ones we observe in our
+``rational programmer'' experiment.
 
 To this end, we converted our fully-typed `sieve` benchmark from TR to
-Reticulated. Then we ran this fully-typed Reticulated program twice: without
-blame and with blame. Adding blame gave a huge slowdown.
+Reticulated. Then we ran this fully-typed Reticulated program twice:
+with and without blame. The `with blame` variant experienced a huge
+slowdown.
 
-This little experiment suggests that Reticulated does not employ any crucial
-implementation techniques that can mitigate the slowdown we observe with Shallow Racket.
-
-chrdimo: Is the translation faithful in terms of types? 
-
-chrdimo: I think there is a valid point here that the claim comes out as
-too strong but what we have a single data point. I think we should also
-admit this and say that we will tone down the claim. 
-
+This little experiment suggests that Reticulated does not employ any
+crucial implementation techniques that can mitigate the slowdown we
+observe with Shallow Racket. Of course, all we have is a single data
+point, and this must come thru more clearly in our prose. We would
+hope that this submission and the parallel submission on Shallow
+Racket's construction inspires the Reticulaed team to report data on
+larger benchmarks than the ones in their published papers.
 
 > The characterization of the Monotonic semantics for references [22] as a
 > variant of natural isn't correct--its exception-raising and blame
@@ -577,8 +575,4 @@ admit this and say that we will tone down the claim.
 
 Indeed this characterization is not right, when it comes to boxes
 monotonic is more than a mere variant of Natural. We will fix this
-description in the final paper.
-
-chrdimo: Is monotonic implemented? What happens with hashes, objects and
-other containers?  
-
+description. 
