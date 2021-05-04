@@ -99,21 +99,22 @@ information in this exception, plus its stack trace, may help the programmer
 find the source of the impedance mismatch between the specified return types of
 {\tt pack} in the two typed modules and the actual return value of {\tt pack}.
 
-The following table summarizes the illustration:
+The following table summarizes the illustration. Each cell describes the result
+of evaluating the column's definition (in {\tt client}) under the row's
+semantics.
 %% -----------------------------------------------------------------------------
 \begin{center}
-  \begin{tabular}{l|ll@{}}
-                        &        \multicolumn{2}{|c}{the evaluation of} \\
-\relax                  & {\tt public-data}               & {\tt secret-data} in {\tt client}, \\
-{under the $\cdot$ semantics yields} & & \\ \hline
-%% ----------------------------------------------------------------------------------------
-\qquad {\it Natural\/}   & error, blaming {\tt pack-lib}  & error, blaming {\tt pack-lib} \\
-     		   	 &                                & \\
-\qquad {\it Transient\/} & no error   		          & error, blaming the boundary crossings \\
-      		  	 &    			          & \quad {\tt pack-lib} to {\tt typed-pack-lib} \\
-               &                     & \quad {\tt pack-lib} to {\tt crypto-pack-lib} \\
-\qquad {\it Erasure\/}   & no error 		          & no error \\
-       	    		 &   \multicolumn{2}{|c}{but {\em Erasure} does signal an error on list access}
+  \begin{tabular}{l|ll}
+                  & {\tt public-data}              & {\tt secret-data}                                 \\
+\hline %% ----------------------------------------------------------------------------------------
+{\it Natural\/}   & error, blaming {\tt pack-lib}  & error, blaming {\tt pack-lib}                     \\
+                  &                                &                                                   \\
+{\it Transient\/} & no error                       & error, blaming the boundary crossings             \\
+                  &                                & \quad {\tt pack-lib} to {\tt typed-pack-lib}, and \\
+                  &                                & \quad {\tt pack-lib} to {\tt crypto-pack-lib}     \\
+                  &                                &                                                   \\
+{\it Erasure\/}   & no error*                      & no error*                                         \\
+                  &   \multicolumn{2}{|c}{*but {\em Erasure} does signal an error on list access}
 \end{tabular}
 \end{center}
 %% -----------------------------------------------------------------------------
