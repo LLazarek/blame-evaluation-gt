@@ -251,14 +251,14 @@
 
 (define (summarize-root-context-sizes bts)
   (for/hash/fold ([bt (in-list bts)])
-    #:combine +
-    #:default 0
+    #:combine cons
+    #:default empty
     (match (blame-trail-mutant-summaries bt)
       [(list _ ... (struct* mutant-summary
                             ([run-status (struct* run-status
                                                   ([context-stack (? list? stack)]))])))
-       (values (length stack) 1)]
-      [else (values 'N/A 1)])))
+       (values (length stack) bt)]
+      [else (values 'N/A bt)])))
 
 (define (format-summary summary)
   (match-define (hash-table ['total-bt-count stat:total-bt-count]
@@ -313,7 +313,7 @@
       ... lengths:                                 @(pretty-format/indent
                                                      (lengths-summary stat:runtime-error-only-bts)
                                                      45)
-      ... mutants for those trails:                @(remove-duplicates (map blame-trail-mutant-id stat:runtime-error-only-bts))
+      ... mutants for those trails:                @(length (remove-duplicates (map blame-trail-mutant-id stat:runtime-error-only-bts)))
 
       Total blame trail failures:                  @failing-trail-count
 
@@ -340,7 +340,7 @@
                                                      45)
 
       Root stack sizes:                            @(pretty-format/indent
-                                                     stat:root-stack-sizes
+                                                     (summary->counts stat:root-stack-sizes)
                                                      45)
       })
 
