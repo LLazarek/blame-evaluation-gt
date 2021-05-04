@@ -8,7 +8,8 @@ helpful than those without. The results also indicate, though, that blame is not
 critical in a majority of cases, and therefore they suggest investigating
 whether blame tracking is worth the performance cost.  Third, the Natural
 approach fares better than the Transient approach, but only by a small margin.
-Since Natural offers complete and sound path-based blame while Transient offers
+Since Natural offers complete and sound path-based blame (i.e. it blames all and only those components
+that are relevant to a type impedance mismatch) while Transient offers
 incomplete but sound heap-based blame~\citep{gfd-oopsla-2019}, the results call
 for a study concerning the relative strengths of the two models of blame.
 Fourth, given that Transient's sound but shallow run-time type checks do not
