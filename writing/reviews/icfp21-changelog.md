@@ -98,3 +98,7 @@ Addresses review B:
 >   mismatch?  (This question is related to the above issue with Natural blame.)
 
 
+c93cef0: *Simplify the table layout at the end of section 2.*
+Addresses review B:
+> The table in section 2 looks rather ugly
+
