@@ -475,10 +475,12 @@
                                          locations-selected-as-blamed
                                          log-factory-message)
        (log-factory debug
-                    "Blame trail ~a @ ~a {~a} ended normally according to configured predicate."
-                    mod
-                    index
-                    (blame-trail-id the-blame-trail+dead-proc))
+                    @~a{
+                        Blame trail @mod @"@" @index @;
+                        {@(blame-trail-id the-blame-trail+dead-proc)} @;
+                        ended normally according to configured predicate. @;
+                        (Configured blame follower chose locations: @locations-selected-as-blamed)
+                        })
 
        ;; Blamed region is typed, so the path ends here.
        ;; Log the trail and stop following.
