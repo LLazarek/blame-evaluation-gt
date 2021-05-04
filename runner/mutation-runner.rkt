@@ -407,7 +407,7 @@
            racket/runtime-path)
 
   (define-runtime-path test-config "../configurables/configs/test.rkt")
-  (define-runtime-path transient-config "../configurables/configs/transient-oldest--errortrace.rkt")
+  (define-runtime-path transient-config "../configurables/errortrace-configs/transient-oldest.rkt")
   (install-configuration! test-config)
 
   (define-test (test/no-error run-thunk test-thunk)
