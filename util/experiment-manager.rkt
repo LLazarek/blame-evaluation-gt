@@ -1,5 +1,20 @@
 #lang at-exp rscript
 
+(provide update-host!
+         check-host-empty!
+         launch-benchmarks!
+         wait-for-current-jobs-to-finish
+         download-results!
+         format-status
+         help!:continue?
+         notify-phone!
+
+         zythos
+         benbox
+
+         needed-benchmarks/10
+         needed-benchmarks/14)
+
 (require syntax/parse/define
          racket/date
          "option.rkt")
@@ -431,7 +446,7 @@
 (define benbox (new direct-access-host%
                     [hostname "benbox"]
                     [host-project-path "./blgt"]))
-(define hosts (list zythos benbox))
+(define hosts (list zythos))
 
 ;; host<%> -> (option/c results?)
 (define (get-results a-host)
@@ -501,7 +516,6 @@
                                       (make-list (length incomplete-benchs) absent)
                                       progresses))])
       (append job-id (list progress))))
-  (printf "Checking ~a...\r" a-host)
   (option-let*
    ([results (get-results a-host)])
    (for/fold ([results+progress results])
@@ -536,7 +550,7 @@
 
 (define job-restart-history (make-hash))
 (define (restart-stuck-jobs! a-host
-                             [maybe-active-jobs (send a-host get-jobs #t)]
+                             [maybe-jobs (send a-host get-jobs 'both)]
                              [maybe-summary (summarize-experiment-status a-host)])
   (define (should-restart? job-info)
     (match-define (list restart-count skips-so-far)
@@ -558,8 +572,8 @@
                   (list 0 0)))
 
   (for* ([summary (in-option maybe-summary)]
-         [active-jobs (in-option maybe-active-jobs)]
-         [job-info (in-list (stuck-jobs active-jobs summary))])
+         [jobs (in-option maybe-jobs)]
+         [job-info (in-list (stuck-jobs (first jobs) summary))])
     (if (should-restart? job-info)
         (restart+record! job-info)
         (record-skipped-start! job-info))))
@@ -593,18 +607,20 @@
                  [(or 'errored 'other) '()] ...)
      #f]
     [else #t]))
-(define (missing-completed-benchmarks summary)
+(define (missing-completed-benchmarks summary expected-benchmarks)
   (define completed (hash-ref summary 'completed))
   (define completed-benchmarks (map first completed))
-  (set-subtract needed-benchmarks/10 completed-benchmarks))
-(define (config/mode-complete? summary)
+  (set-subtract expected-benchmarks completed-benchmarks))
+(define (config/mode-complete? summary expected-benchmarks)
   (define completed (hash-ref summary 'completed))
   (match completed
     [(list (list _ config-names) ..1)
      (and (= (set-count (apply set config-names)) 1)
-          (empty? (missing-completed-benchmarks summary)))]
+          (empty? (missing-completed-benchmarks summary expected-benchmarks)))]
     [else #f]))
-(define (download-completed-benchmarks! a-host summary download-directory)
+(define (download-completed-benchmarks! a-host summary download-directory
+                                        #:name [name #f]
+                                        #:expected-benchmarks [expected-benchmarks needed-benchmarks/10])
   (define (download-results! archive-name
                              #:include-configuration-outcomes? [include-configuration-outcomes? #f])
     (when (string=? archive-name "")
@@ -637,22 +653,22 @@
   (match summary
     [(hash-table ['completed (list (list* _ config-name _) _ ...)]
                  [_ '()] ...)
-     #:when (or (config/mode-complete? summary)
+     #:when (or (config/mode-complete? summary expected-benchmarks)
                 (user-prompt!
                  @~a{
                      Not all benchmarks are completed on @a-host
                      @(format-status a-host summary)
-                     Missing: @(missing-completed-benchmarks summary)
+                     Missing: @(missing-completed-benchmarks summary expected-benchmarks)
                      Do you want to download the results anyway? 
                      }))
-     (download-results! config-name
+     (download-results! (or name config-name)
                         #:include-configuration-outcomes? (equal? config-name "TR"))]
     [else
      #:when (user-prompt!
              @~a{
                  @a-host results are not all successfully completed:
                  @(format-status a-host summary)
-                 Missing: @(missing-completed-benchmarks summary)
+                 Missing: @(missing-completed-benchmarks summary expected-benchmarks)
                  Do you want to download the results anyway? 
                  })
      (displayln "Enter the desired archive name (no extension):")
@@ -663,20 +679,26 @@
      absent]))
 
 
-;; host? (host? (listof jobinfo?) summary? -> any) -> (or/c 'complete 'empty 'error)
+;; host?
+;; [(host? (list/c (listof jobinfo?) x2) summary? -> any)]
+;; ->
+;; (or/c 'complete 'empty 'error)
 (define (wait-for-current-jobs-to-finish host
                                          [periodic-action! void]
-                                         #:period [sleep-period 15])
-  (displayln @~a{Waiting for current jobs to finish on @host ...})
+                                         #:period [sleep-period 15]
+                                         #:print? [print? #f]
+                                         #:expected-benchmarks [expected-benchmarks needed-benchmarks/10])
+  (when print?
+    (displayln @~a{Waiting for current jobs to finish on @host ...}))
   (let loop ()
     (option-let*
      ([summary (summarize-experiment-status host)]
       [jobs (send host get-jobs 'both)])
 
      (match-define (list active-jobs pending-jobs) jobs)
-     (periodic-action! host active-jobs summary)
+     (periodic-action! host jobs summary)
      (define no-jobs? (and (empty? active-jobs) (empty? pending-jobs)))
-     (cond [(and no-jobs? (config/mode-complete? summary))
+     (cond [(and no-jobs? (config/mode-complete? summary expected-benchmarks))
             'complete]
            [(and no-jobs? (summary-empty? summary))
             'empty]
@@ -685,15 +707,28 @@
                                  @~a{
                                      Found errors on @host, summary:
                                      @(format-status host summary)
-                                     Resume waiting for finish? (no means abort): 
+                                     Resume waiting for finish? (No means abort): 
+                                     })
+                (loop)
+                'error)]
+           [no-jobs?
+            (if (help!:continue? @~a{@host lost jobs}
+                                 @~a{
+                                     @host seems to have lost jobs. @;
+                                     Expected to find jobs for all of @expected-benchmarks;
+                                     Summary:
+                                     @(format-status host summary)
+                                     Re-run the missing jobs manually, and then continue.
+                                     Resume waiting for finish? (No means abort): 
                                      })
                 (loop)
                 'error)]
            [else
-            (printf "~a Sleeping for ~a min~nCurrent status:~n~a~n"
-                    (date->string (current-date) #t)
-                    sleep-period
-                    (format-status host summary jobs))
+            (when print?
+              (printf "~a Sleeping for ~a min~nCurrent status:~n~a~n"
+                      (date->string (current-date) #t)
+                      sleep-period
+                      (format-status host summary jobs)))
             (sleep (* sleep-period 60))
             (loop)]))))
 
@@ -701,41 +736,42 @@
   (notify-phone! notification)
   (user-prompt! prompt))
 
-(define (ensure-host-empty! host)
-  (let loop ()
-    (unless (equal? (wait-for-current-jobs-to-finish host restart-stuck-jobs!)
-                    'empty)
-      (unless (help!:continue?
-               @~a{Host @host was not left in a clean state, stuck}
-               @~a{
-                   Unexpected dirty state on @host, summary:
-                   @(pretty-format (summarize-experiment-status host))
-                   Is it fixed now? (Say no to abort)
-                   })
-        (displayln "Aborting.")
-        (exit 1))
-      (loop))))
+(define (check-host-empty! host
+                           [handle-not-empty!
+                            (λ _
+                              (unless (help!:continue?
+                                       @~a{Host @host was not left in a clean state, stuck}
+                                       @~a{
+                                           Unexpected dirty state on @host, summary:
+                                           @(pretty-format (summarize-experiment-status host))
+                                           Is it fixed now? (Say no to abort)
+                                           })
+                                (raise-user-error 'check-host-empty! "Aborted."))
+                              (check-host-empty! host))])
+  (option-let*
+   ([summary (summarize-experiment-status host)])
+   (unless (summary-empty? summary)
+     (handle-not-empty!))))
 
-(define current-dbs-path (make-parameter default-dbs-path))
-(define (update-host! a-host)
+(define (update-host! a-host dbs-dir
+                      [handle-failure! (λ (reason)
+                                         (raise-user-error 'update-host! reason))])
   (define host-dbs-destination
     (build-path (get-field host-project-path a-host)
                 "blame-evaluation-gt"
                 "dbs"))
   (displayln "Zipping up dbs archive...")
-  (define-values {dbs-dir-parent dbs-dir-name} (basename (current-dbs-path) #:with-directory? #t))
+  (define-values {dbs-dir-parent dbs-dir-name} (basename dbs-dir #:with-directory? #t))
   (define archive-name (~a dbs-dir-name ".tar.gz"))
   (parameterize ([current-directory dbs-dir-parent])
     (unless (system @~a{tar -czhf @archive-name @dbs-dir-name})
-      (raise-user-error 'update-host!
-                        "Failed to zip dbs directory, giving up.")))
+      (handle-failure! "Failed to zip dbs directory, giving up.")))
   (displayln "Uploading dbs archive...")
   (define host-db-archive-upload-path (build-path host-dbs-destination archive-name))
   (unless (zero? (send a-host scp
                        #:from-local (~a (build-path dbs-dir-parent archive-name))
                        #:to-host (~a host-db-archive-upload-path)))
-    (raise-user-error 'update-host!
-                      @~a{Failed to upload db archive to @a-host}))
+    (handle-failure! @~a{Failed to upload db archive to @a-host}))
 
   (define host-dbs-unpacked-dir-path (build-path host-dbs-destination
                                                  db-installation-directory-name))
@@ -748,9 +784,9 @@
   (define host-setup.rkt-path
     (build-path (get-field host-utilities-path a-host)
                 "setup.rkt"))
-  (for ([msg (in-list '("Unpacking dbs..."
-                        "Updating implementation..."
-                        "Recompiling and checking status..."))]
+  (for ([step (in-list '("Unpacking dbs..."
+                         "Updating implementation..."
+                         "Recompiling and checking status..."))]
         [cmd (in-list
               (list
                @~a{
@@ -769,13 +805,12 @@
                    @(get-field host-racket-path a-host) '@host-setup.rkt-path' -v && @;
                    echo "Done."
                    }))])
-    (displayln msg)
+    (displayln step)
     (unless (send a-host
                   system/host
                   cmd
                   #:interactive? #t)
-      (raise-user-error 'update-host!
-                        "Update failed."))))
+      (handle-failure! @~a{Update failed on step '@step'}))))
 
 (define (format-status a-host
                        [summary* (summarize-experiment-status a-host)]
@@ -876,6 +911,34 @@
                            all-job-info))
       (newline)))))
 
+(define (launch-benchmarks! a-host config-name benchmark-names
+                            [handle-failure! (λ (benchmark)
+                                               (displayln
+                                                @~a{
+                                                    Failed to submit job for @;
+                                                    @benchmark @config-name on @a-host
+                                                    }))]
+                            #:outcome-checking-mode [outcome-checking-mode 'check])
+  (for ([benchmark (in-list benchmark-names)]
+        [i         (in-naturals)])
+    ;; lltodo: the submission here can be batched
+    ;; > This is (slightly) harder than the progress checks, just because of the job files.
+    (when (and (not (zero? i))
+               (zero? (modulo i 3)))
+      (sleep (* 2 60)))
+    (when (absent? (send a-host submit-job! benchmark config-name
+                         #:mode outcome-checking-mode))
+      (handle-failure! benchmark))))
+
+(define (download-results! a-host download-directory
+                           #:name [name #f]
+                           #:expected-benchmarks [benchmark-names needed-benchmarks/10])
+  (option-let* ([summary (summarize-experiment-status a-host)])
+    (download-completed-benchmarks! a-host summary download-directory
+                                    #:name name
+                                    #:expected-benchmarks benchmark-names)))
+
+
 (define (notify-phone! msg)
   (system @~a{fish -c "notify-phone '@msg'"}))
 
@@ -910,7 +973,7 @@
                            ['queue Q-path]
                            ['resume-queue resume-Q/host]
                            ['update (app (mapper host-by-name) update-targets)]
-                           ['dbs-path _])
+                           ['dbs-path dbs-path])
                args]
               #:once-each
               [("-s" "--status")
@@ -958,8 +1021,8 @@
                'dbs-path
                ("Install the given db set when updating a host's implementation."
                 "Only has an effect when -u is supplied."
-                @~a{Default: @(current-dbs-path)})
-               #:collect ["path" (set-parameter current-dbs-path) (current-dbs-path)]]}
+                @~a{Default: @default-dbs-path})
+               #:collect ["path" take-latest default-dbs-path]]}
  #:check [(or (not Q-path) (path-to-existant-file? Q-path))
           @~a{Unable to find queue spec at @Q-path}]
 
@@ -1004,8 +1067,7 @@
           (loop))]
        [(not (empty? download-targets))
         (for ([a-host (in-list download-targets)])
-          (option-let* ([summary (summarize-experiment-status a-host)])
-                       (download-completed-benchmarks! a-host summary download-directory)))]
+          (download-results! a-host download-directory))]
        [Q-path
         (define (dequeue-target!)
           (match (file->list Q-path)
@@ -1016,7 +1078,7 @@
              front]
             [else #f]))
         (define (wait-for-jobs-to-finish+download-results host waiting-job)
-          (match (wait-for-current-jobs-to-finish host restart-stuck-jobs!)
+          (match (wait-for-current-jobs-to-finish host #:print? #t)
             ['complete
              (option-let*
               ([complete-summary (summarize-experiment-status host)]
@@ -1055,7 +1117,7 @@
              (define launch-spec (list->benchmark-spec launch-spec-list))
              (define host (first launch-spec))
              (send host setup-job-management!)
-             (ensure-host-empty! host)
+             (check-host-empty! host)
              (for-each-target (list launch-spec)
                               (λ (a-host benchmark config-name)
                                 (send a-host submit-job! benchmark config-name))
@@ -1068,4 +1130,4 @@
                 (void)])]))]
        [(not (empty? update-targets))
         (for ([a-host (in-list update-targets)])
-          (update-host! a-host))]))
+          (update-host! a-host dbs-path))]))
