@@ -3,7 +3,7 @@
 The benchmark programs for a rational-programmer experiment must 
 \begin{enumerate}
    
-\item vary in size, complexity and purpose;\footnote{A finer point worth noting is that since the rational programmer assumes observable changes in program behavior are due to its actions, the programs should be deterministic.}
+\item vary in size, complexity and purpose;
     
 \item have a decent number of type-able modules and a variety of module dependency graphs
  (because mixing of typed and untyped code in Typed Racket takes place at the
@@ -31,6 +31,8 @@ Typed Racket features: occurrence typing~\citep{tf-icfp-2010}, types for mutable
 and immutable data structures~\citep{hpst-sfp-2010}, types for first-class
 classes and objects~\citep{tsdtf-oopsla-2012}, and types for Racket's numeric
 tower~\citep{stathff-padl-12}.
+Finally, all of the programs are deterministic, so any changes in the programs' behavior
+between runs can be solely attributed to the actions of the rational programmer.
 
 Hence, even if they do not come with type-level errors, they offer a diverse
 starter suite, suitable for the careful introduction of type-level errors via
