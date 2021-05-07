@@ -108,3 +108,10 @@ Addresses review B:
 > - The paper often says that a blame system is (un)sound, but it is difficult for
 >   me to identify what it precisely means.
 
+
+9683ae2: *Add references for homo economicus and its problems.*
+Address review B:
+> - L1099 "as behavioral economics has shown more recently":  Is there a reference
+>   to be cited?
+
+
