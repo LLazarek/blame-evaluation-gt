@@ -786,7 +786,7 @@ Giving up.
       ;; output as well as error
       (if (equal? status 'done-ok)
           (read-mutant-result mutant-proc)
-          'didnt-check-due-to-error))
+          (file->string (mutant-process-file mutant-proc))))
     (match (cons status maybe-result)
       [(or (cons 'done-error _)
            (cons 'done-ok (? eof-object?)))
