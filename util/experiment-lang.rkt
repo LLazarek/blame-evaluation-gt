@@ -207,11 +207,14 @@
     ['empty
      (handle-job-data-disappeared-failure! host dbs)]
     ['error
-     (raise-user-error 'run-mode
-                       @~a{
-                           Aborted because something went wrong waiting for jobs to @;
-                           finish on @host setup with dbs @dbs
-                           })]))
+     (unless (help!:continue? @~a{Something went wrong waiting for data}
+                              @~a{
+                                  Something went wrong waiting for the data on @host
+                                  You can manually clean it up and then continue with
+                                  the rest of the experiment, or abort (by saying no).
+                                  Continue now?
+                                  })
+       (raise-user-error 'run-one-mode "Aborted."))]))
 
 #;(define-simple-macro (run-mode mode:mode-id
                                {~optional {~seq #:only specific-benchmark:benchmark-id ...}}
