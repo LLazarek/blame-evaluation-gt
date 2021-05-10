@@ -216,21 +216,3 @@
                                   })
        (raise-user-error 'run-one-mode "Aborted."))]))
 
-#;(define-simple-macro (run-mode mode:mode-id
-                               {~optional {~seq #:only specific-benchmark:benchmark-id ...}}
-                               {~optional {~seq #:relocate download-dir}}
-                               {~optional {~seq #:name name}}
-                               {~optional {~and #:record-outcomes record-outcomes-kw}})
-  #:with [benchmark-name ...] (if (attribute specific-benchmark)
-                                  #'(specific-benchmark.str ...)
-                                  (datum->syntax this-syntax all-benchmarks))
-  #:with record-outcomes? (if (attribute record-outcomes-kw) #'#t #'#f)
-  (run-one-mode current-host
-                current-dbs
-                mode.str
-                (list benchmark-name ...)
-                {~? download-dir current-download-dir}
-                {~? name #f}
-                current-status-file
-                record-outcomes?))
-
