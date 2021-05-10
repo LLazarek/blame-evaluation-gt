@@ -1017,7 +1017,7 @@
                'update
                "Update the given hosts implementation of the experiment."
                #:collect ["host" cons empty]]
-              [("-D" "--dbs")
+              [("-B" "--dbs")
                'dbs-path
                ("Install the given db set when updating a host's implementation."
                 "Only has an effect when -u is supplied."
