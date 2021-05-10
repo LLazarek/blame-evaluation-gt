@@ -1,6 +1,8 @@
 #lang at-exp racket
 
-(provide (all-from-out racket)
+(provide (except-out (all-from-out racket)
+                     #%module-begin)
+         (rename-out [module-begin #%module-begin])
          (struct-out experiment-config)
          define-runtime-path
          with-configuration
@@ -95,6 +97,7 @@
 
 (define-simple-macro (module-begin top-level-e ...)
   (#%module-begin
+   (module test racket/base) ;; no testing launching experiments...
    top-level-e ...))
 
 (define-simple-macro (with-configuration [host configuration]
