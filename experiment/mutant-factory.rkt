@@ -1217,16 +1217,19 @@ Mutant: [~a] ~a @ ~a with config:
       [_ (eprintf "Not deleted.~n")]))
 
   (when (metadata-file)
-    (unless (create/check-metadata-integrity!
-             (metadata-info (metadata-file)
-                            (bench-path-to-run)
-                            (configuration-path)
-                            (record/check-configuration-outcomes?)))
+    (define info
+      (metadata-info (metadata-file)
+                     (bench-path-to-run)
+                     (configuration-path)
+                     (record/check-configuration-outcomes?)))
+    (unless (create/check-metadata-integrity! info)
       (raise-user-error
        'mutant-factory
        @~a{
            This appears to be a resumption of the experiment, but the metadata recorded at @;
            @(metadata-file) for the previous run does not match that of this run's configuration.
+           Recorded info: @(~s (file->value (metadata-file)))
+           This run info: @(~s (metadata-info->id info))
            Aborting.
            })))
 

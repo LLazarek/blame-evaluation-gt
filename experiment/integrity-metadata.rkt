@@ -2,7 +2,8 @@
 
 (provide create/check-metadata-integrity!
          (struct-out metadata-info)
-         (struct-out metadata-id))
+         (struct-out metadata-id)
+         metadata-info->id)
 
 (require racket/file
          racket/function
@@ -21,6 +22,9 @@
         'pre-selected-bt-roots       pre-selected-bt-root-db
         'pre-computed-mutant-results pre-computed-results-db
         'mutant-samples              pre-selected-mutant-samples-db))
+
+(define optional-dbs '(transient-special-cases
+                       pre-computed-mutant-results))
 
 
 (define-runtime-path configurables-dir "../configurables")
@@ -76,9 +80,19 @@
                  (metadata-info-file metadata))
   #t)
 
-(define (without-config-outcomes-count id)
+(define (invariant-metadata-id-parts-only id)
   (struct-copy metadata-id id
-               [config-outcomes-count #f]))
+               [config-outcomes-count #f]
+               [dbs #f]))
+
+;; Are the dbs listed by `other` compatible with those in `base`?
+(define (db-compatible-with? other base)
+  (for/and ([{name checksum} (in-hash base)])
+    (match* {checksum (hash-ref other name #f)}
+      [{#f other-sum}
+       (or (member name optional-dbs)
+           (not other-sum))]
+      [{(? string? base-sum) other-sum} (equal? base-sum other-sum)])))
 
 ;; metadata-info? -> boolean?
 (define (check-integrity! metadata)
@@ -90,7 +104,12 @@
      ;; long as we're in `record` mode
      (and (>= (metadata-id-config-outcomes-count current-id)
               (metadata-id-config-outcomes-count recorded-id))
-          (equal? (without-config-outcomes-count current-id)
-                  (without-config-outcomes-count recorded-id)))]
+          (db-compatible-with? (metadata-id-dbs current-id)
+                               (metadata-id-dbs recorded-id))
+          (equal? (invariant-metadata-id-parts-only current-id)
+                  (invariant-metadata-id-parts-only recorded-id)))]
     ['check
-     (equal? current-id recorded-id)]))
+     (and (db-compatible-with? (metadata-id-dbs current-id)
+                               (metadata-id-dbs recorded-id))
+          (equal? (invariant-metadata-id-parts-only current-id)
+                  (invariant-metadata-id-parts-only recorded-id)))]))
