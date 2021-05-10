@@ -784,13 +784,17 @@
   (define host-setup.rkt-path
     (build-path (get-field host-utilities-path a-host)
                 "setup.rkt"))
-  (for ([step (in-list '("Unpacking dbs..."
+  (for ([step (in-list '("Stashing current dbs..."
+                         "Unpacking dbs..."
                          "Updating implementation..."
                          "Recompiling and checking status..."))]
         [cmd (in-list
               (list
                @~a{
-                   rm -r '@host-dbs-unpacked-dir-path' && @;
+                   rm -r '@host-dbs-destination'/last-dbs ; @;
+                   mv '@host-dbs-unpacked-dir-path' '@host-dbs-destination'/last-dbs
+                   }
+               @~a{
                    mkdir -p '@host-dbs-unpacked-dir-path' && @;
                    tar -xzvf '@host-db-archive-upload-path' -C '@host-dbs-unpacked-dir-path' --strip-components=1 && @;
                    echo "Done."
