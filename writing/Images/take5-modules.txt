@@ -1,0 +1,11 @@
+0. basics.rkt
+1. card-pool.rkt
+2. card.rkt
+3. dealer.rkt
+4. deck.rkt
+5. main.rkt
+6. player.rkt
+7. stack.rkt
+8. ../base/untyped.rkt
+
+Source url: https://docs.racket-lang.org/gtp-benchmarks/index.html?q=gtp%20benchmarks#%28part._take5_.Description%29
