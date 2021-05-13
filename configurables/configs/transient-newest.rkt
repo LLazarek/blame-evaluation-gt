@@ -16,6 +16,6 @@
               ; runtime-error
               select-top-of-context/filter-typed
               ; blame
-              select-first-blamed)
+              select-first-blamed-pair)
   (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
   (configure! trail-completion         any-type-error/blamed-at-max))
