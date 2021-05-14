@@ -8,16 +8,16 @@
 \end{figure}
 
 Interpreting the numeric summaries and aggregations of the last section demands an intuitive understanding of what blame trails look like in practice.
-Thus, before drawing high level conclusions, let us examine one set of scenarios with a typical debugging scenario from the {\tt take5} benchmark,
+Thus, before drawing high level conclusions, let us examine one set of trails from a typical debugging scenario from the {\tt take5} benchmark,
 whose module dependency graph is shown in the top left of figure~\ref{fig:example-trails}.
 
-The rest of figure~\ref{fig:example-trails} illustrates the blame trails produced by every mode of the rational programmer for the debugging scenario in
+The rest of figure~\ref{fig:example-trails} illustrates the blame trails produced by every mode of the rational programmer (except Random) for the debugging scenario in
 two different ways: 
 \begin{itemize}
 
 \item The top right shows the blame trails produced by every mode of the rational programmer as paths through the configuration lattice starting at the
-root (leftmost) configuration. Each configuration is represented by a bit string where each digit corresponds to a module in the program and indicates if
-it is typed.
+root (leftmost) configuration. Each configuration is represented by a sequence of boxes corresponding to modules in the program, with an x indicating that the module is typed.
+The mutated module has a gray box.
 
 \item The table in the middle expands the information in the diagram with the details of every step in each trail.
 Every row of the table represents the trail of one mode. The middle-three columns depict the steps of a blame trail:
@@ -30,7 +30,7 @@ Finally, the \textbf{Success?} column summarizes whether exploring the trail suc
 
 \end{itemize}
 
-Let us contrast rows 1 and~4. The first one shows that running the root
+In illustration of how to read the table, let us contrast rows 1 and~4. The first one shows that running the root
 configuration under the Natural-blame mode fails due a dynamic type check and
 blames the {\tt player} module; typing that module and running again then
 results in a type error, and hence the trail is successful.  By contrast, the
@@ -40,7 +40,8 @@ typed. Hence, this trail immediately gets stuck.
 
 In short, this figure concretely demonstrates how the rational programmer
 behaves in different modes. In this case, the behaviors differ from each other
-in all five modes. The reader may keep these scenarios in mind as we next
+in five of the six modes (the two Transient blame modes behave the same).
+The reader may keep these scenarios in mind as we next
 discuss the numeric results of the last section.
 
 \subsection{Interpreting the results}

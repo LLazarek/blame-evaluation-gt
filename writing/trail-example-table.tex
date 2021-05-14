@@ -58,11 +58,12 @@ The mutated module is gray.
 
 \noindent{\bf result}\\
 \begin{center}
+\vspace{-2.5em}
 \begin{tabular}{l@{\quad}l}
 symbol        & denotation \\ \hline 
-\blameFinger  & the configuration results in a dynamic type-check failure, blaming the module(s) below \\
+\blameFinger  & the configuration signals a dynamic type check failure, blaming the module(s) below \\
 \typeError    & the configuration does not type check\\
-\runtimeError & the configuration fails a check to the runtime system\\
+\runtimeError & the configuration fails a check by the runtime system\\
 \checkFailure & the configuration signals a dynamic type check failure for which blame is ignored\\
 \end{tabular}
 \end{center}
