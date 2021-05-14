@@ -7,12 +7,22 @@
 \label{fig:example-trails}
 \end{figure}
 
-Interpreting the numeric summaries and aggregations of the last section demands an intuitive understanding of what blame trails look like in practice.
-Thus, before drawing high level conclusions, let us examine one set of trails from a typical debugging scenario from the {\tt take5} benchmark,
-whose module dependency graph is shown in the top left of figure~\ref{fig:example-trails}.
+Interpreting the numeric summaries and aggregations of the last section demands
+an intuitive understanding of what blame trails look like in practice.  A
+concrete example of blame trails and programmer modes is a good basis for
+synthesizing this kind of intuition.
 
-The rest of figure~\ref{fig:example-trails} illustrates the blame trails produced by every mode of the rational programmer (except Random) for the debugging scenario in
-two different ways: 
+Figure~\ref{fig:example-trails} summarizes one particularly interesting
+debugging scenario from the {\tt take5} benchmark. The module dependency graph
+of this benchmark is shown in the top left of the figure. Its mutated {\tt
+player} module provides a method under a different name than the client module,
+{\tt dealer}, expects. In Typed Racket's gradual type system, this mistake
+corresponds to a type-impedance mismatch---and all rational-programmer modes
+come to different conclusions. 
+
+The rest of figure~\ref{fig:example-trails} illustrates the blame trails for
+every mode of the rational programmer (except Random) for the debugging scenario
+in two different ways:
 \begin{itemize}
 
 \item The top right shows the blame trails produced by every mode of the rational programmer as paths through the configuration lattice starting at the
@@ -30,13 +40,13 @@ Finally, the \textbf{Success?} column summarizes whether exploring the trail suc
 
 \end{itemize}
 
-In illustration of how to read the table, let us contrast rows 1 and~4. The first one shows that running the root
-configuration under the Natural-blame mode fails due a dynamic type check and
-blames the {\tt player} module; typing that module and running again then
-results in a type error, and hence the trail is successful.  By contrast, the
-Natural-exceptions mode (row 4) yields stack information for the root
-configuration that is unhelpful; it identifies only {\tt main}, which is already
-typed. Hence, this trail immediately gets stuck.
+To make this table concrete, compare rows 1 and~4. The first one shows that
+running the root configuration under the Natural-blame mode fails due a dynamic
+type check and blames the {\tt player} module; typing that module and running
+again then results in a type error, and hence the trail is successful.  By
+contrast, the Natural-exceptions mode (row 4) yields stack information for the
+root configuration that is unhelpful; it identifies only {\tt main}, which is
+already typed. Hence, this trail immediately gets stuck.
 
 In short, this figure concretely demonstrates how the rational programmer
 behaves in different modes. In this case, the behaviors differ from each other
