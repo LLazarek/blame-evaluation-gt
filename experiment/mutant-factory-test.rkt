@@ -376,7 +376,27 @@
     "Enqueued a mutant following blame on oom outcome")
    (extend-test-message
     (unbox no-blame-handler-called)
-    "Didn't call no-blame handler when there wasn't any blame")))
+    "Didn't call no-blame handler when there wasn't any blame")
+
+   (ignore (set-box! enqueued #f)
+           (set-box! no-blame-handler-called #f)
+           (define dead-e-proc/blame-lib+e
+             (struct-copy dead-mutant-process dead-e-proc/blame-e
+                          [result
+                           (struct-copy run-status
+                                        (dead-mutant-process-result dead-e-proc/blame-e)
+                                        [blamed '("e.rkt" "module-not-in-benchmark.rkt")])])))
+   (with-handlers ([exn:fail? (const #f)])
+     (follow-blame-from-dead-process mock-q
+                                     dead-e-proc/blame-lib+e
+                                     set-no-blame-handler-called!)
+     #t)
+   (extend-test-message
+    (unbox enqueued)
+    "Didn't enqueue a mutant following blame on e.rkt")
+   (extend-test-message
+    (not (unbox no-blame-handler-called))
+    "Called no-blame handler when there was blame")))
 
 (test-begin/with-env
  #:name make-blame-following-will/fallback
@@ -546,6 +566,7 @@
                                #:test:will-called? will-should-be-called?)
   (parameterize ([data-output-dir test-mutant-dir]
                  [abort-on-failure? #f])
+    (define process-file-contents (file->bytes process-file))
     (define will-called?-box (box #f))
     (define (will:do-nothing q _)
       (set-box! will-called?-box #t)
@@ -580,7 +601,10 @@
                  (unbox will-called?-box))
       [(cons #t #f) (fail "Will was not called when it should have been")]
       [(cons #f #t) (fail "Will called when it shouldn't have been")]
-      [else (void)])))
+      [else (void)])
+    ;; Restore the file if it was deleted by the process will
+    (display-to-file process-file-contents process-file
+                     #:exists 'replace)))
 (test-begin/with-env
  #:name mutant->process-will
  (test-mutant-will #:process-file mutant0-path

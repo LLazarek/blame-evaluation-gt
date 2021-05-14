@@ -497,7 +497,8 @@
                       @locations-selected-as-blamed
                       })
      (define config/blamed-region-ctc-strength-incremented
-       (increment-config-precision-for-all locations-selected-as-blamed
+       (increment-config-precision-for-all (set-intersect locations-selected-as-blamed
+                                                          (hash-keys config))
                                            config
                                            #:increment-types-error? #f))
      (define (spawn-the-blame-following-mutant a-process-q
