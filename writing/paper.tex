@@ -1,4 +1,4 @@
-\documentclass[acmsmall,review,anonymous]{acmart}
+\documentclass[acmsmall]{acmart}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \citestyle{acmauthoryear}
@@ -23,12 +23,46 @@
 %% Many elements are not rendered, but should be provided for metadata
 %% extraction tools.
 
-\author{Nobody In Particular}
-% \affiliation{\institution{PLT} \city{Evanston} \country{Illinois} }
-\affiliation{\relax} % \institution{PLT} \city{Evanston} \country{Illinois} }
-% \email{chrdim@northwestern.edu}          %% \email is recommended
+\author{Lukas Lazarek}
+\affiliation{%
+  \institution{PLT @ Northwestern University}
+  \city{Evanston}
+  \state{Illinois}
+  \country{USA}
+}
+\email{lukas.lazarek@eecs.northwestern.edu}
+
+\author{Ben Greenman}
+\orcid{0000-0001-7078-9287}
+\affiliation{%
+  \institution{PLT @ Northeastern University}
+  \city{Boston}
+  \state{Massachusetts}
+  \country{USA}
+}
+\email{benjaminlgreenman@gmail.com}
 
 
+\author{Matthias Felleisen}
+\orcid{0000-0001-6678-1004}
+\affiliation{%
+  \institution{PLT @ Northeastern University}
+  \city{Boston}
+  \state{Massachusetts}
+  \country{USA}
+}
+\email{matthias@ccs.neu.edu}
+
+\author{Christos Dimoulas}
+\orcid{0000-0002-9338-7034}
+\affiliation{%
+  \institution{PLT @ Northwestern University}
+  \city{Evanston}
+  \state{Illinois}
+  \country{USA}
+}
+\email{chrdimo@northwestern.edu}
+\renewcommand{\shortauthors}{Lazarek, Greenmanm Felleisen, Dimoulas}
 
 \usepackage{alltt}
 \usepackage{tcolorbox}
