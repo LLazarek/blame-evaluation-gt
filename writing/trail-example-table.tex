@@ -17,9 +17,9 @@
 \multicolumn{3}{c}{\begin{minipage}{0.25\textwidth}\centering\includegraphics[width=\linewidth]{Images/take5-module-graph}\end{minipage}} &
 \multicolumn{7}{c}{\begin{minipage}{0.69\textwidth}\centering\includegraphics[width=\linewidth]{Images/trails-example}\end{minipage}} \\
 \multicolumn{3}{c}{\begin{minipage}{0.25\textwidth}\centering the dependency graph\end{minipage}} &
-\multicolumn{7}{c}{\begin{minipage}{0.69\textwidth}\centering the paths taken by each mode through the configuration lattice\end{minipage}} 
-\vspace{1em} \\
+\multicolumn{7}{c}{\begin{minipage}{0.69\textwidth}\centering the paths taken by each mode through the configuration lattice\end{minipage}} \\
 \end{tabular}
+\vspace{1em}
 
 \begin{tabular}{l|ccl|ccl|cc|c}
  & \textbf{Root} &  &  & \textbf{Step 1} &  &  & \textbf{Step 2} &  & \textbf{Success?}\\
@@ -51,7 +51,7 @@ Natural & \config{10001100} & \blameFinger & \texttt{main} & \config{10001110} &
 \vspace{0.5em}
 \centerline{\it Legend}
 
-\noindent{\bf config} Each box corresponds to a module and indicates (with x) if it is typed. 
+\noindent{\bf config} \hspace{0.5em} Each box corresponds to a module and indicates (with x) if it is typed. 
 The mutated module is gray.
 
 \medskip
@@ -59,7 +59,7 @@ The mutated module is gray.
 \noindent{\bf result}\\
 \begin{center}
 \vspace{-2.5em}
-\begin{tabular}{l@{\quad}l}
+\begin{tabular}{c@{\quad}l}
 symbol        & denotation \\ \hline 
 \blameFinger  & the configuration signals a dynamic type check failure, blaming the module(s) below \\
 \typeError    & the configuration does not type check\\
