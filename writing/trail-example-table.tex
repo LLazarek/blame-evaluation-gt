@@ -14,11 +14,14 @@
   \footnotesize
 \centering
 \begin{tabular}{l|ccl|ccl|cc|c}
-\multicolumn{7}{c}{\begin{minipage}{0.65\textwidth}\centering\includegraphics[width=\linewidth]{Images/trails-example}\end{minipage}} & %
-\multicolumn{3}{c}{\begin{minipage}{0.25\textwidth}\centering\includegraphics[width=\linewidth]{Images/take5-module-graph}\end{minipage}} \\
-\multicolumn{7}{c}{\begin{minipage}{0.65\textwidth}\centering The paths taken by each mode through the configuration lattice.\end{minipage}} & %
-\multicolumn{3}{c}{\begin{minipage}{0.25\textwidth}\centering The module graph of take5.\end{minipage}}
+\multicolumn{3}{c}{\begin{minipage}{0.25\textwidth}\centering\includegraphics[width=\linewidth]{Images/take5-module-graph}\end{minipage}} &
+\multicolumn{7}{c}{\begin{minipage}{0.69\textwidth}\centering\includegraphics[width=\linewidth]{Images/trails-example}\end{minipage}} \\
+\multicolumn{3}{c}{\begin{minipage}{0.25\textwidth}\centering the dependency graph\end{minipage}} &
+\multicolumn{7}{c}{\begin{minipage}{0.69\textwidth}\centering the paths taken by each mode through the configuration lattice\end{minipage}} 
 \vspace{1em} \\
+\end{tabular}
+
+\begin{tabular}{l|ccl|ccl|cc|c}
  & \textbf{Root} &  &  & \textbf{Step 1} &  &  & \textbf{Step 2} &  & \textbf{Success?}\\
 \textbf{Mode} & config & result & stack & config & result & stack & config & result & \\
 \hline
@@ -42,7 +45,27 @@ Natural & \config{10001100} & \blameFinger & \texttt{main} & \config{10001110} &
 \textcolor{trans-exn}{-exceptions} &  &  & \texttt{dealer} &  &  &  &  &  & \\
  &  &  & \texttt{dealer} &  &  &  &  &  & \\
  &  &  & \texttt{main} &  &  &  &  &  & \\
-\multicolumn{10}{c}{\begin{minipage}{0.95\textwidth}\vspace{0.5em} \textit{Legend.} Configurations: each box corresponds to a module and indicates (with an x) if it is typed. The mutated module is gray. Results: \blameFinger~~denotes that the configuration results in a run-time type check failure blaming the module(s) below it, \checkFailure~~a run-time type check failure for which blame is ignored, \runtimeError~~an error from the runtime, and \typeError~~a type-checker error.\end{minipage}}  \\
 \end{tabular}
-}
+
+\begin{minipage}{0.95\textwidth}
+\vspace{0.5em}
+\centerline{\it Legend}
+
+\noindent{\bf config} Each box corresponds to a module and indicates (with x) if it is typed. 
+The mutated module is gray.
+
+\medskip
+
+\noindent{\bf result}\\
+\begin{center}
+\begin{tabular}{l@{\quad}l}
+symbol        & denotation \\ \hline 
+\blameFinger  & the configuration results in a dynamic type-check failure, blaming the module(s) below \\
+\typeError    & the configuration does not type check\\
+\runtimeError & the configuration fails a check to the runtime system\\
+\checkFailure & the configuration signals a dynamic type check failure for which blame is ignored\\
+\end{tabular}
+\end{center}
+
+\end{minipage}}
 
