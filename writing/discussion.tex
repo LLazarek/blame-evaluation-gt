@@ -158,10 +158,11 @@ programmer appears to do well in the experiment, the implementation of the
 Transient blame strategy might be unrealistic. 
 
 At first glance, these measurements seem to contradict the results
-of~\citet{vss-popl-2017}. They report an average slowdown of 2.5x and a
-worst-case of 5.4x on the fully-typed Python benchmarks in Reticulated Python.
-Unfortunately, the high cost of Shallow Racket seems closer to the truth.
-There are at least four broad issues that skew the earlier results:
+of~\citet{vss-popl-2017}. They report an average slowdown of 6.2x and a
+worst-case of 17.2x on the fully-typed Python benchmarks in Reticulated
+Python with the blame map enabled.  Unfortunately, the orders-of-magnitude
+higher cost of Shallow Racket seems closer to the truth.  There are at
+least four broad issues that skew the earlier results:
 \begin{enumerate}
 
 \item The 2017 implementation of Reticulated fails to insert certain soundness
@@ -170,9 +171,11 @@ checks\footnote{Missing check:
 updates\footnote{Missing cast:
 \url{https://github.com/mvitousek/reticulated/issues/43}} from the paper.
 
-\item The types of almost all local variables in the "fully typed" benchmarks is
-{\tt Dynamic}, often due the impoverished nature of the type system, which does
-not allow the ascription of precise types.  Code that ends up with the type {\tt
+\item While Reticulated attempts to infer types for local variables,
+  often local variables end up with type
+{\tt Dynamic} due the impoverished nature of the type system,  which does
+    not allow the ascription of precise
+    types~\citet{g-dissertation-2020}. Code with the type {\tt
 Dynamic} has fewer constraints to check at run-time---and much less information
 to track in the blame map.
 
@@ -181,13 +184,15 @@ from the official Python benchmark suite because they are too small,
 unrealistic, and unstable.\footnote{Release notes:
 \url{https://pyperformance.readthedocs.io/changelog.html}}
 
-\item On non-trivial programs, Reticulated Python suffers from the same high
-overhead as Shallow Racket.  It runs the simplest benchmark from the GTP suite (translated into Python)
-in approximately 40 seconds without blame and times out after 10 minutes when
-the blame map is enabled.
+\item Reticulated Python does not seem to employ any crucial
+  implementation techniques that can mitigate the significant slowdown due to
+    the blame map observed in Shallow Racket. For example Reticulated Python  runs the simplest
+    benchmark from the GTP suite (translated into Python) in approximately
+    40 seconds without blame but times out after 10 minutes with blame.
 
 \end{enumerate}
-More work on Transient blame is needed to make an informed decision. 
+More work on Transient blame is needed to make an informed decision about
+its prospects as a viable production-level approach. 
 
 
 %% NOTE: Vitousek's benchmarks are from the Python "pyperformance" suite.
