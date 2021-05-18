@@ -12,10 +12,9 @@ untyped (\dyncolor) syntax.
 \begin{description}
 
 \item[\texttt{pack-lib}] (at the top right) represents a library that provides,
-among others, a function {\tt pack}. As the documentation says, this function
-consumes JSON data and packages it in an association list (like a dictionary). By mistake, though, the
-function returns a hash table instead of the association list its documentation
-promises.
+among others, a function {\tt pack}. The documentation says this function
+consumes JSON data and packages it in an association list. In reality, though, the
+function returns a hash table instead of the association list. 
 
 \item[\texttt{types}] (at the top left) is one of three modules that overlays
 types onto this library. This specific modules defines types in common to the
@@ -34,38 +33,39 @@ encrypts its input before passing it to \texttt{pack}.
 \item[\texttt{client}] (at the bottom right) uses {\tt pack}
 indirectly. Specifically, it goes through the two intermediary typed modules to
 use it. Imagine a programmer who relies on the types in the \typecolor\
-modules as checked documentation but prototypes the client in an untyped manner.
+modules as checked documentation but prototypes the client in the untyped language.
 
 \end{description}
-Due to the mistake in {\tt pack-lib}, each of the three semantics assigns a
-different outcome to the client module and signals different kinds of errors.
+The mistaken comment in {\tt pack-lib} causes an impedance mismatch,
+with which each of the three semantics deals differently. 
 
 Under {\it the Natural semantics\/}, functions imported into and exported from
 typed modules are wrapped in proxies that enforce the static type discipline
 with run-time checks and track responsibilities~\citep{tf-popl-2008,
 tfffgksst-snapl-2017}. Thus, when {\tt pack} is imported into a typed module,
 the run-time system checks that it is a function and wraps it in a protective
-proxy, which in turn, enforces the type of the function arguments with run-time checks.
+proxy, which in turn, enforces the type of the function result with run-time checks.
 Analogously the run-time system wraps each exported function of a typed module
-(such as {\tt crypto-pack}) in a proxy that checks its arguments.  These checks
-protect functions exported from typed modules against applications in untyped
-code that supply the wrong kind of arguments.
+such as {\tt crypto-pack} in a proxy that checks its arguments.  These checks
+protect functions exported from typed modules against applications to
+wrong arguments in untyped code.
 
 As this analysis implies, if a return-type check fails, the problem is with
 the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
 an argument-type check fails, responsibility lies with {\tt client}. Due to the
-proxies wrapped around functions, Natural can easily track the responsible party
+proxies wrapped around functions, {\it Natural\/} can easily track the responsible party
 for each check. Thus, in the example of figure~\ref{fig:example}, as
 \texttt{pack} returns, the return-type check fails and Natural blames
-\texttt{pack-lib} for both {\tt define}s in {\tt client}.
+the boundary between \texttt{pack-lib} with {\tt typed-pack-lib} and
+{\tt crypti-packed-lib}, respectively, for the two {\tt define}s in {\tt client}.
 
-Under {\it the Transient semantics\/}, typed code is compiled so that all entry
-points to functions check their arguments at run time and all function calls
-check their return values against the expected type~\citep{vss-popl-2017}.
-Furthermore, Transient uses \emph{shallow} checks, meaning they inspect only the
-top constructor of a value. Since retrieving a value from within a structure (or
-list, array, hash table etc.) is performed via a function call, the contents of a
-complex value is checked on a piecemeal basis.
+Under {\it Transient\/}, typed code is compiled so that all entry points to
+functions check their arguments at run time and all function calls check their
+return values against the expected type~\citep{vss-popl-2017}.  Furthermore,
+Transient uses \emph{shallow} checks, meaning they inspect only the top
+constructor of a value. Since retrieving a value from within a structure (or
+list, array, hash table etc.) is performed via a function call, the contents of
+a complex value is checked on a piecemeal basis.
 
 As a result, the call to \texttt{typed-pack} does {\em not\/} signal an error
 because it takes place in the untyped {\tt client} module, which is compiled in
@@ -87,7 +87,7 @@ work of~\citet{gfd-oopsla-2019} shows that for some programs Transient
 constructs a blame sequence that excludes responsible parties and includes modules
 irrelevant to the failing check.
 
-Under {\it the Erasure semantics\/}, the compiler checks the specified types and
+Under {\it Erasure\/}, the compiler checks the specified types and
 then discards them when it generates code. The generated code includes run-time
 checks that ensure the dynamic safety of all operations as specified in the
 underlying untyped language. Hence, neither the call to {\tt typed-pack} nor the
@@ -104,10 +104,11 @@ of evaluating the column's definition (in {\tt client}) under the row's
 semantics.
 %% -----------------------------------------------------------------------------
 \begin{center}
-  \begin{tabular}{l|ll}
+  \begin{tabular}{l|l@{\qquad\quad}l}
                   & {\tt public-data}              & {\tt secret-data}                                 \\
 \hline %% ----------------------------------------------------------------------------------------
-{\it Natural\/}   & error, blaming {\tt pack-lib}  & error, blaming {\tt pack-lib}                     \\
+{\it Natural\/}   & error, blaming the boundary between & error, blaming the boundary between          \\
+                  & {\tt pack-lib} and {\tt typed-pack-lib} & {\tt pack-lib} and {\tt crypto-pack-lib} \\
                   &                                &                                                   \\
 {\it Transient\/} & no error                       & error, blaming the boundary crossings             \\
                   &                                & \quad {\tt pack-lib} to {\tt typed-pack-lib}, and \\

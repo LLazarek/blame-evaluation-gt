@@ -2,15 +2,15 @@
 
 The general challenge of evaluating blame is a methodological one. Unlike most
 current research on programming languages, the question seems to call for
-empirical studies similar to those of human-computer interaction. At the same
-time, a significant evaluation result demands a large amount of
+empirical studies similar to those of the human-computer interaction research
+area. At the same time, a significant result demands a large amount of
 data. As~\citet{lksfd-popl-2020} recently demonstrated, the way around this
-dilemma is to simulate a programmer's activities algorithmically on a large set
+dilemma is to simulate a programmer algorithmically on a large set
 of programming scenarios.
 
 \input{why-rational-case.tex}
 
-This paper dubs Lazarek et. al's idea {\em the rational programmer\/}.
+This paper generalizes Lazarek et. al.'s idea to {\em the rational programmer\/}.
 Like~\citet{mill1874essays}'s {\it homo economicus\/}, the rational programmer approximates the
 behavior of a software developer who reduces time spent on a task by exploiting the
 available information. In the context of gradual typing, the rational programmer
@@ -19,14 +19,16 @@ behavior: the error message and the state of the program. Hence, the most
 rational procedure is to use the former to improve the latter. Specifically,
 the rational programmer translates the Wadler-Findler slogan into a debugging
 method, searching for the source of the impedance mismatch by adding type
-annotations to the untyped parts of the program identified in the error.
-If the type checker rejects an annotation that is considered correct, the
+annotations to some of the untyped parts of the program identified in the error.
+If the type checker rejects an annotation derived from the context, the
 rational programmer has found the source of the problem.
 Otherwise, the rational programmer concludes that the just-annotated parts are not the problem
 and re-runs the program;
-the Wadler-Findler slogan says the new version of the program must now blame a different location for the problem, which the rational programmer can check in the same fashion.
+the Wadler-Findler slogan implies the new version of the program must now blame
+a different location for the problem, which the rational programmer can check in
+the same fashion. 
 Measuring this simulated
-programmer's behavior on a large number of debugging scenarios yields data that
+behavior on a large number of debugging scenarios yields data that
 is similar to data collected in a human-facing study.
 
 The idea is best illustrated with an example in Typed Racket's migratory type
@@ -45,8 +47,8 @@ the \typecolor\ module at the bottom; \dyncolor\ indicates untyped, while
 \typecolor\ means typed. When a typed module imports an untyped module, it must
 assign types to the imported identifiers for the type checker's sake. Here {\tt
 main} specifies that {\tt na-client} consumes a {\tt Real} number and produces a
-non-positive one.\footnote{Typed Racket's type system reflects Racket's subset
-reasoning about numbers, not (only) machine-level
+non-positive one.\footnote{Racket's type system reifies
+reasoning about subsets of numbers, not machine-level
 representations~\citep{stathff-padl-12}.} A program execution ends in this error:
 \begin{verbatim}
     na-client: broke its own contract
@@ -75,19 +77,18 @@ predicted by the theory, running the modified program (in the same way as before
       blaming: (interface for neg-abs)
        (assuming the contract is correct)
 \end{verbatim}
-The last step of the rational programmer is to assign types to the {\tt server}
-module and to re-direct the import of {\tt layer-typed} to {\tt (submod ".."
-server-typed)}. At this point the type checker objects to the conjectured type
-of {\tt neg-abs}---and the source of the impedance mismatch is found. How to fix
-it is a separate question.
+Lastly, the rational programmer assigns types to {\tt server} and to re-direct
+the import of {\tt layer-typed} to {\tt (submod ".." server-typed)}. Now the
+type checker objects to the conjectured type of {\tt neg-abs}, i.e.\ the source
+of the impedance mismatch is found. How to fix it is a separate question.
 
 Like {\it homo economicus\/}, the rational programmer is an approximation.
 People do not behave in a purely rational manner as economic actors, and they
 also do not do so as software developers. The point is not to deny the existence
 of ``lucky hunches'' programmers or ``tinkering works'' approaches and so on. It
 is also not to claim that equipping entire modules with types represents an
-always feasible approach (though adding types at the expression level, say, as
-in TypeScript should be considered well within bounds).  {\em But\/}, the
+always feasible approach\footnote{Adding types at the expression level, say, as
+in TypeScript should be considered well within bounds.}  {\em But\/}, the
 concept of studying the idea of an economically rational actor has produced
 benefits to the discipline of political economics, and this paper suggests that
 implementing and studying the rational programmer will help language designers.

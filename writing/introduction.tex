@@ -10,7 +10,7 @@ Racket~\citep{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010})
 come with sophisticated checking and blame assignment strategies (see
 sec.~\ref{sec:landscape}). Their academic creators embrace the idea that
 blame can help practicing programmers find impedance mismatches, that is,
-disagreements between the type ascriptions of a software system and its
+disagreements between the type ascriptions of a software component and its
 behavior.
 
 Industrial implementors of gradual typing systems have almost
@@ -59,17 +59,18 @@ the approach of industrial systems, which forgo blame in favor of error
 messages from the safety checks of the underlying language. The results
 (see sec.~\ref{sec:discussion}) are at least somewhat surprising.  In
 principle they validate the conjectures behind the work of theoreticians.
-First, a blame assignment strategy helps with the search for
+\mf{don't we also want to say the run-time checks alone help?}
+A blame assignment strategy helps with the search for
 impedance mismatches between the specified types and the behavior of
-untyped components.  Second, Natural's wrapper-based blame tracking is
+untyped components.  Natural's wrapper-based blame tracking is
 more useful than Transient's ``collective blame'' tracking algorithm,
 which in turn is superior to Erasure. {\em But\/}, the application of the
-method also indicates problems with the expectations of theoreticians. First,
-in contrast with the theoretical differences between the methods,
+method also indicates problems with the expectations of theoreticians. 
+In contrast with the theoretical differences between the methods,
 {\it Natural\/} is only marginally more useful than {\it Transient\/}, and neither of the two
-blame assignment methods are highly superior to {\it Erasure\/}.  Second,
+blame assignment methods are highly superior to {\it Erasure\/}. Additionally, 
 the cost of Transient's blame can be huge.  In turn, these
 problems suggest that, on one hand, the existing theory does not properly
-predict practice (i.e. the behavior of blame in real systems with real programs),
-and on the other hand, the existing practice may need
-additional experiments to collect more data.
+predict the behavior of blame in real systems with real programs,
+and on the other hand, the existing practice lacks data and alternative
+experiments to assess the entire landscape of blame assignment. 
