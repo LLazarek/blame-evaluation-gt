@@ -9,3 +9,7 @@ cs.bib: cs.bib
 
 clean:
 	latexmk -C
+
+matthias:
+	pdflatex paper && \
+	open paper.pdf 
