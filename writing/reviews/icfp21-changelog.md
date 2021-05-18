@@ -115,3 +115,18 @@ Address review B:
 >   to be cited?
 
 
+511c90f: *Fix discussion of Monotonic in related work.*
+Addresses review D:
+> The characterization of the Monotonic semantics for references [22] as a
+> variant of natural isn't correct--its exception-raising and blame
+> behavior for references (though not for functions) is quite different
+> from that of Natural. For example, a monotonic reference imported from
+> untyped code into two incompatible typed contexts will error
+> immediately, before being used.
+
+
+8183046: *Fix descriptions of Reticulated type inference and performance in the discussion section.*
+Addresses all of review D's other concerns.
+
+
+
