@@ -129,4 +129,15 @@ Addresses review D:
 Addresses all of review D's other concerns.
 
 
+141a371: *Add new prose + figure at beginning of discussion section walking through an example trail for every mode.*
+Addresses review C:
+> Sections 8 and 9 report on the finding of the paper. These include statements
+> that blame is useful, that Natural often produces shorter trails than
+> Transient, and others. My only issue at this point is that the reader is left
+> with numnbers only, while I think a reader would like to see selected
+> examples, for example about which blame labels have been provided by Natural
+> and which by Transient, so to see that one approach took a longer path, as
+> well as similar examples the reader can learn from. Numbers do not seem to
+> teach the whole story in this part of the paper.
+
 
