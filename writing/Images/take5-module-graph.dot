@@ -5,7 +5,7 @@ digraph g {
   3 [label="dealer"]
   4 [label="deck"]
   5 [label="main"]
-  6 [label="player"]
+  6 [label="player", style="filled", fillcolor="lightgrey"]
   7 [label="stack"]
 
   5 -> 3

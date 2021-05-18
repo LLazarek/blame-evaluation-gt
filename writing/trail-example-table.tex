@@ -1,16 +1,16 @@
 {
   \definecolor{trans-fb}{RGB}{215, 48, 31}
   \definecolor{trans-lb}{RGB}{252, 141, 89}
-  \definecolor{trans-exn}{RGB}{253, 204, 0}
-  \definecolor{erasure}{RGB}{119, 87, 254}
+  \definecolor{trans-exn}{RGB}{147, 204, 0}
+  \definecolor{erasure}{RGB}{119, 133, 254}
 
   \newcommand\config[1]{\begin{minipage}{0.09\textwidth}\centering\includegraphics[width=\linewidth]{Images/#1}\end{minipage}}
   \newcommand\runtimeError{\begin{minipage}{0.03\textwidth}\centering\includegraphics[width=\linewidth]{Images/runtime-error}\end{minipage}}
   \newcommand\checkFailure{\begin{minipage}{0.03\textwidth}\centering\includegraphics[width=\linewidth]{Images/check-failure-plain}\end{minipage}}
   \newcommand\blameFinger{\begin{minipage}{0.02\textwidth}\centering\vspace{0.25em}\includegraphics[width=\linewidth]{Images/finger}\end{minipage}}
   \newcommand\typeError{\scalebox{1.5}{$\tau_{\hspace{-0.1em}\times}$}}
-  \newcommand\success{\textcolor{black!30!green}{\checkmark}}
-  \newcommand\fail{\textcolor{red}{\sffamily x}}
+  \newcommand\success{\textcolor{black!30!green}{\LARGE \checkmark}}
+  \newcommand\fail{\textcolor{red}{\LARGE \sffamily x}}
   \footnotesize
 \centering
 \begin{tabular}{l|ccl|ccl|cc|c}
@@ -51,12 +51,12 @@ Natural & \config{10001100} & \blameFinger & \texttt{main} & \config{10001110} &
 \vspace{0.5em}
 \centerline{\it Legend}
 
-\noindent{\bf config} \hspace{0.5em} Each box corresponds to a module and indicates (with x) if it is typed. 
+\noindent{\it config} \hspace{0.5em} Each box corresponds to a module and indicates (with x) if it is typed. 
 The mutated module is gray.
 
 \medskip
 
-\noindent{\bf result}\\
+\noindent{\it result}\\
 \begin{center}
 \vspace{-2.5em}
 \begin{tabular}{c@{\quad}l}

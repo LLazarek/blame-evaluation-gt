@@ -122,7 +122,7 @@
       <path
          inkscape:connector-curvature="0"
          id="path1905-5-67-5"
-         style="fill:#7757fe;fill-opacity:1;fill-rule:evenodd;stroke:#7757fe;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         style="fill:#7785fe;fill-opacity:1;fill-rule:evenodd;stroke:#7785fe;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
          d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
          transform="matrix(-0.3,0,0,-0.3,0.69,0)" />
     </marker>
@@ -137,7 +137,7 @@
       <path
          inkscape:connector-curvature="0"
          id="path1905-5-9"
-         style="fill:#fdcc00;fill-opacity:1;fill-rule:evenodd;stroke:#fdcc00;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         style="fill:#93cc00;fill-opacity:1;fill-rule:evenodd;stroke:#93cc00;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
          d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
          transform="matrix(-0.3,0,0,-0.3,0.69,0)" />
     </marker>
@@ -165,14 +165,14 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.7"
-     inkscape:cx="521.57301"
-     inkscape:cy="564.07044"
+     inkscape:cx="263.71587"
+     inkscape:cy="392.64187"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
-     inkscape:window-width="1076"
-     inkscape:window-height="1877"
-     inkscape:window-x="0"
+     inkscape:window-width="1596"
+     inkscape:window-height="857"
+     inkscape:window-x="1080"
      inkscape:window-y="20"
      inkscape:window-maximized="0"
      inkscape:measure-start="0,0"
@@ -273,9 +273,9 @@
    style="fill:#fc8d59;fill-opacity:1"
    id="flowSpan3464">Transient-last-blame</flowSpan>,</flowPara><flowPara
          id="flowPara5523"><flowSpan
-   style="fill:#fdcc00;fill-opacity:1"
+   style="fill:#93cc00;fill-opacity:1"
    id="flowSpan3474">Transient-exceptions</flowSpan>, <flowSpan
-   style="fill:#7757fe;fill-opacity:1"
+   style="fill:#7785fe;fill-opacity:1"
    id="flowSpan3484">Erasure</flowSpan></flowPara></flowRoot>    <path
        style="fill:none;stroke:#fc8d59;stroke-width:2.06500006;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow2Send-8-3)"
        d="m -20.76525,195.50965 66.523809,11.1503"
@@ -283,7 +283,7 @@
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cc" />
     <path
-       style="fill:none;stroke:#fdcc00;stroke-width:2.06500006;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow2Send-8-62)"
+       style="fill:none;stroke:#93cc00;stroke-width:2.06500006;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow2Send-8-62)"
        d="m -20.76525,202.73969 66.523804,11.1503"
        id="path1870-1-1"
        inkscape:connector-curvature="0"
@@ -291,7 +291,7 @@
        inkscape:export-xdpi="150"
        inkscape:export-ydpi="150" />
     <path
-       style="fill:none;stroke:#7757fe;stroke-width:2.06500006;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow2Send-8-3-3)"
+       style="fill:none;stroke:#7785fe;stroke-width:2.06500006;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#Arrow2Send-8-3-3)"
        d="m -20.76525,210.2779 66.523808,11.15031"
        id="path1870-1-5-2"
        inkscape:connector-curvature="0"
