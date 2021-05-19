@@ -89,7 +89,8 @@ rational programmer decouples the actual debugging behavior of a software
 developer for the sake of a systematic, large-scale analysis. This decoupling
 comes with advantages and disadvantages. In the economic realm, mathematical
 models have provided some predictive insights into the market's behavior; but as
-behavioral economics has shown more recently (e.g.~\cite{henrich2001search}), the mathematical abstraction of a
+behavioral economics has shown more recently (e.g.~\cite{henrich2001search}),
+the mathematical abstraction of a
 rational actor makes predictions also quite unreliable in some situations.
 \footnote{It has misled economists to focus on just mathematics, though
 this problem is not relevant here---tongue firmly in cheek.}  Just like an
@@ -111,6 +112,27 @@ has driven home this lesson but, fortunately, it has also shown that the types
 are in somewhat canonical.  The authors therefore conjecture that different
 real-world programmers would often come up with equivalent type assignments
 during debugging sessions. 
+
+%% -----------------------------------------------------------------------------
+\subsection{Threat: Is the Definition of Interesting Scenarios Reasonable?} \label{sec:threat:erasure-bias}
+
+Section~\ref{sub:mutate-interesting} defines criteria for interesting mutations,
+one of which limits the scenarios under consideration to those with mistakes
+detectable by Erasure. In other words, the experiment only considers the utility
+of blame when no checking at all is necessary to detect a problem. In reality,
+checking is necessary to detect some mistakes, and it is possible that blame has
+more or less to offer for these kinds of mistakes. If that is the case, then the
+results of the experiment on a population of scenarios including such mistakes
+should be quite different.
+
+The authors have collected preliminary data that suggests this difference may be
+large. In particular, the data comes from running the experiment with a
+population including any scenario detectable by Natural, regardless of the other
+semantics; the population therefore also includes scenarios where Transient or
+Erasure may not even detect the mistake.
+%% While that detection disparity reflects reality in that such mistakes can be made in practice, it also biases the population to favor Natural in those new scenarios where Transient and Erasure have no chance to succeed.
+Under this broader population of scenarios, the preliminary experimental results
+suggest that Natural blame may be much more useful than all of the other modes.
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Why Does Transient Lose Blame?} \label{sec:threat:transient}
