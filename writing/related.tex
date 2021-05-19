@@ -29,14 +29,14 @@ rat-oopsla-2017} assume that every value comes with a type tag and use tag
 checks to supervise the interactions between typed and untyped code.  The semantics~\citep{tlt-popl-2019,
 etg-icfp-19, tt-scp-20, tgt-popl-18, tt-sas-17} derived with the Abstracting
 Gradual Typing technique~\citep{gct-popl-2016} are variants of Natural.
- Monotonic References~\citep{svctg-esop-2015, rsfbv-popl-2015, sfrbcsb-popl-2014, kas-pldi-2019} 
-differ from Natural in the treatment of mutable data by
+The Monotonic semantics~\citep{svctg-esop-2015, rsfbv-popl-2015, sfrbcsb-popl-2014, kas-pldi-2019} 
+differs from Natural in the treatment of mutable data by
 associating heap locations with a type and permitting only updates that 
-make that type more precise.  
-Among these representative semantics, only Amnesic, Nom and Monotonic References present innovative blame
+do not make the type less precise.  
+Among these representative semantics, only Amnesic, Nom, and Monotonic present innovative blame
 strategies.  The experiment excludes the first because it is
 merely a theoretical construction, the second because it imposes severe restrictions on
-programmers and the third because it would require a complete
+programmers, and the third because it would require a complete
 re-engineering of the Racket runtime. 
 %That said, the paper offers a
 %detailed chart that the creators of these blame strategies can transplant to their

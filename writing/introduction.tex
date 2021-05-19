@@ -49,28 +49,28 @@ comparable use; and sampling the huge space of possibilities (see
 sec.~\ref{sec:challenges} and, for details, secs.~\ref{sec:rational} through~\ref{sec:sample}).
 
 The paper's {\it second contribution\/} is a set of {\em results from
-applying the evaluation method to three distinct blame assignment
+applying the evaluation method to three distinct checking regimes for
+gradual types and their blame assignment
 strategies in approximately 72,000 different scenarios\/} (see
 sec.~\ref{sec:results}): (1)~{\it Transient\/}, i.e. Reticulated's
-tracking of typed/untyped boundaries~\citep{vss-popl-2017}; (2)~{\it
+inlined type assertions and collaborative tracking of typed/untyped boundaries~\citep{vss-popl-2017}; (2)~{\it
 Natural\/}, i.e. Typed Racket's use of a higher-order contract system and
 its blame assignment~\citep{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e.
-the approach of industrial systems, which forgo blame in favor of error
+the approach of industrial systems, which forgo type checks and blame in favor of error
 messages from the safety checks of the underlying language. The results
 (see sec.~\ref{sec:discussion}) are at least somewhat surprising.  In
 principle they validate the conjectures behind the work of theoreticians.
-\mf{don't we also want to say the run-time checks alone help?}
-A blame assignment strategy helps with the search for
+Type checks and blame work together to help with the search for
 impedance mismatches between the specified types and the behavior of
-untyped components.  Natural's wrapper-based blame tracking is
-more useful than Transient's ``collective blame'' tracking algorithm,
-which in turn is superior to Erasure. {\em But\/}, the application of the
+untyped components.  Natural's wrapper-based type checks and blame tracking are
+more useful than Transient's type in-lined assertions and ``collective blame'' tracking algorithm,
+which in turn are superior to Erasure. {\em But\/}, the application of the
 method also indicates problems with the expectations of theoreticians. 
 In contrast with the theoretical differences between the methods,
 {\it Natural\/} is only marginally more useful than {\it Transient\/}, and neither of the two
-blame assignment methods are highly superior to {\it Erasure\/}. Additionally, 
+checking and blame assignment methods are highly superior to {\it Erasure\/}. Additionally, 
 the cost of Transient's blame can be huge.  In turn, these
 problems suggest that, on one hand, the existing theory does not properly
 predict the behavior of blame in real systems with real programs,
 and on the other hand, the existing practice lacks data and alternative
-experiments to assess the entire landscape of blame assignment. 
+experiments to assess the entire landscape of the pragmatics of blame. 
