@@ -1,0 +1,5 @@
+Max error margin for bt-lengths-table: 0.0004898321538799365
+Max error margin for bt-lengths-comparisons: 0.00031181807003971535
+Max error margin for avo-bars: 0.0002347639605143612
+Max error margin for success-bars: 0.0001758689476364635
+Max error margin for venns: 0.00017113064104407714

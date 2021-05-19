@@ -41,7 +41,7 @@ limit. Running the experiment on all debugging scenarios took over
      For example, in the leftmost diagram, all three modes succeed on the same
      scenario 57.3\% of the time, only Natural and Natural exceptions succeed on
      29.1\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and
-     Natural alone succeeds on 9\%.  \\ The upper bound margin of error is 0.02\%.
+     Natural alone succeeds on 9\%. The upper bound margin of error is 0.02\%.
 
   \end{minipage}
 
@@ -93,14 +93,14 @@ the rational programmer without hints about how to proceed.
 Sections~\ref{sec:threat:transient} and ~\ref{sec:threat:transient2} address
 these causes of failure for Transient and how they affect the experiment.
 
-The second key observation from figure~\ref{fig:success-bars} is that the
-modes that use blame all outperform those that do not.  In particular,
-Natural and both of Transient's blame modes succeed in around 95\% of the
-scenarios, while their corresponding exception modes succeed in around
-85\% of them, and Erasure succeeds in only 60\%.  The only
-exception is that the random programmer always succeeds; this reflects the
-fact that every scenario has finitely many modules, so the random programmer 
-eventually types the buggy module.
+The second key observation from figure~\ref{fig:success-bars} is that the modes
+that use blame all outperform those that do not. In particular, Natural and both
+of Transient's blame modes succeed in 85 - 90\% of the scenarios, while their
+corresponding exception modes succeed in less than 80\% of them, and so too for
+Erasure. The only exception is that the random programmer always succeeds; the
+figure omits this mode because it just reflects the fact that every scenario has
+finitely many modules, so the random programmer eventually types the buggy
+module.
 
 Figure~\ref{fig:avo-bars} depicts a head-to-head comparison of every
 mode's performance against every other mode (except Random). The
@@ -110,11 +110,11 @@ better or worse than each other mode.  In particular, each bar above zero
 represents the proportion where the plot's named mode succeeds and the
 mode on the x-axis fails; the corresponding bar below zero represents the
 proportion of the inverse case.  For example, the plot titled ``Natural''
-shows that Natural outperforms Natural exceptions in about 12\% of the
+shows that Natural outperforms Natural exceptions in about 11\% of the
 scenarios, and the inverse (Natural performs worse than Natural
 exceptions) never happens.  Similarly, the plot titled ``Transient last
 blame'' shows that Transient last blame outperforms Natural exceptions
- in about 12\% of the scenarios, but conversely it performs worse
+ in about 9\% of the scenarios, but conversely it performs worse
 than Natural exceptions in about 2\% of the scenarios.
 
 The figure answers questions $Q_1$, $Q_2$ and $Q_3$ affirmatively.  
@@ -122,17 +122,17 @@ In all three semantics, blame modes outperform their
 corresponding exception mode by \textasciitilde10\%.  The
 Natural exceptions mode is never more useful than Natural blame, and
 Transient exceptions are more useful than Transient first and Transient
-last blame in a small percentage (about 2\%) of the scenarios. 
+last blame in a small percentage (less than 1\%) of the scenarios. 
 
-Figure~\ref{fig:avo-bars} also provides answers for $Q_*$.
-Blame for all three semantics is significantly
-more useful than Erasure exceptions (by around 35\%). Natural blame is
-more useful than both versions of Transient blame by a small percentage;
-in about 4\% of scenarios Natural blame is more useful while in about 1.5\% of the
-scenarios Transient blame is more useful. The Transient first and
-Transient last blame are practically indistinguishable. Finally, there is
-no clear winner between Natural exceptions and Transient exceptions
-despite the theoretically advantageous additional checks of Natural.
+Figure~\ref{fig:avo-bars} also provides answers for $Q_*$. Blame for all three
+semantics is significantly more useful than Erasure exceptions --- by almost
+12\% for Natural and almost 9\% for Transient. Natural blame is more useful than
+both versions of Transient blame by a small percentage (about 4\%). The
+Transient first and Transient last blame are practically indistinguishable.
+Finally, Natural exceptions are more useful than Transient exceptions, although
+only in a small percentage of scenarios (about 2.5\%). A rare few scenarios
+(about 0.5\%) show the opposite, despite the theoretically advantageous
+additional checks of Natural.
 
 \begin{figure} \footnotesize \centering
   \includegraphics[width=\textwidth]{./plots/bt-lengths-table}
@@ -140,6 +140,7 @@ despite the theoretically advantageous additional checks of Natural.
   \vspace{1em}
   \begin{minipage}{0.95\textwidth}
     Each plot depicts the distribution of trail lengths for a given mode across all benchmarks.
+    The upper bound margin of error is 0.05\%.
   \end{minipage}
 
   \caption{Programmer effort} \label{fig:effort-table}
@@ -152,11 +153,13 @@ despite the theoretically advantageous additional checks of Natural.
   \begin{minipage}{0.95\textwidth}
 
     Each plot depicts the distribution of scenarios with trail length
-    differences ranging from -3 to 3.  A -x difference denotes that the first
-    mode's trail is x steps {\em shorter\/} than the second mode's trail for the
-    same scenario; a positive difference denotes the inverse.  Only
-    scenarios where both modes succeed are considered.  The 10|85 on the y-axis
-    indicates that the axis is truncated between 10 and 85\%.
+    differences ranging from -3 to 3. A $-x$ difference denotes that the first
+    mode's trail is $x$ steps {\em shorter\/} than the second mode's trail for the
+    same scenario; a positive difference denotes the inverse. A difference of
+    $\infty$ indicates one mode's trail succeeds while other mode's fails. The
+    15|60 on the y-axis indicates that the axis is truncated between 15 and
+    60\%.
+    The upper bound margin of error is 0.03\%.
 
   \end{minipage}
 
@@ -170,9 +173,9 @@ Specifically, the figure shows one Venn diagram per mode of the rational
 programmer that uses blame.  Each diagram shows the overlap of successful
 scenarios for the blame mode, its corresponding exception mode, and Erasure.
 For example, the leftmost diagram (Natural) shows that all three modes succeed
-on 59.5\% of the scenarios, only Natural and Natural exceptions succeed on
-25.7\% of the scenarios, only Natural and Erasure succeed on 2.1\%, and Natural
-alone succeeds on 9.7\%.  This analysis highlights the success trade-offs each
+on 75.7\% of the scenarios, only Natural and Natural exceptions succeed on
+11.6\% of the scenarios, only Natural and Erasure succeed on 1.8\%, and Natural
+alone succeeds on 9.2\%.  This analysis highlights the success trade-offs each
 semantics offers against Erasure, with and without blame. For instance, the
 analysis for Natural clearly illustrates that, when choosing between Natural
 blame, Natural exceptions, and Erasure, Natural blame is the absolutely most
@@ -181,13 +184,8 @@ successful scenarios.  On the other hand, Transient's blame modes fare similarly
 but the choice is not so clear-cut.
 
 Turning to programmer effort, figure~\ref{fig:effort-table} shows the
-distribution of blame trail lengths for the sampled interesting debugging
-scenarios. Unlike the usefulness comparisons above, these proportions do
-not generalize to a representation of the full population.  Still, as
-section~\ref{subsec:effort} discusses, they provide an alternative view of
-the workings of the rational programmer. 
-
-There are two immediate take-aways from the figure. First, the effort for
+estimated distribution of blame trail lengths for the interesting debugging
+scenarios. There are two immediate take-aways from the figure. First, the effort for
 successfully debugging interesting scenarios (in green) for the random
 mode of the rational programmer is highly spread out, as
 expected. In contrast, in the other modes, successful effort coalesces at
@@ -204,25 +202,21 @@ first try. Otherwise the rational programmer types an irrelevant module, runs
 the program again, and the same exception points again to the already typed
 module.
 
-Figure~\ref{fig:effort-comparisons} provides head-to-head comparisons of
-effort.  The comparison between two modes boils down to the difference in
-length between their trails for all scenarios where they both succeed.
-Hence, each plot in the figure shows the distribution of scenarios with
-length differences ranging from -3 (the first mode's trail is 3 steps
-shorter than the second's) to 3 (the first mode's trail is 3 steps longer
-than the second's).  The figure offers several insights about how  modes
-compare in terms of effort that complement the insights about how they
-compare in terms of success rates from figure~\ref{fig:avo-bars}.  First,
-Natural blame never produces shorter trails than Natural exceptions, and
-sometimes (albeit rarely) produces slightly longer ones.  Hence, the
-experiment provides evidence that blame helps the rational programmer
-debug more scenarios but does not shorten the debugging process compared
-to exceptions. Second, Natural relatively often (around 10\% of the
-scenarios) produces shorter trails than both Transient blame modes, and
-sometimes the trails are significantly shorter.  Third, Transient last
-blame often produces shorter trails than Transient first blame, which is a
-particularly interesting distinction in light of their nearly
-indistinguishable success rates.  Finally, Transient's blame modes also
-share the characteristic with Natural that blame sometimes produces longer
-trails than their corresponding exception modes.
+Figure~\ref{fig:effort-comparisons} provides head-to-head comparisons of effort.
+The comparison between two modes boils down to the difference in length between
+their trails for all scenarios where they both succeed. Hence, each plot in the
+figure shows the distribution of scenarios with length differences ranging from
+-3 (the first mode's trail is 3 steps shorter than the second's) to 3 (the first
+mode's trail is 3 steps longer than the second's). The figure offers several
+insights about how modes compare in terms of effort that complement the insights
+about how they compare in terms of success rates from figure~\ref{fig:avo-bars}.
+First, Natural blame never produces shorter trails than Natural exceptions, and
+sometimes (albeit rarely) produces slightly longer ones. Hence, the experiment
+provides evidence that blame helps the rational programmer debug more scenarios
+but does not shorten the debugging process compared to exceptions. Second,
+Natural relatively often (close to 8\% of the scenarios) produces shorter trails
+than both Transient blame modes, and sometimes the trails are significantly
+shorter. Finally, Transient's blame modes also share the characteristic with
+Natural that blame sometimes produces longer trails than their corresponding
+exception modes.
 
