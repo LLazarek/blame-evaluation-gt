@@ -36,19 +36,18 @@ use it. Imagine a programmer who relies on the types in the \typecolor\
 modules as checked documentation but prototypes the client in the untyped language.
 
 \end{description}
-The mistaken comment in {\tt pack-lib} causes an impedance mismatch,
-with which each of the three semantics deals differently. 
 
-Under {\it the Natural semantics\/}, functions imported into and exported from
-typed modules are wrapped in proxies that enforce the static type discipline
-with run-time checks and track responsibilities~\citep{tf-popl-2008,
-tfffgksst-snapl-2017}. Thus, when {\tt pack} is imported into a typed module,
-the run-time system checks that it is a function and wraps it in a protective
-proxy, which in turn, enforces the type of the function result with run-time checks.
-Analogously the run-time system wraps each exported function of a typed module
-such as {\tt crypto-pack} in a proxy that checks its arguments.  These checks
-protect functions exported from typed modules against applications to
-wrong arguments in untyped code.
+The mistaken comment in {\tt pack-lib} causes an impedance mismatch, with which each
+of the three semantics deals differently.  Under {\it the Natural semantics\/},
+functions imported into and exported from typed modules are wrapped in proxies that
+enforce the static type discipline with run-time checks and track
+responsibilities~\citep{tf-popl-2008, tfffgksst-snapl-2017}. Thus, when {\tt pack}
+is imported into a typed module, the run-time system checks that it is a function
+and wraps it in a protective proxy, which in turn, enforces the type of the function
+result with run-time checks.  Analogously the run-time system wraps each exported
+function of a typed module such as {\tt crypto-pack} in a proxy that checks its
+arguments.  These checks protect functions exported from typed modules against
+applications to wrong arguments in untyped code.
 
 As this analysis implies, if a return-type check fails, the problem is with
 the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
