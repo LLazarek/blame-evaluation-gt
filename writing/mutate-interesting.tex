@@ -67,13 +67,12 @@ target rather specific features; for instance, the class-focused mutators are
 mainly effective in a program that makes extensive use of object-oriented
 features.
 
-The definition of interesting mutants is more than a filter for uninteresting
-mutants. It is also the guide for evaluating and refining mutators until they
-collectively produce a sizable and diverse population of interesting
-mutants. Consider a candidate for the set of mutators that casts the tests of conditional
-expressions to the {\tt Any} type, which would suppress occurrence typing. An
-examination of its mutants through the lens of ``interesting'' reveals that none
-of them is interesting, because they never raise run-time errors. Hence Indeed,
-the interesting standard guided countless iterations of adding and removing
-mutators and of refining the chosen mutators in figure~\ref{table:mutation-ops}.
+The goal of filtering for interesting mutants guided countless iterations of
+adding, removing, and refining mutators in figure~\ref{table:mutation-ops}.  For
+an illustrative example, Consider a candidate mutator that casts the tests of
+conditionals to the {\tt Any} type. Like the example explained at the end of the
+preceding subsection, this mutant would suppress occurrence typing. But, it
+would not be interesting because an execution would not raise a run-time error;
+instead the function would process its input as if nothing had changed. Hence
+this candidate mutator is not included in the final set.
 
