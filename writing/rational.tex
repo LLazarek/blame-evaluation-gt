@@ -3,24 +3,22 @@
 Section~\ref{sec:why-rational} explains how a migratory type setting helps with
 finding the source of an impedance mismatch. Roughly speaking, it encourages the
 rational programmer to equip a module with types if it is blamed in an error
-message. A sequence of such steps make up a portion of the migratory path in the
+message. A sequence of such steps makes up a path in the
 lattice of type migration~\citep{tfgnvf-popl-2016}. The lattice serves as the
-common substrate for the definition modes of the rational programmer (see
+universe \mf{what does this sentence really mean? what does it contribute?} for the definition modes of the rational programmer (see
 sec.~\ref{sub:stuff}).
 
 Each mode receives different kinds of information and thus may construct
 different paths in the lattice. As discussed in section~\ref{sec:challenges},
 evaluating blame relies on comparing modes of the rational programmer
 within the same semantics and across different semantics.  
-
 Hence the research problem is to develop modes for the rational programmer and to make
-them comparable even when they correspond to different semantics and offer
+them comparable even when they correspond to different semantics and process
 different kinds of information (see secs.~\ref{sub:natural}
 through~\ref{sub:erasure}). Programmer effort relative to a fixed debugging
 scenario introduces another dimension along which the modes become may be
 compared (see sec.~\ref{sub:effort}). With these notions in place, it
-becomes possible to state the experimental questions and gives an overview of
-the experimental process (see sec.~\ref{sub:experiment}).
+becomes possible to state the experimental questions and describes the process (see sec.~\ref{sub:experiment}).
 
 %% -----------------------------------------------------------------------------
 \def\rsub#1#2{\subsection{#2} \label{sub:#1} \input{rational-#1.tex}}

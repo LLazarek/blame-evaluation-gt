@@ -19,7 +19,9 @@ information:
 \item[$Q_*$] Is blame for X more useful than blame for Y (for X, Y in Natural, Transient, or Erasure)?
 \end{itemize}
 
-\begin{figure}[ht] \footnotesize
+\begin{wrapfigure}{r}{.450\textwidth}
+% \begin{figure}[ht]
+\footnotesize
 \center
 {\begin{tabular}{l|c|c|c}
 %% ---------------------------------------------------------------------------------------------------------------
@@ -31,9 +33,9 @@ information:
 {\bf Exceptions}        &      $Q_1$    &     $Q_2/Q_3$    &      $Q_*$      \\
 \end{tabular}}
   \label{fig:experiment-outline}
-\end{figure}
+\end{wrapfigure}
 
-The above table summarizes how each question relates to
+The nearby table summarizes how each question relates to
 different kinds of trails/modes of the rational programmer. For example,
 experimental question $Q_1$ asks whether blame is valuable for Natural and the
 experiment uses the Natural blame and exception trails to answer it, so $Q_1$
@@ -52,15 +54,14 @@ Natural-blame trail is successful; otherwise it is failing.
 Figure~\ref{fig:process} summarizes this experimental process for
 one mode of the rational programmer and connects it with the mutations from
 section~\ref{sec:mutate}.
-The process is repeated for the same roots with the other mode, Natural
-exceptions.
+The process is repeated for the same roots with the Natural-exceptions mode.
 After completing, the test bed
 reports the success/failure results of the trails to determine the proportion of
-scenarios where Natural blame is more useful than Natural exceptions.  Question
+scenarios where Natural-blame is more useful than Natural-exceptions.  Question
 $Q_1$ has a positive answer if a root exists where the above is true because it
 is evidence that there is at least one interesting scenario that the rational
 programmer manages to debug because of blame information.  The process is analogous
-for $Q_2$ and $Q_3$, using the respective modes of the rational programmer.
+for $Q_2$ and $Q_3$, using the respective modes. % of the rational programmer.
 
 \begin{figure}[bh] \footnotesize
   \centering
@@ -73,11 +74,10 @@ for $Q_2$ and $Q_3$, using the respective modes of the rational programmer.
 For $Q_*$, the process is a bit more involved. Answering this question calls for
 a comparison of the percentage of scenarios where one mode is more useful than
 the other and the inverse.  For instance, deciding whether blame for Natural is
-more useful than first blame for Transient requires comparing the percentage
-of scenarios where Natural blame is more successful than Transient
-first blame with the percentage where Transient first
-blame is more successful than Natural blame. Repeating the whole process
+more useful than Transient-first requires comparing the percentage
+of scenarios where the first is more successful than the second with
+the percentage where the second is more successful than the first. Repeating the whole process
 for every pair of modes produces a
-complete picture of the comparative usefulness of blame between all of the modes.
+complete picture of the comparative usefulness of blame. % between all of the modes.
 
 

@@ -1,13 +1,12 @@
 %% -----------------------------------------------------------------------------
 
 \citet{tfgnvf-popl-2016} describe the set of all possible type migrations with a
-lattice. Formally, a program $\system$ is a set of modules $\set{\component}$.
+lattice. A program $\system$ is a set of modules $\set{\component}$.
 Let a configuration $\conf$ of $\system$ be the subset of $\set{\component}$
 that comes with type annotations. These configurations of $\system$ are ordered
 by the subset relation and form a lattice $\lattice{\system}$ with
-$2^{\size{\system}}$ elements. The bottom scenario of $\lattice{\system}$ is
-$\emptyset$, the top one $\system$ itself; in between are the mixed-typed
-scenarios.
+$2^{\size{\system}}$ elements. The bottom of $\lattice{\system}$ is
+$\emptyset$, the top one $\set{\component}$ itself; in between are the mixed-typed ones.
 
 Applying a mutator to module $\component^*$ of $\system$ acts like a homomorphism
 on the generated lattice. The two lattices differ only in the mutated
@@ -17,10 +16,9 @@ checker points out the type-level mistake in the mutated $\component^*$.
 
 The actions of the rational programmer create an ascending chain---dubbed a
 \emph{trail}---in $\lattice{\system}$.  The {\em root\/} $\conf_0$ of a trail is
-the initial debugging scenario.  Starting from such a root, the rational
-programmer steps along a trail. If the (program for this) scenario type-checks,
+the initial debugging scenario. If the program for some scenario  $\conf_i$ type-checks,
 the rational programmer runs the program until it raises a run-time error.  The
-rational programmer uses the information in the error to decide which module to
+rational programmer then uses the information in the error to decide which module to
 equip with types. This choice constructs scenario $\conf_{i+1}$ from $\conf_{i}$
 and thus creates a trail. The trail's construction ends when it reaches a
 scenario that contains the mutated module because the type checker rejects its

@@ -10,6 +10,8 @@ module for its typed counterpart.
 
 % Formally, %% <-- MF: this is called a ``dangling def.'' and is considered bad style
 
+\mf{Technically a Natural blame trail could be a Natural exception trail. Hmph? }
+
 Here is a rigorous definition. 
 \begin{quote}
 \it A \emph{Natural blame trail} is a sequence of scenarios $\conf_0,...\conf_n$ of
@@ -31,8 +33,8 @@ The first part reflects the rational programmer's use of blame to extend the
 trail. However, blame may not be available in some scenarios. The second part
 accounts for those scenarios that produce errors from the runtime system before
 any impedance mismatch can be detected. For example, the fully untyped
-configuration can only produce such an error (e.g. from {\tt +} receiving a
-string). Exceptions from the runtime do not carry blame, so
+configuration can only produce such an error, e.g. from {\tt +} receiving a
+string. Exceptions from the runtime do not carry blame, so
 the rational programmer proceeds using the accompanying stacktrace instead.
 
 When the buggy untyped module of a program is replaced by the typed counterpart,
@@ -46,8 +48,8 @@ blame trail $\conf_0,..,\conf_n$ in a lattice $\lattice{\system}$ is \emph{faili
 iff (the program for) $\conf_n$ type checks and the trail cannot be extended further.
 \end{quote}
 That is, failing Natural blame trails are those that end in a scenario that does not reveal the bug statically, yet also does not blame
-an untyped module. Thus the rational programmer gets
-no hints from the gradual type system on how to continue the search for the bug.
+an untyped module. Thus the rational programmer has
+no further hints on how to continue the search for the bug.
 
 While a successful Natural blame trail indicates that it 
 pays off to heed blame assignments while debugging the trail's root, it does not answer whether
@@ -56,7 +58,7 @@ typing the top of a failed run-time type check's stack trace, dubbed the
 location of the exception, might be as useful as typing the blamed one.
 
 To account for this situation, a new mode of the Natural rational
-programmer follows a migration process based on entirely on exceptions.
+programmer follows a migration process based entirely on exceptions.
 \begin{quote}
 \it A {\em Natural exception trail\/} is a sequence of scenarios $\conf_0,...\conf_n$ of a
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
