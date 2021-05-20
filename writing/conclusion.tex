@@ -7,8 +7,9 @@ assignment adds value. Similarly, researchers and language designers have
 implicitly answered this question one way or another without evidence for the
 blame-strategy dimension. The experiment presented in this paper provides some
 justification for the programmers' leanings and helps language creators revisit
-their decisions. Of course, the design choice remains a trade-off, and the
-the experiment contribute to only one of its many facets. 
+their decisions. Of course, the design choice remains a trade-off
+along several dimensions while the presented experiment sheds light on
+only one of them. 
 
 The paper does {\em not\/} address a problem in the gradually typed world that
 was pointed out early on by practical researchers~\citep{incorrect-ts,
@@ -17,23 +18,23 @@ attention~\citep{gfd-oopsla-2019, cc-oopsla-20}: mistakes in type annotations
 themselves.  Developers use gradual typing to move an untyped code base into the
 typed realm, and to this end, they need typed APIs for the vast repositories of
 already-existing libraries. Instead of converting the libraries themselves,
-language implementors merely create typed facade modules that import untyped
-functions and export them with type annotations, like {\tt typed-pack-lib} in
-figure~\ref{fig:example}.  With those facades, the compiler can easily
-type-check typed modules. The problem is that these retroactive additions of
-types to a library may result from a misunderstanding of the code. \emph{Any
-retroactively ascribed type may thus be a mistake itself.}
+language implementors merely create facade modules that import untyped functions
+and export them with type annotations, like {\tt typed-pack-lib} in
+figure~\ref{fig:example}.  With those facades, the compiler can 
+type-check typed modules. But, these retroactive additions of types to a library
+may result from a misunderstanding of the code. \emph{Any retroactively ascribed
+type may thus be a mistake itself.}
 
 The cited evidence suggests that this scenario is quite common and largely
 unadressed.  A future evaluation must develop mutators that produce incorrect
 type annotations without breaking the code itself. Some preliminary work
 suggests that such type mutators are even more difficult to develop than the
 type-level code mutators presented here. Based on the gradual typing literature,
-the Natural semantics should usually discover such mistakes. In contrast, the
-Transient and Erasure semantics cannot help with such mistakes at all; indeed,
-we expect that these latter two raise misleading exceptions or produce
-plainly-wrong answers.  Of course, only additional experimental work can confirm
-or reject these conjectures.
+the Natural semantics should discover such mistakes. In contrast, the Transient
+and Erasure semantics cannot help with such mistakes at all; indeed, we expect
+that these latter two raise misleading exceptions or produce wrong answers
+without warning.  Only additional experimental work can confirm or reject these
+conjectures.
 
 
 

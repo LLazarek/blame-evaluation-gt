@@ -1,16 +1,14 @@
 %% -----------------------------------------------------------------------------
-% \subsection{Contextualizing the results through an example scenario}
+Interpreting the numeric summaries and aggregations of the preceding section
+demands an intuitive understanding of what blame trails look like in practice.
+A concrete example of blame trails and programmer modes is a good basis for
+synthesizing this kind of intuition.
 
 \begin{figure}
 \input{trail-example-table}
 \caption{An example scenario from take5, with every mode's resulting trail.}
 \label{fig:example-trails}
 \end{figure}
-
-Interpreting the numeric summaries and aggregations of the last section demands
-an intuitive understanding of what blame trails look like in practice.  A
-concrete example of blame trails and programmer modes is a good basis for
-synthesizing this kind of intuition.
 
 Figure~\ref{fig:example-trails} summarizes one particularly interesting
 debugging scenario from the {\tt take5} benchmark. The module dependency graph
@@ -51,8 +49,7 @@ already typed. Hence, this trail immediately gets stuck.
 In short, this figure concretely demonstrates how the rational programmer
 behaves in different modes. In this case, the behaviors differ from each other
 in five of the six modes (the two Transient blame modes behave the same).
-The reader may keep these scenarios in mind as we next
-discuss the numeric results of the last section.
+The reader may keep these scenarios for the following discussion of the numeric results.
 
 \subsection{Interpreting the results}
 

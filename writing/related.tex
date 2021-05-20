@@ -1,22 +1,20 @@
 %% -----------------------------------------------------------------------------
 
-\citet{lksfd-popl-2020}'s human-out-of-the-loop empirical analysis of blame for
-higher-order contracts is the inspiration for this paper.  While they do not
-spell out the notion of the rational programmer, they present the basic
-ingredients of the technique.
+At a philosophical level, \citet{lksfd-popl-2020} present the first empirical
+analysis {\em without\/} involving humans in this general area.  While they do
+not spell out the notion of the rational programmer, they present many of the
+basic ingredients.
 
-At a technical level, this work and~\citet{lksfd-popl-2020}'s differ in
-many ways. The experiment presented here concerns three different modes of
-gradual typing, theirs a single notion of contract checking.  It also
-contributes the idea of creating three comparable rational programmers
-(with several modes). Thus the method of this paper answers whether blame
-adds value to a gradual type system and what gradual type system it
-benefits the most; while~\citet{lksfd-popl-2020} only establish a
-systematic relation between blame for contracts and behavioral bugs. The
-type-level mutators represent another technical contribution of the work
-presented here; as explained in section~\ref{sec:mutate}, almost none
-of~\citet{lksfd-popl-2020}'s mutators is useful at the level of type
-mistakes.
+At a technical level, the two pieces of work differ in many ways.  First the
+experiment presented here involves three different modes of gradual typing,
+theirs a single notion of contract checking.  Second, this paper also
+contributes the idea of creating three comparable rational programmers, with
+several modes. Hence it can answer whether blame adds value to a gradual type
+system and which gradual type system it benefits the most, while theirs
+establishes only a systematic relation between blame for contracts and
+behavioral bugs. Finally, this paper also contributes type-level mutators. As
+explained in section~\ref{sec:mutate}, almost none of~\citet{lksfd-popl-2020}'s
+mutators is useful in the context of gradual typing. 
 
 The literature on gradual typing presents many semantics beyond the three used
 here and three additional blame strategies.  Pyret (pyret.org) assigns fixed-size
@@ -30,14 +28,10 @@ checks to supervise the interactions between typed and untyped code.  The semant
 etg-icfp-19, tt-scp-20, tgt-popl-18, tt-sas-17} derived with the Abstracting
 Gradual Typing technique~\citep{gct-popl-2016} are variants of Natural.
 The Monotonic semantics~\citep{svctg-esop-2015, rsfbv-popl-2015, sfrbcsb-popl-2014, kas-pldi-2019} 
-differs from Natural in the treatment of mutable data by
-associating heap locations with a type and permitting only updates that 
+differs from Natural in the treatment of mutable data. It 
+associates every heap location with a type and permits only updates that 
 do not make the type less precise.  
-Among these representative semantics, only Amnesic, Nom, and Monotonic present innovative blame
-strategies.  The experiment excludes the first because it is
+Among these semantics, only Amnesic, Nom, and Monotonic present interesting blame
+strategies.  The experiment excludes the first because it is 
 merely a theoretical construction, the second because it imposes severe restrictions on
-programmers, and the third because it would require a complete
-re-engineering of the Racket runtime. 
-%That said, the paper offers a
-%detailed chart that the creators of these blame strategies can transplant to their
-%linguistic setting and determine the value of their blame strategies.   
+programmers, and the third because it requires a re-engineering of the Racket runtime. 

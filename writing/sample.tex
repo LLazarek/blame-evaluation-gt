@@ -8,19 +8,20 @@ to even identify the interesting ones among them.  Furthermore this population
 is heterogeneous; scenarios come from different mutants, and the mutants are the
 result of different mutators applied to each benchmark.
 
-To become computationally feasible and statistically sound, the experiment employs
-stratified uniform random sampling with three levels of stratification.
-The first two levels group mutants first by benchmark and then by
-mutator, making sure that the sample within each benchmark reflects the diversity of
-mutants with respect to the mutators that generated them.  Specifically, the
-experiment samples 80 interesting mutants per benchmark,
+To render the experiment computationally feasible and statistically sound, it
+becomes necessary to sample this large space in a uniform and stratified manner.
+The first two levels of stratification group mutants first by benchmark and then
+by mutator, making sure that the sample within each benchmark reflects the
+diversity of mutants with respect to the mutators that generated them.
+Specifically, the experiment samples 80 interesting mutants per benchmark,
 evenly-distributed across all of the mutators that contribute mutants for the
-benchmark. Some benchmarks have less than  80 mutants with interesting scenarios,
-in which case the only choice is to include them all.
-The result is a total of 752 interesting mutants across all benchmarks.
-Finally, the third level of sampling draws 96 random interesting debugging
-scenarios from each configuration lattice with replacement. The
-final sample thus consists of 72,192 interesting scenarios.
+benchmark. Some benchmarks have less than 80 mutants with interesting scenarios,
+in which case the only choice is to include them all.  The result is a total of
+752 interesting mutants across all benchmarks.  Finally, the third level of
+sampling randomly draws 96 debugging scenarios from each configuration lattice
+\mf{is ``with replacement'' correct here? Do you put it back for the next draw?}
+with replacement. The final sample thus consists of 72,192 interesting
+scenarios.
 
 
 
