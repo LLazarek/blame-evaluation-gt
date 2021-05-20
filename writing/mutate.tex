@@ -3,17 +3,9 @@
 Putting the rational programmer to work means generating many mutants and turning
 those into debugging scenarios. The process must start with a suitable
 collection of representative programs (see sec.~\ref{sub:mutate-benchmarks}).
-Since existing mutators do not generate useful mutants, the first step is to
+Since existing mutators do not generate useful mutants, the next step is to
 develop new mutators (see sec.~\ref{sub:mutate-mutators}) and to validate their
 suitability on the benchmarks (see sec.~\ref{sub:mutate-interesting}).
-
-% As section~\ref{sec:challenges} explains, the first challenge is to
-% generate a representative mistakes in representative software. This
-% section explains the specific choices made for the first application
-% of the method: the source and nature of the chosen benchmarks
-% (sec.~\ref{sub:mutate-benchmarks}), the newly developed mutators
-% (sec.~\ref{sub:mutate-mutators}), and why they are suitable for this
-% experiment (sec.~\ref{sub:mutate-interesting}). 
 
 %% -----------------------------------------------------------------------------
 \def\sub#1#2{\subsection{#2} \label{sub:mutate-#1} \input{mutate-#1.tex}}

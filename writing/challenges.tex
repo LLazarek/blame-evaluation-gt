@@ -58,15 +58,18 @@ mechanism might be useless.
 An experiment must also rule out that the usefulness of blame assignment is sheer
 luck.  Hence, a completely random mode provides yet another necessary baseline.
 
-The {\em second challenge\/} is to find a representative collection of
-programs with impedance mismatches. The latter must represent mistakes that programmers
-accidentally create and that the run-time checks of academic systems catch. In
-other words, the experiment calls for a collection of mistakes in
-mix-typed programs that is representative of those ``in the wild.''
-Unfortunately no such collection exists, and with good reason. The kind of
-mistakes needed are typically detected by unit or integration tests; even if it
-takes some time to find their sources, these mistakes do not make it into code
-repositories with appropriate commit messages.
+The {\em second challenge\/} is to find a representative collection of programs
+with impedance mismatches.\footnote{\citet{cc-oopsla-20} created a collection of
+Reticulated Python programs to evaluate their technique of fixing mistakes in
+type annotations. Their collection does not come with type-level mistakes in the
+code itself.}  The latter must represent mistakes that programmers accidentally
+create and that the run-time checks of academic systems catch. In other words,
+the experiment calls for a collection of mistakes in mix-typed programs that is
+representative of those ``in the wild.''  Unfortunately no such collection
+exists, and with good reason. The kind of mistakes needed are typically detected
+by unit or integration tests; even if it takes some time to find their sources,
+these mistakes do not make it into code repositories with appropriate commit
+messages.
 
 An alternative is to {\em generate a corpus of 
 mistakes \/} using mutation analysis~\citep{lipton1971fault, demillo1978hints,
