@@ -68,7 +68,11 @@ for a study concerning the relative strengths of the two models of blame.
 Fourth, given that Transient's sound but shallow run-time type checks do not
 seem to hamper debugging, a version of the Natural semantics of Typed Racket
 that disables some of its wrappers may offer an answer to the well-known
-performance issues of Natural~\citep{gtnffvf-jfp-2019}.
+performance issues of Natural~\citep{gtnffvf-jfp-2019}.  Fifth, the fact that both
+modes of the Transient rational programmer are equally successful suggests that
+returning the whole blame sequence may not be beneficial. If so, Reticulated
+Python could limit the size of blame sequences to attempt to mitigate its
+serious performance problems (see below).
 
 The validity of these conclusions is threatened in several ways: (i) the
 representativeness of benchmarks; (ii) the relation between mutations and real
@@ -115,21 +119,22 @@ during debugging sessions.
 
 Section~\ref{sub:mutate-interesting} defines criteria for interesting mutations,
 one of which limits the scenarios under consideration to those with mistakes
-detectable by Erasure. In other words, the experiment only considers the utility
-of blame when no checking at all is necessary to detect a problem. In reality,
-checking is necessary to detect some mistakes, and it is possible that blame has
-more or less to offer for these kinds of mistakes. If that is the case, then the
-results of the experiment on a population of scenarios including such mistakes
-should be quite different.
+that raise a run-time error under Erasure. In other words, the experiment is
+Erasure-biased: it only considers the usefulness of blame when the safety checks
+of the underlying language alone are sufficient to detect the mistake. In
+reality, some mistakes require run-time type checks to be
+detected~\cite{gfd-oopsla-2019}, and it is possible that blame has more or less
+to offer for these kinds of mistakes. If that is the case, then the results of
+the experiment on a population of scenarios including such mistakes should be
+different.
 
-The authors have collected preliminary data that suggests this difference may be
-large. In particular, the data comes from running the experiment with a
-population including any scenario detectable by Natural, regardless of the other
-semantics; the population therefore also includes scenarios where Transient or
-Erasure may not even detect the mistake.
-%% While that detection disparity reflects reality in that such mistakes can be made in practice, it also biases the population to favor Natural in those new scenarios where Transient and Erasure have no chance to succeed.
-Under this broader population of scenarios, the preliminary experimental results
-suggest that Natural blame may be much more useful than all of the other modes.
+In fact, the authors have conducted a variation of the experiment that provides
+some preliminary evidence that this difference may be significant. In
+particular, the variation of the experiment includes only three of the
+benchmarks but broadens the selection of scenarios to include any that raise
+run-time errors under Natural, regardless of other semantics. The preliminary
+results from this experiment suggest that without Erasure-bias, Natural blame
+may be much more useful than all of the other modes.
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Why Does Transient Lose Blame?} \label{sec:threat:transient}
