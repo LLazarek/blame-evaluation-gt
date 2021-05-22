@@ -13,3 +13,9 @@ clean:
 matthias:
 	pdflatex paper && \
 	open paper.pdf 
+
+.PHONY: mf
+mf: paper.pdf
+	mutool poster -y 2 paper.pdf draft.pdf
+	rmapi mkdir /Lukas
+	rmapi put draft.pdf /Lukas/
