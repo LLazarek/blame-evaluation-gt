@@ -61,14 +61,13 @@ helpful than those without. The results also indicate, though, that blame is not
 critical in a majority of cases, and therefore they suggest investigating
 whether blame tracking is worth the performance cost.  Third, the Natural
 approach fares better than the Transient approach, but only by a small margin.
-Since Natural offers complete and sound path-based blame (i.e. it blames all and only those components
-that are relevant to a type impedance mismatch) while Transient offers
+Since Natural offers complete and sound path-based blame  while Transient offers
 incomplete but sound heap-based blame~\citep{gfd-oopsla-2019}, the results call
 for a study concerning the relative strengths of the two models of blame.
 Fourth, given that Transient's sound but shallow run-time type checks do not
-seem to hamper debugging, a version of the Natural semantics of Typed Racket
-that disables some of its wrappers may offer an answer to the well-known
-performance issues of Natural~\citep{gtnffvf-jfp-2019}.  Fifth, the fact that both
+seem to hamper debugging, a language that supports {\em both\/} Natural and Transient 
+might help reduce the number of wrappers and thus address the well-known
+performance issues of sound gradual typing~\citep[chapter~6]{g-dissertation-2020}.  Fifth, the fact that both
 modes of the Transient rational programmer are equally successful suggests that
 returning the whole blame sequence may not be beneficial. If so, Reticulated
 Python could limit the size of blame sequences to attempt to mitigate its
@@ -84,13 +83,13 @@ ones.
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Is the Rational Programmer Realistic?}
 
-Like {\em homo economicus\/}, which decouples the actual behavior of a
+Like {\em homo economicus\/}, which idealizes the actual behavior of a
 participant in an economy for the sake of mathematical modeling, the model of a
-rational programmer decouples the actual debugging behavior of a software
-developer for the sake of a systematic, large-scale analysis. This decoupling
+rational programmer idealizes the actual debugging behavior of a software
+developer for the sake of a systematic, large-scale analysis. This idealization 
 comes with advantages and disadvantages. In the economic realm, mathematical
 models have provided some predictive insights into the market's behavior; but as
-behavioral economics has shown more recently (e.g.~\cite{henrich2001search}),
+behavioral economics has shown more recently~\cite{henrich2001search},
 the mathematical abstraction of a
 rational actor makes predictions also quite unreliable in some situations.
 \footnote{It has misled economists to focus on just mathematics, though
@@ -105,10 +104,10 @@ and relating the evaluation to the behavior of working programmers.
 
 Relatedly, the experimental setup hides how a rational programmer ascribes types
 to extend a trail. When the run-time checks signal an impedance mismatch in the
-real world, a real-world programmer does not have a typed module ready to swap
+real world, a programmer does not have a typed module ready to swap
 in. Instead, the programmer must come up with the next set of types, which means
 making choices. It is usually possible to consistently assign types to variables
-in a module in different ways. The maintenance of the benchmarks over many years
+in a module in several different ways. The maintenance of the benchmarks over many years
 has driven home this lesson but, fortunately, it has also shown that the types
 are in somewhat canonical.  The authors therefore conjecture that different
 real-world programmers would often come up with equivalent type assignments
@@ -123,26 +122,26 @@ that raise a run-time error under Erasure. In other words, the experiment is
 Erasure-biased: it only considers the usefulness of blame when the safety checks
 of the underlying language alone are sufficient to detect the mistake. In
 reality, some mistakes require run-time type checks to be
-detected~\cite{gfd-oopsla-2019}, and it is possible that blame has more or less
+detected~\cite{gfd-oopsla-2019}, and it is possible that blame has more 
 to offer for these kinds of mistakes. If that is the case, then the results of
 the experiment on a population of scenarios including such mistakes should be
 different.
 
-In fact, the authors have conducted a variation of the experiment that provides
-some preliminary evidence that this difference may be significant. In
-particular, the variation of the experiment includes only three of the
+In fact, a variation of the experiment provides
+some preliminary evidence that this difference may be significant. Thus far,
+the variation of the experiment covers only three of the
 benchmarks but broadens the selection of scenarios to include any that raise
-run-time errors under Natural, regardless of other semantics. The preliminary
-results from this experiment suggest that without Erasure-bias, Natural blame
+run-time errors under Natural, regardless of other semantics. The 
+results from this small experiment suggest that without Erasure-bias, Natural blame
 may be much more useful than all of the other modes.
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Why Does Transient Lose Blame?} \label{sec:threat:transient}
 
 The execution of the experiment reveals that Transient produces empty blame
-sequences for 967 scenarios. In theory, empty set must not occur. An empty blame
-sequence means a lack of boundary crossings for the witness value.  By
-implication, a typed module is blaming itself---something that can happen only
+sequences for 967 scenarios. An empty blame sequence means a lack of boundary
+crossings for the witness value. In theory, an empty sequence should not occur,
+because it means a typed module is blaming itself---something that can happen only
 if the type checker (or system) is unsound.
 
 An investigation of these empty blame cases reveals that Transient is not
@@ -173,17 +172,17 @@ limits into context, the fully typed and fully untyped benchmarks all normally c
 in a few seconds with minimal memory usage. Furthermore, none of the mixed
 Natural configurations hit these limits, and with the blame map turned off,
 the Transient semantics also runs these programs in a short amount of time and
-well within the memory limits. In short, even though the Transient rational
+well within the memory limit. In short, even though the Transient rational
 programmer appears to do well in the experiment, the implementation of the
 Transient blame strategy might be unrealistic. 
 
 At first glance, these measurements seem to contradict the results
 of~\citet{vss-popl-2017}. They report an average slowdown of 6.2x and a
 worst-case slowdown of 17.2x on the fully-typed Python benchmarks in Reticulated
-Python when the blame map gets enabled.  Unfortunately, the average slowdown of 
-133x and the
-worst-case slowdown of 560x  due to to blame  in Shallow Racket seems closer to the truth.  There are at
-least three broad issues that skew the earlier results:
+Python when the blame map gets enabled.  Unfortunately, the average slowdown of
+133x and the worst-case slowdown of 560x due to blame in Shallow Racket seems
+closer to the truth.  There are at least three broad factors that skew Vitousek
+et. al.'s results:
 \begin{enumerate}
 
 \item The 2017 implementation of Reticulated fails to insert certain soundness
@@ -195,7 +194,7 @@ updates\footnote{Missing cast:
 \item While Reticulated attempts to infer types for local variables, the impoverished nature of its type
     system does not allow the ascription of precise types and often resorts
     to type {\tt Dynamic}~\citep[section~5.4.4]{g-dissertation-2020}. 
-    Code with the type {\tt Dynamic}
+    Code with type {\tt Dynamic}
     has fewer constraints to check at run-time---and much less information
     to track in the blame map.
 

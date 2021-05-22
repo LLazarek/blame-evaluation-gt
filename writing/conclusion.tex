@@ -1,16 +1,16 @@
 %% -----------------------------------------------------------------------------
 
-The work of~\citet{tgpk-dls-2018} suggests that, by intuition, programmers
-prefer the run-time checking of Natural over other soundness methods. But of course,
+The interviews of~\citet{tgpk-dls-2018} suggests that programmers
+prefer the run-time checking of Natural over other soundness methods. But,
 the opinion of a random set of programmers does not mean that blame
 assignment adds value. Similarly, researchers and language designers have
 implicitly answered this question one way or another without evidence for the
 blame-strategy dimension. The experiment presented in this paper provides some
 justification for the programmers' leanings
-\ll{Does it really?}
+\ll{Does it really?} \mf{addressed}
 and helps language creators revisit
 their decisions. Of course, the design choice remains a trade-off
-along several dimensions while the presented experiment sheds light on
+along several dimensions, and  the presented experiment sheds light on
 only one of them. 
 
 The paper does {\em not\/} address a problem in the gradually typed world that
@@ -23,8 +23,8 @@ already-existing libraries. Instead of converting the libraries themselves,
 language implementors merely create facade modules that import untyped functions
 and export them with type annotations, like {\tt typed-pack-lib} in
 figure~\ref{fig:example}.  With those facades, the compiler can 
-type-check typed modules. But, these retroactive additions of types to a library
-may result from a misunderstanding of the code. \emph{Any retroactively ascribed
+type-check typed modules, but these retroactive additions of types to a library
+may result from a misunderstanding of the code. \emph{In short, any retroactively ascribed
 type may thus be a mistake itself.}
 
 The cited evidence suggests that this scenario is quite common and largely

@@ -3,18 +3,16 @@
 At a philosophical level, \citet{lksfd-popl-2020} present the first empirical
 analysis {\em without\/} involving humans in this general area.  While they do
 not spell out the notion of the rational programmer, they present many of the
-basic ingredients.
-
-At a technical level, the two pieces of work differ in many ways.  First the
-experiment presented here involves three different modes of gradual typing,
-theirs a single notion of contract checking.  Second, this paper also
-contributes the idea of creating three comparable rational programmers, with
-several modes. Hence it can answer whether blame adds value to a gradual type
-system and which gradual type system it benefits the most, while theirs
+basic ingredients. At a technical level, the two pieces of work differ in many
+ways.  First the experiment presented here involves three different modes of
+gradual typing, theirs a single notion of contract checking.  Second, this paper
+also contributes the idea of creating three comparable rational programmers,
+with several modes. Hence it can answer whether blame adds value to a gradual
+type system and which gradual type system it benefits the most, while theirs
 establishes only a systematic relation between blame for contracts and
 behavioral bugs. Finally, this paper also contributes type-level mutators. As
 explained in section~\ref{sec:mutate}, almost none of~\citet{lksfd-popl-2020}'s
-mutators is useful in the context of gradual typing. 
+mutators is useful in the context of gradual typing.
 
 The literature on gradual typing presents many semantics beyond the three used
 here and three additional blame strategies.  Pyret (pyret.org) assigns fixed-size
@@ -24,8 +22,7 @@ are similar to Transient but use wrappers instead of in-lined checks.
 Nom~\citep{mt-oopsla-2017} and other \emph{concrete\/}
 semantics~\citep{wnlov-popl-2010, rsfbv-popl-2015, rzv-ecoop-2015,
 rat-oopsla-2017} assume that every value comes with a type tag and use tag
-checks to supervise the interactions between typed and untyped code.  The semantics~\citep{tlt-popl-2019,
-etg-icfp-19, tt-scp-20, tgt-popl-18, tt-sas-17} derived with the Abstracting
+checks to supervise the interactions between typed and untyped code.  The semantics derived with the Abstracting
 Gradual Typing technique~\citep{gct-popl-2016} are variants of Natural.
 The Monotonic semantics~\citep{svctg-esop-2015, rsfbv-popl-2015, sfrbcsb-popl-2014, kas-pldi-2019} 
 differs from Natural in the treatment of mutable data. It 
