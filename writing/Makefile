@@ -19,3 +19,8 @@ mf: paper.pdf
 	mutool poster -y 2 paper.pdf draft.pdf
 	rmapi mkdir /Lukas
 	rmapi put draft.pdf /Lukas/
+
+.PHONY: mf-save
+mf-save:
+	rmapi get /Lukas/draft
+	mv draft.zip recovered-draft.zip 
