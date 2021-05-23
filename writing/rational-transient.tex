@@ -18,7 +18,7 @@ blame sequence as a boundary-aware stack.
 These two modes of rationalizing give rise to two different notions of trail.
 
 \begin{quote}
-\it A \emph{Transient-first blame trail}/\emph{Transient-last blame trail} is a sequence of scenarios
+\it A \emph{Transient-first blame trail}{\lrdef}\emph{Transient-last blame trail} is a sequence of scenarios
 $\conf_0,...\conf_n$ of $\system$ where for all $0 \leq i \leq n - 1$,
 $\conf_i \subset \conf_{i+1}$ and
 \[ \conf_{i+1} \setminus \conf_i = %
@@ -28,8 +28,8 @@ $\{\first{\mblame{\system, \conf_i}}\}$  & if $\conf_i$ produces blame \\ %
 $\{\exception{\system, \conf_i}\}$     & otherwise \\ %
 \end{tabular} \right. %
 \]
-where $\first{\mblame{\system, \conf}}$/$\last{\mblame{\system, \conf}}$ is the
-first/last module, respectively,  that Transient adds to the blame sequence for $\conf$.
+where $\first{\mblame{\system, \conf}}${\lrdef}$\last{\mblame{\system, \conf}}$ is the
+first{\lrdef}last module, respectively,  that Transient adds to the blame sequence for $\conf$.
 \end{quote}
 
 The definition of \emph{Transient exception trails} is analogous to that for
