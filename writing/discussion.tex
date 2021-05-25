@@ -73,15 +73,28 @@ returning the whole blame sequence may not be beneficial. If so, Reticulated
 Python could limit the size of blame sequences to attempt to mitigate its
 serious performance problems (see below).
 
-The validity of these conclusions is threatened in several ways: (i) the
+%% -----------------------------------------------------------------------------
+\subsection{What Are the Threats to Validity?}
+
+The validity of these conclusions is threatened in two fundamentally distinct
+ways. The first sets of threats have been mentioned before: (i) the
 representativeness of benchmarks; (ii) the relation between mutations and real
 programming mistakes; (iii) the definition of interesting debugging scenarios;
-and (iv) the sampling strategy. While these threats have been mitigated by the
-experimental setup, the remainder of this section discusses four additional
-ones.
+and (iv) the sampling strategy.  While the experimental setup attempts to
+mitigate against these threats, the reader must definitely take into account
+these limitations of the experiment and must understand that the collected data
+not support any further generalization.
+
+The second set of threats connects the experiment with reality or, more
+precisely, assess how close the connection is. To start with, it questions the
+realism of the rational programmer itself (sec.~\ref{sub:rational}), followed by
+the definition of ``interesting scenarios''
+(sec.~\ref{sec:threat:erasure-bias}).  The remaining questions address the
+accuracy and the cost of Transient blame, respectively (see
+secs.~\ref{sec:threat:transient} and~\ref{sec:threat:transient2}).
 
 %% -----------------------------------------------------------------------------
-\subsection{Threat: Is the Rational Programmer Realistic?}
+\subsection{Threat: Is the Rational Programmer Realistic?} \label{sub:rational}
 
 Like {\em homo economicus\/}, which idealizes the actual behavior of a
 participant in an economy for the sake of mathematical modeling, the model of a
