@@ -49,14 +49,20 @@ function of a typed module such as {\tt crypto-pack} in a proxy that checks its
 arguments.  These checks protect functions exported from typed modules against
 applications to wrong arguments in untyped code.
 
-As this analysis implies, if a return-type check fails, the problem is with
-the untyped module that supplied an incorrect function, here {\tt pack-lib}. If
-an argument-type check fails, responsibility lies with {\tt client}. Due to the
-proxies wrapped around functions, {\it Natural\/} can easily track the responsible party
-for each check. Thus, in the example of figure~\ref{fig:example}, as
+As this analysis implies, if a return-type check fails, the problem is
+that the untyped module supplied a function, here {\tt
+pack-lib}, that is not a  match for the type ascribed by the typed module. 
+Hence either the type at the boundary between the two modules is wrong or, 
+if the programmer trusts the type, the untyped module is at fault.
+If an argument-type check fails, responsibility  lies with
+{\tt client}. After all either the type it ascribes to the argument is
+wrong or the argument it produced clashes with the type. Due to 
+proxies, {\it Natural\/} can easily track the 
+boundary, type and responsible parties that correspond to each check. 
+Thus, in the example of figure~\ref{fig:example}, as
 \texttt{pack} returns, the return-type check fails and Natural blames
 the boundary between \texttt{pack-lib} with {\tt typed-pack-lib} and
-{\tt crypti-packed-lib}, respectively, for the two {\tt define}s in {\tt client}.
+{\tt crypto-pack-lib}, respectively, for the two {\tt define}s in {\tt client}.
 
 Under {\it Transient\/}, typed code is compiled so that all entry points to
 functions check their arguments at run time and all function calls check their
@@ -73,15 +79,16 @@ module, Transient's inlined checks make sure that the imported
 \texttt{pack} is a function and that its result is a list. This
 last check fails in \texttt{client}'s call to {\tt crypto-pack}.
 
-In order to locate the responsible party for failed checks, Transient
+In order to locate the corresponding boundaries for failed checks, Transient
 maintains a map from values to the boundaries between typed and untyped modules that
 they cross, plus the corresponding types. In the example, the map records that
 \texttt{pack} crosses from \texttt{pack-lib} to {\tt typed-pack-lib} and
 from {\tt pack-lib} to {\tt crypto-pack-lib} with the type that appears in the
 {\tt required/typed} forms in the example. Since the failed check corresponds to
-the return type of \texttt{pack}, Transient blames the sources of the two
-boundary crossings, which in this particular case is \texttt{pack-lib}. In
-general though, Transient blames more than one party. In fact, the theoretical
+the return type of \texttt{pack}, assuming that the type is correct, 
+the responsible parties are the sources of the two
+boundary crossings, \texttt{pack-lib}. In
+general though, Transient blames more than one boundary. In fact, the theoretical
 work of~\citet{gfd-oopsla-2019} shows that for some programs Transient
 constructs a blame sequence that excludes responsible parties and includes modules
 irrelevant to the failing check.
@@ -95,27 +102,28 @@ at some later point {\tt client} tries to inspect the elements of the lists
 that \texttt{typed-pack} and {\tt crypto-pack} are supposed to produce, Racket's
 safety checks signal a violation and point to some place in {\tt client}. The
 information in this exception, plus its stack trace, may help the programmer
-find the source of the impedance mismatch between the specified return types of
-{\tt pack} in the two typed modules and the actual return value of {\tt pack}.
+find the source of the impedance mismatch between the specified types of
+{\tt pack} in the two typed modules and its actual results.
 
 The following table summarizes the illustration. Each cell describes the result
 of evaluating the column's definition (in {\tt client}) under the row's
 semantics.
 %% -----------------------------------------------------------------------------
 \begin{center}
-  \begin{tabular}{l|l@{\qquad\quad}l}
+  \begin{tabular}{l|l@{\qquad}l}
                   & {\tt public-data}              & {\tt secret-data}                                 \\
 \hline %% ----------------------------------------------------------------------------------------
 {\it Natural\/}   & error, blaming the boundary between & error, blaming the boundary between          \\
                   & {\tt pack-lib} and {\tt typed-pack-lib} & {\tt pack-lib} and {\tt crypto-pack-lib} \\
-                  &                                &                                                   \\
-{\it Transient\/} & no error                       & error, blaming the boundary crossings             \\
-                  &                                & \quad {\tt pack-lib} to {\tt typed-pack-lib}, and \\
-                  &                                & \quad {\tt pack-lib} to {\tt crypto-pack-lib}     \\
-                  &                                &                                                   \\
-{\it Erasure\/}   & no error*                      & no error*                                         \\
+\hline
+{\it Transient\/} & no error                       & error, blaming the boundaries between            \\
+                  &                                & {\tt pack-lib}  and {\tt typed-pack-lib}, and \\
+                  &                                & {\tt  pack-lib} and {\tt crypto-pack-lib}     \\
+\hline
+ {\it Erasure\/}   & no error*                      & no error*                                         \\
                   &   \multicolumn{2}{|c}{*but {\em Erasure} does signal an error on list access}
 \end{tabular}
 \end{center}
 %% -----------------------------------------------------------------------------
+
 

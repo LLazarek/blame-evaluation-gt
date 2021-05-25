@@ -12,6 +12,7 @@ module for its typed counterpart.
 
 \mf{Technically a Natural blame trail could be a Natural exception trail. Hmph? }
 \mf{I added a sentence below this definition and the next to address this issue.}
+\cd{I revised a bit.}
 
 Here is a rigorous definition. 
 \begin{quote}
@@ -28,8 +29,9 @@ $\{\exception{\system, \conf_i}\}$  & otherwise \\ %
 where $\blame{\system, \conf}$ denotes the module (of $\system$) that $\conf$ blames,
 and $\exception{\system, \conf}$ denotes the first untyped location in the stacktrace produced by $\conf$.
 \end{quote}
-Note how this definition interprets ``blame information'' broadly, as
-any information from a failed run-time check in a blame-oriented semantics.  
+Note how, in the absence of ``blame information'' in the narrow sense, 
+this definition interprets ``blame information'' broadly, as
+any information from a failing run-time check.  
 
 This definition rests on the two options for $\conf_{i+1} \setminus \conf_i$.
 The first part reflects the rational programmer's use of blame to extend the
