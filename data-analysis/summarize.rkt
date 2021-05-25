@@ -48,7 +48,8 @@
                                         [{_ _} #f])
                         all-bts))
   (define stat:blame-but-none-in-program
-    (trails-ending-with (match-lambda** [{(struct* run-status ([blamed blamed]
+    (trails-ending-with (match-lambda** [{(struct* run-status ([blamed (and (not (or #f '()))
+                                                                            blamed)]
                                                                [outcome 'blamed]))
                                           config}
                                          (set-empty? (set-intersect blamed (hash-keys config)))]
