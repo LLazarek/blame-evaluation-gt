@@ -55,7 +55,7 @@ pack-lib}, that is not a  match for the type ascribed by the typed module.
 Hence either the type at the boundary between the two modules is wrong or, 
 if the programmer trusts the type, the untyped module is at fault.
 If an argument-type check fails, responsibility  lies with
-{\tt client}. After all either the type it ascribes to the argument is
+{\tt client}. After all, either the type it ascribes to the argument is
 wrong or the argument it produced clashes with the type. Due to 
 proxies, {\it Natural\/} can easily track the 
 boundary, type and responsible parties that correspond to each check. 
@@ -117,7 +117,7 @@ semantics.
                   & {\tt pack-lib} and {\tt typed-pack-lib} & {\tt pack-lib} and {\tt crypto-pack-lib} \\
 \hline
 {\it Transient\/} & no error                       & error, blaming the boundaries between            \\
-                  &                                & {\tt pack-lib}  and {\tt typed-pack-lib}, and \\
+                  &                                & {\tt pack-lib}  and {\tt typed-pack-lib}/ \\
                   &                                & {\tt  pack-lib} and {\tt crypto-pack-lib}     \\
 \hline
  {\it Erasure\/}   & no error*                      & no error*                                         \\

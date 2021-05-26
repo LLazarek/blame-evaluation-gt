@@ -10,9 +10,9 @@ module for its typed counterpart.
 
 % Formally, %% <-- MF: this is called a ``dangling def.'' and is considered bad style
 
-\mf{Technically a Natural blame trail could be a Natural exception trail. Hmph? }
-\mf{I added a sentence below this definition and the next to address this issue.}
-\cd{I revised a bit.}
+%\mf{Technically a Natural blame trail could be a Natural exception trail. Hmph? }
+%\mf{I added a sentence below this definition and the next to address this issue.}
+%\cd{I revised a bit.}
 
 Here is a rigorous definition. 
 \begin{quote}
@@ -30,10 +30,9 @@ where $\blame{\system, \conf}$ denotes the module (of $\system$) that $\conf$ bl
 and $\exception{\system, \conf}$ denotes the first untyped location in the stacktrace produced by $\conf$.
 \end{quote}
 Note how, in the absence of ``blame information'' in the narrow sense, 
-this definition interprets ``blame information'' broadly, as
+this definition interprets ``blame information'' broadly, as in
 any information from a failing run-time check.  
-
-This definition rests on the two options for $\conf_{i+1} \setminus \conf_i$.
+In particular, the definition rests on the two options for $\conf_{i+1} \setminus \conf_i$.
 The first part reflects the rational programmer's use of blame to extend the
 trail. However, blame may not be available in some scenarios. The second part
 accounts for those scenarios that produce errors from the runtime system before
@@ -69,7 +68,7 @@ programmer follows a migration process based entirely on exceptions.
 program $\system$ such that for all $0 \leq i \leq n - 1$, $\conf_i \subset
 \conf_{i+1}$ and $\conf_{i+1} \setminus \conf_i = \{\exception{\system, \conf_i}\}$.
 \end{quote}
-Using Natural exception trails it becomes possible to factor out
+Using Natural exception trails, it becomes possible to factor out
 ``blame information'' in the narrow sense from the broad one of the
 above definition. 
 
