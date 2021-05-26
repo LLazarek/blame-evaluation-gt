@@ -76,21 +76,19 @@ serious performance problems (see below).
 %% -----------------------------------------------------------------------------
 \subsection{What Are the Threats to Validity?}
 
-The validity of these conclusions is threatened in two distinct
-ways. The first set of threats concerns easy-to-tune parameters of the
-experiment and have been mentioned before: (i) the
-representativeness of benchmarks; (ii) the relation between the mutations and real
-programming mistakes; and (iii) the sampling strategy.  While the experimental setup attempts to
-mitigate against these threats, the reader must definitely take into account
-these limitations of the experiment when generalizing its conclusions.
+The validity of these conclusions is threatened in two distinct ways. The first
+set of threats concerns aspects of the experimental setup discussed in preceding
+sections: (i) the representativity of benchmarks; (ii) the relation between the
+mutations and real programming mistakes; and (iii) the sampling strategy.
+Although the experimental setup attempts to mitigate against these threats, the
+reader must definitely keep these limitations in mind when drawing conclusions.
 
-The second set of threats connects the fundamental ideas and infrastructure of the experiment with reality or, more
-precisely, assess how close the connection is. To start with, it questions the
-realism of the rational programmer itself (sec.~\ref{sub:rational}), followed by
-the definition of ``interesting scenarios''
-(sec.~\ref{sec:threat:erasure-bias}).  The remaining questions address the
-accuracy and the cost of Transient blame, respectively (see
-secs.~\ref{sec:threat:transient} and~\ref{sec:threat:transient2}).
+The second set of threats questions four rather different aspects. To start
+with, the realism of the rational programmer itself is questionable
+(sec.~\ref{sub:rational}) as is the definition of ``interesting scenarios''
+(sec.~\ref{sec:threat:erasure-bias}).  The remaining threats are about the
+accuracy and cost of Transient blame, respectively
+(secs.~\ref{sec:threat:transient} and~\ref{sec:threat:transient2}).
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Is the Rational Programmer Realistic?} \label{sub:rational}
