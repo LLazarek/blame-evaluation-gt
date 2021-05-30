@@ -52,17 +52,6 @@ limit. Running the experiment on all debugging scenarios took over
 
 % \footnote{The random mode behaves the same for all three semantics, so this analysis considers it a single mode.}
 
-Figure~\ref{fig:success-bars} summarizes the overall success rates of
-every mode.
-The success rates illustrate a few points that underlie the
-rest of the analysis.  The first notable piece of information from this
-figure is that every mode has failed debugging scenarios, not just
-Erasure. This should not come as a surprise to the astute reader.  Running
-a rational programmer mode on a scenario may result in an exception
-that carries no useful information about which module to equip with types next. For instance the stack trace of the exception may not
-contain frames from any untyped module of the program. This can happen at any point
-along a blame trail, causing it to fail.
-
 \begin{wrapfigure}{r}{.40\textwidth} \footnotesize 
   \vspace{-1.5em}
   \includegraphics[width=0.38\textwidth]{./plots/success-bars}
@@ -76,6 +65,17 @@ along a blame trail, causing it to fail.
 \end{wrapfigure}
 
 
+
+Figure~\ref{fig:success-bars} summarizes the overall success rates of
+every mode.
+The success rates illustrate a few points that underlie the
+rest of the analysis.  The first notable piece of information from this
+figure is that every mode has failed debugging scenarios, not just
+Erasure. This should not come as a surprise to the astute reader.  Running
+a rational programmer mode on a scenario may result in an exception
+that carries no useful information about which module to equip with types next. For instance the stack trace of the exception may not
+contain frames from any untyped module of the program. This can happen at any point
+along a blame trail, causing it to fail.
 
 While most blame trail failures follow the above pattern, a few do
 not.  Breaking down the failure reasons for Natural blame (1748 in
