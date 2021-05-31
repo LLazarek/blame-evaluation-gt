@@ -155,7 +155,7 @@ because it means a typed module is blaming itself---something that can happen on
 if the type checker (or system) is unsound.
 
 An investigation of these empty blame cases reveals problems with tracking blame
-for higher-order functions, but conversely suggests three improvements for the
+for higher-order functions and conversely suggests three improvements for the
 Transient algorithm. To illustrate, consider the call \texttt{(filter f xs)}.
 The first suggestion is that the blame map should know that inputs to
 \texttt{f} may have come from the \texttt{xs} list; concretely, the blame-map
@@ -167,7 +167,6 @@ that rename \texttt{filter} or that replace the identifier with
 an expression. This third point suggests a need for type-like specifications
 that guide the construction of the blame map, instead of the identifier-based
 matching in Reticulated~\cite{vss-popl-2017} and Shallow Racket.
-
 
 %% -----------------------------------------------------------------------------
 \subsection{Threat: Is the Transient Blame Assignment Mechanism Realistic?}
