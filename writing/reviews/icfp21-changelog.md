@@ -125,6 +125,7 @@ and B:
 > - It is not fully explained how the given mutators change programs.
 *Add an example and explanation of the kinds of programs occurrence-typing mutators target (6.2, page 15).*
 
+
 Review B:
 > - In principle, Natural blame should always point out the faulty components
 >   by the Wadler-Findler slogan.  However, the experiment shows it is not the
@@ -145,7 +146,7 @@ Review B:
 Review B:
 > - The paper often says that a blame system is (un)sound, but it is difficult for
 >   me to identify what it precisely means.
-*Ensured that sound and complete blame is adequately referenced throughout.*
+*Ensure that sound and complete blame is adequately referenced throughout.*
 
 
 Review B:
@@ -168,6 +169,58 @@ Review B:
 Review B:
 > - L370 "the latter must represent":  What does the "latter" specify?
 *Rephrased on page 8.*
+
+
+Review B:
+> - It is not fully explained how the given mutators change programs.  For
+>   example, I cannot completely predict changes by the mutators deletion and
+>   class:super.
+*The added extra example and explanation of occurrence typing mutators, along with the examples in the mutator table (pages 14-15) should address this.*
+
+
+Review B:
+> - The paragraph starting at line 1122 is quite difficult to understand for me.
+>   [...]
+>   - What does the paper mean by "incomplete population of the blame map"?
+>   - To understand the idea on the improvements of Transit, more explanations
+>     on the usage of blame maps in Transient would be needed.
+*Revise section 9.5 (page 25).*
+
+
+Review B:
+>   - What "sophisticated typing features" are considered (line 589)?  It would be
+>     crucial to confirm whether the proposed mutators are enough.
+*Done on page 13.*
+
+
+Review B:
+> - Perhaps it is valuable for followers to share the experience on developing
+>   mutators that are not interesting, .e.g., in the supplementary material.
+and
+> - L785 "the interesting standard guided countless iterations":  I fail to find
+>   what this intends.
+*Expand prose at end of section 6.3 (page 16) to clarify how we used the criteria of interestingness to develop mutators.*
+
+
+Review B:
+> - L431 "type-level mistake":  Is it the same as a impedance mismatch?
+*Revised the terminology in section 2 (pages 2-4) around impedance mismatches and boundaries to clarify this.*
+
+
+Review B:
+> - L556: It would be helpful to describe how to extend trails and how to
+>   determine if there is no scenario to be added.  (This comment is also related
+>   to the issue with Natural blame).
+*The new example at the beginning of discussion section (9, pages 22-23) should address this.*
+
+
+Review B:
+> I am wondering whether the approach that the paper calls Transient First could
+> be regarded as Transient Early, since it points to an earlier part of the
+> code. Similarly Transient Last could be Transient Late, but you would have to
+> see whether this terminology really fits.
+*After a lengthy discussion and extremely careful consideration, we decided against these names because we like the stronger "first" and "last" contrast.*
+
 
 
 Other improvements
