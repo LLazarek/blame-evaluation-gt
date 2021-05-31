@@ -154,21 +154,19 @@ crossings for the witness value. In theory, an empty sequence should not occur,
 because it means a typed module is blaming itself---something that can happen only
 if the type checker (or system) is unsound.
 
-An investigation of these empty blame cases reveals that Transient is not
-unsound but that Vitousek et al.'s Transient blame assignment loses track
-of the proper boundaries due to an incomplete initialization of the blame map.
-Despite these losses, the number of failures is a small fraction of the
-overall number of debugging scenarios. It is unlikely that any
-improvements to Vitousek et al.'s strategy would change the overall
-conclusion about Transient blame.
-
-{\bf Note} The scenarios where Transient returns no blame suggest two ways to
-improve its blame map.  First, entries in a blame map should point to {\em
-several\/} parent entries.  For example, if \texttt{f} receives bad input in the
-context of {\tt (filter f xs)}, the entry should point to both \texttt{filter}
-and \texttt{xs}. Second, the construction of entries must be guided by type-like
-specifications for primitives instead of special cases for built-in
-functions. Aliasing such function changes the blame map.  
+An investigation of these empty blame cases reveals problems with tracking blame
+for higher-order functions, but conversely suggests three improvements for the
+Transient algorithm. To illustrate, consider the call \texttt{(filter f xs)}.
+The first suggestion is that the blame map should know that inputs to
+\texttt{f} may have come from the \texttt{xs} list; concretely, the blame-map
+entry for \texttt{f} should point to \texttt{xs} as a parent.
+Second, there should be two parents for \texttt{f} instead of one, because
+both \texttt{xs} and \texttt{filter} are responsible for sending correct input
+to \texttt{f}. Third, the blame map should work equally well in programs
+that rename \texttt{filter} or that replace the identifier with
+an expression. This third point suggests a need for type-like specifications
+that guide the construction of the blame map, instead of the identifier-based
+matching in Reticulated~\cite{vss-popl-2017} and Shallow Racket.
 
 
 %% -----------------------------------------------------------------------------
