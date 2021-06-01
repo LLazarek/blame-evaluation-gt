@@ -3,14 +3,21 @@ Change log
 
 Log format
 ----------
-Review #:
-> comment
-*Changes to address.*
+Review #: or in reference to Review #:
+> comment ...+
+*Changes in response to comment.*
 
 
-Stressed changes
-----------------
-Review C:
+Stressed revisions
+------------------
+
+Review Summary
+> In Section 7 or 8: incorporate examples that illustrate the difference
+> in trails between the three mechanisms. As it is, the reader does not
+> learn much about these blame methods, as numbers do not teach the whole
+> story.
+
+in reference to Review C:
 > Sections 8 and 9 report on the finding of the paper. These include statements
 > that blame is useful, that Natural often produces shorter trails than
 > Transient, and others. My only issue at this point is that the reader is left
@@ -22,7 +29,29 @@ Review C:
 *Add new prose + figure at beginning of discussion section (9, pages 22-23) walking through an example trail for every mode.*
 
 
-Review D:
+Review Summary
+> Revise the way you address the experiments of Vitousek et al. [38]
+> according to the feedback that you have received.
+
+
+in reference to Review D:
+> First, the performance figures cited from [38] (worst case 5.4x
+> slowdown) are used incorrectly: those numbers are about transient
+> /without/ blame (see Section 6.2 of [38]), and given that "with the
+> ...
+> clear if the point is that performance of this benchmark in blame-free
+> Reticulated is seriously slow compared to regular Python, or if the
+> program itself is just slow in Python (in which case, what's the
+> relevance to this paper?).
+*Fix descriptions of Reticulated type inference and performance in the discussion section (9.6, pages 25-26).*
+Specifically, we 
+1. Fix the mistaken slowdown multipliers (bottom of page 25),
+2. add an explicit acknowledgment that Reticulated Python supports type
+   inference for local variables (top of page 26), and
+3. revise all of the bullets summarizing the factors that may explain the observed slowdown (top of page 26).
+
+
+in reference Review D:
 > The characterization of the Monotonic semantics for references [22] as a
 > variant of natural isn't correct--its exception-raising and blame
 > behavior for references (though not for functions) is quite different
@@ -32,11 +61,6 @@ Review D:
 *Fix discussion of Monotonic in related work section (10, page 26).*
 
 
-Review D's other concerns:
-*Fix descriptions of Reticulated type inference and performance in the discussion section (9.6, pages 25-26).*
-Specifically, we 
-1. Fixed the mistaken slowdown multipliers (bottom of page 25), and
-2. revised all of the bullets summarizing the factors that may explain the observed slowdown (top of page 26).
 
 
 Other revisions based on reviews
@@ -101,7 +125,7 @@ Review B:
 
 
 All reviews mentioning typos.
-*Typo fixes, including in particular the 756/752 typo.*
+*Fix typos, including in particular the 756/752 typo.*
 
 
 Review B:
@@ -158,24 +182,24 @@ Review B:
 Review B:
 >   - The benchmarks are selected (line 647), but why?  The GPT benchmark suite of
 >     Racket provides more examples.
-*Added a paragraph to section 6.1 (page 14) clarifying how the benchmarks from GTP were filtered.*
+*Add a paragraph to section 6.1 (page 14) clarifying how the benchmarks from GTP were filtered.*
 
 
 Review B:
 > - L356 "despite advertisements for the opposite":  I cannot find what this means.
-*Clarified on page 8.*
+*Clarify on page 8.*
 
 
 Review B:
 > - L370 "the latter must represent":  What does the "latter" specify?
-*Rephrased on page 8.*
+*Rephrase on page 8.*
 
 
 Review B:
 > - It is not fully explained how the given mutators change programs.  For
 >   example, I cannot completely predict changes by the mutators deletion and
 >   class:super.
-*The added extra example and explanation of occurrence typing mutators, along with the examples in the mutator table (pages 14-15) should address this.*
+*Add extra example and explanation of occurrence typing mutators, which along with the examples in the mutator table (pages 14-15) should address this.*
 
 
 Review B:
@@ -204,14 +228,14 @@ and
 
 Review B:
 > - L431 "type-level mistake":  Is it the same as a impedance mismatch?
-*Revised the terminology in section 2 (pages 2-4) around impedance mismatches and boundaries to clarify this.*
+*Revise the terminology in section 2 (pages 2-4) around impedance mismatches and boundaries to clarify this.*
 
 
 Review B:
 > - L556: It would be helpful to describe how to extend trails and how to
 >   determine if there is no scenario to be added.  (This comment is also related
 >   to the issue with Natural blame).
-*The new example at the beginning of discussion section (9, pages 22-23) should address this.*
+*Add new example at the beginning of discussion section (9, pages 22-23) which should address this.*
 
 
 Review B:
@@ -235,7 +259,7 @@ Fixing this issue does not change our analysis or conclusions.
 *Add a new threat subsection (9.2, page 24) to make generalization caveats very clear.*
 
 
-*Clarified notions of boundary and blame, and how they differ between Natural and Transient, in section 2.*
+*Clarify notions of boundary and blame, and how they differ between Natural and Transient, in section 2.*
 
 
 *Add a new threat subsection (9.4, page 25) to clarify the threat of erasure bias.*
