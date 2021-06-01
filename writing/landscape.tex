@@ -50,15 +50,15 @@ arguments.  These checks protect functions exported from typed modules against
 applications to wrong arguments in untyped code.
 
 As this analysis implies, if a return-type check fails, the problem is
-that the untyped module supplied a function, here {\tt
-pack-lib}, that is not a  match for the type ascribed by the typed module. 
+that the untyped module, here {\tt pack-lib}, supplied a function that is not a
+match for the type ascribed by the typed module.
 Hence either the type at the boundary between the two modules is wrong or, 
 if the programmer trusts the type, the untyped module is at fault.
 If an argument-type check fails, responsibility  lies with
 {\tt client}. After all, either the type it ascribes to the argument is
 wrong or the argument it produced clashes with the type. Due to 
 proxies, {\it Natural\/} can easily track the 
-boundary, type and responsible parties that correspond to each check. 
+boundary, type, and responsible parties that correspond to each check. 
 Thus, in the example of figure~\ref{fig:example}, as
 \texttt{pack} returns, the return-type check fails and Natural blames
 the boundary between \texttt{pack-lib} with {\tt typed-pack-lib} and
@@ -85,9 +85,9 @@ they cross, plus the corresponding types. In the example, the map records that
 \texttt{pack} crosses from \texttt{pack-lib} to {\tt typed-pack-lib} and
 from {\tt pack-lib} to {\tt crypto-pack-lib} with the type that appears in the
 {\tt required/typed} forms in the example. Since the failed check corresponds to
-the return type of \texttt{pack}, assuming that the type is correct, 
-the responsible parties are the sources of the two
-boundary crossings, \texttt{pack-lib}. In
+the return type of \texttt{pack}, assuming that the type is correct,
+the responsible party is the source of the two
+boundary crossings: \texttt{pack-lib}. In
 general though, Transient blames more than one boundary. In fact, the theoretical
 work of~\citet{gfd-oopsla-2019} shows that for some programs Transient
 constructs a blame sequence that excludes responsible parties and includes modules

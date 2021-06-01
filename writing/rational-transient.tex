@@ -2,11 +2,11 @@
 
 The Transient semantics assigns blame to a sequence of modules. The blame
 assignment says that the value witnessing the impedance mismatch may have
-crossed the boundaries between elements in the sequence, and each crossing
+crossed the boundaries between elements in the sequence, and that each crossing
 checked the value's type in a shallow manner.
 
 This ambiguity in Transient blame raises the question of how the rational
-programmer should react when the language produces a blame set. Our answer
+programmer should react when the language produces a blame sequence. Our answer
 is that the rational programmer has at least two reasonable options. The first
 one is to select the untyped module that is added to the blame sequence first and
 assign types to only that one---after all, if fully checked, the types of this

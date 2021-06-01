@@ -20,7 +20,7 @@ the initial debugging scenario. If the program for some scenario  $\conf_i$ type
 the rational programmer runs the program until it raises a run-time error.  The
 rational programmer then uses the information in the error to decide which module to
 equip with types. This choice constructs scenario $\conf_{i+1}$ from $\conf_{i}$
-and thus creates a trail. The trail's construction ends when it reaches a
+and thus lengthens the trail. A trail's construction ends successfully when it reaches a
 scenario that contains the mutated module because the type checker rejects its
 typed version outright.  At this point, the source of the impedance mismatch is
 identified.

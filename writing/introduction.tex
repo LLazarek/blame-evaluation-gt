@@ -7,8 +7,8 @@ blamed'' turned the theorem into a slogan~\citep{wf-esop-2009}. Academic
 systems (Reticulated Python~\citep{vsc-dls-2019, vss-popl-2017,
 vksb-dls-2014} and Typed
 Racket~\citep{tf-dls-2006,tf-popl-2008,tfffgksst-snapl-2017,tf-icfp-2010})
-come with sophisticated checking and blame assignment strategies (see
-sec.~\ref{sec:landscape}). Their academic creators embrace the idea that
+come with sophisticated checking and blame assignment strategies
+(sec.~\ref{sec:landscape}). Their academic creators embrace the idea that
 blame can help practicing programmers find impedance mismatches, that is,
 disagreements between the type ascriptions of a software component and its
 behavior.
@@ -37,8 +37,8 @@ community has thus far failed to offer a method for evaluating blame assignment.
 This paper's {\em first contribution\/} is {\em a method for evaluating the
 effectiveness of blame assignment strategies\/} in the gradual typing world.
 The top-level innovation is the idea of a {\em rational programmer\/}, that is,
-a programmer that acts only in response to available information (see
-sec.~\ref{sec:why-rational}). In the case of an impedance mismatch, the
+a programmer that acts only in response to available information
+(sec.~\ref{sec:why-rational}). In the case of an impedance mismatch, the
 available information consists of the error message and the current state of the
 program. The rational programmer can hence use the former to change the
 latter---and this systematic, information-driven process can be implemented and
@@ -51,14 +51,14 @@ sec.~\ref{sec:challenges} and, for details, secs.~\ref{sec:rational} through~\re
 The paper's {\it second contribution\/} is a set of {\em results from
 applying the evaluation method to three distinct checking regimes for
 gradual types and their blame assignment
-strategies in approximately 72,000 different scenarios\/} (see
-sec.~\ref{sec:results}): (1)~{\it Transient\/}, i.e. Reticulated's
+strategies in approximately 72,000 different scenarios\/}
+(sec.~\ref{sec:results}): (1)~{\it Transient\/}, i.e. Reticulated's
 inlined type assertions and collaborative tracking of typed/untyped boundaries~\citep{vss-popl-2017}; (2)~{\it
 Natural\/}, i.e. Typed Racket's use of a higher-order contract system and
 its blame assignment~\citep{ff-icfp-2002}; and (3) {\it Erasure\/}, i.e.
 the approach of industrial systems, which forgo type checks and blame in favor of error
 messages from the safety checks of the underlying language. The results
-(see sec.~\ref{sec:discussion}) are at least somewhat surprising.  In
+(sec.~\ref{sec:discussion}) are at least somewhat surprising.  In
 principle they validate the conjectures behind the work of theoreticians.
 Run-time type checks and blame work together to help with the search for
 impedance mismatches between the specified types and the behavior of

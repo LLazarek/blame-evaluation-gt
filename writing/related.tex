@@ -1,3 +1,4 @@
+\newcommand{\pyret}{\href{https://www.pyret.org}{pyret.org}}
 %% -----------------------------------------------------------------------------
 
 At a philosophical level, \citet{lksfd-popl-2020} present the first empirical
@@ -12,10 +13,10 @@ type system and which gradual type system it benefits the most, while theirs
 establishes only a systematic relation between blame for contracts and
 behavioral bugs. Finally, this paper also contributes type-level mutators. As
 explained in section~\ref{sec:mutate}, almost none of~\citet{lksfd-popl-2020}'s
-mutators is useful in the context of gradual typing.
+mutators are useful in the context of gradual typing.
 
 The literature on gradual typing presents many semantics beyond the three used
-here and three additional blame strategies.  Pyret (pyret.org) assigns fixed-size
+here, and three additional blame strategies.  Pyret (\pyret{}) assigns fixed-size
 data types the Natural semantics and functions a Transient semantics. The
 Forgetful~\citep{cl-icfp-2017} and the Amnesic~\citep{gfd-oopsla-2019} semantics
 are similar to Transient but use wrappers instead of in-lined checks.
@@ -26,8 +27,8 @@ checks to supervise the interactions between typed and untyped code.  The semant
 Gradual Typing technique~\citep{gct-popl-2016} are variants of Natural.
 The Monotonic semantics~\citep{svctg-esop-2015, rsfbv-popl-2015, sfrbcsb-popl-2014, kas-pldi-2019} 
 differs from Natural in the treatment of mutable data. It 
-associates every heap location with a type and permits only updates that 
-do not make the type less precise.  
+associates every heap location with a type and rejects updates that lower the
+precision of types.
 Among these semantics, only Amnesic, Nom, and Monotonic present interesting blame
 strategies.  The experiment excludes the first because it is 
 merely a theoretical construction, the second because it imposes severe restrictions on
