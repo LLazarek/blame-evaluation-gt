@@ -30,7 +30,7 @@
 (define rename-benchmark values)
 
 ;; (bt-lengths-table bt-length-comparisons avo-bars blame-vs-exns-bars blame-vs-exns-venn success-bars)
-(define to-generate '(bt-length-comparisons))
+(define to-generate '(success-bars))
 (plot-font-size 14)
 (define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
@@ -41,7 +41,7 @@
 ;; are *not* pulling data from a cache on disk ...
 (define collect-max-error-margin? (make-parameter #t))
 ;; ... i.e. this is not #t
-(define use-disk-data-cache? (make-parameter #f))
+(define use-disk-data-cache? (make-parameter #t))
 
 
 (define max-error-margin (box 0))
@@ -67,7 +67,7 @@
          "bt-ids.rkt")
 
 (define-runtime-paths
-  [data-dirs "../../experiment-data/results/code-mutations"]
+  [data-dirs "../../experiment-data/results/code-mutations-erasure-biased-2"]
   [mutant-summaries-db-path "../dbs/code-mutations/type-err-summaries.rktdb"]
   [TR-config "../configurables/configs/TR.rkt"]
   [outdir "./figures"]
@@ -306,11 +306,11 @@
     ;; to show up in the final plot, in every group (see below)
     (parameterize ([plot-y-transform (axis-transform-compose
                                       (axis-transform-compose
-                                       (collapse-transform (~% 0.15) (~% 0.75))
+                                       (collapse-transform (~% 0.15) (~% 0.6))
                                        (stretch-transform (~% 0) (~% 0.15) 2))
-                                      (stretch-transform (~% 0.75) (~% 1) 1/2))]
+                                      (stretch-transform (~% 0.6) (~% 1) 1/4))]
                    [plot-y-ticks (ticks-add (plot-y-ticks)
-                                            (map ~% '(0.025 0.05 0.075 0.1 0.125 0.15 0.75 0.8 0.85 0.9)))])
+                                            (map ~% '(0.025 0.05 0.075 0.1 0.125 0.15 0.7 0.8 0.9)))])
       (plot-pict (list
                   (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
                              [color (in-list (list success-color
@@ -393,6 +393,7 @@
                       #:row-spacing 50))
 
 (define (generate-figure:avo-bars modes/ordered bottom-modes)
+  (define y-max/min-% 0.14)
   (define direct-avo-%
     (simple-memoize
      #:on-disk (and (use-disk-data-cache?)
@@ -429,8 +430,8 @@
                  #:title (rename-mode top-mode)
                  #:y-label @~a{% of scenarios} ; where @top-mode is more useful than mode X (above) | vice versa (below)
                  #:x-label #f
-                 #:y-min (~% -0.4)
-                 #:y-max (~% 0.4)
+                 #:y-min (~% (- y-max/min-%))
+                 #:y-max (~% y-max/min-%)
                  #:height (* 2 (plot-height))
                  #:width (* 1.3 (plot-width)))))
 
@@ -460,7 +461,8 @@
        (hash-ref estimate 'proportion-estimate))))
 
   (parameterize ([plot-x-tick-label-angle 40]
-                 [plot-x-tick-label-anchor 'top-right])
+                 [plot-x-tick-label-anchor 'top-right]
+                 [plot-y-ticks (linear-ticks #:number 10)])
     (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes/ordered)])
                                      (list (rename-mode mode-name) (~% (mode-success-% mode-name))))
                                    #:color success-color)
@@ -527,7 +529,8 @@
                                 "transient-oldest"
                                 "transient-stack-first"
                                 "erasure-stack-first"
-                                "null"))
+                                #;"null" ; decided to remove it from this plot
+                                ))
         (generate-figure:success-bars modes/ordered)))
     (pict->figure-png! success-bars "success-bars")
     (when (collect-max-error-margin?)
