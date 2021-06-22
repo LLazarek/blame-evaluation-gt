@@ -1,13 +1,24 @@
 %% -----------------------------------------------------------------------------
 
+\begin{wrapfigure}{r}{.40\textwidth} \footnotesize
+  \vspace{-1.5em}
+  \includegraphics[width=0.38\textwidth]{./plots/success-bars}
+  \vspace{1em}
+  \begin{minipage}{0.35\textwidth} \raggedright
+%   The estimated percentage of scenarios for which each mode succeeds in locating the bug.
+   The upper bound margin of error is 0.02\%.
+  \end{minipage}
+\vspace{-2em}
+  \caption{Percentage rates of success} \label{fig:success-bars}
+\end{wrapfigure}
+
 
 The test bed for executing the experimental process utilizes a machine with two
 Intel Xeon Gold 6258R processors (28 doubly-threaded cores each) and 500GB of
 memory.  Each debugging scenario had a 4 minute timeout and a 6GB memory
 limit. Running the experiment on all debugging scenarios took over
-30,000 compute hours or roughly three-and-a-half compute years. 
+30,000 compute hours or roughly three-and-a-half compute years.
 
-\
 \begin{figure} \footnotesize 
   \centering
   \includegraphics[width=\textwidth]{./plots/avo-bars}
@@ -51,19 +62,6 @@ limit. Running the experiment on all debugging scenarios took over
 
 
 % \footnote{The random mode behaves the same for all three semantics, so this analysis considers it a single mode.}
-
-\begin{wrapfigure}{r}{.40\textwidth} \footnotesize 
-  \vspace{-1.5em}
-  \includegraphics[width=0.38\textwidth]{./plots/success-bars}
-  \vspace{1em}
-  \begin{minipage}{0.35\textwidth} \raggedright
-%   The estimated percentage of scenarios for which each mode succeeds in locating the bug.
-   The upper bound margin of error is 0.02\%.
-  \end{minipage}
-\vspace{-2em}
-  \caption{Percentage rates of success} \label{fig:success-bars}
-\end{wrapfigure}
-
 
 
 Figure~\ref{fig:success-bars} summarizes the overall success rates of
