@@ -190,16 +190,6 @@ expected. In contrast, in the other modes, successful effort coalesces at
 the left side of the plot, meaning that in most cases the programmer needs
 to type a single module to debug a scenario. 
 
-Second, the exceptions of the Erasure semantics either help the rational
-programmer immediately or the rational programmer fails to debug a scenario
-altogether (in red).  This is expected; adding type annotations to an Erasure
-program does not change its behavior, so if the type checker does not reject the
-program with the new annotations, the rational programmer is stuck.  In other
-words, an exception from the run-time system has to point to the buggy module with the
-first try. Otherwise the rational programmer types an irrelevant module, runs
-the program again, and the same exception points again to the already typed
-module.
-
 Figure~\ref{fig:effort-comparisons} provides head-to-head comparisons of effort.
 The comparison between two modes boils down to the difference in length between
 their trails for all scenarios where they both succeed. Hence, each plot in the
@@ -208,13 +198,13 @@ figure shows the distribution of scenarios with length differences ranging from
 mode's trail is 3 steps longer than the second's). The figure offers several
 insights about how modes compare in terms of effort that complement the insights
 about how they compare in terms of success rates from figure~\ref{fig:avo-bars}.
-First, Natural blame never produces shorter trails than Natural exceptions, and
-sometimes (albeit rarely) produces slightly longer ones. Hence, the experiment
+First, Natural blame rarely produces shorter trails than Natural exceptions, and
+occasionally produces slightly longer ones. Hence, the experiment
 provides evidence that blame helps the rational programmer debug more scenarios
 but does not shorten the debugging process compared to exceptions. Second,
 Natural relatively often (close to 8\% of the scenarios) produces shorter trails
 than both Transient blame modes, and sometimes the trails are significantly
-shorter. Finally, Transient's blame modes also share the characteristic with
+shorter. Finally, Transient's blame modes share the characteristic with
 Natural that blame sometimes produces longer trails than their corresponding
 exception modes.
 
