@@ -37,8 +37,8 @@ The first part reflects the rational programmer's use of blame to extend the
 trail. However, blame may not be available in some scenarios. The second part
 accounts for those scenarios that produce errors from the runtime system before
 any impedance mismatch can be detected. For example, the fully untyped
-configuration can only produce such an error, e.g. from {\tt +} receiving a
-string. Exceptions from the runtime do not carry blame, so
+configuration can only produce such an error, e.g. from {\tt length} receiving a
+boolean. Exceptions from the runtime do not carry blame, so
 the rational programmer proceeds using the accompanying stacktrace instead.
 
 When the buggy untyped module of a program is replaced by the typed counterpart,

@@ -43,8 +43,8 @@ functions imported into and exported from typed modules are wrapped in proxies t
 enforce the static type discipline with run-time checks and track
 responsibilities~\citep{tf-popl-2008, tfffgksst-snapl-2017}. Thus, when {\tt pack}
 is imported into a typed module, the run-time system checks that it is a function
-and wraps it in a protective proxy, which in turn, enforces the type of the function
-result with run-time checks.  Analogously the run-time system wraps each exported
+and wraps it in a protective proxy, which in turn enforces the type of the function
+result with run-time checks.  Analogously, the run-time system wraps each exported
 function of a typed module such as {\tt crypto-pack} in a proxy that checks its
 arguments.  These checks protect functions exported from typed modules against
 applications to wrong arguments in untyped code.
@@ -61,7 +61,7 @@ proxies, {\it Natural\/} can easily track the
 boundary, type, and responsible parties that correspond to each check. 
 Thus, in the example of figure~\ref{fig:example}, as
 \texttt{pack} returns, the return-type check fails and Natural blames
-the boundary between \texttt{pack-lib} with {\tt typed-pack-lib} and
+the boundary of \texttt{pack-lib} with {\tt typed-pack-lib} and
 {\tt crypto-pack-lib}, respectively, for the two {\tt define}s in {\tt client}.
 
 Under {\it Transient\/}, typed code is compiled so that all entry points to
@@ -70,7 +70,7 @@ return values against the expected type~\citep{vss-popl-2017}.  Furthermore,
 Transient uses \emph{shallow} checks, meaning they inspect only the top
 constructor of a value. Since retrieving a value from within a structure (or
 list, array, hash table etc.) is performed via a function call, the contents of
-a complex value is checked on a piecemeal basis.
+a complex value are checked on a piecemeal basis.
 
 As a result, the call to \texttt{typed-pack} does {\em not\/} signal an error
 because it takes place in the untyped {\tt client} module, which is compiled in
