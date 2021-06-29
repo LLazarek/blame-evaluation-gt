@@ -56,6 +56,6 @@ illustrates how this confusion works. The function deals with an input that is
 either a {\tt Real} or {\tt \#false}; the conditional deals with the first type
 in the {\tt then} branch and the second type in the {\tt else} branch.  If a
 mutator wraps {\tt (not $\cdot$)} around the test of the conditional, the
-resulting mutant no longer type checks and, when run, this function eventually
+resulting mutant is ill-typed and, when run, this function eventually
 causes a run-time type check to signal an impedance mismatch.
 
