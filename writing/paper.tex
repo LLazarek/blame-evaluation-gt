@@ -83,17 +83,28 @@
 
 \input{def.tex}
 
-\acmConference[]{}{}{}
-\acmYear{}
-\acmISBN{} % \acmISBN{978-x-xxxx-xxxx-x/YY/MM}
-\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
-\startPage{1}
-
 %% Copyright information
 %% Supplied to authors (based on authors' rights management selection;
 %% see authors.acm.org) by publisher for camera-ready submission;
 %% use 'none' for review submission.
 %% \setcopyright{none}
+
+%%% The following is specific to ICFP '21 and the paper
+%%% 'How to Evaluate Blame for Gradual Types'
+%%% by Lukas Lazarek, Ben Greenman, Matthias Felleisen, and Christos Dimoulas.
+%%%
+\setcopyright{rightsretained}
+\acmPrice{}
+\acmDOI{10.1145/3473573}
+\acmYear{2021}
+\copyrightyear{2021}
+\acmSubmissionID{icfp21main-p45-p}
+\acmJournal{PACMPL}
+\acmVolume{5}
+\acmNumber{ICFP}
+\acmArticle{68}
+\acmMonth{8}
+
 
 %% Bibliography style
 \bibliographystyle{ACM-Reference-Format}
@@ -142,7 +153,6 @@ Programming language theoreticians develop blame assignment systems and
 
 \ccsdesc[500]{Software and its engineering~Empirical software validation}
 \ccsdesc[500]{Theory of computation~Program specifications}
-
 
 %% Keywords
 %% comma separated list
