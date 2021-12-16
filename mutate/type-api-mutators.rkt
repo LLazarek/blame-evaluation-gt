@@ -1,6 +1,7 @@
 #lang at-exp racket
 
-(provide count-type-mutations)
+(provide count-type-mutations
+         type:base-type-substitution)
 
 (require "logger.rkt"
          "mutate-expr.rkt"
@@ -16,11 +17,11 @@
 ;; - drop fields from a struct, then the adaptor produces False? <-- not well typed, but perhaps something similar
 ;;   ^ forgetting to document a field, or adding a field that isn't there
 
+(define type:base-type-substitution "known-type-generalization-restriction")
 (define-id-mutator base-type-gen/restr
-  #:type "known-type-generalization-restriction"
+  #:type type:base-type-substitution
   [Number #:<-> Real]
   [Real #:<-> Integer]
-  [Real #:<-> Complex]
   [Integer #:<-> Natural]
   [Index #:<-> Integer]
   [Index #:<-> Natural]
@@ -37,6 +38,20 @@
            [return
             (quasisyntax/loc stx
               (head #,@rearranged-e-stxs range))])]
+    [else
+     (no-mutation stx mutation-index counter)]))
+
+(define-mutator (function-result-swap stx mutation-index counter) #:type [type "function-result-swap"]
+  (log-mutation-type type)
+  (syntax-parse stx
+    [({~and {~datum ->} head} arg ... (values e ...))
+     (define e-stxs (attribute e))
+     (mdo* (def rearranged-e-stxs (rearrange-in-seq e-stxs
+                                                    mutation-index
+                                                    counter))
+           [return
+            (quasisyntax/loc stx
+              (head arg ... (values #,@rearranged-e-stxs)))])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -62,7 +77,7 @@
   (and (identifier? x)
        (free-identifier=? x #'ll-this-is-definitely-unique:dropped)))
 
-(define-mutator (drop-function-arg stx mutation-index counter) #:type [type "drop-function-arg"]
+(define-mutator (function-arg-drop stx mutation-index counter) #:type [type "drop-function-arg"]
   (log-mutation-type type)
   (syntax-parse stx
     [({~and {~datum ->} head} e ... range)
@@ -77,7 +92,22 @@
     [else
      (no-mutation stx mutation-index counter)]))
 
-(define-mutator (drop-union-branch stx mutation-index counter) #:type [type "drop-union-branch"]
+(define-mutator (function-result-drop stx mutation-index counter) #:type [type "drop-function-arg"]
+  (log-mutation-type type)
+  (syntax-parse stx
+    [({~and {~datum ->} head} arg ... ({~datum values} e ...))
+     (define e-stxs (attribute e))
+     (mdo* (def mutated-e-stxs (mutate-in-seq e-stxs
+                                              mutation-index
+                                              counter
+                                              drop))
+           [return
+            (quasisyntax/loc stx
+              (head arg ... (values #,@(filter-not dropped? mutated-e-stxs))))])]
+    [else
+     (no-mutation stx mutation-index counter)]))
+
+(define-mutator (union-branch-drop stx mutation-index counter) #:type [type "drop-union-branch"]
   (log-mutation-type type)
   (syntax-parse stx
     [({~and {~datum U} head} e ...)
@@ -95,8 +125,10 @@
 
 (define mutate-type-expr (make-expr-mutator (compose-mutators base-type-gen/restr
                                                               function-arg-swap
-                                                              drop-function-arg
-                                                              drop-union-branch
+                                                              function-result-swap
+                                                              function-arg-drop
+                                                              function-result-drop
+                                                              union-branch-drop
                                                               vector-arg-swap)))
 
 (struct t+r (type reconstructor))
