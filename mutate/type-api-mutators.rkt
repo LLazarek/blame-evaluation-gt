@@ -1,7 +1,8 @@
 #lang at-exp racket
 
 (provide count-type-mutations
-         type:base-type-substitution)
+         type:base-type-substitution
+         type:function-arg-swap)
 
 (require "logger.rkt"
          "mutate-expr.rkt"
@@ -27,7 +28,8 @@
   [Index #:<-> Natural]
   [Index #:<-> Exact-Rational])
 
-(define-mutator (function-arg-swap stx mutation-index counter) #:type [type "function-arg-swap"]
+(define type:function-arg-swap "function-arg-swap")
+(define-mutator (function-arg-swap stx mutation-index counter) #:type [type type:function-arg-swap]
   (log-mutation-type type)
   (syntax-parse stx
     [({~and {~datum ->} head} e ... range)
