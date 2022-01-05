@@ -2,7 +2,10 @@
 
 (provide count-type-mutations
          type:base-type-substitution
-         type:function-arg-swap)
+         type:function-arg-swap
+         type:function-result-swap
+         type:struct-field-swap
+         type:vector-arg-swap)
 
 (require "logger.rkt"
          "mutate-expr.rkt"
@@ -43,7 +46,8 @@
     [else
      (no-mutation stx mutation-index counter)]))
 
-(define-mutator (function-result-swap stx mutation-index counter) #:type [type "function-result-swap"]
+(define type:function-result-swap "function-result-swap")
+(define-mutator (function-result-swap stx mutation-index counter) #:type [type type:function-result-swap]
   (log-mutation-type type)
   (syntax-parse stx
     [({~and {~datum ->} head} arg ... (values e ...))
@@ -57,7 +61,8 @@
     [else
      (no-mutation stx mutation-index counter)]))
 
-(define-mutator (vector-arg-swap stx mutation-index counter) #:type [type "vector-arg-swap"]
+(define type:vector-arg-swap "vector-arg-swap")
+(define-mutator (vector-arg-swap stx mutation-index counter) #:type [type type:vector-arg-swap]
   (log-mutation-type type)
   (syntax-parse stx
     [({~and {~datum Vector} head} e ...)
@@ -68,6 +73,21 @@
            [return
             (quasisyntax/loc stx
               (head #,@rearranged-e-stxs))])]
+    [else
+     (no-mutation stx mutation-index counter)]))
+
+(define type:struct-field-swap "struct-field-swap")
+(define-mutator (struct-field-swap stx mutation-index counter) #:type [type type:struct-field-swap]
+  (log-mutation-type type)
+  (syntax-parse stx
+    [({~and #:struct head} name:id ... (field-spec ...))
+     (define field-stxs (attribute field-spec))
+     (mdo* (def rearranged-field-stxs (rearrange-in-seq field-stxs
+                                                    mutation-index
+                                                    counter))
+           [return
+            (quasisyntax/loc stx
+              (head name ... (#,@rearranged-field-stxs)))])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -124,6 +144,7 @@
     [else
      (no-mutation stx mutation-index counter)]))
 
+;; lltodo: tests for mutators
 
 (define mutate-type-expr (make-expr-mutator (compose-mutators base-type-gen/restr
                                                               function-arg-swap
@@ -131,7 +152,8 @@
                                                               function-arg-drop
                                                               function-result-drop
                                                               union-branch-drop
-                                                              vector-arg-swap)))
+                                                              vector-arg-swap
+                                                              struct-field-swap)))
 
 (struct t+r (type reconstructor))
 (define (parse-name+types name+type-pairs)

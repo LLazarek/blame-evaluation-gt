@@ -1,149 +1,28 @@
 #lang at-exp racket
 
+(provide generate-adapter-ctc
+         ->stx
+         generate-delegating-adapter-ctc
+
+         (struct-out mutated-interface-type)
+
+         make-base-type-adapter
+         delegating->
+         swap->
+         delegating-struct
+         swap-struct-field
+
+         sexp-diff)
+
 (require "../mutate/type-api-mutators.rkt"
+         "sexp-diff.rkt"
+         "util.rkt"
          syntax/parse/define
          (for-syntax syntax/parse)
          racket/struct)
 
-(struct mutated-interface-type (name original mutated mutation-type)
+(struct mutated-interface-type (original mutated mutation-type)
   #:transparent)
-
-(struct difference (left right) #:transparent)
-(struct nothing () #:transparent)
-
-;; A B -> (or/c A (difference A B))
-(define (compare left right)
-  (if (equal? left right)
-      left
-      (difference left right)))
-
-(define (=length? a b)
-  (implies (and (list? a) (list? b))
-           (= (length a) (length b))))
-
-(define-simple-macro (assert c
-                             {~alt {~optional message #:defaults ([message #'""])}
-                                   {~optional {~seq #:name name} #:defaults ([name #'#f])}}
-                             ...)
-  (unless c
-    (error (or name 'unknown-function) message)))
-
-;; Dumb diff of s1 and s2, assuming both have the same length or at most one
-;; element missing from one and not the other.
-;; sexp? sexp? -> sexp?
-(define (sexp-diff s1 s2)
-  (let loop ([result empty]
-             [s1-remaining s1]
-             [s2-remaining s2])
-    (cond [(=length? s1-remaining s2-remaining)
-           (match* {s1-remaining s2-remaining}
-             [{(cons head-1 tail-1)
-               (cons head-2 tail-2)}
-              #:when (=length? head-1 head-2)
-              (loop (cons (loop empty head-1 head-2)
-                          result)
-                    tail-1
-                    tail-2)]
-             [{(cons (? list? head-1) tail-1)
-               (cons (? list? head-2) tail-2)}
-              ;; different length heads. Something was dropped.
-              (define-values {head-1* head-2*} (mark-drop head-1 head-2))
-              (assert (=length? head-1* head-2*) #:name 'sexp-diff
-                      "given two sub-sexps that have more than one difference in length")
-              (loop result
-                    (cons head-1* tail-1)
-                    (cons head-2* tail-2))]
-             [{'() '()}
-              (reverse result)]
-             [{atom1 atom2}
-              (compare   atom1  atom2)])]
-          [else
-           (define-values {s1* s2*} (mark-drop s1-remaining s2-remaining))
-           (assert (=length? s1* s2*) #:name 'sexp-diff
-                   "given two sexps that have more than one difference in length")
-           (loop result
-                 s1*
-                 s2*)])))
-
-;; Given two lists that are exactly the same, but one has at most a single element dropped,
-;; return copies of the lists such that the dropped element now has the placeholder
-;; `(nothing)`.
-(define (mark-drop l1 l2)
-  (assert (let ([l1-len (length l1)]
-                [l2-len (length l2)])
-            (or (= l1-len        l2-len)
-                (= l1-len        (sub1 l2-len))
-                (= (sub1 l1-len) l2-len)))
-          #:name 'mark-drop
-          @~a{given two lists whose length difference is != 1:
-                    @~s[l1]
-                    @~s[l2]})
-  (match* {l1 l2}
-    [{'() '()} (values l1 l2)]
-    [{(cons one l1-rest)
-      (cons two l2-rest)}
-     #:when (equal? one two)
-     (define-values {l1* l2*} (mark-drop l1-rest l2-rest))
-     (values (cons one l1*)
-             (cons two l2*))]
-    [{(cons one l1-rest)
-                (? list?)}
-     #:when (equal? l1-rest l2)
-     (values l1
-             (cons (nothing) l2))]
-    [{          (? list?)
-      (cons two l2-rest)}
-     #:when (equal? l1 l2-rest)
-     (values (cons (nothing) l1)
-             l2)]))
-
-(module+ test
-  (require ruinit)
-  (use-rackunit-backend #t)
-
-  (define-test-syntax (test-equal?/2 actual-e expected1 expected2)
-    #'(let-values ([{v1 v2} actual-e])
-        (and/test (test-equal? v1 expected1)
-                  (test-equal? v2 expected2))))
-
-  (test-begin
-    #:name mark-drop
-    (test-equal?/2 (mark-drop empty empty)
-                   empty empty)
-    (test-equal?/2 (mark-drop '(1) empty)
-                   '(1) (list (nothing)))
-    (test-equal?/2 (mark-drop '(1 2) '(1))
-                   '(1 2) (list 1 (nothing)))
-    (test-equal?/2 (mark-drop '(2 1) '(1))
-                   '(2 1) (list (nothing) 1))
-    (test-equal?/2 (mark-drop '(1 2 3) '(1 3))
-                   '(1 2 3) (list 1 (nothing) 3))
-    (test-equal?/2 (mark-drop '(1 3) '(1 2 3))
-                   (list 1 (nothing) 3) '(1 2 3)))
-
-  (test-begin
-    #:name sexp-diff
-    (test-equal? (sexp-diff 1 1)
-                 1)
-    (test-equal? (sexp-diff 1 2)
-                 (difference 1 2))
-    (test-equal? (sexp-diff '(1 2 3) '(1 2 3))
-                 '(1 2 3))
-    (test-equal? (sexp-diff '(1 2 3) '(1 3 2))
-                 (list 1 (difference 2 3) (difference 3 2)))
-    (test-equal? (sexp-diff '(1 2 (3 4) 5)
-                            '(1 2 (4 3) 5))
-                 `(1 2 (,(difference 3 4) ,(difference 4 3)) 5))
-    (test-equal? (sexp-diff '(1 2 (3 4) (5 (6)))
-                            '(1 2 (4 3) (5 (6))))
-                 `(1 2 (,(difference 3 4) ,(difference 4 3)) (5 (6))))
-    (test-equal? (sexp-diff '((1 2 3))
-                            '((1 3)))
-                 `((1 ,(difference 2 (nothing)) 3)))
-    (test-equal? (sexp-diff '(1 2 3)
-                            '(1 3))
-                 `(1 ,(difference 2 (nothing)) 3))))
-
 
 (define (mapping f)
   (λ (l) (map f l)))
@@ -155,14 +34,12 @@
             (app (const val) name)
             ...)]))
 
-(struct field (name index) #:transparent)
-
 ;; type-diff
 (struct td () #:transparent)
 (struct td:-> td (argument? index-map) #:transparent)
 (struct td:base td (original new) #:transparent)
 (struct td:vector td (index-map) #:transparent)
-(struct td:struct td (field-map) #:transparent) ; `field` in the sense above
+(struct td:struct td (index-map) #:transparent)
 (define (sexp->type-diff a-sexp-diff)
   (define (list->td-index-map a-list)
     (match a-list
@@ -188,10 +65,10 @@
                          sub-tds))
      (td:vector (list->td-index-map sub-tds))]
     [(list '#:struct name (list [list fields ': (app sexp->type-diff sub-tds)] ...))
-     (define (indexes->fields index-map)
+     #;(define (indexes->fields index-map)
        (for/list ([{i td} (in-dict index-map)])
          (cons (field (list-ref fields i) i) td)))
-     (td:struct (indexes->fields (list->td-index-map sub-tds)))]
+     (td:struct (list->td-index-map sub-tds))]
     [(difference original new)
      (td:base original new)]
     [(list* 'values (app (mapping sexp->type-diff)
@@ -201,6 +78,7 @@
     [(? symbol?) #f]))
 
 (module+ test
+  (require ruinit)
   (test-begin
     #:name sexp->type-diff
     (test-equal? (sexp->type-diff (sexp-diff 'A 'B))
@@ -238,8 +116,7 @@
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
-  (match-define (mutated-interface-type value-name
-                                        original
+  (match-define (mutated-interface-type original
                                         mutated
                                         mutation-type)
     a-mutated-interface-type)
@@ -271,66 +148,85 @@
       ))
   full-combinator)
 
+(struct recur () #:transparent)
+;; td? (td? -> (or/c contract? recur?)) -> contract?
+;; Converts `td` into a contract from the bottom up using `instantiator`,
+;; which decides where the "bottom" of the tree is by producing the base contract,
+;; or asks to continue unpacking the tree by producing `(recur)`.
+;; All layers above the base contract will simply delegate down to the base.
+(define (type-diff->contract td instantiator)
+  (let loop ([td td])
+    (match* {(instantiator td) td}
+      [{(and (not (recur)) result) _} result]
+      [{(recur) (and (td:base _ _) base)}
+       (error 'type-diff->contract
+              @~a{given instantiator @~e[instantiator] asked to recur into td:base @~e[base]})]
+      [{(recur) (td:-> arg? index-map)}
+       (delegating-> arg?
+                     (for/list ([{i td} (in-dict index-map)])
+                       (cons i (loop td))))]
+      [{(recur) (td:struct index-map)}
+       (delegating-struct (for/list ([{field td} (in-dict index-map)])
+                            (cons field (loop td))))])))
+
+;; sexp? symbol? contract? -> contract?
+;; Generate a contract that delegates on `name` to `ctc`.
+(define (generate-delegating-adapter-ctc type name ctc)
+  (define td (sexp->type-diff (sexp-diff type (replace-name-in-sexp type name (gensym name)))))
+  (type-diff->contract td
+                       (match-lambda [(td:base _ _) ctc]
+                                     [else (recur)])))
+
 (define (base-type-substitution-adapter type-diff)
-  (match type-diff
-    [(td:base original new)
-     (make-value-adapter original new)]
-    [(td:-> arg? index-map)
-     (delegating-> arg?
-                   (for/list ([{i td} (in-dict index-map)])
-                     (cons i (base-type-substitution-adapter td))))]
-    [(td:struct field-map)
-     (delegating-struct (for/list ([{field td} (in-dict field-map)])
-                          (cons field (base-type-substitution-adapter td))))]))
+  (type-diff->contract type-diff
+                       (match-lambda [(td:base original new)
+                                      (make-base-type-adapter original new)]
+                                     [else (recur)])))
 
 (define largest-possible-vector-size (expt 2 64))
 (define round->exact (compose1 inexact->exact round))
 (define realize-delta 0.00001)
-(define (make-value-adapter original-type new-type)
-  (match (difference original-type new-type)
-    [(difference 'Number 'Real) (transform/c real-part)]
-    [(difference 'Real 'Number) (transform/c (λ (x) (+ x 0+1i)))]
-    [(difference 'Real 'Integer) (transform/c round->exact)]
-    [(difference 'Integer 'Real) (transform/c (λ (x) (+ x realize-delta)))]
-    [(or (difference 'Integer 'Natural)
-         (difference 'Integer 'Index)) (transform/c abs)]
-    [(difference 'Exact-Rational 'Index)
-     (transform/c (compose1 abs round->exact))]
-    [(or (difference 'Natural 'Integer)
-         (difference 'Index 'Integer)) (transform/c -)]
-    [(or (difference 'Index 'Natural)
-         (difference 'Index 'Exact-Rational)) (transform/c (const (add1 largest-possible-vector-size)))]
-    [(difference 'Natural 'Index) (transform/c (λ (x)
-                                                 (if (< x largest-possible-vector-size)
-                                                     x
-                                                     0)))]))
+(define (make-base-type-adapter original-type new-type)
+  (let ([transform/c (λ (f) (transform/c f original-type new-type))])
+    (match (difference original-type new-type)
+      [(difference 'Number 'Real) (transform/c real-part)]
+      [(difference 'Real 'Number) (transform/c (λ (x) (+ x 0+1i)))]
+      [(difference 'Real 'Integer) (transform/c round->exact)]
+      [(difference 'Integer 'Real) (transform/c (λ (x) (+ x realize-delta)))]
+      [(or (difference 'Integer 'Natural)
+           (difference 'Integer 'Index)) (transform/c abs)]
+      [(difference 'Exact-Rational 'Index)
+       (transform/c (compose1 abs round->exact))]
+      [(or (difference 'Natural 'Integer)
+           (difference 'Index 'Integer)) (transform/c -)]
+      [(or (difference 'Index 'Natural)
+           (difference 'Index 'Exact-Rational)) (transform/c (const (add1 largest-possible-vector-size)))]
+      [(difference 'Natural 'Index) (transform/c (λ (x)
+                                                   (if (< x largest-possible-vector-size)
+                                                       x
+                                                       0)))])))
 
 (define (function-arg/result-swap-adapter type-diff)
-  (match type-diff
-    [(td:-> arg? `((,i1 . ,(td:base t1-orig t1-new))
-                   (,i2 . ,(td:base t2-orig t2-new))))
-     (assert (and (equal? t1-orig t2-new)
-                  (equal? t2-orig t1-new))
-             #:name 'function-arg-swap-adapter
-             @~a{Mutation type is function arg swap but diff doesn't look like a swap:
-                          @t1-orig -> @t1-new
-                          @t2-orig -> @t2-new})
-     (swap-> arg? i1 i2)]
-    [(td:struct field-map)
-     (delegating-struct (for/list ([{field td} (in-dict field-map)])
-                          (cons field (function-arg/result-swap-adapter td))))]
-    [(td:base original new)
-     (error 'function-arg-swap-adapter
-            "Should be impossible: got a base type diff?")]))
+  (type-diff->contract
+   type-diff
+   (match-lambda [(td:-> arg? `((,i1 . ,(td:base t1-orig t1-new))
+                                (,i2 . ,(td:base t2-orig t2-new))))
+                  (assert (and (equal? t1-orig t2-new)
+                               (equal? t2-orig t1-new))
+                          #:name 'function-arg-swap-adapter
+                          @~a{Mutation type is function arg swap but diff doesn't look like a swap:
+                                       @t1-orig -> @t1-new
+                                       @t2-orig -> @t2-new})
+                  (swap-> arg? i1 i2)]
+                 [(td:base original new)
+                  (error 'function-arg-swap-adapter
+                         "Should be impossible: got a base type diff?")]
+                 [else (recur)])))
 
 (define (struct-field-swap-adapter type-diff)
   (match type-diff
-    [(td:-> arg? index-map)
-     (delegating-> arg?
-                   (for/list ([{i td} (in-dict index-map)])
-                     (cons i (base-type-substitution-adapter td))))]
-    [(td:struct `((,(field _ i1) . ,(td:base t1-orig t1-new))
-                   (,(field _ i2) . ,(td:base t2-orig t2-new))))
+    [(td:struct `((,i1 . ,(td:base t1-orig t1-new))
+                   (,i2 . ,(td:base t2-orig t2-new))))
      (assert (and (equal? t1-orig t2-new)
                   (equal? t2-orig t1-new))
              #:name 'function-arg-swap-adapter
@@ -338,10 +234,10 @@
                           @t1-orig -> @t1-new
                           @t2-orig -> @t2-new})
      (swap-struct-field i1 i2)]
-    [(td:base original new)
+    [other
      (error 'struct-field-swap-adapter
-            "Should be impossible: got a base type diff?")]))
-    
+            @~a{Should be impossible: got a td that isn't td:struct?: @~e[other]})]))
+
 
 #;(define (vector-swap-adapter type-diff)
   (match type-diff
@@ -358,8 +254,12 @@
      (error 'vector-swap-adapter
             "Should be impossible: got a base type diff?")]))
 
+(require racket/generic)
+(define-generics adapted
+  (->stx adapted))
+
 (struct adapter/c ())
-(struct transform/c adapter/c (transformer)
+(struct transform/c adapter/c (transformer from-type to-type)
   #:property prop:contract
   (build-contract-property
    #:name (const 'transform/c)
@@ -368,7 +268,11 @@
      (define transform (transform/c-transformer this))
      (λ (blame)
        (λ (v neg-party)
-         (transform v))))))
+         (transform v)))))
+  #:methods gen:adapted
+  [(define (->stx this)
+     #`(make-base-type-adapter '#,(transform/c-from-type this)
+                           '#,(transform/c-to-type this)))])
 
 ;; This weird dance with this macro wrapping the adapt-arguments? expr in a thunk is only there to delay the reference to struct accessor ids until they are defined.
 ;; IOW those references must happen under the lambda of the projection, otherwise they're unbound.
@@ -417,7 +321,13 @@
    (simple->adapter-projection (λ (this)
                                  (define index-ctc-pairs (delegating->-index-ctc-pairs this))
                                  (λ (args/results) (apply-contracts-in-list args/results index-ctc-pairs)))
-                               delegating->-argument?)))
+                               delegating->-argument?))
+  #:methods gen:adapted
+  [(define/generic generic->stx ->stx)
+   (define (->stx this)
+     #`(delegating-> #,(delegating->-argument? this)
+                     (list #,@(for/list ([{i ctc} (in-dict (delegating->-index-ctc-pairs this))])
+                                #`(cons #,i #,(generic->stx ctc))))))])
 
 (struct swap-> adapter/c (argument? i1 i2)
   #:property prop:contract
@@ -433,7 +343,10 @@
                                  (define i1 (swap->-i1 this))
                                  (define i2 (swap->-i2 this))
                                  (λ (args/results) (swap-in-list args/results i1 i2)))
-                               swap->-argument?)))
+                               swap->-argument?))
+  #:methods gen:adapted
+  [(define (->stx this)
+     #`(swap-> #,(swap->-argument? this) #,(swap->-i1 this) #,(swap->-i2 this)))])
 
 (define (transform-struct-fields v transform)
   ;; lltodo: this is a mess and wrong.
@@ -456,29 +369,34 @@
   ;; this approach at least doesn't demand structs to be mutable.
   (apply (struct-type-make-constructor struct-type)
          (transform fields)))
-  
-(struct delegating-struct adapter/c (field-map)
+
+(struct delegating-struct adapter/c (index-ctc-pairs)
   #:property prop:contract
   (build-contract-property
    #:name (λ (this) (list 'delegating-struct
-                          (for/list ([{field ctc} (in-dict (delegating-struct-field-map this))])
+                          (for/list ([{field ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
                             (cons field (contract-name ctc)))))
    #:late-neg-projection
    (λ (this)
-     (define field-map (delegating-struct-field-map this))
+     (define index-map (delegating-struct-index-ctc-pairs this))
      (λ (blame)
        (λ (v neg-party)
          (transform-struct-fields v
                                   (λ (fields)
                                     (apply-contracts-in-list fields
-                                                             (for/list ([{field ctc} (in-dict field-map)])
-                                                               (cons (field-index field) ctc))))))))))
+                                                             index-map)))))))
+  #:methods gen:adapted
+  [(define/generic generic->stx ->stx)
+   (define (->stx this)
+     #`(delegating-struct
+        (list #,@(for/list ([{f ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
+                   #`(cons #,f #,(generic->stx ctc))))))])
 
 (struct swap-struct-field adapter/c (i1 i2)
   #:property prop:contract
   (build-contract-property
    #:name (λ (this) (list 'delegating-struct
-                          (for/list ([{field ctc} (in-dict (delegating-struct-field-map this))])
+                          (for/list ([{field ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
                             (cons field (contract-name ctc)))))
    #:late-neg-projection
    (λ (this)
@@ -486,7 +404,10 @@
      (define i2 (swap-struct-field-i2 this))
      (λ (blame)
        (λ (v neg-party)
-         (transform-struct-fields v (λ (fields) (swap-in-list fields i1 i2))))))))
+         (transform-struct-fields v (λ (fields) (swap-in-list fields i1 i2)))))))
+  #:methods gen:adapted
+  [(define (->stx this)
+     #`(swap-struct-field #,(swap-struct-field-i1 this) #,(swap-struct-field-i2 this)))])
 
 #;(struct swap-vector adapter/c (i1 i2)
   #:property prop:contract
@@ -531,29 +452,25 @@
   (test-begin
     #:name value-adapter
     (test-equal? (contract-name
-                  (generate-adapter-ctc (mutated-interface-type 'n
-                                                                'Real
+                  (generate-adapter-ctc (mutated-interface-type 'Real
                                                                 'Integer
                                                                 type:base-type-substitution)))
                  'transform/c)
     (test-adapter-contract
      [v 5
-        #:with-contract (generate-adapter-ctc (mutated-interface-type 'n
-                                                                      'Real
+        #:with-contract (generate-adapter-ctc (mutated-interface-type 'Real
                                                                       'Integer
                                                                       type:base-type-substitution))]
      (test-equal? v 5))
     (test-adapter-contract
      [v 5/2
-        #:with-contract (generate-adapter-ctc (mutated-interface-type 'n
-                                                                      'Exact-Rational
+        #:with-contract (generate-adapter-ctc (mutated-interface-type 'Exact-Rational
                                                                       'Index
                                                                       type:base-type-substitution))]
      (test-equal? v (round 5/2)))
     (test-adapter-contract
      [v 5
-        #:with-contract (generate-adapter-ctc (mutated-interface-type 'n
-                                                                      'Integer
+        #:with-contract (generate-adapter-ctc (mutated-interface-type 'Integer
                                                                       'Real
                                                                       type:base-type-substitution))]
      (and/test (not/test (test-equal? v 5))
@@ -564,53 +481,46 @@
     (test-adapter-contract
      [f (λ (x) x)
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'f
-                                                 '(-> Real Integer)
+                         (mutated-interface-type '(-> Real Integer)
                                                  '(-> Integer Integer)
                                                  type:base-type-substitution))]
      (test-equal? (f 5.2) 5))
     (test-equal? (contract-name
                   (generate-adapter-ctc
-                   (mutated-interface-type 'f
-                                           '(-> Integer Integer)
+                   (mutated-interface-type '(-> Integer Integer)
                                            '(-> Real Integer)
                                            type:base-type-substitution)))
                  '(delegating->arg [0 transform/c]))
     (test-equal? (contract-name
                   (generate-adapter-ctc
-                   (mutated-interface-type 'f
-                                           '(-> Integer Real)
+                   (mutated-interface-type '(-> Integer Real)
                                            '(-> Integer Integer)
                                            type:base-type-substitution)))
                  '(delegating->result [0 transform/c]))
     (test-adapter-contract
      [f (λ _ 5.2)
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'f
-                                                 '(-> Integer Real)
+                         (mutated-interface-type '(-> Integer Real)
                                                  '(-> Integer Integer)
                                                  type:base-type-substitution))]
      (test-equal? (f 2) 5))
     (test-equal? (contract-name
                   (generate-adapter-ctc
-                   (mutated-interface-type 'f
-                                           '(-> Integer (values Integer Real))
+                   (mutated-interface-type '(-> Integer (values Integer Real))
                                            '(-> Integer (values Integer Integer))
                                            type:base-type-substitution)))
                  '(delegating->result [1 transform/c]))
     (test-adapter-contract
      [f (λ _ (values 2 5.2))
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'f
-                                                 '(-> Integer (values Integer Real))
+                         (mutated-interface-type '(-> Integer (values Integer Real))
                                                  '(-> Integer (values Integer Integer))
                                                  type:base-type-substitution))]
      (let-values ([{v1 v2} (f 0)])
        (test-equal? v2 5)))
     (test-equal? (contract-name
                   (generate-adapter-ctc
-                   (mutated-interface-type 'f
-                                           '(-> String
+                   (mutated-interface-type '(-> String
                                                 (-> Integer Real)
                                                 (values Integer Real))
                                            '(-> String
@@ -621,8 +531,7 @@
     (test-adapter-contract
      [f (λ (s g) (values 2 (g 0)))
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'f
-                                                 '(-> String
+                         (mutated-interface-type '(-> String
                                                       (-> Integer Real)
                                                       (values Integer Real))
                                                  '(-> String
@@ -637,8 +546,7 @@
     (test-adapter-contract
      [f (λ (a b) (values a b))
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'f
-                                                 '(-> Integer
+                         (mutated-interface-type '(-> Integer
                                                       String
                                                       (values Integer String))
                                                  '(-> String
@@ -651,8 +559,7 @@
     (test-adapter-contract
      [f (λ (a b) (values a b))
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'f
-                                                 '(-> Integer
+                         (mutated-interface-type '(-> Integer
                                                       String
                                                       (values Integer String))
                                                  '(-> Integer
@@ -669,8 +576,7 @@
    (test-adapter-contract
      [t (temp 5.5 "hello" 2.3)
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'temp
-                                                 '[#:struct temp ([x : Real] [y : String] [z : Real])]
+                         (mutated-interface-type '[#:struct temp ([x : Real] [y : String] [z : Real])]
                                                  '[#:struct temp ([x : Integer] [y : String] [z : Real])]
                                                  type:base-type-substitution))]
      (and/test (temp? t)
@@ -683,8 +589,7 @@
    (test-adapter-contract
      [t (temp 5.5 "hello" 2.3)
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type 'temp
-                                                 '[#:struct temp ([x : Integer] [y : String] [z : Real])]
+                         (mutated-interface-type '[#:struct temp ([x : Integer] [y : String] [z : Real])]
                                                  '[#:struct temp ([y : String] [x : Integer] [z : Real])]
                                                  type:struct-field-swap))]
      (and/test (temp? t)
@@ -692,4 +597,4 @@
                (test-equal? (temp-x t) "hello")
                (test-equal? (temp-z t) 2.3))))
   )
-   
+
