@@ -9,13 +9,16 @@
          exn:fail:runner-wrapped?
          exn:fail:runner-unwrap
 
-         run-with:require)
+         run-with:require
+
+         (struct-out instrumented-module))
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
          "modgraph.rkt"
          "../util/program.rkt"
-         "../util/optional-contracts.rkt")
+         "../util/optional-contracts.rkt"
+         "../configurables/configurables.rkt")
 
 (define (module-path-resolve mod-path [load? #f])
   ((current-module-name-resolver) mod-path #f #f load?))
@@ -74,12 +77,16 @@
                          module-containing-directory
                          module-stx/instrumented))
 
-  (match-define (struct* program ([main main-module]
-                                  [others other-modules-to-instrument]))
-    a-program)
-  (define main/instrumented (make-instrumented-module main-module))
-  (define others/instrumented
-    (map make-instrumented-module other-modules-to-instrument))
+  (define instrument-program (configured:instrument-program))
+  (match-define (program main/instrumented others/instrumented)
+    (instrument-program a-program
+                        make-instrumented-module
+                        #;(match-lambda
+                            [(program main-module other-modules-to-instrument)
+                             (define main/instrumented (make-instrumented-module main-module))
+                             (define others/instrumented
+                               (map make-instrumented-module other-modules-to-instrument))
+                             (program main/instrumented others/instrumented)])))
   ;; Modules must be loaded in order such that loading one module doesn't
   ;; cause another one to be loaded before it gets instrumented
   (define others/instrumented/ordered

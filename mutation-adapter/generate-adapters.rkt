@@ -14,16 +14,15 @@
 
 
 ;; syntax? syntax? mutation-type? string? -> syntax?
-;; `mod-path` should be the relative path (from the `both/` directory) to the interface module
-;; corresponding to `original-mod-stx`. Usually that's just the name of the file.
+;; `mod-name` should be the of the interface module corresponding to `original-mod-stx`.
 (define (generate-adapter-module-for-mutation original-mod-stx
                                               mutated-mod-stx
                                               mutation-type
-                                              mod-path)
+                                              mod-name)
   (define adapter-ctcs (generate-adapter-ctcs-for-mutation original-mod-stx
                                                            mutated-mod-stx
                                                            mutation-type))
-  (adapter-ctcs->module-stx adapter-ctcs mod-path))
+  (adapter-ctcs->module-stx adapter-ctcs mod-name))
 
 ;; syntax? syntax? mutation-type? -> (listof (cons identifier? contract?))
 (define (generate-adapter-ctcs-for-mutation original-mod-stx
@@ -265,11 +264,11 @@
 
 (define-runtime-path type-api-mutators.rkt "type-api-mutators.rkt")
 ;; (dictof identifier? contract?) syntax?  -> syntax?
-(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-path)
+(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name)
   #`(module mutation-adapter racket
       (require (file #,(path->string type-api-mutators.rkt)))
-      (require #,interface-mod-path)
-      (provide (except-out (all-from-out #,interface-mod-path) #,@(dict-keys adapter-ctcs)))
+      (require #,interface-mod-name)
+      (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
       (provide (contract-out
                 #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
                      #`[#,id #,(->stx adapter)])))))

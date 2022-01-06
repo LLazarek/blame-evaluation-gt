@@ -14,7 +14,10 @@
     #:module "mutation/mutate-benchmark.rkt")
 
   (define-implementation type-annotation-mistakes
-    #:module "mutation/mutate-types.rkt"))
+    #:module "mutation/mutate-types.rkt")
+
+  (define-implementation type-interface-mistakes
+    #:module "mutation/mutate-type-interface.rkt"))
 
 (define-configurable mutant-sampling
   #:provides [select-mutants all-mutants-should-have-trails?]
@@ -26,6 +29,7 @@
     #:module "mutant-sampling/use-pre-selected-samples.rkt"
     #:parameters [pre-selected-mutant-samples-db]))
 
+;; Extra module-level instrumentation beyond mutation
 (define-configurable module-instrumentation
   #:provides [instrument-module]
 
@@ -35,6 +39,17 @@
   (define-implementation transient-types
     #:module "module-instrumentation/type-with-transient.rkt"
     #:parameters [transient-special-cases-db]))
+
+;; Controls how all instrumentation is applied to a program.
+;; Thus also has the opportunity to transform the program as part of "instrumentation".
+(define-configurable program-instrumentation
+  #:provides [instrument-program]
+
+  (define-implementation just-instrument-modules
+    #:module "program-instrumentation/just-instrument-modules.rkt")
+
+  (define-implementation instrument-modules-and-insert-interface-adapter-module
+    #:module "program-instrumentation/instrument-modules-and-insert-interface-adapter-module.rkt"))
 
 (define-configurable benchmark-runner
   #:provides [make-benchmark-runner]
@@ -78,4 +93,9 @@
 
   (define-implementation pre-selected
     #:module "bt-root-sampling/pre-selected.rkt"
-    #:parameters [pre-selected-bt-root-db]))
+    #:parameters [pre-selected-bt-root-db])
+
+  (define-implementation subset-random-without-replacement
+    #:module "bt-root-sampling/subset-random-wo-replacement.rkt"
+    #:parameters [root-config-filter]))
+
