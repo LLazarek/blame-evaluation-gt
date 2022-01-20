@@ -7,8 +7,8 @@
          "../../util/program.rkt")
 
 (define instrumented-program/c
-  (struct/c program instrumented-module? (listof instrumented-module?)))
+  (struct/c program resolved-module? (listof resolved-module?)))
 
 (define instrument-program/c
-  (program/c (mod/c . -> . instrumented-module?) . -> . instrumented-program/c))
+  (program/c (mod/c . -> . resolved-module?) . -> . instrumented-program/c))
 

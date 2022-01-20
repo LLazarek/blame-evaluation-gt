@@ -37,21 +37,22 @@
       (list (cons name (generate-adapter-ctc mit)))))
 
 (struct name+type (name type definition?) #:transparent)
-  (define (r/t/p-entry->name+type entry)
-    (match entry
-      [(list '#:struct name _ ...) (name+type name entry #t)]
-      [(list name t)               (name+type name t #f)]))
-  (define (interface-types a-mod-stx)
-    (define (top-level-form->types form)
-      (match form
-        [(list 'require/typed/provide _ entries ...)
-         (map r/t/p-entry->name+type entries)]
-        [(list 'define-type name t)
-         (list (name+type name t #t))]
-        [other empty]))
-    (match (syntax->datum a-mod-stx)
-      [(list 'module name lang top-level-forms ...)
-       (append* (map top-level-form->types top-level-forms))]))
+(define (r/t/p-entry->name+type entry)
+  (match entry
+    [(list '#:struct name _ ...) (name+type name entry #t)]
+    [(list name t)               (name+type name t #f)]))
+(define (interface-types a-mod-stx)
+  (define (top-level-form->types form)
+    (match form
+      [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
+       (map r/t/p-entry->name+type entries)]
+      [(list 'define-type name t)
+       (list (name+type name t #t))]
+      [other empty]))
+  (match (syntax->datum a-mod-stx)
+    [(or (list 'module name lang (list '#%module-begin top-level-forms ...))
+         (list 'module name lang top-level-forms ...))
+     (append* (map top-level-form->types top-level-forms))]))
 
 ;; syntax? syntax? -> mutated-type?
 (define (find-mutated-type original-mod-stx new-mod-stx)
@@ -65,7 +66,14 @@
                            (name+type-type t2)
                            (name+type-definition? t1))))
       (error 'find-mutated-type
-             "Couldn't find mutated type")))
+             @~a{
+                 Couldn't find mutated type between the original and new mods.
+                 original:
+                 @original-mod-stx
+
+                 @new-mod-stx
+
+                 })))
 
 (module+ test
   (require ruinit)
@@ -81,12 +89,12 @@
                  (mutated-type 'f 'Number 'String #f))
     (test-equal? (find-mutated-type
                   #'(module A racket
-                      (require/typed/provide "x.rkt"
+                      (require/typed/check/provide "x.rkt"
                         [f X]
                         [f Number]
                         [f Y]))
                   #'(module A racket
-                      (require/typed/provide "x.rkt"
+                      (require/typed/check/provide "x.rkt"
                         [f X]
                         [f String]
                         [f Y])))
@@ -167,7 +175,23 @@
                                           [b : Real])]
                                '[#:struct foobar ([a : Real]
                                           [b : Number])]
-                               #t))))
+                               #t))
+
+    (test-equal? (find-mutated-type
+                  #'(module main racket
+                      (#%module-begin
+                       (require/typed/check/provide
+                        "something"
+                        [f (-> Number Real String)])))
+                  #'(module main racket
+                      (#%module-begin
+                       (require/typed/check/provide
+                        "something"
+                        [f (-> Real Number String)]))))
+                 (mutated-type 'f
+                               '(-> Number Real String)
+                               '(-> Real Number String)
+                               #f))))
 
 (define (sexp-contains? s id)
   (let loop ([s s])
@@ -266,12 +290,13 @@
 ;; (dictof identifier? contract?) syntax?  -> syntax?
 (define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name)
   #`(module mutation-adapter racket
-      (require (file #,(path->string type-api-mutators.rkt)))
-      (require #,interface-mod-name)
-      (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
-      (provide (contract-out
-                #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
-                     #`[#,id #,(->stx adapter)])))))
+      (#%module-begin
+       (require (file #,(path->string type-api-mutators.rkt)))
+       (require #,interface-mod-name)
+       (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
+       (provide (contract-out
+                 #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
+                      #`[#,id #,(->stx adapter)]))))))
 
 
 (module+ test
@@ -280,10 +305,11 @@
    (test-equal? (syntax->datum
                  (adapter-ctcs->module-stx empty "interface.rkt"))
                 `(module mutation-adapter racket
-                   (require (file ,(path->string type-api-mutators.rkt)))
-                   (require "interface.rkt")
-                   (provide (except-out (all-from-out "interface.rkt")))
-                   (provide (contract-out))))
+                   (#%module-begin
+                    (require (file ,(path->string type-api-mutators.rkt)))
+                    (require "interface.rkt")
+                    (provide (except-out (all-from-out "interface.rkt")))
+                    (provide (contract-out)))))
    (test-equal?
     (syntax->datum
      (adapter-ctcs->module-stx
@@ -291,12 +317,13 @@
         (bar . ,(delegating-> #t (list (cons 1 (make-base-type-adapter 'Integer 'Real))))))
       "interface.rkt"))
     `(module mutation-adapter racket
-       (require (file ,(path->string type-api-mutators.rkt)))
-       (require "interface.rkt")
-       (provide (except-out (all-from-out "interface.rkt")
-                            foo
-                            bar))
-       (provide
-        (contract-out
-         [foo (make-base-type-adapter 'Integer 'Real)]
-         [bar (delegating-> #t (list (cons 1 (make-base-type-adapter 'Integer 'Real))))]))))))
+       (#%module-begin
+        (require (file ,(path->string type-api-mutators.rkt)))
+        (require "interface.rkt")
+        (provide (except-out (all-from-out "interface.rkt")
+                             foo
+                             bar))
+        (provide
+         (contract-out
+          [foo (make-base-type-adapter 'Integer 'Real)]
+          [bar (delegating-> #t (list (cons 1 (make-base-type-adapter 'Integer 'Real))))])))))))

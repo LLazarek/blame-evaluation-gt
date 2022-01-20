@@ -11,7 +11,8 @@
 
          run-with:require
 
-         (struct-out instrumented-module))
+         (struct-out resolved-module)
+         mod->resolved-module)
 
 (require custom-load
          (only-in syntax/modresolve [resolve-module-path module-path->path])
@@ -23,8 +24,8 @@
 (define (module-path-resolve mod-path [load? #f])
   ((current-module-name-resolver) mod-path #f #f load?))
 
-(struct instrumented-module
-  (path-string module-path file-path containing-directory stx))
+(struct resolved-module (path-string module-path file-path containing-directory stx)
+  #:transparent)
 
 ;; Requires `main-mod-path` and then `(submod main-mod-path main)`, if it has a main submodule
 (define (run-with:require main-mod-path)
@@ -39,6 +40,18 @@
 ;; until the runtime phase.
 (struct exn:fail:runner:module-evaluation exn:fail (error))
 (struct exn:fail:runner:runtime exn:fail (error))
+
+(define (mod->resolved-module m)
+  (define path-string/simplified (path->string (simplify-path (mod-path m))))
+  (define module-path `(file ,path-string/simplified))
+  (define file-path (module-path->path module-path))
+  (define-values (module-containing-directory ___1 ___2)
+    (split-path file-path))
+  (resolved-module path-string/simplified
+                   module-path
+                   file-path
+                   module-containing-directory
+                   (mod-stx m)))
 
 ;; The returned thunk will throw one of the above exceptions if `a-program`
 ;; raises an exception in the process of begin evaluated.
@@ -65,17 +78,9 @@
        [result (-> any)])
 
   (define (make-instrumented-module m)
-    (define path-string/simplified (path->string (simplify-path (mod-path m))))
-    (define module-path `(file ,path-string/simplified))
-    (define file-path (module-path->path module-path))
-    (define-values (module-containing-directory ___1 ___2)
-      (split-path file-path))
-    (define module-stx/instrumented (instrument-module m))
-    (instrumented-module path-string/simplified
-                         module-path
-                         file-path
-                         module-containing-directory
-                         module-stx/instrumented))
+    (define instrumented-mod (mod (mod-path m)
+                                  (instrument-module m)))
+    (mod->resolved-module instrumented-mod))
 
   (define instrument-program (configured:instrument-program))
   (match-define (program main/instrumented others/instrumented)
@@ -91,8 +96,8 @@
   ;; cause another one to be loaded before it gets instrumented
   (define others/instrumented/ordered
     (order-by-dependencies others/instrumented
-                           instrumented-module-stx
-                           instrumented-module-path-string))
+                           resolved-module-stx
+                           resolved-module-path-string))
 
   (define others+main/instrumented/ordered
     (append others/instrumented/ordered
@@ -109,7 +114,7 @@
                     (make-custom-load/use-compiled
                      #:blacklist
                      (curryr member
-                             (map instrumented-module-file-path
+                             (map resolved-module-file-path
                                   others+main/instrumented/ordered)))]
                    [current-namespace ns])
 
@@ -123,12 +128,12 @@
           (parameterize
               ;; Ensure relative load paths work
               ([current-load-relative-directory
-                (instrumented-module-containing-directory m)]
+                (resolved-module-containing-directory m)]
                [current-module-declare-name
-                (module-path-resolve (instrumented-module-module-path m))]
+                (module-path-resolve (resolved-module-module-path m))]
                [current-directory
-                (instrumented-module-containing-directory m)])
-            (eval (instrumented-module-stx m)))))
+                (resolved-module-containing-directory m)])
+            (eval (resolved-module-stx m)))))
 
       ;; Run the main module
       (with-handlers ([exn? (λ (e)
@@ -139,11 +144,11 @@
         (parameterize
             ;; Ensure relative load paths work
             ([current-load-relative-directory
-              (instrumented-module-containing-directory main/instrumented)]
+              (resolved-module-containing-directory main/instrumented)]
              [current-directory
-              (instrumented-module-containing-directory main/instrumented)])
+              (resolved-module-containing-directory main/instrumented)])
           (do-before-main! ns)
-          (define result (run-main (instrumented-module-module-path main/instrumented)))
+          (define result (run-main (resolved-module-module-path main/instrumented)))
 
           (make-result ns result)))))
 
@@ -164,7 +169,10 @@
       [else #f])))
 
 (module+ test
-  (require ruinit)
+  (require ruinit
+           racket/runtime-path)
+  (define-runtime-path test-config "../configurables/configs/test.rkt")
+  (install-configuration! test-config)
   (test-begin
     #:name make-instrumented-runner
     (ignore

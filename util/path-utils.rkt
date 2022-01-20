@@ -68,6 +68,10 @@
     [(list* sum _) sum]
     [else #f]))
 
+(define (path-replace-filename p new-name)
+  (define-values {parent name _2} (split-path (simple-form-path p)))
+  (build-path parent new-name))
+
 (module+ test
   (require ruinit)
   (test-begin
@@ -106,4 +110,9 @@
   (test-begin
     #:name benchmark-mod-relative-path
     (test-equal? (benchmark-mod-relative-path "/foo/bar/gregor/untyped/a.rkt")
-                 "gregor/untyped/a.rkt")))
+                 "gregor/untyped/a.rkt"))
+
+  (test-begin
+    #:name path-replace-filename
+    (paths=? (path-replace-filename "/foo/bar/hello.rkt" "bye")
+             "/foo/bar/bye")))
