@@ -29,6 +29,15 @@
     #:module "mutant-sampling/use-pre-selected-samples.rkt"
     #:parameters [pre-selected-mutant-samples-db]))
 
+(define-configurable module-selection-for-mutation
+  #:provides [select-modules-to-mutate]
+
+  (define-implementation all-regular-modules
+    #:module "module-selection-for-mutation/all-regular-modules.rkt")
+
+  (define-implementation interface-module-only
+    #:module "module-selection-for-mutation/interface-module-only.rkt"))
+
 ;; Extra module-level instrumentation beyond mutation
 (define-configurable module-instrumentation
   #:provides [instrument-module]

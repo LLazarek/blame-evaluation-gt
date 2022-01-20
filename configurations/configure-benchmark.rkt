@@ -146,12 +146,14 @@
    @~a{a config for @~v[b]}))
 
 ;; Produces the names of the mutatable modules in `a-benchmark`
-(define (benchmark->mutatable-modules a-benchmark)
+(define (benchmark->mutatable-modules a-benchmark #:include-both? [include-both? #t])
   (map file-name-string-from-path
-       (benchmark-typed a-benchmark)))
+       (append (or (and include-both? (benchmark-both a-benchmark))
+                   empty)
+               (benchmark-typed a-benchmark))))
 
 (define (make-max-bench-config a-benchmark)
-  (define mods (benchmark->mutatable-modules a-benchmark))
+  (define mods (benchmark->mutatable-modules a-benchmark #:include-both? #f))
   (for/hash ([mod (in-list mods)])
     (values mod 'types)))
 

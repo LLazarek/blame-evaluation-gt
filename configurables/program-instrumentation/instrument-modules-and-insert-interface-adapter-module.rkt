@@ -1,6 +1,7 @@
 #lang at-exp racket
 
-(provide (contract-out [instrument-program instrument-program/c]))
+(provide (contract-out [instrument-program instrument-program/c])
+         type-interface-file-name)
 
 (require "../../util/program.rkt"
          "../../util/logging.rkt"

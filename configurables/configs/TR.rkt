@@ -9,6 +9,7 @@
 (define (install!)
   (configure! mutation                 type-interface-mistakes)
   (configure! mutant-sampling          none)
+  (configure! module-selection-for-mutation interface-module-only)
   (configure! module-instrumentation   none)
   (configure! benchmark-runner         run-it)
   (configure! blame-following          pick-some

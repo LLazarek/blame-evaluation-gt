@@ -10,7 +10,9 @@
          function-arg-swap
          function-result-swap
          struct-field-swap
-         vector-arg-swap)
+         vector-arg-swap
+         ;; ll: write tests for the others before providing/using them!
+         )
 
 (require "logger.rkt"
          "mutate-util.rkt"
@@ -53,7 +55,7 @@
 (define-mutator (function-result-swap stx mutation-index counter) #:type [type type:function-result-swap]
   (log-mutation-type type)
   (syntax-parse stx
-    [({~and {~datum ->} head} arg ... (values e ...))
+    [({~and {~datum ->} head} arg ... ({~and {~datum values} values} e ...))
      (define e-stxs (attribute e))
      (mdo* (def rearranged-e-stxs (rearrange-in-seq e-stxs
                                                     mutation-index
@@ -83,14 +85,15 @@
 (define-mutator (struct-field-swap stx mutation-index counter) #:type [type type:struct-field-swap]
   (log-mutation-type type)
   (syntax-parse stx
-    [({~and #:struct head} name:id ... (field-spec ...))
-     (define field-stxs (attribute field-spec))
-     (mdo* (def rearranged-field-stxs (rearrange-in-seq field-stxs
-                                                    mutation-index
-                                                    counter))
+    [({~and #:struct head} name:id ... ([field-name:id {~datum :} field-t] ...))
+     (define field-t-stxs (attribute field-t))
+     (mdo* (def rearranged-field-stxs (rearrange-in-seq field-t-stxs
+                                                        mutation-index
+                                                        counter))
            [return
-            (quasisyntax/loc stx
-              (head name ... (#,@rearranged-field-stxs)))])]
+            (with-syntax ([[new-field-t ...] rearranged-field-stxs])
+              (quasisyntax/loc stx
+                (head name ... ([field-name : new-field-t] ...))))])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -147,5 +150,75 @@
     [else
      (no-mutation stx mutation-index counter)]))
 
-;; lltodo: tests for mutators
+(module+ test
+  (require ruinit
+           "mutate-test-common.rkt")
 
+  (test-begin
+    #:name function-arg-swap
+    (test-mutator* function-arg-swap
+                   #'(-> A B C D)
+                   (list #'(-> B A C D)
+                         #'(-> A B C D)))
+    (test-mutator* function-arg-swap
+                   #'(-> A B C D E)
+                   (list #'(-> B A C D E)
+                         #'(-> A B D C E)
+                         #'(-> A B C D E))))
+  (test-begin
+    #:name function-result-swap
+    (test-mutator* function-result-swap
+                   #'(-> A B C D)
+                   (list #'(-> A B C D)))
+    (test-mutator* function-result-swap
+                   #'(-> A (values B C D))
+                   (list #'(-> A (values C B D))
+                         #'(-> A (values B C D))))
+    (test-mutator* function-result-swap
+                   #'(-> A (values B C D E))
+                   (list #'(-> A (values C B D E))
+                         #'(-> A (values B C E D))
+                         #'(-> A (values B C D E)))))
+
+  (test-begin
+    #:name vector-arg-swap
+    (test-mutator* vector-arg-swap
+                   #'(Vector A B C D)
+                   (list #'(Vector B A C D)
+                         #'(Vector A B D C)
+                         #'(Vector A B C D)))
+    (test-mutator* vector-arg-swap
+                   #'(Vector A B C D E)
+                   (list #'(Vector B A C D E)
+                         #'(Vector A B D C E)
+                         #'(Vector A B C D E))))
+
+  (test-begin
+    #:name struct-field-swap
+    (test-mutator* struct-field-swap
+                   #'[#:struct foo ([x : Number]
+                                    [y : String]
+                                    [z : Bar])]
+                   (list #'[#:struct foo ([x : String]
+                                          [y : Number]
+                                          [z : Bar])]
+                         #'[#:struct foo ([x : Number]
+                                          [y : String]
+                                          [z : Bar])]))
+    (test-mutator* struct-field-swap
+                   #'[#:struct foo ([x : Number]
+                                    [y : String]
+                                    [z : Bar]
+                                    [e : Woozle])]
+                   (list #'[#:struct foo ([x : String]
+                                          [y : Number]
+                                          [z : Bar]
+                                          [e : Woozle])]
+                         #'[#:struct foo ([x : Number]
+                                          [y : String]
+                                          [z : Woozle]
+                                          [e : Bar])]
+                         #'[#:struct foo ([x : Number]
+                                          [y : String]
+                                          [z : Bar]
+                                          [e : Woozle])]))))

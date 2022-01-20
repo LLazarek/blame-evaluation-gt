@@ -63,25 +63,28 @@
     [(_ [count-with (counter-id:id current-value:expr)]
         (def bound-id:expr m-expr:expr)
         more-clauses ...+)
-     #'(match-let* ([counter-id current-value]
+     (syntax/loc stx
+       (match-let* ([counter-id current-value]
                     [(mutated bound-id counter-id) m-expr])
          (mdo [count-with (counter-id counter-id)]
-              more-clauses ...))]
+              more-clauses ...)))]
     [(_ [count-with (counter-id:id current-value:expr)]
         (def/value bound-id:expr non-m-expr:expr)
         more-clauses ...+)
-     #'(match-let* ([bound-id non-m-expr])
+     (syntax/loc stx
+       (match-let* ([bound-id non-m-expr])
          (mdo [count-with (counter-id current-value)]
-              more-clauses ...))]
+              more-clauses ...)))]
     ;; return <=> mmap
     [(_ [count-with (counter-id:id current-value:expr)]
         [return m-expr:expr])
-     #'(mutated m-expr
-                counter-id)]
+     (syntax/loc stx
+       (mutated m-expr
+                counter-id))]
     ;; in <=> mbind
     [(_ [count-with (counter-id:id current-value:expr)]
         [in m-expr:expr])
-     #'m-expr]))
+     (syntax/loc stx m-expr)]))
 
 ;; bind version that shows more clearly how this is similar to monadic do
 ;; but it doesn't simply support pattern matching for id like above..

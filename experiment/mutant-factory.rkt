@@ -140,9 +140,10 @@
                  [current-result-cache (load-result-cache)])
     (log-factory info @~a{Running on benchmark @bench})
 
-    (define mutatable-module-names (benchmark->mutatable-modules bench))
+    (define select-modules (configured:select-modules-to-mutate))
+    (define mutatable-module-names (select-modules bench))
     (define max-config (make-max-bench-config bench))
-    (log-factory info "Benchmark has modules:~n~a"
+    (log-factory info "Benchmark has mutatable modules:~n~a"
                  mutatable-module-names)
 
     (unless (directory-exists? (data-output-dir))
