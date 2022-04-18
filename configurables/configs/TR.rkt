@@ -19,7 +19,7 @@
               select-top-of-context/filter-typed
               ; blame
               select-all-blamed)
-  (configure! bt-root-sampling         subset-random-without-replacement
+  (configure! bt-root-sampling         subset-random-with-replacement
               config-has-both-sides-of-interface-untyped?)
   (configure! trail-completion         any-type-error/blamed-at-max)
 

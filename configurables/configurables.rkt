@@ -104,7 +104,7 @@
     #:module "bt-root-sampling/pre-selected.rkt"
     #:parameters [pre-selected-bt-root-db])
 
-  (define-implementation subset-random-without-replacement
-    #:module "bt-root-sampling/subset-random-wo-replacement.rkt"
+  (define-implementation subset-random-with-replacement
+    #:module "bt-root-sampling/subset-random-w-replacement.rkt"
     #:parameters [root-config-filter]))
 

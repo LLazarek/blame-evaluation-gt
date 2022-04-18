@@ -7,7 +7,7 @@
 
 (define ((benchmark-named name) a-benchmark)
   (equal? (benchmark->name (bench-info-benchmark a-benchmark)) name))
-(define (untyped? config key) (equal? (hash-ref config key) 'untyped))
+(define (untyped? config key) (equal? (hash-ref config key) 'none))
 
 (define config-has-both-sides-of-interface-untyped?
   (match-lambda** [{(? (benchmark-named "sieve")) config}
