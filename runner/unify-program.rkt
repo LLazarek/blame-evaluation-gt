@@ -115,11 +115,11 @@
 (define (unified-module-path-of? orig-mod-path maybe-unified-mod-path)
   (match* {(explode-path/string orig-mod-path)
            (explode-path/string maybe-unified-mod-path)}
-    [{(list before-parts/orig ... (or "untyped" "typed") name/orig)
+    [{(list before-parts/orig ... (or "untyped" "typed" "both") name/orig)
       (list before-parts/unif ... (== unification-directory-name) name/unif)}
      (and (equal? before-parts/orig before-parts/unif)
           (equal? name/orig name/unif))]
-    [{(and parts/orig (list _ ... (or "base" "both") _))
+    [{(and parts/orig (list _ ... "base" _))
       parts/unif}
      (equal? parts/orig parts/unif)]
     [{_ _} #f]))
@@ -283,4 +283,17 @@
               (list (mod (simple-form-path "../../gtp-benchmarks/benchmarks/kcfa/both/benv-adapted.rkt")
                          #'(module main racket
                              (#%module-begin a b c))))
-              'pos 'neg)))
+              'pos 'neg))
+
+  (test-begin
+    #:name unified-module-path-of?
+    (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/typed/a.rkt"
+                             "/foo/bar/baz/benchmarks/sieve/unified/a.rkt")
+    (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/untyped/a.rkt"
+                             "/foo/bar/baz/benchmarks/sieve/unified/a.rkt")
+    (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/both/type-interface.rkt"
+                             "/foo/bar/baz/benchmarks/sieve/unified/type-interface.rkt")
+    (not (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/base/a.rkt"
+                                  "/foo/bar/baz/benchmarks/sieve/unified/a.rkt"))
+    (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/base/a.rkt"
+                             "/foo/bar/baz/benchmarks/sieve/base/a.rkt")))

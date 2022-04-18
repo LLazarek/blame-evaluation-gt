@@ -72,6 +72,12 @@
   (define-values {parent name _2} (split-path (simple-form-path p)))
   (build-path parent new-name))
 
+(define (simple-form-path? path)
+  (and (path? path)
+       (complete-path? path)
+       (for/and ([p (in-list (explode-path path))])
+         (path-for-some-system? p))))
+
 (module+ test
   (require ruinit)
   (test-begin

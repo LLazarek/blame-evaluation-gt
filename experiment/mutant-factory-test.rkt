@@ -225,6 +225,15 @@
             (hash)
             5)))
 
+(displayln
+ @~a{
+
+     The following tests may display error messages as part of testing error handling.
+     These messages can be safely ignored in the absence of *test failure* messages.
+     A test failure will be identified by a block labeled with: ----- FAILURE -----
+
+
+     })
 
 (test-begin
  #:name dead-process-blame/type-errors

@@ -5,7 +5,8 @@
          index-exceeded-outcome
          index-exceeded?
          run-status/c
-         run-outcome/c)
+         run-outcome/c
+         mutated-identifier?)
 
 (require racket/contract
          racket/math
@@ -40,6 +41,7 @@
         library-path?))
 
 (define run-outcome/c (apply or/c outcomes))
+(define mutated-identifier? (or/c string? symbol?))
 
 (define run-status/c
   (struct/dc run-status
@@ -48,7 +50,7 @@
              [mutated-id        {outcome}
                                 (if (equal? outcome index-exceeded-outcome)
                                     #f
-                                    symbol?)]
+                                    mutated-identifier?)]
              [outcome           run-outcome/c]
              [blamed            {outcome}
                                 (cond [(member outcome '(blamed type-error))

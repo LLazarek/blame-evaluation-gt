@@ -18,6 +18,7 @@
          (only-in syntax/modresolve [resolve-module-path module-path->path])
          "modgraph.rkt"
          "../util/program.rkt"
+         "../util/path-utils.rkt"
          "../util/optional-contracts.rkt"
          "../configurables/configurables.rkt")
 
@@ -53,6 +54,14 @@
                    module-containing-directory
                    (mod-stx m)))
 
+(define ((write-module-to-disk! base-path write-to-dir on-module-exists) a-mod)
+  (define path (resolved-module-path-string a-mod))
+  (define rel-path (find-relative-path base-path path))
+  (define new-path (simple-form-path (build-path write-to-dir rel-path)))
+  (make-parent-directory* new-path)
+  (call-with-output-file new-path #:exists on-module-exists
+    (λ (out) (pretty-write (syntax->datum (resolved-module-stx a-mod)) out))))
+
 ;; The returned thunk will throw one of the above exceptions if `a-program`
 ;; raises an exception in the process of begin evaluated.
 ;; `exn:fail:runner:module-evaluation?` is raised if just evaluating the modules
@@ -67,13 +76,31 @@
                                            #:make-result
                                            [make-result (λ (ns r) r)]
                                            #:run-with
-                                           [run-main run-with:require])
+                                           [run-main run-with:require]
+
+                                           #:modules-base-path
+                                           [base-path #f]
+                                           #:write-modules-to
+                                           [write-to-dir #f]
+                                           #:on-module-exists
+                                           [on-module-exists 'error])
   (->i ([a-program program/c]
         [instrument-module (mod/c . -> . syntax?)])
        (#:setup-namespace [setup-namespace! (namespace? . -> . void?)]
         #:before-main [do-before-main! (namespace? . -> . any)]
         #:make-result [make-result (namespace? any/c . -> . any/c)]
-        #:run-with [run-main ((list/c 'file path-string?) . -> . any/c)])
+        #:run-with [run-main ((list/c 'file path-string?) . -> . any/c)]
+
+        #:modules-base-path [base-path (or/c simple-form-path? #f)]
+        #:write-modules-to [write-to-dir (or/c path-string? #f)]
+        #:on-module-exists [on-module-exists (or/c 'error 'replace)])
+
+       #:pre/desc {base-path write-to-dir}
+       (or (not (and write-to-dir
+                     (not (unsupplied-arg? write-to-dir))
+                     (or (not base-path)
+                         (unsupplied-arg? base-path))))
+           "must specify #:modules-base-path if #:write-modules-to is specified")
 
        [result (-> any)])
 
@@ -103,6 +130,9 @@
     (append others/instrumented/ordered
             (list main/instrumented)))
 
+  (when write-to-dir
+    (for-each (write-module-to-disk! base-path write-to-dir on-module-exists)
+              others+main/instrumented/ordered))
 
   (define ns (make-base-namespace))
   (setup-namespace! ns)

@@ -11,6 +11,7 @@
          swap->
          delegating-struct
          swap-struct-field
+         sealing-adapter
 
          sexp-diff)
 
@@ -36,7 +37,7 @@
 
 ;; type-diff
 (struct td () #:transparent)
-(struct td:-> td (argument? index-map) #:transparent)
+(struct td:-> td (argument-index-map result-index-map) #:transparent)
 (struct td:base td (original new) #:transparent)
 (struct td:vector td (index-map) #:transparent)
 (struct td:struct td (index-map) #:transparent)
@@ -49,33 +50,51 @@
                   [index    (in-naturals)]
                   #:when (td? maybe-td))
          (cons index maybe-td))]))
-  (match a-sexp-diff
-    [(list* '-> (app (mapping sexp->type-diff)
-                     (or (binding (list #f ...
-                                        (or (? td? sub-tds)
-                                            (list* 'values
-                                                   (and (list _ ... (? td?) _ ...)
-                                                        sub-tds))))
-                                  #:with [arg? #f])
-                         (binding (and (list _ ... (? td?) _ ... #f)
-                                       sub-tds)
-                                  #:with [arg? #t]))))
-     (td:-> arg? (list->td-index-map sub-tds))]
-    [(list* 'Vector (and (list _ ... (? td?) _ ... #f)
-                         sub-tds))
-     (td:vector (list->td-index-map sub-tds))]
-    [(list '#:struct name (list [list fields ': (app sexp->type-diff sub-tds)] ...))
-     #;(define (indexes->fields index-map)
-       (for/list ([{i td} (in-dict index-map)])
-         (cons (field (list-ref fields i) i) td)))
-     (td:struct (list->td-index-map sub-tds))]
-    [(difference original new)
-     (td:base original new)]
-    [(list* 'values (app (mapping sexp->type-diff)
-                         result-tds))
-     (and (ormap td? result-tds)
-          (cons 'values result-tds))]
-    [(? symbol?) #f]))
+  (define td
+    (let recur ([sexp-diff-part a-sexp-diff])
+      (match sexp-diff-part
+        [(list* '-> (app (mapping recur)
+                         (list arg-tds ...
+                               (or (list* 'values result-tds)
+                                   result-tds))))
+         (define arg-map (list->td-index-map arg-tds))
+         (define result-map (list->td-index-map (if (list? result-tds)
+                                                    result-tds
+                                                    (list result-tds))))
+         (and (or (not (empty? arg-map)) (not (empty? result-map)))
+              (td:-> arg-map result-map))]
+        [(list* 'Vector (and (list _ ... (? td?) _ ... #f)
+                             sub-tds))
+         (td:vector (list->td-index-map sub-tds))]
+        [(list '#:struct name (list [list fields ': (app recur sub-tds)] ...))
+         #;(define (indexes->fields index-map)
+             (for/list ([{i td} (in-dict index-map)])
+               (cons (field (list-ref fields i) i) td)))
+         (td:struct (list->td-index-map sub-tds))]
+        [(difference original new)
+         (td:base original new)]
+        [(list* 'values (app (mapping recur)
+                             result-tds))
+         (and (ormap td? result-tds)
+              (cons 'values result-tds))]
+        [(? symbol?) #f]
+        [(? list? (app (mapping recur) (list #f ...))) #f]
+        [something-else
+         (error 'sexp->type-diff
+                @~a{
+                    Don't know how to convert sexp-diff to type-diff:
+                    @~s[a-sexp-diff]
+                    specifically, this part is unrecognized:
+                    @~s[something-else]
+                    })])))
+  (unless td
+    (error 'sexp->type-diff
+           @~a{
+               No diff found in argument.
+               Expected: a sexp-diff
+               Given: @~s[a-sexp-diff]
+               }))
+  td)
 
 (module+ test
   (require ruinit)
@@ -85,34 +104,56 @@
                  (td:base 'A 'B))
     (test-equal? (sexp->type-diff (sexp-diff '(-> A C)
                                              '(-> B C)))
-                 (td:-> #t `((0 . ,(td:base 'A 'B)))))
+                 (td:-> `((0 . ,(td:base 'A 'B)))
+                        '()))
+    (test-equal? (sexp->type-diff (sexp-diff '(-> A (listof C))
+                                             '(-> B (listof C))))
+                 (td:-> `((0 . ,(td:base 'A 'B)))
+                        '()))
     (test-equal? (sexp->type-diff (sexp-diff '(-> A Z Z Z C)
                                              '(-> B Z Z Z C)))
-                 (td:-> #t `((0 . ,(td:base 'A 'B)))))
+                 (td:-> `((0 . ,(td:base 'A 'B)))
+                        '()))
     (test-equal? (sexp->type-diff (sexp-diff '(-> Z Z A Z C)
                                              '(-> Z Z B Z C)))
-                 (td:-> #t `((2 . ,(td:base 'A 'B)))))
+                 (td:-> `((2 . ,(td:base 'A 'B)))
+                        '()))
     (test-equal? (sexp->type-diff (sexp-diff '(-> X Z A Z C)
                                              '(-> Y Z B Z C)))
-                 (td:-> #t `((0 . ,(td:base 'X 'Y))
-                             (2 . ,(td:base 'A 'B)))))
+                 (td:-> `((0 . ,(td:base 'X 'Y))
+                          (2 . ,(td:base 'A 'B)))
+                        '()))
     (test-equal? (sexp->type-diff (sexp-diff '(-> Z Z Z A)
                                              '(-> Z Z Z B)))
-                 (td:-> #f `((0 . ,(td:base 'A 'B)))))
+                 (td:-> '()
+                        `((0 . ,(td:base 'A 'B)))))
     (test-equal? (sexp->type-diff (sexp-diff '(-> Z Z Z (values A))
                                              '(-> Z Z Z (values B))))
-                 (td:-> #f `((0 . ,(td:base 'A 'B)))))
+                 (td:-> '()
+                        `((0 . ,(td:base 'A 'B)))))
     (test-equal? (sexp->type-diff (sexp-diff '(-> Z Z Z (values Z A))
                                              '(-> Z Z Z (values Z B))))
-                 (td:-> #f `((1 . ,(td:base 'A 'B)))))
+                 (td:-> '()
+                        `((1 . ,(td:base 'A 'B)))))
     (test-equal? (sexp->type-diff (sexp-diff '(-> Z Z Z (values Z A Z X))
                                              '(-> Z Z Z (values Z B Z Y))))
-                 (td:-> #f `((1 . ,(td:base 'A 'B))
-                             (3 . ,(td:base 'X 'Y)))))
+                 (td:-> '()
+                        `((1 . ,(td:base 'A 'B))
+                          (3 . ,(td:base 'X 'Y)))))
 
     (test-equal? (sexp->type-diff (sexp-diff '(-> Z Z Z (values Z (-> A C)))
                                              '(-> Z Z Z (values Z (-> B C)))))
-                 (td:-> #f `((1 . ,(td:-> #t `((0 . ,(td:base 'A 'B))))))))))
+                 (td:-> '()
+                        `((1 . ,(td:-> `((0 . ,(td:base 'A 'B)))
+                                       '())))))
+
+    (test-equal? (sexp->type-diff (sexp-diff '[#:struct
+                                               stream
+                                               ((first : Natural) (rest : (-> stream)))]
+                                             '[#:struct
+                                               stream
+                                               ((first : Index) (rest : (-> stream)))]))
+                 (td:struct `((0 . ,(td:base 'Natural 'Index)))))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -126,6 +167,14 @@
   ;;  |    + middle layer
   ;;  + top layer
   ;;
+  (assert (not (equal? original mutated))
+          #:name 'mutation-adapter:generate-adapter-ctc
+          @~a{
+              Original and mutated are the same?
+              @~s[original]
+              vs
+              @~s[mutated]
+              })
   (define type-diff (sexp->type-diff (sexp-diff original mutated)))
   (define full-combinator
     (match mutation-type
@@ -137,15 +186,24 @@
        (function-arg/result-swap-adapter type-diff)]
       [(== type:struct-field-swap)
        (struct-field-swap-adapter type-diff)]
-      #;[type:vector-arg-swap
-       (vector-swap-adapter type-diff)]
+      ;; [(== type:vector-arg-swap)
+      ;;  (vector-swap-adapter type-diff)]
       ;; [type:function-arg-drop
       ;;  (function-arg-drop-adapter annotated-diff)]
       ;; [type:function-result-drop
       ;;  (function-result-drop-adapter annotated-diff)]
       ;; [type:union-branch-drop
       ;;  (union-branch-drop-adapter annotated-diff)]
-      ))
+      [other-type
+       (error
+        'mutation-adapter:generate-adapter-ctc
+        @~a{
+            Received unknown or unimplemented mutation type: @other-type
+            For mutation:
+            @~s[original]
+            -->
+            @~s[mutated]
+            })]))
   full-combinator)
 
 (struct recur () #:transparent)
@@ -158,12 +216,13 @@
   (let loop ([td td])
     (match* {(instantiator td) td}
       [{(and (not (recur)) result) _} result]
-      [{(recur) (and (td:base _ _) base)}
+      [{(recur) (? td:base? base)}
        (error 'type-diff->contract
               @~a{given instantiator @~e[instantiator] asked to recur into td:base @~e[base]})]
-      [{(recur) (td:-> arg? index-map)}
-       (delegating-> arg?
-                     (for/list ([{i td} (in-dict index-map)])
+      [{(recur) (td:-> arg-index-map result-index-map)}
+       (delegating-> (for/list ([{i td} (in-dict arg-index-map)])
+                       (cons i (loop td)))
+                     (for/list ([{i td} (in-dict result-index-map)])
                        (cons i (loop td))))]
       [{(recur) (td:struct index-map)}
        (delegating-struct (for/list ([{field td} (in-dict index-map)])
@@ -174,7 +233,7 @@
 (define (generate-delegating-adapter-ctc type name ctc)
   (define td (sexp->type-diff (sexp-diff type (replace-name-in-sexp type name (gensym name)))))
   (type-diff->contract td
-                       (match-lambda [(td:base _ _) ctc]
+                       (match-lambda [(? td:base?) ctc]
                                      [else (recur)])))
 
 (define (base-type-substitution-adapter type-diff)
@@ -209,8 +268,14 @@
 (define (function-arg/result-swap-adapter type-diff)
   (type-diff->contract
    type-diff
-   (match-lambda [(td:-> arg? `((,i1 . ,(td:base t1-orig t1-new))
-                                (,i2 . ,(td:base t2-orig t2-new))))
+   (match-lambda [(or (binding (td:-> `((,i1 . ,(td:base t1-orig t1-new))
+                                        (,i2 . ,(td:base t2-orig t2-new)))
+                                      '())
+                               #:with [arg? #t])
+                      (binding (td:-> '()
+                                      `((,i1 . ,(td:base t1-orig t1-new))
+                                        (,i2 . ,(td:base t2-orig t2-new))))
+                               #:with [arg? #f]))
                   (assert (and (equal? t1-orig t2-new)
                                (equal? t2-orig t1-new))
                           #:name 'function-arg-swap-adapter
@@ -272,78 +337,99 @@
   #:methods gen:adapted
   [(define (->stx this)
      #`(make-base-type-adapter '#,(transform/c-from-type this)
-                           '#,(transform/c-to-type this)))])
+                               '#,(transform/c-to-type this)))])
+(struct sealed ())
+(struct sealing-adapter adapter/c ()
+  #:property prop:contract
+  (build-contract-property
+   #:name (const 'sealing-adapter)
+   #:late-neg-projection
+   (λ (this)
+     (λ (blame)
+       (λ (v neg-party)
+         (sealed)))))
+  #:methods gen:adapted
+  [(define (->stx this)
+     #`(sealing-adapter))])
 
-;; This weird dance with this macro wrapping the adapt-arguments? expr in a thunk is only there to delay the reference to struct accessor ids until they are defined.
-;; IOW those references must happen under the lambda of the projection, otherwise they're unbound.
-(define-simple-macro (simple->adapter-projection make-arg/result-adapter:expr
-                                                 adapt-arguments?:expr)
-  (simple->adapter-projection-helper make-arg/result-adapter
-                                     (λ _ adapt-arguments?)))
-(define (simple->adapter-projection-helper make-arg/result-adapter
-                                           get-adapt-arguments?)
+;; (struct-instance? -> (values (or/c #f (-> list? list?))
+;;                              (or/c #f (-> list? list?))))
+;; ->
+;; (struct-instance? -> late-neg-projection?)
+;;
+;; `make-arg/result-adapters` returns up to two functions:
+;; the first can transform the arguments, and the second can transform the results.
+;; Either being #f signals that that step is not necessary (which might make things more efficient).
+(define (simple->adapter-projection make-arg/result-adapters)
   (λ (this)
-    (define adapt-arguments? (get-adapt-arguments?))
-    (define arg/result-adapter (make-arg/result-adapter this))
+    (define-values {arg-adapter result-adapter} (make-arg/result-adapters this))
     (define impersonator-wrapper
       (make-keyword-procedure
-       (if (adapt-arguments? this)
-           (λ (kws kw-args . args)
-             (define new-args (arg/result-adapter args))
-             (apply values
-                    (if (empty? kw-args)
-                        new-args
-                        (list kw-args new-args))))
-           (λ (kws kw-args . args)
+       (λ (kws kw-args . args)
+         (define new-args (if (procedure? arg-adapter)
+                              (arg-adapter args)
+                              args))
+         (define impersonator-arg-results
+           (if (empty? kw-args)
+               new-args
+               (list kw-args new-args)))
+         (if (procedure? result-adapter)
              (apply values
                     (λ results
-                      (apply values
-                             (arg/result-adapter results)))
-                    (if (empty? kw-args)
-                        args
-                        (list kw-args args)))))))
+                      (apply values (result-adapter results)))
+                    impersonator-arg-results)
+             (apply values impersonator-arg-results)))))
     (λ (blame)
       (λ (v neg-party)
         (impersonate-procedure v
                                impersonator-wrapper)))))
 
 ;; doesn't support keyword mutations
-(struct delegating-> adapter/c (argument? index-ctc-pairs)
+(struct delegating-> adapter/c (arg-index-ctc-pairs result-index-ctc-pairs)
   #:property prop:contract
   (build-contract-property
    #:name (λ (this)
-            (cons (if (delegating->-argument? this)
-                      'delegating->arg
-                      'delegating->result)
-                  (for/list ([{index ctc} (in-dict (delegating->-index-ctc-pairs this))])
+            (list 'delegating->
+                  (for/list ([{index ctc} (in-dict (delegating->-arg-index-ctc-pairs this))])
+                    (list index (contract-name ctc)))
+                  (for/list ([{index ctc} (in-dict (delegating->-result-index-ctc-pairs this))])
                     (list index (contract-name ctc)))))
    #:late-neg-projection
-   (simple->adapter-projection (λ (this)
-                                 (define index-ctc-pairs (delegating->-index-ctc-pairs this))
-                                 (λ (args/results) (apply-contracts-in-list args/results index-ctc-pairs)))
-                               delegating->-argument?))
+   (simple->adapter-projection
+    (λ (this)
+      (define arg-index-ctc-pairs (delegating->-arg-index-ctc-pairs this))
+      (define result-index-ctc-pairs (delegating->-result-index-ctc-pairs this))
+      (values (and (not (empty? arg-index-ctc-pairs))
+                   (λ (args) (apply-contracts-in-list args arg-index-ctc-pairs)))
+              (and (not (empty? result-index-ctc-pairs))
+                   (λ (results) (apply-contracts-in-list results result-index-ctc-pairs)))))))
   #:methods gen:adapted
   [(define/generic generic->stx ->stx)
    (define (->stx this)
-     #`(delegating-> #,(delegating->-argument? this)
-                     (list #,@(for/list ([{i ctc} (in-dict (delegating->-index-ctc-pairs this))])
+     #`(delegating-> (list #,@(for/list ([{i ctc} (in-dict (delegating->-arg-index-ctc-pairs this))])
+                                #`(cons #,i #,(generic->stx ctc))))
+                     (list #,@(for/list ([{i ctc} (in-dict (delegating->-result-index-ctc-pairs this))])
                                 #`(cons #,i #,(generic->stx ctc))))))])
 
 (struct swap-> adapter/c (argument? i1 i2)
   #:property prop:contract
   (build-contract-property
    #:name (λ (this)
-            (list (if (delegating->-argument? this)
+            (list (if (swap->-argument? this)
                       'swap->arg
                       'swap->result)
                   (swap->-i1 this)
                   (swap->-i2 this)))
    #:late-neg-projection
-   (simple->adapter-projection (λ (this)
-                                 (define i1 (swap->-i1 this))
-                                 (define i2 (swap->-i2 this))
-                                 (λ (args/results) (swap-in-list args/results i1 i2)))
-                               swap->-argument?))
+   (simple->adapter-projection
+    (λ (this)
+      (define argument? (swap->-argument? this))
+      (define i1 (swap->-i1 this))
+      (define i2 (swap->-i2 this))
+      (define swapper (λ (args/results) (swap-in-list args/results i1 i2)))
+      (if argument?
+          (values swapper #f)
+          (values #f swapper)))))
   #:methods gen:adapted
   [(define (->stx this)
      #`(swap-> #,(swap->-argument? this) #,(swap->-i1 this) #,(swap->-i2 this)))])
@@ -490,13 +576,13 @@
                    (mutated-interface-type '(-> Integer Integer)
                                            '(-> Real Integer)
                                            type:base-type-substitution)))
-                 '(delegating->arg [0 transform/c]))
+                 '(delegating-> [[0 transform/c]] []))
     (test-equal? (contract-name
                   (generate-adapter-ctc
                    (mutated-interface-type '(-> Integer Real)
                                            '(-> Integer Integer)
                                            type:base-type-substitution)))
-                 '(delegating->result [0 transform/c]))
+                 '(delegating-> [] [[0 transform/c]]))
     (test-adapter-contract
      [f (λ _ 5.2)
         #:with-contract (generate-adapter-ctc
@@ -509,7 +595,7 @@
                    (mutated-interface-type '(-> Integer (values Integer Real))
                                            '(-> Integer (values Integer Integer))
                                            type:base-type-substitution)))
-                 '(delegating->result [1 transform/c]))
+                 '(delegating-> [] [[1 transform/c]]))
     (test-adapter-contract
      [f (λ _ (values 2 5.2))
         #:with-contract (generate-adapter-ctc
@@ -527,7 +613,7 @@
                                                 (-> Integer Integer)
                                                 (values Integer Real))
                                            type:base-type-substitution)))
-                 '(delegating->arg [1 (delegating->result [0 transform/c])]))
+                 '(delegating-> [[1 (delegating-> [] [[0 transform/c]])]] []))
     (test-adapter-contract
      [f (λ (s g) (values 2 (g 0)))
         #:with-contract (generate-adapter-ctc

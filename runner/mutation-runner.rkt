@@ -67,12 +67,6 @@
     (dynamic-require 'typed-racket/utils/transient-contract-struct
                      'exn:fail:contract:blame:transient?)))
 
-(define (simple-form-path? path)
-  (and (path? path)
-       (complete-path? path)
-       (for/and ([p (in-list (explode-path path))])
-         (path-for-some-system? p))))
-
 (define/contract (make-mutated-program-runner a-program
                                               module-to-mutate
                                               mutation-index
@@ -86,7 +80,7 @@
        (#:modules-base-path [base-path (or/c simple-form-path? #f)]
         #:write-modules-to [write-to-dir (or/c path-string? #f)]
         #:on-module-exists [on-module-exists (or/c 'error 'replace)]
-        #:mutator [mutate (mod/c natural? #:in program/c . -> . (values syntax? symbol?))])
+        #:mutator [mutate (mod/c natural? #:in program/c . -> . (values syntax? mutated-identifier?))])
        #:pre/desc {base-path write-to-dir}
        (or (not (and write-to-dir
                      (not (unsupplied-arg? write-to-dir))
@@ -98,51 +92,22 @@
            "module-to-mutate must be part of a-program")
 
        (values [runner (-> any)]
-               [mutated-id symbol?]))
-
-  (define mod-paths/write-to
-    (and
-     write-to-dir
-     (for/fold ([new-paths #hash()])
-               ([mod (in-list (program->mods a-program))])
-       (define old-path (mod-path mod))
-       (define rel-path (find-relative-path base-path old-path))
-       (define new-path (simple-form-path (build-path write-to-dir rel-path)))
-       (hash-set new-paths old-path new-path))))
-
-  (define (maybe-write-module! a-mod)
-    (when write-to-dir
-      (define path (mod-path a-mod))
-      (define new-path (hash-ref mod-paths/write-to path
-                                 (λ _
-                                   (error 'write-modules-to
-                                          "~v not found in ~v"
-                                          path
-                                          mod-paths/write-to))))
-      (log-mutation-runner-debug "writing module configuration for ~a to ~a"
-                               (find-relative-path base-path path)
-                               new-path)
-      (make-parent-directory* new-path)
-      (call-with-output-file new-path #:exists on-module-exists
-        (λ (out) (pretty-write (syntax->datum (mod-stx a-mod)) out)))))
+               [mutated-id mutated-identifier?]))
 
   ;; ll: Ugly hack to get the mutated id out of the instrumentor
   (define mutated-id-box (box #f))
-  (define (record-mutated-id/maybe-write-modules a-mod)
+  (define (mutate-and-record-id a-mod)
     (match a-mod
       [(and (== module-to-mutate)
             (mod path stx))
        (define-values (mutated-stx mutated-id)
          (mutate a-mod mutation-index #:in a-program))
-       (maybe-write-module! (mod path mutated-stx))
 
        ;; ll: see above...
        (set-box! mutated-id-box mutated-id)
 
-       (replace-stx-location mutated-stx path)]
-      [(mod _ stx)
-       (maybe-write-module! a-mod)
-       stx]))
+       (mod path (replace-stx-location mutated-stx path))]
+      [other other]))
 
   (define (setup-namespace! ns)
     ;; Make racket/contract come from the same namespace so that
@@ -173,8 +138,9 @@
   (define runner
     (make-instrumented-runner
      a-program
-     (compose1 record-mutated-id/maybe-write-modules
-               configured-instrumenter)
+     (compose1 mod-stx
+               configured-instrumenter
+               mutate-and-record-id)
      #:setup-namespace setup-namespace!
      #:run-with (make-configured-runner a-program
                                         (mod->name module-to-mutate)
@@ -189,7 +155,10 @@
                        (apply build-path-string
                               (append (drop-right (explode-path (mod-path module-to-mutate)) 2)
                                       '("untyped"))))
-                     (eval `(current-directory ,program-dir-path) ns))))
+                     (eval `(current-directory ,program-dir-path) ns))
+     #:modules-base-path base-path
+     #:write-modules-to write-to-dir
+     #:on-module-exists on-module-exists))
   (define mutated-id (unbox mutated-id-box))
 
   (values runner mutated-id))
@@ -222,7 +191,7 @@
         #:modules-base-path [base-path (or/c simple-form-path? #f)]
         #:write-modules-to [write-to-dir (or/c path-string? #f)]
         #:on-module-exists [on-module-exists (or/c 'error 'replace)]
-        #:mutator [mutate (mod/c natural? #:in program/c . -> . (values syntax? symbol?))])
+        #:mutator [mutate (mod/c natural? #:in program/c . -> . (values syntax? mutated-identifier?))])
 
        #:pre/desc (base-path write-to-dir)
        (or (not (and write-to-dir (not (unsupplied-arg? write-to-dir))

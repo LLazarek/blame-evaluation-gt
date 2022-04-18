@@ -18,4 +18,22 @@
           #:logger logger
           level
           topic))
-   (λ results (apply values (unbox message-list-box) results))))
+   (λ results (apply values (reverse (unbox message-list-box)) results))))
+
+(module+ test
+  (require ruinit)
+  (test-begin
+    (ignore (define-logger wclm-test)
+            (define-values {messages _}
+              (with-collected-log-messages wclm-test-logger 'info 'wclm-test
+                (match-lambda [(vector level
+                                       str
+                                       payload
+                                       _)
+                               str]
+                              [other #f])
+                (thunk
+                 (for ([i 5])
+                   (log-wclm-test-info (~a i)))))))
+    (test-equal? messages
+                 (build-list 5 (curry ~a "wclm-test: ")))))

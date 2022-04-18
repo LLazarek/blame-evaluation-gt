@@ -84,7 +84,7 @@
 ;; (listof resolved-module?) -> (values resolved-module? (listof resolved-module?))
 (define split-interface-mod/rest
   (match-lambda [(list-no-order (and interface-mod
-                                     (resolved-module (== type-interface-file-name)
+                                     (resolved-module (? (path-ends-with type-interface-file-name))
                                                       _
                                                       _
                                                       _
@@ -124,7 +124,8 @@
 (module+ test
   (require ruinit
            racket/runtime-path
-           "../../mutate/type-api-mutators.rkt")
+           "../../mutate/type-api-mutators.rkt"
+           "../configurables.rkt")
 
   (define-runtime-path type-api-mutators.rkt "../../mutation-adapter/type-api-mutators.rkt")
 
@@ -133,10 +134,10 @@
   (define ((make-test-mod-instrumentor mutation-type new-interface-stx) a-mod)
     (match a-mod
       [(mod (== type-interface-file-name) _)
-       (log-mutation-type mutation-type)
+       (log-mutation-type (~a "not " mutation-type))
        (log-mutation-type mutation-type)
        (log-mutation 1 2)
-       (log-mutation-type mutation-type)
+       (log-mutation-type (~a "not " mutation-type))
        (make-test-resolved-mod type-interface-file-name new-interface-stx)]
       [(mod path stx)
        (make-test-resolved-mod path stx)]))
@@ -165,7 +166,50 @@
                                                     (require/typed/check/provide
                                                      "something"
                                                      [f (-> Real Number String)])))))])
-      (test-equal? type type:function-arg-swap)))
+      (test-equal? type type:function-arg-swap))
+
+    ;; Now test some real mutation logging
+    (ignore (configure! mutation type-interface-mistakes)
+            (define the-program
+              (program
+               (mod "main.rkt" #'(module main racket
+                                   (#%module-begin
+                                    (+ 2 2))))
+               (list
+                (mod type-interface-file-name
+                     #'(module type-interface typed/racket
+                         (#%module-begin
+                          (require "../../../utilities/require-typed-check-provide.rkt")
+                          (require/typed/check/provide
+                           "streams.rkt"
+                           (#:struct stream ((first : Natural) (rest : (-> stream))))
+                           (make-stream (-> Natural (-> stream) stream))
+                           (stream-unfold (-> stream (values Natural stream)))
+                           (stream-get (-> stream Natural Natural))
+                           (stream-take (-> stream Natural (Listof Natural)))))))))))
+    (for/and/test ([expected-mutation-type (list type:struct-field-swap
+                                                 type:base-type-substitution
+                                                 type:base-type-substitution
+                                                 type:function-arg-swap
+                                                 type:base-type-substitution
+                                                 type:base-type-substitution
+                                                 type:function-result-swap
+                                                 type:base-type-substitution)]
+                   [i (in-naturals)])
+      (define-values {instrumented-program type}
+        (instrument-program/get-mutation-type
+         the-program
+         (λ (a-mod)
+           (local-require "../../runner/mutation-runner.rkt")
+           (match a-mod
+             [(mod (== type-interface-file-name) _)
+              (define-values {mutated-stx mutated-id}
+                (mutate-module a-mod i #:in the-program))
+              (make-test-resolved-mod type-interface-file-name
+                                      mutated-stx)]
+             [(mod path stx)
+              (make-test-resolved-mod path stx)]))))
+      (test-equal? type expected-mutation-type)))
 
   (test-begin
     #:name instrument-program

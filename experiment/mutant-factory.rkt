@@ -798,7 +798,9 @@ Giving up.
                                    maybe-result
                                    mutant-will)]
       [(cons 'done-ok (struct* run-status ([outcome 'type-error])))
-       #:when (equal? (hash-ref config mod) 'none)
+       ;; mod may not be a configurable module, e.g. if it's a type interface module
+       #:when (and (hash-has-key? config mod)
+                   (equal? (hash-ref config mod) 'none))
        (log-factory warning
                     @~a{Mutant has unexpected type error, attempting to revive:})
        (maybe-revive-failed-mutant process-q

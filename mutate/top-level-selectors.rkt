@@ -13,7 +13,9 @@
           [select-define-body                  top-level-selector/c]
           [select-type-annotations+define-body top-level-selector/c]
 
-          [leftmost-identifier-in  (syntax? . -> . symbol?)]))
+          [leftmost-identifier-in  (syntax? . -> . symbol?)]
+
+          [mutated-identifier? (any/c . -> . boolean?)]))
 
 (require racket/bool
          racket/format
@@ -39,10 +41,11 @@
     [(list* (? symbol? s) _) s]
     [else '<no-name-found>]))
 
+(define mutated-identifier? (or/c string? symbol?))
 (define top-level-selector/c
   (->i ([stx syntax?])
        (values [parts-to-mutate (or/c #f (listof syntax?))]
-               [mutated-id (or/c #f symbol?)]
+               [mutated-id (or/c #f mutated-identifier?)]
                [reconstruct-stx (or/c #f ((listof syntax?) . -> . syntax?))])
        #:post/desc {parts-to-mutate mutated-id reconstruct-stx}
        (or (andmap false? (list parts-to-mutate

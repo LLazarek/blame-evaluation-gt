@@ -6,7 +6,7 @@
           [read-benchmark
            (path-to-existant-directory? . -> . (or/c #f benchmark/c))]
           [benchmark->mutatable-modules
-           (benchmark/c . -> . (listof string?))]
+           ({benchmark/c} {#:include-both? boolean?} . ->* . (listof string?))]
           [benchmark->name
            (benchmark/c . -> . string?)]
           [make-max-bench-config
@@ -66,9 +66,7 @@
   (match-define-values {(list main) others}
                        (partition (path-ends-with "main.rkt")
                                   configured-files))
-  (define adapters (match both
-                     [#f '()]
-                     [dir (directory-list dir #:build? #t)]))
+  (define adapters (benchmark-both->files both))
   (benchmark-configuration main
                            (append others
                                    adapters)
@@ -112,6 +110,11 @@
         #;(hash-set! benchmark-cache path result)
         result])]))
 
+(define (benchmark-both->files both)
+  (match both
+    [#f '()]
+    [dir (directory-list dir #:build? #t)]))
+
 (define (has-.rkt-extension? path)
   (path-has-extension? path ".rkt"))
 
@@ -148,7 +151,8 @@
 ;; Produces the names of the mutatable modules in `a-benchmark`
 (define (benchmark->mutatable-modules a-benchmark #:include-both? [include-both? #t])
   (map file-name-string-from-path
-       (append (or (and include-both? (benchmark-both a-benchmark))
+       (append (if include-both?
+                   (benchmark-both->files (benchmark-both a-benchmark))
                    empty)
                (benchmark-typed a-benchmark))))
 
@@ -308,4 +312,14 @@
                                                           #f
                                                           #f))
                  (make-program main/t
-                               (list a/t b/t)))))
+                               (list a/t b/t))))
+
+  (test-begin
+    #:name benchmark->mutatable-modules
+    #:short-circuit
+    #:before (setup!)
+    #:after (cleanup!)
+
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
+    (test-equal? (list->set (benchmark->mutatable-modules a-benchmark))
+                 (set "main.rkt" "a.rkt" "b.rkt" "adapter.rkt"))))

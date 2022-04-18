@@ -137,7 +137,7 @@
      @~a{
          Error: Module to mutate not in given program.
          Program: @the-program
-         Module: @the-module-to-mutate
+         Module: @(module-to-mutate)
          }))
 
   (define the-run-status

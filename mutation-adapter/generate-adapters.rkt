@@ -4,7 +4,8 @@
 
 (require "mutation-adapter.rkt"
          "util.rkt"
-         racket/runtime-path)
+         racket/runtime-path
+         syntax/parse)
 
 (struct mutated-type (name original-type new-type definition?) #:transparent)
 
@@ -22,7 +23,8 @@
   (define adapter-ctcs (generate-adapter-ctcs-for-mutation original-mod-stx
                                                            mutated-mod-stx
                                                            mutation-type))
-  (adapter-ctcs->module-stx adapter-ctcs mod-name))
+  (define interface-r/t/c/p-forms (extract-r/t/c/p-forms original-mod-stx))
+  (adapter-ctcs->module-stx adapter-ctcs mod-name interface-r/t/c/p-forms))
 
 ;; syntax? syntax? mutation-type? -> (listof (cons identifier? contract?))
 (define (generate-adapter-ctcs-for-mutation original-mod-stx
@@ -35,6 +37,16 @@
   (if mutated-definition?
       (adapt-all-referencing-provides mutated-mod-stx name adapter)
       (list (cons name (generate-adapter-ctc mit)))))
+
+(define extract-r/t/c/p-forms
+  (syntax-parser
+    [(module _ _
+       (#%module-begin
+        {~alt {~and forms ({~datum require/typed/check/provide} _ ...)}
+              _}
+        ...))
+     (attribute forms)]))
+
 
 (struct name+type (name type definition?) #:transparent)
 (define (r/t/p-entry->name+type entry)
@@ -206,11 +218,19 @@
   (define referencing-name (for/list ([n+t (in-list all-interface-types)]
                                       #:when (sexp-contains? (name+type-type n+t) name))
                              n+t))
-  (assert (not (ormap name+type-definition? referencing-name))
+  (define (another-name+type-definition? a-name+type)
+    (and (name+type-definition? a-name+type)
+         (not (equal? (name+type-name a-name+type)
+                      name))))
+  (assert (not (ormap another-name+type-definition? referencing-name))
           #:name 'adapt-all-referencing-provides
           @~a{
-              Found a type definition that refers to a mutated type.
+              Found one or more type definitions that refer to a mutated type.
               Chaining definition adapters to support this is not implemented yet.
+
+              Mutated type name: @name
+              Definitions referring to it:
+              @~s[(filter another-name+type-definition? referencing-name)]
               })
   (for/list ([ref (in-list referencing-name)])
     (cons (name+type-name ref)
@@ -236,12 +256,12 @@
                 (list-no-order
                  (cons 'b (app (compose1 syntax->datum ->stx)
                                '(delegating->
-                                 #f
+                                 (list)
                                  (list
                                   (cons 0 (delegating->
-                                           #t
                                            (list
-                                            (cons 0 (make-base-type-adapter 'Integer 'Real)))))))))))
+                                            (cons 0 (make-base-type-adapter 'Integer 'Real)))
+                                           (list)))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
@@ -258,18 +278,18 @@
                  (cons 'a
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
-                              #f
+                              (list)
                               (list
                                (cons 0 (make-base-type-adapter 'Integer 'Real))))))
                  (cons 'b
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
-                              #f
+                              (list)
                               (list
                                (cons 0 (delegating->
-                                        #t
                                         (list
-                                         (cons 0 (make-base-type-adapter 'Integer 'Real)))))))))))
+                                         (cons 0 (make-base-type-adapter 'Integer 'Real)))
+                                        (list)))))))))
     (test-exn (λ (e) (string-contains? (exn-message e)
                                        "not implemented"))
               (adapt-all-referencing-provides
@@ -283,47 +303,95 @@
                      [c Y])
                    (define-type Z2 (-> Foo (-> Number Number))))
                'Foo
-               any/c))))
+               any/c))
+
+    ;; This adaptation of `something` requires adapting both arguments and results.
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (define-type Z Real)
+                     (require/typed/provide "x.rkt"
+                       [#:struct foobar ([a : Real]
+                                         [b : Number])]
+                       [something (-> Natural (-> stream) stream)]
+                       [c Y])
+                     (define-type Z2 (-> String (-> Number Number))))
+                 'stream
+                 (make-base-type-adapter 'Integer 'Index))
+                (list-no-order
+                 (cons 'something
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 1 (delegating->
+                                        (list)
+                                        (list (cons 0 (make-base-type-adapter 'Integer 'Index))))))
+                              (list
+                               (cons 0 (make-base-type-adapter 'Integer 'Index))))))))))
 
 
-(define-runtime-path type-api-mutators.rkt "type-api-mutators.rkt")
-;; (dictof identifier? contract?) syntax?  -> syntax?
-(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name)
-  #`(module mutation-adapter racket
+(define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
+;; (dictof identifier? contract?) syntax? (listof syntax) -> syntax?
+(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name original-interface-r/t/c/p-forms)
+  (define redirected-interface-r/t/c/p-forms
+    (map (r/t/c/p-redirecter #''contracted) original-interface-r/t/c/p-forms))
+  #`(module mutation-adapter typed/racket
       (#%module-begin
-       (require (file #,(path->string type-api-mutators.rkt)))
-       (require #,interface-mod-name)
-       (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
-       (provide (contract-out
-                 #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
-                      #`[#,id #,(->stx adapter)]))))))
+       (module contracted racket
+         (require (file #,(path->string type-api-mutators.rkt)))
+         (require #,interface-mod-name)
+         (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
+         (provide (contract-out
+                   #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
+                        #`[#,id #,(->stx adapter)]))))
+       (require "../../../utilities/require-typed-check-provide.rkt")
+       #,@redirected-interface-r/t/c/p-forms)))
+
+;; syntax? -> (syntax? -> syntax?)
+(define (r/t/c/p-redirecter to)
+  (syntax-parser
+    [({~and r/t/c/p {~datum require/typed/check/provide}} source . more)
+     #`(r/t/c/p #,to . more)]))
 
 
 (module+ test
   (test-begin
    #:name adapter-ctcs->module-stx
    (test-equal? (syntax->datum
-                 (adapter-ctcs->module-stx empty "interface.rkt"))
-                `(module mutation-adapter racket
+                 (adapter-ctcs->module-stx empty "interface.rkt" empty))
+                `(module mutation-adapter typed/racket
                    (#%module-begin
-                    (require (file ,(path->string type-api-mutators.rkt)))
-                    (require "interface.rkt")
-                    (provide (except-out (all-from-out "interface.rkt")))
-                    (provide (contract-out)))))
+                    (module contracted racket
+                      (require (file ,(path->string type-api-mutators.rkt)))
+                      (require "interface.rkt")
+                      (provide (except-out (all-from-out "interface.rkt")))
+                      (provide (contract-out)))
+                    (require "../../../utilities/require-typed-check-provide.rkt"))))
    (test-equal?
     (syntax->datum
      (adapter-ctcs->module-stx
       `((foo . ,(make-base-type-adapter 'Integer 'Real))
-        (bar . ,(delegating-> #t (list (cons 1 (make-base-type-adapter 'Integer 'Real))))))
-      "interface.rkt"))
-    `(module mutation-adapter racket
+        (bar . ,(delegating-> (list (cons 1 (make-base-type-adapter 'Integer 'Real))) empty)))
+      "interface.rkt"
+      (list #'(require/typed/check/provide
+               "server.rkt"
+               [foo Integer]
+               [bar (-> Boolean Integer Void)]
+               [baz (-> Real String)]))))
+    `(module mutation-adapter typed/racket
        (#%module-begin
-        (require (file ,(path->string type-api-mutators.rkt)))
-        (require "interface.rkt")
-        (provide (except-out (all-from-out "interface.rkt")
-                             foo
-                             bar))
-        (provide
-         (contract-out
-          [foo (make-base-type-adapter 'Integer 'Real)]
-          [bar (delegating-> #t (list (cons 1 (make-base-type-adapter 'Integer 'Real))))])))))))
+        (module contracted racket
+          (require (file ,(path->string type-api-mutators.rkt)))
+          (require "interface.rkt")
+          (provide (except-out (all-from-out "interface.rkt")
+                               foo
+                               bar))
+          (provide
+           (contract-out
+            [foo (make-base-type-adapter 'Integer 'Real)]
+            [bar (delegating-> (list (cons 1 (make-base-type-adapter 'Integer 'Real))) (list))])))
+        (require "../../../utilities/require-typed-check-provide.rkt")
+        (require/typed/check/provide
+         'contracted
+         [foo Integer]
+         [bar (-> Boolean Integer Void)]
+         [baz (-> Real String)]))))))
