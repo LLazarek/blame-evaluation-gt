@@ -35,8 +35,11 @@
   (define mit (mutated-interface-type original-type new-type mutation-type))
   (define adapter (generate-adapter-ctc mit))
   (if mutated-definition?
-      (adapt-all-referencing-provides mutated-mod-stx name adapter)
-      (list (cons name (generate-adapter-ctc mit)))))
+      (raise-user-error 'generate-adapter-ctcs-for-mutation
+                        "Mutated a type definition, which we haven't really figured out yet.")
+      ;; lltodo: is this really right?
+      #;(adapt-all-referencing-provides mutated-mod-stx name adapter)
+      (list (cons name adapter))))
 
 (define extract-r/t/c/p-forms
   (syntax-parser
@@ -203,7 +206,18 @@
                  (mutated-type 'f
                                '(-> Number Real String)
                                '(-> Real Number String)
-                               #f))))
+                               #f)))
+
+  (test-begin
+    #:name extract-r/t/c/p-forms
+    (test-equal? (map syntax->datum
+                      (extract-r/t/c/p-forms
+                       #'(module type-interface typed-racket
+                           (#%module-begin
+                            (require "../../../utilities/require-typed-check-provide.rkt")
+                            (require/typed/check/provide "library.rkt"
+                                                         [x Integer])))))
+                 '((require/typed/check/provide "library.rkt" [x Integer])))))
 
 (define (sexp-contains? s id)
   (let loop ([s s])

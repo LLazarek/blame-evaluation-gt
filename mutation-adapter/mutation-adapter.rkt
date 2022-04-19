@@ -11,7 +11,7 @@
          swap->
          delegating-struct
          swap-struct-field
-         sealing-adapter
+         ;; sealing-adapter
 
          sexp-diff)
 
@@ -161,12 +161,6 @@
                                         mutated
                                         mutation-type)
     a-mutated-interface-type)
-  ;; Think about the diff sexp as layers. E.g.
-  ;; (1 (2 3 (4 5)))
-  ;; ^- ^--- ^--- innermost layer
-  ;;  |    + middle layer
-  ;;  + top layer
-  ;;
   (assert (not (equal? original mutated))
           #:name 'mutation-adapter:generate-adapter-ctc
           @~a{
@@ -246,7 +240,8 @@
 (define round->exact (compose1 inexact->exact round))
 (define realize-delta 0.00001)
 (define (make-base-type-adapter original-type new-type)
-  (let ([transform/c (λ (f) (transform/c f original-type new-type))])
+  ;; see notes: sealing makes more consistent sense for base types
+  #;(let ([transform/c (λ (f) (transform/c f original-type new-type))])
     (match (difference original-type new-type)
       [(difference 'Number 'Real) (transform/c real-part)]
       [(difference 'Real 'Number) (transform/c (λ (x) (+ x 0+1i)))]
@@ -263,7 +258,10 @@
       [(difference 'Natural 'Index) (transform/c (λ (x)
                                                    (if (< x largest-possible-vector-size)
                                                        x
-                                                       0)))])))
+                                                       0)))]
+
+      [(difference 'Integer 'String) (transform/c ~a)]))
+  (sealing-adapter))
 
 (define (function-arg/result-swap-adapter type-diff)
   (type-diff->contract
