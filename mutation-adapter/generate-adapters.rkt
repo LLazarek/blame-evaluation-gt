@@ -347,7 +347,11 @@
 ;; (dictof identifier? contract?) syntax? (listof syntax) -> syntax?
 (define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name original-interface-r/t/c/p-forms)
   (define redirected-interface-r/t/c/p-forms
-    (map (r/t/c/p-redirecter #''contracted) original-interface-r/t/c/p-forms))
+    (for/list ([form (in-list original-interface-r/t/c/p-forms)])
+      ;; munge the bindings so that they line up with the import of r/t/c/p below
+      (datum->syntax #'here
+                     (syntax->datum
+                      (r/t/c/p-redirect #''contracted form)))))
   #`(module mutation-adapter typed/racket
       (#%module-begin
        (module contracted racket
@@ -360,11 +364,11 @@
        (require "../../../utilities/require-typed-check-provide.rkt")
        #,@redirected-interface-r/t/c/p-forms)))
 
-;; syntax? -> (syntax? -> syntax?)
-(define (r/t/c/p-redirecter to)
-  (syntax-parser
-    [({~and r/t/c/p {~datum require/typed/check/provide}} source . more)
-     #`(r/t/c/p #,to . more)]))
+;; syntax? syntax? -> syntax?
+(define (r/t/c/p-redirect to stx)
+  (syntax-parse stx
+    [({~datum require/typed/check/provide} source . more)
+     #`(require/typed/check/provide #,to . more)]))
 
 
 (module+ test
