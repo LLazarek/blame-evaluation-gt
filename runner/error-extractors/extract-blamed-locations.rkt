@@ -80,8 +80,11 @@
     ;; util/setup.rkt makes this modification automatically.
     [`(interface for ,_ from ,mod-name)
      mod-name]
-    [(? path-string?)
-     (file-name-string-from-path blamed)]
+    [(or (? path-string? path)
+         ;; a submod
+         (list (? path-string? path)
+               (? symbol?) ...))
+     (file-name-string-from-path path)]
     [else
      (error 'extract-blamed-mod-name
             @~a{
