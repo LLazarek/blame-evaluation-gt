@@ -53,7 +53,7 @@
            current-result-cache
 
            run-all-mutants*configs
-           sample-blame-trails-if-type-error
+           sample-blame-trails-if-max-config-result-ok
            sample-blame-trail-roots
            extend-blame-trail
            record-blame-trail!
@@ -165,10 +165,10 @@
                  #:when #t
                  [mutation-index (select-mutants module-to-mutate-name
                                                  bench)])
-        (sample-blame-trails-if-type-error process-q
-                                           (mutant #f
-                                                   module-to-mutate-name
-                                                   mutation-index))))
+        (sample-blame-trails-if-max-config-result-ok process-q
+                                                     (mutant #f
+                                                             module-to-mutate-name
+                                                             mutation-index))))
 
     (log-factory info "Finished enqueing all test mutants. Waiting...")
     (define process-q-finished (process-Q-wait process-q))
@@ -257,12 +257,12 @@
        })
   all-checks-pass?)
 
-;; Spawns a test mutant and if that mutant has a blame result at
+;; Spawns a test mutant and if that mutant has a result at
 ;; max contract configuration, then samples the precision lattice
 ;; and spawns mutants for each samples point
 ;; Note that sampling the precision lattice is done indirectly by
 ;; just generating random configs
-(define/contract (sample-blame-trails-if-type-error process-q mutant-program)
+(define/contract (sample-blame-trails-if-max-config-result-ok process-q mutant-program)
   ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
 
   (match-define (mutant #f module-to-mutate-name mutation-index) mutant-program)
@@ -272,21 +272,19 @@
                mutation-index)
   (define bench (factory-bench (process-Q-get-data process-q)))
   (define max-config (bench-info-max-config bench))
+  (define should-sample-mutant-blame-trails? (configured:should-sample-mutant-blame-trails?))
   (define (will:sample-if-type-error current-process-q dead-proc)
-    (match (process-outcome dead-proc)
-      ['type-error
-       (log-factory info
-                    "  Mutant ~a @ ~a has type error. Sampling..."
-                    module-to-mutate-name
-                    mutation-index)
-       (sample-blame-trail-roots current-process-q
-                                 mutant-program)]
-      [else
-       (log-factory info
-                    "  Mutant ~a @ ~a has no type error; discarding."
-                    module-to-mutate-name
-                    mutation-index)
-       current-process-q]))
+    (define ok? (should-sample-mutant-blame-trails? (process-outcome dead-proc)))
+    (log-factory info
+                 @~a{
+                     @"  "Mutant @module-to-mutate-name @"@" @mutation-index @;
+                     has @(if ok? "" "un")acceptable result according to configured filter. @;
+                     @(if ok? "Sampling..." "Discarding it.")
+                     })
+    (if ok?
+        (sample-blame-trail-roots current-process-q
+                                  mutant-program)
+        current-process-q))
   (define (result-cache-has-trail? number)
     (and ((current-result-cache) module-to-mutate-name
                                  mutation-index
@@ -1036,9 +1034,7 @@ Mutant: [~a] ~a @ ~a with config:
        result/well-formed]
       [else (report-malformed-output)])))
 
-;; dead-mutant-process?
-;; ->
-;; (or/c 'blamed 'type-error 'completed 'syntax-error 'timeout 'oom)
+;; dead-mutant-process? -> run-outcome/c
 (define (process-outcome dead-proc)
   (run-status-outcome (dead-mutant-process-result dead-proc)))
 

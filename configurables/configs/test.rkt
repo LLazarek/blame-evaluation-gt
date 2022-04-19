@@ -8,6 +8,7 @@
 (define (install!)
   (configure! mutation                 type-mistakes-in-code)
   (configure! mutant-sampling          none)
+  (configure! mutant-filtering         select-type-erroring-max-config-mutants)
   (configure! module-selection-for-mutation all-regular-modules)
   (configure! module-instrumentation   none)
   (configure! benchmark-runner         run-it)

@@ -41,7 +41,7 @@
 (struct blame-trail (id parts) #:transparent)
 
 ;; will?           := (factory? dead-mutant-process? -> factory?)
-;; result/c        := run-status/c (see `mutation-runner.rkt`)
+;; result/c        := run-status/c (see `runner/mutation-runner-data.rkt`)
 ;; ctc-level?      := symbol?
 ;; config?         := (hash path-string?
 ;;                         (hash (or symbol? path-string?) ctc-level?))

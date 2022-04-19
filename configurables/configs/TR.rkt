@@ -9,6 +9,7 @@
 (define (install!)
   (configure! mutation                 type-interface-mistakes)
   (configure! mutant-sampling          none)
+  (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
   (configure! module-selection-for-mutation interface-module-only)
   (configure! module-instrumentation   none)
   (configure! benchmark-runner         run-it)

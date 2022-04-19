@@ -29,6 +29,14 @@
     #:module "mutant-sampling/use-pre-selected-samples.rkt"
     #:parameters [pre-selected-mutant-samples-db]))
 
+(define-configurable mutant-filtering
+  #:provides [should-sample-mutant-blame-trails?]
+
+  (define-implementation select-type-erroring-max-config-mutants
+    #:module "mutant-filtering/type-error.rkt")
+  (define-implementation select-type/runtime/ctc-erroring-max-config-mutants
+    #:module "mutant-filtering/type-runtime-ctc-error.rkt"))
+
 (define-configurable module-selection-for-mutation
   #:provides [select-modules-to-mutate]
 
