@@ -473,21 +473,20 @@
      #:when (blame-trail-ended-normally? dead-proc
                                          locations-selected-as-blamed
                                          log-factory-message)
-       (log-factory debug
-                    @~a{
-                        Blame trail @mod @"@" @index @;
-                        {@(blame-trail-id the-blame-trail+dead-proc)} @;
-                        ended normally according to configured predicate. @;
-                        (Configured blame follower chose locations: @locations-selected-as-blamed)
-                        })
+     (log-factory debug
+                  @~a{
+                      Blame trail @mod @"@" @index @;
+                      {@(blame-trail-id the-blame-trail+dead-proc)} @;
+                      ended normally according to configured predicate. @;
+                      (Configured blame follower chose locations: @locations-selected-as-blamed)
+                      })
 
-       ;; Blamed region is typed, so the path ends here.
-       ;; Log the trail and stop following.
-       (define new-factory
-         (record-blame-trail! (process-Q-get-data the-process-q)
-                              the-blame-trail+dead-proc))
-       (process-Q-set-data the-process-q
-                           new-factory)]
+     ;; Log the trail and stop following.
+     (define new-factory
+       (record-blame-trail! (process-Q-get-data the-process-q)
+                            the-blame-trail+dead-proc))
+     (process-Q-set-data the-process-q
+                         new-factory)]
 
     [(list locations-selected-as-blamed ..1)
      (log-factory debug
