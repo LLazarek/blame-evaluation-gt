@@ -656,8 +656,8 @@
                                         #:record-in calls))
   (parameterize ([current-result-cache
                   (λ _ mutant0-path)])
-    (sample-blame-trails-if-type-error mock-q
-                                       (mutant #f main.rkt 0))))
+    (sample-blame-trails-if-max-config-result-ok mock-q
+                                                 (mutant #f main.rkt 0))))
  (test-match calls
              (hash-table [_ 0] ___))
 
@@ -668,8 +668,8 @@
                    [{(== main.rkt) 0 (? (</c (- (sample-size) remaining-procs)))}
                     mutant0-path]
                    [{_ _ _} #f])])
-    (sample-blame-trails-if-type-error mock-q
-                                       (mutant #f main.rkt 0))))
+    (sample-blame-trails-if-max-config-result-ok mock-q
+                                                 (mutant #f main.rkt 0))))
  (test-match calls
              (hash-table ['enq (== remaining-procs)] [_ 0] ___))
 
@@ -677,8 +677,8 @@
   (hash-set! calls 'enq 0)
   (parameterize ([current-result-cache
                   (λ _ #f)])
-    (sample-blame-trails-if-type-error mock-q
-                                       (mutant #f main.rkt 0))))
+    (sample-blame-trails-if-max-config-result-ok mock-q
+                                                 (mutant #f main.rkt 0))))
  (test-match calls
              ;; only 1 because must spawn test mutant
              (hash-table ['enq 1] [_ 0] ___)))

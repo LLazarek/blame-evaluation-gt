@@ -128,7 +128,7 @@
            "../../mutate/type-api-mutators.rkt"
            "../configurables.rkt")
 
-  (define-runtime-path type-api-mutators.rkt "../../mutation-adapter/type-api-mutators.rkt")
+  (define-runtime-path type-api-mutators.rkt "../../mutation-adapter/mutation-adapter.rkt")
 
   (define (make-test-resolved-mod path stx)
     (resolved-module path #f #f #f stx))
@@ -244,16 +244,20 @@
        ;; Interface module is moved and adapter injected
        (test-equal? (make-immutable-hash (map rm->name+code others))
                     (hash (path->string (simple-form-path type-interface-file-name))
-                          `(module mutation-adapter racket
+                          `(module mutation-adapter typed/racket
                              (#%module-begin
-                              (require (file ,(path->string
-                                               (simple-form-path
-                                                type-api-mutators.rkt))))
-                              (require ,type-interface-file-rename)
-                              (provide (except-out (all-from-out ,type-interface-file-rename)
-                                                   f))
-                              (provide (contract-out
-                                        [f (swap-> #t 0 1)]))))
+                              (module contracted racket
+                                (require (file ,(path->string
+                                                 (simple-form-path
+                                                  type-api-mutators.rkt))))
+                                (require ,type-interface-file-rename)
+                                (provide (except-out (all-from-out ,type-interface-file-rename)
+                                                     f))
+                                (provide (contract-out
+                                          [f (swap-> #t 0 1)])))
+                              (require "../../../utilities/require-typed-check-provide.rkt")
+                              (require/typed/check/provide 'contracted
+                                                           [f (-> Number Real String)])))
 
                           (path->string (simple-form-path type-interface-file-rename))
                           '(module interface racket
