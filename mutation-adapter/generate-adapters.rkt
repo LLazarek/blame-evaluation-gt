@@ -274,7 +274,8 @@
                                  (list
                                   (cons 0 (delegating->
                                            (list
-                                            (cons 0 (make-base-type-adapter 'Integer 'Real)))
+                                            (cons 0 #;(make-base-type-adapter 'Integer 'Real)
+                                                  (sealing-adapter)))
                                            (list)))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -294,7 +295,8 @@
                             '(delegating->
                               (list)
                               (list
-                               (cons 0 (make-base-type-adapter 'Integer 'Real))))))
+                               (cons 0 #;(make-base-type-adapter 'Integer 'Real)
+                                     (sealing-adapter))))))
                  (cons 'b
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
@@ -302,7 +304,8 @@
                               (list
                                (cons 0 (delegating->
                                         (list
-                                         (cons 0 (make-base-type-adapter 'Integer 'Real)))
+                                         (cons 0 #;(make-base-type-adapter 'Integer 'Real)
+                                               (sealing-adapter)))
                                         (list)))))))))
     (test-exn (λ (e) (string-contains? (exn-message e)
                                        "not implemented"))
@@ -338,9 +341,11 @@
                               (list
                                (cons 1 (delegating->
                                         (list)
-                                        (list (cons 0 (make-base-type-adapter 'Integer 'Index))))))
+                                        (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
+                                                    (sealing-adapter))))))
                               (list
-                               (cons 0 (make-base-type-adapter 'Integer 'Index))))))))))
+                               (cons 0 #;(make-base-type-adapter 'Integer 'Index)
+                                     (sealing-adapter))))))))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
@@ -405,8 +410,10 @@
                                bar))
           (provide
            (contract-out
-            [foo (make-base-type-adapter 'Integer 'Real)]
-            [bar (delegating-> (list (cons 1 (make-base-type-adapter 'Integer 'Real))) (list))])))
+            [foo #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter)]
+            [bar (delegating->
+                  (list (cons 1 #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter)))
+                  (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require/typed/check/provide
          'contracted

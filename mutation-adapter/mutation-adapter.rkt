@@ -539,30 +539,47 @@
                   (generate-adapter-ctc (mutated-interface-type 'Real
                                                                 'Integer
                                                                 type:base-type-substitution)))
-                 'transform/c)
+                 #;'transform/c
+                 'sealing-adapter)
     (test-adapter-contract
      [v 5
         #:with-contract (generate-adapter-ctc (mutated-interface-type 'Real
                                                                       'Integer
                                                                       type:base-type-substitution))]
+     (sealed? v))
+    ;; lltodo: re-enable these tests if we return to transformation instead of sealing
+    ;; Also the tests below
+    #;(test-adapter-contract
+     [v 5
+        #:with-contract (generate-adapter-ctc (mutated-interface-type 'Real
+                                                                      'Integer
+                                                                      type:base-type-substitution))]
      (test-equal? v 5))
-    (test-adapter-contract
+    #;(test-adapter-contract
      [v 5/2
         #:with-contract (generate-adapter-ctc (mutated-interface-type 'Exact-Rational
                                                                       'Index
                                                                       type:base-type-substitution))]
      (test-equal? v (round 5/2)))
-    (test-adapter-contract
+    #;(test-adapter-contract
      [v 5
         #:with-contract (generate-adapter-ctc (mutated-interface-type 'Integer
                                                                       'Real
                                                                       type:base-type-substitution))]
      (and/test (not/test (test-equal? v 5))
-               (test-within v 5 realize-delta))))
+               (test-within v 5 realize-delta)))
+    )
 
   (test-begin
    #:name delegating->
-    (test-adapter-contract
+   (test-adapter-contract
+     [f (λ (x) x)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> Real Integer)
+                                                 '(-> Integer Integer)
+                                                 type:base-type-substitution))]
+     (sealed? (f 5.2)))
+    #;(test-adapter-contract
      [f (λ (x) x)
         #:with-contract (generate-adapter-ctc
                          (mutated-interface-type '(-> Real Integer)
@@ -574,14 +591,23 @@
                    (mutated-interface-type '(-> Integer Integer)
                                            '(-> Real Integer)
                                            type:base-type-substitution)))
-                 '(delegating-> [[0 transform/c]] []))
+                 '(delegating-> [[0 #;transform/c
+                                    sealing-adapter]] []))
     (test-equal? (contract-name
                   (generate-adapter-ctc
                    (mutated-interface-type '(-> Integer Real)
                                            '(-> Integer Integer)
                                            type:base-type-substitution)))
-                 '(delegating-> [] [[0 transform/c]]))
+                 '(delegating-> [] [[0 #;transform/c
+                                       sealing-adapter]]))
     (test-adapter-contract
+     [f (λ _ 5.2)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> Integer Real)
+                                                 '(-> Integer Integer)
+                                                 type:base-type-substitution))]
+     (sealed? (f 2)))
+    #;(test-adapter-contract
      [f (λ _ 5.2)
         #:with-contract (generate-adapter-ctc
                          (mutated-interface-type '(-> Integer Real)
@@ -593,8 +619,17 @@
                    (mutated-interface-type '(-> Integer (values Integer Real))
                                            '(-> Integer (values Integer Integer))
                                            type:base-type-substitution)))
-                 '(delegating-> [] [[1 transform/c]]))
+                 '(delegating-> [] [[1 #;transform/c
+                                       sealing-adapter]]))
     (test-adapter-contract
+     [f (λ _ (values 2 5.2))
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> Integer (values Integer Real))
+                                                 '(-> Integer (values Integer Integer))
+                                                 type:base-type-substitution))]
+     (let-values ([{v1 v2} (f 0)])
+       (sealed? v2)))
+    #;(test-adapter-contract
      [f (λ _ (values 2 5.2))
         #:with-contract (generate-adapter-ctc
                          (mutated-interface-type '(-> Integer (values Integer Real))
@@ -611,8 +646,22 @@
                                                 (-> Integer Integer)
                                                 (values Integer Real))
                                            type:base-type-substitution)))
-                 '(delegating-> [[1 (delegating-> [] [[0 transform/c]])]] []))
+                 '(delegating-> [[1 (delegating-> [] [[0 #;transform/c
+                                                         sealing-adapter]])]]
+                                []))
     (test-adapter-contract
+     [f (λ (s g) (values 2 (g 0)))
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> String
+                                                      (-> Integer Real)
+                                                      (values Integer Real))
+                                                 '(-> String
+                                                      (-> Integer Integer)
+                                                      (values Integer Real))
+                                                 type:base-type-substitution))]
+     (let-values ([{v1 v2} (f "" (λ _ 5.2))])
+       (sealed? v2)))
+    #;(test-adapter-contract
      [f (λ (s g) (values 2 (g 0)))
         #:with-contract (generate-adapter-ctc
                          (mutated-interface-type '(-> String
@@ -658,6 +707,16 @@
    #:name delegating-struct
    (ignore (struct temp (x y z) #:prefab))
    (test-adapter-contract
+     [t (temp 5.5 "hello" 2.3)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '[#:struct temp ([x : Real] [y : String] [z : Real])]
+                                                 '[#:struct temp ([x : Integer] [y : String] [z : Real])]
+                                                 type:base-type-substitution))]
+     (and/test (temp? t)
+               (sealed? (temp-x t))
+               (test-equal? (temp-y t) "hello")
+               (test-equal? (temp-z t) 2.3)))
+   #;(test-adapter-contract
      [t (temp 5.5 "hello" 2.3)
         #:with-contract (generate-adapter-ctc
                          (mutated-interface-type '[#:struct temp ([x : Real] [y : String] [z : Real])]
