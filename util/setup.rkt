@@ -34,7 +34,7 @@
                                "transient-special-cases.rktdb" #f)))
 
 (define expected-TR-branch "transient-blame")
-(define expected-gtp-branch "master")
+(define expected-gtp-branch "library-split")
 (define expected-blgt-branch "dev")
 
 ;; ==================================================
