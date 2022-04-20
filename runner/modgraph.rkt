@@ -38,34 +38,70 @@
     #:directories ()
     #:files ([a.rkt
               "a.rkt"
-              "#lang racket
-(require bar
-         \"b.rkt\"
-         foo
-         \"c.rkt\")
-(+ 2 2)
-"]
+              @~a{#lang racket
+                  (require bar
+                           \"b.rkt\"
+                           foo
+                           \"c.rkt\")
+                  (+ 2 2)
+                  }]
              [b.rkt
               "b.rkt"
-              "#lang racket
-(require foo
-         \"c.rkt\"
-         \"another-a.rkt\"
-         syntax/to-string
-         baz)
-(+ 2 2)
-"]
+              @~a{#lang racket
+                  (require foo
+                           \"c.rkt\"
+                           \"another-a.rkt\"
+                           syntax/to-string
+                           baz)
+                  (+ 2 2)
+                  }]
              [c.rkt
               "c.rkt"
-              "#lang racket
-(require racket/match)
-(+ 2 2)
-"]
+              @~a{#lang racket
+                  (require racket/match)
+                  (+ 2 2)
+                  }]
              [another-a.rkt
               "another-a.rkt"
-              "#lang racket
-(provide foo)
-"]))
+              @~a{#lang racket
+                  (provide foo)
+                  }]
+
+             ;; The essence of the forth benchmark, a good test because it's a
+             ;; bit pathological with requires frequently split up, and
+             ;; modifiers like only-in
+             [forth-main.rkt
+              "forth-main.rkt"
+              @~a{#lang racket/base
+                  (require (only-in "forth-eval.rkt"
+                                    forth-eval*
+                                    ))
+                  (require (only-in racket/file file->lines))
+                  }]
+             [forth-command.rkt
+              "forth-command.rkt"
+              @~a{#lang racket/base
+                  (provide command% CMD*)
+                  (require "../base/untyped.rkt" racket/match racket/class (only-in racket/string string-join) (for-syntax racket/base racket/syntax syntax/parse))
+                  (require (only-in "forth-stack.rkt" stack-drop stack-dup stack-init stack-over stack-pop stack-push stack-swap))
+                  (define command% (class object% (super-new) (init-field id descr exec)))
+                  }]
+             [forth-eval.rkt
+              "forth-eval.rkt"
+              @~a{#lang racket/base
+                  (provide forth-eval*)
+                  (require "../base/untyped.rkt" racket/match racket/class (only-in racket/port with-input-from-string))
+                  (require (only-in "forth-command.rkt" CMD* command%))
+                  (require (only-in "forth-stack.rkt" stack-init))
+                  (define defn-command #f)
+                  }]
+             [forth-stack.rkt
+              "forth-stack.rkt"
+              @~a{#lang racket/base
+                  (provide stack-drop stack-dup stack-init stack-over stack-pop stack-push stack-swap)
+                  (define (list->stack xs) xs)
+                  }]
+))
 
   (test-begin
     #:name module-dependencies
@@ -79,31 +115,30 @@
     (test-equal? (module-dependencies "c.rkt" '("a.rkt" "b.rkt" "c.rkt" "another-a.rkt"))
                  '())
 
-    ;; Test on forth benchmark
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '("../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"))
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '("../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
-                 '("../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"
-                   "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"))
-    (test-equal? (module-dependencies "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"
-                                      '("../../gtp-benchmarks/benchmarks/forth/untyped/main.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/command.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/eval.rkt"
-                                        "../../gtp-benchmarks/benchmarks/forth/untyped/stack.rkt"))
+    (test-equal? (module-dependencies "forth-main.rkt"
+                                      '("forth-main.rkt"
+                                        "forth-command.rkt"
+                                        "forth-eval.rkt"
+                                        "forth-stack.rkt"))
+                 '("forth-eval.rkt"))
+    (test-equal? (module-dependencies "forth-command.rkt"
+                                      '("forth-main.rkt"
+                                        "forth-command.rkt"
+                                        "forth-eval.rkt"
+                                        "forth-stack.rkt"))
+                 '("forth-stack.rkt"))
+    (test-equal? (module-dependencies "forth-eval.rkt"
+                                      '("forth-main.rkt"
+                                        "forth-command.rkt"
+                                        "forth-eval.rkt"
+                                        "forth-stack.rkt"))
+                 '("forth-stack.rkt"
+                   "forth-command.rkt"))
+    (test-equal? (module-dependencies "forth-stack.rkt"
+                                      '("forth-main.rkt"
+                                        "forth-command.rkt"
+                                        "forth-eval.rkt"
+                                        "forth-stack.rkt"))
                  '())
 
     (when (directory-exists? "../../gtp-benchmarks/benchmarks/take5-mixin")
@@ -117,7 +152,18 @@
 
   (test-begin
     #:name order-by-dependencies
-    (test-equal? (order-by-dependencies (map path->string
+    #:before (setup-test-env!)
+    #:after (cleanup-test-env!)
+    (test-equal? (order-by-dependencies '("forth-main.rkt"
+                                          "forth-command.rkt"
+                                          "forth-eval.rkt"
+                                          "forth-stack.rkt"))
+                 '("forth-stack.rkt"
+                   "forth-command.rkt"
+                   "forth-eval.rkt"
+                   "forth-main.rkt"))
+    ;; Also a nice test, but only for the standard benchmarks!
+    #;(test-equal? (order-by-dependencies (map path->string
                                              (directory-list "../../gtp-benchmarks/benchmarks/take5/untyped"
                                                              #:build? #t)))
                  '("../../gtp-benchmarks/benchmarks/take5/untyped/basics.rkt"
