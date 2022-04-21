@@ -32,8 +32,8 @@
   (require racket/runtime-path
            racket/format
            racket/path
-           (rename-in (only-in "experiment-manager.rkt" needed-benchmarks/10)
-                      [needed-benchmarks/10 all-benchmarks]))
+           (rename-in (only-in "experiment-manager.rkt" experiment-benchmarks)
+                      [experiment-benchmarks all-benchmarks]))
   (define-syntax-class benchmark-id
     #:description "a benchmark name"
     #:commit

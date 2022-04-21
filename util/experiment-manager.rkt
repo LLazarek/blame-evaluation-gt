@@ -12,7 +12,7 @@
          zythos
          benbox
 
-         needed-benchmarks/10
+         experiment-benchmarks
          needed-benchmarks/14)
 
 (require syntax/parse/define
@@ -473,12 +473,12 @@
     (or (string-prefix? str maybe-pre-or-suffix)
         (string-suffix? str maybe-pre-or-suffix)))
   (findf (prefix-or-suffix-of benchmark-data-name)
-         needed-benchmarks/10))
+         experiment-benchmarks))
 
 ;; host? (listof string?) -> (option/c (listof (option/c (and/c real? (between/c 0 1)))))
 (define (get-progress a-host . benchmarks)
   #;(define benchmark
-    (if (member benchmark needed-benchmarks/10)
+    (if (member benchmark experiment-benchmarks)
         benchmark
         (try-infer-benchmark-from-data-name benchmark)))
   (cond [(empty? benchmarks)
@@ -593,8 +593,9 @@
     "gregor"
     "quadT"
     "quadU"))
-(define needed-benchmarks/10
-  (drop needed-benchmarks/14 4))
+(define experiment-benchmarks
+  ;; ll: for now
+  '("sieve"))
 
 (define (summary-empty? summary)
   (match summary
@@ -620,7 +621,7 @@
     [else #f]))
 (define (download-completed-benchmarks! a-host summary download-directory
                                         #:name [name #f]
-                                        #:expected-benchmarks [expected-benchmarks needed-benchmarks/10])
+                                        #:expected-benchmarks [expected-benchmarks experiment-benchmarks])
   (define (download-results! archive-name
                              #:include-configuration-outcomes? [include-configuration-outcomes? #f])
     (when (string=? archive-name "")
@@ -687,7 +688,7 @@
                                          [periodic-action! void]
                                          #:period [sleep-period 15]
                                          #:print? [print? #f]
-                                         #:expected-benchmarks [expected-benchmarks needed-benchmarks/10])
+                                         #:expected-benchmarks [expected-benchmarks experiment-benchmarks])
   (when print?
     (displayln @~a{Waiting for current jobs to finish on @host ...}))
   (let loop ()
@@ -936,7 +937,7 @@
 
 (define (download-results! a-host download-directory
                            #:name [name #f]
-                           #:expected-benchmarks [benchmark-names needed-benchmarks/10])
+                           #:expected-benchmarks [benchmark-names experiment-benchmarks])
   (option-let* ([summary (summarize-experiment-status a-host)])
     (download-completed-benchmarks! a-host summary download-directory
                                     #:name name
@@ -1035,7 +1036,7 @@
      (match-define (list a-host config-name benchmarks) target)
      (send a-host setup-job-management!)
      (define target-benchmarks (match benchmarks
-                                 ['("<all>") needed-benchmarks/10]
+                                 ['("<all>") experiment-benchmarks]
                                  [else benchmarks]))
      (for ([benchmark (in-list target-benchmarks)]
            [i (in-naturals)])
