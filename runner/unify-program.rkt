@@ -296,4 +296,6 @@
     (not (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/base/a.rkt"
                                   "/foo/bar/baz/benchmarks/sieve/unified/a.rkt"))
     (unified-module-path-of? "/foo/bar/baz/benchmarks/sieve/base/a.rkt"
-                             "/foo/bar/baz/benchmarks/sieve/base/a.rkt")))
+                             "/foo/bar/baz/benchmarks/sieve/base/a.rkt")
+    (unified-module-path-of? "/project/blgt/gtp-benchmarks/benchmarks/sieve/both/type-interface.rkt"
+                             "/project/blgt/gtp-benchmarks/benchmarks/sieve/unified/type-interface.rkt")))

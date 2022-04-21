@@ -97,8 +97,8 @@
     [else
      (define-values {typed untyped}
        (read-typed-untyped-dirs path))
-     (define base (build-path path "base"))
-     (define both (build-path path "both"))
+     (define base (simple-form-path (build-path path "base")))
+     (define both (simple-form-path (build-path path "both")))
      (match (and typed untyped)
        [#f #f]
        [else
@@ -220,8 +220,8 @@
     (test-equal? (read-benchmark a-benchmark-dir)
                  (benchmark (list a/t b/t main/t)
                             (list a b main)
-                            base
-                            both)
+                            (simple-form-path base)
+                            (simple-form-path both))
                 #;(benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            base
@@ -231,7 +231,7 @@
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
                            (list-no-order (== main) (== a) (== b))
                            #f
-                           (== both)))
+                           (== (simple-form-path both))))
     (ignore (delete-directory/files both))
     (test-match (read-benchmark a-benchmark-dir)
                 (benchmark (list-no-order (== main/t) (== a/t) (== b/t))
