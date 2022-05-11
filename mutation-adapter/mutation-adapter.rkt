@@ -11,7 +11,7 @@
          swap->
          delegating-struct
          swap-struct-field
-         ;; sealing-adapter
+         sealing-adapter
 
          sexp-diff)
 

@@ -206,7 +206,7 @@
                          the-module-to-mutate
                          index
                          config
-                         #:timeout/s (* 2 60)
+                         #:timeout/s (default-timeout/s)
                          #:memory/gb 3
                          #:modules-base-path (find-program-base-path the-program)
                          #:write-modules-to dump-dir-path*

@@ -24,7 +24,7 @@
                                                            mutated-mod-stx
                                                            mutation-type))
   (define interface-r/t/c/p-forms (extract-r/t/c/p-forms original-mod-stx))
-  (adapter-ctcs->module-stx adapter-ctcs mod-name interface-r/t/c/p-forms))
+  (adapter-ctcs->module-stx adapter-ctcs mod-name interface-r/t/c/p-forms original-mod-stx))
 
 ;; syntax? syntax? mutation-type? -> (listof (cons identifier? contract?))
 (define (generate-adapter-ctcs-for-mutation original-mod-stx
@@ -349,15 +349,18 @@
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
-;; (dictof identifier? contract?) syntax? (listof syntax) -> syntax?
-(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name original-interface-r/t/c/p-forms)
+;; (dictof identifier? contract?) syntax? (listof syntax) [syntax?] -> syntax?
+(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name original-interface-r/t/c/p-forms [stx-for-location+bindings #'here])
+  (define (munge-location+bindings stx)
+    (datum->syntax stx-for-location+bindings
+                   (syntax->datum stx)
+                   stx-for-location+bindings))
   (define redirected-interface-r/t/c/p-forms
     (for/list ([form (in-list original-interface-r/t/c/p-forms)])
       ;; munge the bindings so that they line up with the import of r/t/c/p below
-      (datum->syntax #'here
-                     (syntax->datum
-                      (r/t/c/p-redirect #''contracted form)))))
-  #`(module mutation-adapter typed/racket
+      (munge-location+bindings (r/t/c/p-redirect #''contracted form))))
+  (munge-location+bindings
+    #`(module mutation-adapter typed/racket
       (#%module-begin
        (module contracted racket
          (require (file #,(path->string type-api-mutators.rkt)))
@@ -367,7 +370,7 @@
                    #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
                         #`[#,id #,(->stx adapter)]))))
        (require "../../../utilities/require-typed-check-provide.rkt")
-       #,@redirected-interface-r/t/c/p-forms)))
+       #,@redirected-interface-r/t/c/p-forms))))
 
 ;; syntax? syntax? -> syntax?
 (define (r/t/c/p-redirect to stx)

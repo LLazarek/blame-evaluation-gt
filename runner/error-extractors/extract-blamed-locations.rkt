@@ -33,8 +33,6 @@
     (match (blame-positive blame-obj)
       [`(function ,id) id]
       [`(definition ,id) id]
-      [(or 'cast 'typed-world)
-       (srcloc-source (blame-source blame-obj))]
       [other other]))
   (define (error-info)
     @~a{
@@ -45,7 +43,8 @@
         @(exn-message e)
         })
   (define blamed-mod-name
-    ((extract-blamed-mod-name error-info)
+    ((extract-blamed-mod-name error-info
+                              (srcloc-source (blame-source blame-obj)))
      blamed))
   (list blamed-mod-name))
 
@@ -70,14 +69,20 @@
   (map (extract-blamed-mod-name error-info)
        blamed))
 
-(define ((extract-blamed-mod-name [extra-error-info (const "")])
+(define ((extract-blamed-mod-name [extra-error-info (const "")]
+                                  [blame-positive-source #f])
          blamed)
   (match blamed
-    ;; NOTE: This depends on a modification to Typed Racket;
+    ;; NOTE: The `(interface for X from Y)` shape depends on a modification to Typed Racket;
     ;; Specifically `require/contract` must be modified to change
     ;; the positive party, by extending the list with
     ;; ```from #,(syntax->datum #'lib)```
     ;; util/setup.rkt makes this modification automatically.
+    [(or 'cast
+         'typed-world
+         ;; Submods just get location from the blame positive path
+         `(interface for ,_ from (quote ,_)))
+     (file-name-string-from-path blame-positive-source)]
     [`(interface for ,_ from ,mod-name)
      mod-name]
     [(or (? path-string? path)
