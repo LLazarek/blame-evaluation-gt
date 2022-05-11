@@ -10,6 +10,7 @@
          delegating->
          swap->
          delegating-struct
+         delegating-listof
          swap-struct-field
          sealing-adapter
 
@@ -41,6 +42,7 @@
 (struct td:base td (original new) #:transparent)
 (struct td:vector td (index-map) #:transparent)
 (struct td:struct td (index-map) #:transparent)
+(struct td:listof td (sub-td) #:transparent)
 (define (sexp->type-diff a-sexp-diff)
   (define (list->td-index-map a-list)
     (match a-list
@@ -66,6 +68,8 @@
         [(list* 'Vector (and (list _ ... (? td?) _ ... #f)
                              sub-tds))
          (td:vector (list->td-index-map sub-tds))]
+        [(list 'Listof (app recur sub-td))
+         (td:listof sub-td)]
         [(list '#:struct name (list [list fields ': (app recur sub-tds)] ...))
          #;(define (indexes->fields index-map)
              (for/list ([{i td} (in-dict index-map)])
@@ -153,7 +157,10 @@
                                              '[#:struct
                                                stream
                                                ((first : Index) (rest : (-> stream)))]))
-                 (td:struct `((0 . ,(td:base 'Natural 'Index)))))))
+                 (td:struct `((0 . ,(td:base 'Natural 'Index)))))
+    (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
+                                             '(Listof B)))
+                 (td:listof (td:base 'A 'B)))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -220,7 +227,9 @@
                        (cons i (loop td))))]
       [{(recur) (td:struct index-map)}
        (delegating-struct (for/list ([{field td} (in-dict index-map)])
-                            (cons field (loop td))))])))
+                            (cons field (loop td))))]
+      [{(recur) (td:listof sub-td)}
+       (delegating-listof (loop sub-td))])))
 
 ;; sexp? symbol? contract? -> contract?
 ;; Generate a contract that delegates on `name` to `ctc`.
@@ -475,6 +484,22 @@
      #`(delegating-struct
         (list #,@(for/list ([{f ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
                    #`(cons #,f #,(generic->stx ctc))))))])
+
+(struct delegating-listof adapter/c (sub-ctc)
+  #:property prop:contract
+  (build-contract-property
+   #:name (λ (this) (list 'delegating-listof
+                          (contract-name (delegating-listof-sub-ctc this))))
+   #:late-neg-projection
+   (λ (this)
+     (define sub-ctc (delegating-listof-sub-ctc this))
+     (λ (blame)
+       (λ (v neg-party)
+         (contract (listof sub-ctc) v #f #f)))))
+  #:methods gen:adapted
+  [(define/generic generic->stx ->stx)
+   (define (->stx this)
+     #`(delegating-listof #,(generic->stx (delegating-listof-sub-ctc this))))])
 
 (struct swap-struct-field adapter/c (i1 i2)
   #:property prop:contract
@@ -739,5 +764,15 @@
                (test-equal? (temp-y t) 5.5)
                (test-equal? (temp-x t) "hello")
                (test-equal? (temp-z t) 2.3))))
-  )
+
+  (test-begin
+    #:name delegating-listof
+    (test-adapter-contract
+     [l (list 1 2 3)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(Listof Number)
+                                                 '(Listof String)
+                                                 type:base-type-substitution))]
+     (and/test (list? l)
+               (andmap sealed? l)))))
 
