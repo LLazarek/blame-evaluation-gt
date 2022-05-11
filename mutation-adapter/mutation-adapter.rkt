@@ -69,7 +69,7 @@
                              sub-tds))
          (td:vector (list->td-index-map sub-tds))]
         [(list 'Listof (app recur sub-td))
-         (td:listof sub-td)]
+         (and sub-td (td:listof sub-td))]
         [(list '#:struct name (list [list fields ': (app recur sub-tds)] ...))
          #;(define (indexes->fields index-map)
              (for/list ([{i td} (in-dict index-map)])
@@ -104,6 +104,7 @@
   (require ruinit)
   (test-begin
     #:name sexp->type-diff
+    (test-exn exn? (sexp->type-diff (sexp-diff 'A 'A)))
     (test-equal? (sexp->type-diff (sexp-diff 'A 'B))
                  (td:base 'A 'B))
     (test-equal? (sexp->type-diff (sexp-diff '(-> A C)
@@ -160,7 +161,10 @@
                  (td:struct `((0 . ,(td:base 'Natural 'Index)))))
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
-                 (td:listof (td:base 'A 'B)))))
+                 (td:listof (td:base 'A 'B)))
+    (test-exn exn?
+              (sexp->type-diff (sexp-diff '(Listof A)
+                                          '(Listof A))))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -726,7 +730,19 @@
                                                  type:function-result-swap))]
      (let-values ([{v1 v2} (f 1 "two")])
        (and/test (test-equal? v1 "two")
-                 (test-equal? v2 1)))))
+                 (test-equal? v2 1))))
+    (test-adapter-contract
+     [f (λ (a b) (list a))
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> Integer
+                                                      String
+                                                      (Listof Integer))
+                                                 '(-> String
+                                                      Integer
+                                                      (Listof Integer))
+                                                 type:function-arg-swap))]
+     (let ([v (f 1 "two")])
+       (test-equal? v (list "two")))))
 
   (test-begin
    #:name delegating-struct
