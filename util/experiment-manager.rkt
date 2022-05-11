@@ -978,7 +978,8 @@
                            ['queue Q-path]
                            ['resume-queue resume-Q/host]
                            ['update (app (mapper host-by-name) update-targets)]
-                           ['dbs-path dbs-path])
+                           ['dbs-path dbs-path]
+                           ['launch-outcome-checking-mode (app string->symbol outcome-checking-mode)])
                args]
               #:once-each
               [("-s" "--status")
@@ -1027,7 +1028,13 @@
                ("Install the given db set when updating a host's implementation."
                 "Only has an effect when -u is supplied."
                 @~a{Default: @default-dbs-path})
-               #:collect ["path" take-latest default-dbs-path]]}
+               #:collect ["path" take-latest default-dbs-path]]
+              [("-L" "--launch-outcome-checking-mode")
+               'launch-outcome-checking-mode
+               ("Outcome checking mode for benchmarks to be launched."
+                "Only has an effect when -l is supplied."
+                "Default: check")
+               #:collect ["record/check" take-latest "check"]]}
  #:check [(or (not Q-path) (path-to-existant-file? Q-path))
           @~a{Unable to find queue spec at @Q-path}]
 
@@ -1055,7 +1062,8 @@
        [(not (empty? launch-targets))
         (for-each-target launch-targets
                          (λ (a-host benchmark config-name)
-                           (send a-host submit-job! benchmark config-name))
+                           (send a-host submit-job! benchmark config-name
+                                 #:mode outcome-checking-mode))
                          "submit")]
        [(not (empty? cancel-targets))
         (for-each-target cancel-targets
