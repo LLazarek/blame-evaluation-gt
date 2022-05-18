@@ -20,7 +20,9 @@
   '("mutation-analysis/plot-mutation-analyses.rkt"
     "util/places-suck-demonstration.rkt"
     "util/mutation-index-cache-performance-check.rkt"
-    "data-analysis/*"))
+    "data-analysis/*"
+    "configurables/errortrace-configs/*"
+    "configurables/code-mutation-configs/*"))
 (define (ignored-path? p)
   (ormap (λ (pat) (glob-match? pat p))
          glob-patterns-to-ignore))
