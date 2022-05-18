@@ -25,7 +25,7 @@
   (define-implementation none
     #:module "mutant-sampling/no-sampling.rkt")
 
-  (define-implementation use-pre-selected-samples
+  (define-implementation pre-selected
     #:module "mutant-sampling/use-pre-selected-samples.rkt"
     #:parameters [pre-selected-mutant-samples-db]))
 

@@ -14,7 +14,7 @@
 
 (define current-mutation-types (make-parameter #f))
 
-(define PLOT-WIDTH 300)
+(define PLOT-WIDTH 700)
 (define SUCCESS-COUNTS-LIMIT 50)
 
 (struct annotated (data points) #:prefab)

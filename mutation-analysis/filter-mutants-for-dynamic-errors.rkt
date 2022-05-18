@@ -20,7 +20,7 @@
          racket/random)
 
 (define-runtime-paths
-  [erasure-config-path "../configurables/configs/dynamic-error-analysis-erasure.rkt"]
+  [erasure-config-path "../configurables/configs/mutation-analysis.rkt"]
   [natural-config-path "../configurables/configs/dynamic-error-analysis-natural.rkt"])
 
 (define working-dir (make-parameter "find-mutant-dynamic-errors-scratch"))
@@ -65,6 +65,7 @@
 
 (define (blamed-is-interesting? blamed-list a-config mutant)
   (match (current-mode)
+    ['erasure-any #t]
     ['erasure-interesting
      (define blamed-mods-in-program
        (filter (λ (blamed) (hash-has-key? a-config blamed)) blamed-list))
@@ -84,8 +85,9 @@
                    (file->value outfile)))
   (match result
     [(struct* run-status ([outcome (or 'runtime-error 'blamed)]
-                          [blamed blamed-list]))
-     #:when (blamed-is-interesting? blamed-list config mutant)
+                          [blamed blamed-list]
+                          [context-stack stack]))
+     #:when (blamed-is-interesting? (or blamed-list stack) config mutant)
      (log-mutant-dynamic-errors-info @~a{@mutant => @(run-status-outcome result) : accepted})
      (dynamic-error)]
     [(? run-status?)
@@ -106,7 +108,7 @@
   (define max-configuration (make-max-bench-config benchmark))
   (define-values {run-configuration config-path}
     (match (current-mode)
-      ['erasure-interesting
+      [(or 'erasure-interesting 'erasure-any)
        (values (for/hash ([mod (in-hash-keys max-configuration)])
                  (values mod 'none))
                erasure-config-path)]
@@ -229,13 +231,14 @@
                'mode
                ("Set the mode of filtering. Options are:"
                 "  erasure-interesting : using erasure, interesting dynamic errors"
+                "  erasure-any : using erasure, any dynamic errors"
                 "  natural : using natural with all but mutated @ types, any dynamic error"
                 @~a{Default: @(current-mode)})
                #:collect {"name" (set-parameter current-mode string->symbol) #f}])
 
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
- #:check [(member (current-mode) '(erasure-interesting natural))
+ #:check [(member (current-mode) '(erasure-interesting erasure-any natural))
           @~a{@(current-mode) isn't a valid mode}]
 
  (log-mutant-dynamic-errors-info @~a{Mode: @(current-mode)})

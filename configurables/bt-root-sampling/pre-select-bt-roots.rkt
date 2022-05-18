@@ -46,9 +46,13 @@
                     ([{mod-name indices} (in-hash mutant-samples-by-module)]
                      [index (in-list indices)]
                      [root-id (in-range root-sample-size)])
-           (define root (hash-set (random-config-variant bench-max-config)
-                                  mod-name
-                                  'none))
+           (define random-config (random-config-variant bench-max-config))
+           (define root
+             (if (hash-has-key? random-config mod-name)
+                 (hash-set random-config
+                           mod-name
+                           'none)
+                 random-config))
            (hash-update roots-by-mutant
                         (mutant #f mod-name index)
                         (add-to-list root)
@@ -79,7 +83,7 @@
                ("Path to the db containing interesting scenarios for the mutants in"
                 "the mutant-samples-db."
                 "If supplied, scenarios for each mutant will be sampled from those in this db."
-                "Otherwise, random scenarios from the lattice for each mutant will be selected.")
+                "Otherwise, random scenarios (which do not type the buggy module) from the lattice for each mutant will be selected.")
                #:collect {"path" take-latest #f}]
               [("-o" "--outdb")
                'outdb-path

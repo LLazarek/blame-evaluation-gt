@@ -13,6 +13,7 @@
 
 (define process-limit (make-parameter 3))
 (define data-output-dir (make-parameter "./mutant-data"))
+(define check-type-error-blame? (make-parameter #f))
 
 (define-logger mutation-analysis)
 
@@ -31,8 +32,10 @@
    {}
    . ->* . any)
 
-  (define mutatable-module-names (benchmark->mutatable-modules bench))
-  (define max-config (make-max-bench-config bench))
+  (define mutatable-module-names ((configured:select-modules-to-mutate) bench))
+
+  (log-mutation-analysis-info
+   @~a{Configured mutatable modules: @~s[mutatable-module-names]})
 
   (unless (directory-exists? (data-output-dir))
     (make-directory (data-output-dir)))
@@ -86,12 +89,13 @@
                                       module-to-mutate-name
                                       index
                                       id)))
-  (define ctl (spawn-mutant-runner the-benchmark-configuration
-                                   module-to-mutate-name
-                                   index
-                                   outfile
-                                   (current-configuration-path)
-                                   #:log-mutation-info? #t))
+  (define ctl (parameterize ([mutant-error-log outfile])
+                (spawn-mutant-runner the-benchmark-configuration
+                                     module-to-mutate-name
+                                     index
+                                     outfile
+                                     (current-configuration-path)
+                                     #:log-mutation-info? #t)))
   (log-mutation-analysis-info
    @~a{Spawned mutant @module-to-mutate-name @"@" @index})
   (define (will:record-type-error q* info)
@@ -132,7 +136,8 @@
   (box #f))
 (define (extract-mutation-type-and-result f max-config mutant)
   (define trimmed-output
-    (system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f}))
+    #;(system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f})
+    (file->string f))
   (define output-regexp
     (pregexp @~a{
                  (?m:@;
@@ -165,12 +170,24 @@
           #f]
          [else
           #f]))
-     (values (and type-error? blamed-is-in-program?)
+     (values (and type-error?
+                  (implies (check-type-error-blame?) blamed-is-in-program?))
              mutation-type)]
+    [(and (regexp "generate-adapter-ctcs-for-mutation: Mutated a type definition,")
+          (regexp (pregexp @~a{
+                               (?m:@;
+                               mutate: type: (\S+)$
+                               mutate: Mutating.+$@;
+                               )
+                               })
+                  (list _ mutation-type)))
+     (values #f mutation-type)]
     [other-contents
      (raise-user-error @~a{
-                           Unable to match against file contents for @|mutant|:
+                           Unable to match against file contents for @mutant in @|f|:
+                           -----
                            @other-contents
+                           -----
                            })]))
 
 (define (set-parameter p [transform values])
@@ -205,8 +222,14 @@
                ("Record progress in the given log file."
                 "If it exists and is not empty, resume from the point reached in the log.")
                #:collect ["path" take-latest #f]
-               #:mandatory]}
+               #:mandatory]
+              [("--check-type-error-blame")
+               'check-type-error-blame?
+               ("Check and only consider successful type erros that blame a typeable module"
+                "Default: consider any type error a success")
+               #:record]}
  (install-configuration! (hash-ref flags 'config-path))
+ (check-type-error-blame? (hash-ref flags 'check-type-error-blame?))
  (define progress-log (hash-ref flags 'progress-log))
  (define progress
    (match progress-log
