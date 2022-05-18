@@ -6,7 +6,7 @@
 
 (define (install!)
   (configure! mutation                 type-mistakes-in-code)
-  (configure! mutant-sampling          use-pre-selected-samples "../dbs/code-mutations/mutant-samples.rktdb")
+  (configure! mutant-sampling          pre-selected "../dbs/code-mutations/mutant-samples.rktdb")
   (configure! module-instrumentation   none)
   (configure! benchmark-runner         load-pre-computed-result "../dbs/code-mutations/pre-computed-mutant-results.rktdb")
   (configure! blame-following          null)
