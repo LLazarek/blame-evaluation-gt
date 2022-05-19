@@ -84,9 +84,9 @@
              @~a{
                  Couldn't find mutated type between the original and new mods.
                  original:
-                 @original-mod-stx
+                 @pretty-format[(syntax->datum original-mod-stx)]
 
-                 @new-mod-stx
+                 @pretty-format[(syntax->datum new-mod-stx)]
 
                  })))
 

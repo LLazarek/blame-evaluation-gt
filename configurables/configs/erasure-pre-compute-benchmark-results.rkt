@@ -14,15 +14,16 @@
   (configure! benchmark-runner         run-it)
   (configure! blame-following          pick-some
               ; runtime-error-with-blame
-              select-all-blamed
+              select-top-of-context/filter-typed
               ; runtime-error
               select-top-of-context/filter-typed
               ; blame
-              select-all-blamed)
+              select-top-of-context/filter-typed)
   (configure! bt-root-sampling         pre-selected
               "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
   (configure! trail-completion         any-type-error/blamed-at-max)
 
-  (configure! module-instrumentation   transient-types "../dbs/type-api-mutations/transient-special-cases.rktdb")
+  ;; Only the interface and adapter modules will be in #lang tr, so this will
+  ;; only affect those two
+  (configure! module-instrumentation   erasure-types)
   (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module))
-

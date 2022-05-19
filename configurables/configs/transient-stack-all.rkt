@@ -6,9 +6,11 @@
 (provide install!)
 
 (define (install!)
-  (configure! mutation                 type-mistakes-in-code)
-  (configure! mutant-sampling          pre-selected "../dbs/code-mutations/mutant-samples.rktdb")
-  (configure! module-instrumentation   transient-types "../dbs/code-mutations/transient-special-cases.rktdb")
+  (configure! mutation                 type-interface-mistakes)
+  (configure! mutant-sampling          pre-selected
+              "../dbs/type-api-mutations/mutant-samples.rktdb")
+  (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
+  (configure! module-selection-for-mutation interface-module-only)
   (configure! benchmark-runner         run-it)
   (configure! blame-following          pick-some
               ; runtime-error-with-blame
@@ -17,5 +19,9 @@
               select-all-context
               ; blame
               select-all-context)
-  (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
-  (configure! trail-completion         any-type-error/blamed-at-max))
+  (configure! bt-root-sampling         pre-selected
+              "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
+  (configure! trail-completion         any-type-error/blamed-at-max)
+
+  (configure! module-instrumentation   transient-types "../dbs/type-api-mutations/transient-special-cases.rktdb")
+  (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module))

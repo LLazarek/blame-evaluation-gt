@@ -1,14 +1,23 @@
 #lang racket/base
 
-(require "../configurables.rkt")
+(require "../configurables.rkt"
+         "blame-following-common.rkt")
 
 (provide install!)
 
 (define (install!)
-  (configure! mutation                 type-mistakes-in-code)
-  (configure! mutant-sampling          pre-selected "../dbs/code-mutations/mutant-samples.rktdb")
-  (configure! module-instrumentation   none)
-  (configure! benchmark-runner         load-pre-computed-result "../dbs/code-mutations/pre-computed-mutant-results.rktdb")
+  (configure! mutation                 type-interface-mistakes)
+  (configure! mutant-sampling          pre-selected
+              "../dbs/type-api-mutations/mutant-samples.rktdb")
+  (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
+  (configure! module-selection-for-mutation interface-module-only)
+  (configure! benchmark-runner         load-pre-computed-result "../dbs/type-api-mutations/pre-computed-mutant-results.rktdb")
   (configure! blame-following          null)
-  (configure! bt-root-sampling         pre-selected "../dbs/code-mutations/pre-selected-bt-roots.rktdb")
-  (configure! trail-completion         any-type-error/blamed-at-max))
+  (configure! bt-root-sampling         pre-selected
+              "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
+  (configure! trail-completion         any-type-error/blamed-at-max)
+
+  (configure! module-instrumentation   none)
+  ;; We need to insert the TR adapter module to check for a type error, but we
+  ;; won't use that TR adapter to run since we're loading pre-computed results anyway.
+  (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module))

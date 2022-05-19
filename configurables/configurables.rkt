@@ -55,7 +55,10 @@
 
   (define-implementation transient-types
     #:module "module-instrumentation/type-with-transient.rkt"
-    #:parameters [transient-special-cases-db]))
+    #:parameters [transient-special-cases-db])
+
+  (define-implementation erasure-types
+    #:module "module-instrumentation/type-with-erasure.rkt"))
 
 ;; Controls how all instrumentation is applied to a program.
 ;; Thus also has the opportunity to transform the program as part of "instrumentation".
