@@ -12,10 +12,9 @@
          "../../runner/instrumented-runner.rkt"
          "instrument-program.rkt"
          (rename-in "just-instrument-modules.rkt"
-                    [instrument-program instrument-all-the-modules]))
+                    [instrument-program instrument-all-the-modules])
+         "type-interface-module-names.rkt")
 
-(define type-interface-file-name "type-interface.rkt")
-(define type-interface-file-rename "original-type-interface.rkt")
 (define type-interface-adapter-temporary-name "type-interface-adapter.rkt")
 
 (define (instrument-program a-program make-instrumented-module)

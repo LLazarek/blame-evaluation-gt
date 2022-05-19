@@ -73,6 +73,11 @@
                                   [blame-positive-source #f])
          blamed)
   (match blamed
+    ['contracted
+     ;; There doesn't seem to be a better way to do this, unfortunately, than
+     ;; just knowing a-priori what this blamed location means
+     (local-require "../../configurables/program-instrumentation/type-interface-module-names.rkt")
+     type-interface-file-name]
     ;; NOTE: The `(interface for X from Y)` shape depends on a modification to Typed Racket;
     ;; Specifically `require/contract` must be modified to change
     ;; the positive party, by extending the list with
