@@ -7,12 +7,14 @@
          (struct-out mutated-interface-type)
 
          make-base-type-adapter
-         delegating->
          swap->
-         delegating-struct
-         delegating-listof
          swap-struct-field
          sealing-adapter
+
+         delegating->
+         delegating-struct
+         delegating-listof
+         delegating-parameter/c
 
          sexp-diff)
 
@@ -20,7 +22,8 @@
          "sexp-diff.rkt"
          "util.rkt"
          syntax/parse/define
-         (for-syntax syntax/parse)
+         (for-syntax syntax/parse
+                     racket/syntax)
          racket/struct)
 
 (struct mutated-interface-type (original mutated mutation-type)
@@ -43,6 +46,7 @@
 (struct td:vector td (index-map) #:transparent)
 (struct td:struct td (index-map) #:transparent)
 (struct td:listof td (sub-td) #:transparent)
+(struct td:parameterof td (sub-td) #:transparent)
 (define (sexp->type-diff a-sexp-diff)
   (define (list->td-index-map a-list)
     (match a-list
@@ -70,6 +74,8 @@
          (td:vector (list->td-index-map sub-tds))]
         [(list 'Listof (app recur sub-td))
          (and sub-td (td:listof sub-td))]
+        [(list 'Parameterof (app recur sub-td))
+         (and sub-td (td:parameterof sub-td))]
         [(list '#:struct name (list [list fields ': (app recur sub-tds)] ...))
          #;(define (indexes->fields index-map)
              (for/list ([{i td} (in-dict index-map)])
@@ -164,7 +170,10 @@
                  (td:listof (td:base 'A 'B)))
     (test-exn exn?
               (sexp->type-diff (sexp-diff '(Listof A)
-                                          '(Listof A))))))
+                                          '(Listof A))))
+    (test-equal? (sexp->type-diff (sexp-diff '(Parameterof A)
+                                             '(Parameterof B)))
+                 (td:parameterof (td:base 'A 'B)))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -233,7 +242,9 @@
        (delegating-struct (for/list ([{field td} (in-dict index-map)])
                             (cons field (loop td))))]
       [{(recur) (td:listof sub-td)}
-       (delegating-listof (loop sub-td))])))
+       (delegating-listof (loop sub-td))]
+      [{(recur) (td:parameterof sub-td)}
+       (delegating-parameter/c (loop sub-td))])))
 
 ;; sexp? symbol? contract? -> contract?
 ;; Generate a contract that delegates on `name` to `ctc`.
@@ -489,7 +500,27 @@
         (list #,@(for/list ([{f ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
                    #`(cons #,f #,(generic->stx ctc))))))])
 
-(struct delegating-listof adapter/c (sub-ctc)
+(define-simple-macro (define-simple-delegating-adapter name [sub-ctc-name ...]
+                       (λ (value-name:id) proj-body ...))
+  #:with [sub-ctc-accessor ...] (for/list ([sub-name (in-list (attribute sub-ctc-name))])
+                                  (format-id sub-name "~a-~a" #'name sub-name))
+  (struct name adapter/c (sub-ctc-name ...)
+    #:property prop:contract
+    (build-contract-property
+     #:name (λ (this) (list 'name
+                            (contract-name (sub-ctc-accessor this))
+                            ...))
+     #:late-neg-projection
+     (λ (this)
+       (define sub-ctc-name (sub-ctc-accessor this)) ...
+       (λ (blame)
+         (λ (value-name neg-party)
+           proj-body ...))))
+    #:methods gen:adapted
+    [(define/generic generic->stx ->stx)
+     (define (->stx this)
+       #`(name #,(generic->stx (sub-ctc-accessor this)) ...))]))
+#;(struct delegating-listof adapter/c (sub-ctc)
   #:property prop:contract
   (build-contract-property
    #:name (λ (this) (list 'delegating-listof
@@ -504,6 +535,13 @@
   [(define/generic generic->stx ->stx)
    (define (->stx this)
      #`(delegating-listof #,(generic->stx (delegating-listof-sub-ctc this))))])
+(define-simple-delegating-adapter delegating-listof [sub-ctc]
+  (λ (v) (contract (listof sub-ctc) v #f #f)))
+(define-simple-delegating-adapter delegating-parameter/c [sub-ctc]
+  (λ (p)
+    (make-derived-parameter p
+                            (λ (new-v) (contract sub-ctc new-v #f #f))
+                            (λ (inner-v) (contract sub-ctc inner-v #f #f)))))
 
 (struct swap-struct-field adapter/c (i1 i2)
   #:property prop:contract
@@ -790,5 +828,18 @@
                                                  '(Listof String)
                                                  type:base-type-substitution))]
      (and/test (list? l)
-               (andmap sealed? l)))))
+               (andmap sealed? l))))
+  (test-begin
+    #:name delegating-parameter/c
+    (let ([outer-p (make-parameter 5)])
+      (test-adapter-contract
+       [p outer-p
+          #:with-contract (generate-adapter-ctc
+                           (mutated-interface-type '(Parameterof Number)
+                                                   '(Parameterof String)
+                                                   type:base-type-substitution))]
+       (and/test (parameter? p)
+                 (sealed? (p))
+                 (begin (p "hello")
+                        (sealed? (outer-p))))))))
 

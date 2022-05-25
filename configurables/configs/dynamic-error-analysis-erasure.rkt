@@ -8,14 +8,6 @@
 (define (install!)
   (configure! mutation                 type-mistakes-in-code)
   (configure! mutant-sampling          pre-selected "../dbs/code-mutations/mutant-samples.rktdb")
-  (configure! module-instrumentation   none)
+  (configure! module-instrumentation   erasure-types)
   (configure! benchmark-runner         run-it)
-  (configure! blame-following          pick-some
-              ; runtime-error-with-blame
-              select-all-errortrace/context-fallback
-              ; runtime-error
-              select-all-errortrace/context-fallback
-              ; blame
-              select-all-errortrace/context-fallback)
-  (configure! bt-root-sampling         random-with-replacement)
-  (configure! trail-completion         any-type-error/blamed-at-max))
+  (configure! bt-root-sampling         random-with-replacement))

@@ -24,7 +24,12 @@
                                                            mutated-mod-stx
                                                            mutation-type))
   (define interface-r/t/c/p-forms (extract-r/t/c/p-forms original-mod-stx))
-  (adapter-ctcs->module-stx adapter-ctcs mod-name interface-r/t/c/p-forms original-mod-stx))
+  (define interface-requires (extract-requires original-mod-stx))
+  (adapter-ctcs->module-stx adapter-ctcs
+                            mod-name
+                            interface-r/t/c/p-forms
+                            interface-requires
+                            original-mod-stx))
 
 ;; syntax? syntax? mutation-type? -> (listof (cons identifier? contract?))
 (define (generate-adapter-ctcs-for-mutation original-mod-stx
@@ -46,6 +51,15 @@
     [(module _ _
        (#%module-begin
         {~alt {~and forms ({~datum require/typed/check/provide} _ ...)}
+              _}
+        ...))
+     (attribute forms)]))
+
+(define extract-requires
+  (syntax-parser
+    [(module _ _
+       (#%module-begin
+        {~alt {~and forms ({~or {~datum require} {~datum reprovide}} _ ...)}
               _}
         ...))
      (attribute forms)]))
@@ -350,7 +364,11 @@
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
 ;; (dictof identifier? contract?) syntax? (listof syntax) [syntax?] -> syntax?
-(define (adapter-ctcs->module-stx adapter-ctcs interface-mod-name original-interface-r/t/c/p-forms [stx-for-location+bindings #'here])
+(define (adapter-ctcs->module-stx adapter-ctcs
+                                  interface-mod-name
+                                  original-interface-r/t/c/p-forms
+                                  original-interface-require-forms
+                                  [stx-for-location+bindings #'here])
   (define (munge-location+bindings stx)
     (datum->syntax stx-for-location+bindings
                    (syntax->datum stx)
@@ -370,6 +388,7 @@
                    #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
                         #`[#,id #,(->stx adapter)]))))
        (require "../../../utilities/require-typed-check-provide.rkt")
+       #,@original-interface-require-forms
        #,@redirected-interface-r/t/c/p-forms))))
 
 ;; syntax? syntax? -> syntax?
@@ -378,12 +397,14 @@
     [({~datum require/typed/check/provide} source . more)
      #`(require/typed/check/provide #,to . more)]))
 
-
 (module+ test
   (test-begin
    #:name adapter-ctcs->module-stx
    (test-equal? (syntax->datum
-                 (adapter-ctcs->module-stx empty "interface.rkt" empty))
+                 (adapter-ctcs->module-stx empty
+                                           "interface.rkt"
+                                           empty
+                                           empty))
                 `(module mutation-adapter typed/racket
                    (#%module-begin
                     (module contracted racket
@@ -402,7 +423,9 @@
                "server.rkt"
                [foo Integer]
                [bar (-> Boolean Integer Void)]
-               [baz (-> Real String)]))))
+               [baz (-> Real String)]))
+      (list #'(require "../base/base-types.rkt")
+            #'(reprovide "../base/more-types.rkt"))))
     `(module mutation-adapter typed/racket
        (#%module-begin
         (module contracted racket
@@ -418,6 +441,8 @@
                   (list (cons 1 #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter)))
                   (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
+        (require "../base/base-types.rkt")
+        (reprovide "../base/more-types.rkt")
         (require/typed/check/provide
          'contracted
          [foo Integer]

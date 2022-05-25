@@ -65,7 +65,7 @@
              (syntax->datum #'name)
              (λ (new-type)
                (quasisyntax/loc this-syntax
-                 (d-t name #,new-type))))]
+                 (d-t name #,@new-type))))]
     [_ (values #f #f #f)]))
 
 (define mutate-type-interface (make-program-mutator mutate-type-expr select-interface-types))
@@ -255,4 +255,25 @@
                                             [stream-unfold (-> stream (values Natural stream))]
                                             [stream-get (-> stream Natural Natural)]
                                             [stream-take (-> stream Natural (Listof Integer))])
-               ]]))))
+               ]]))
+
+    (test-mutation/sequence
+     #'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+        (define-type BoxQuad (List* 'box QuadAttrs QuadList))
+        (define-type RunQuad (List* 'run QuadAttrs QuadList))
+        (require/typed/check/provide "streams.rkt"
+                                     [make-stream (-> Natural (-> stream) stream)])
+        ]
+     `(#;[0 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (define-type BoxQuad (List* 'box QuadAttrs QuadList))
+              (define-type RunQuad (List* 'run QuadAttrs QuadList))
+              ]]
+       [0 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (define-type BoxQuad (List* 'box QuadAttrs QuadList))
+              (define-type RunQuad (List* 'run QuadAttrs QuadList))
+              (require/typed/check/provide "streams.rkt"
+                                            [make-stream (-> (-> stream) Natural stream)])
+              ]]))))
