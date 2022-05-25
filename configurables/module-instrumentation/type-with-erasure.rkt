@@ -30,9 +30,14 @@
 
 (define-syntax-class tlf
   #:description "top level form"
-  (pattern ({~datum require} "../../../utilities/require-typed-check-provide.rkt")
+  (pattern ({~datum require} {~alt "../../../utilities/require-typed-check-provide.rkt"
+                                   {~datum require-typed-check}
+                                   other-reqs}
+                             ...)
            #:with erased (datum->syntax this-syntax
-                                        '(require "../../../utilities/require-typed-check-provide-erased.rkt")))
+                                        `(require
+                                          "../../../utilities/require-typed-check-provide-erased.rkt"
+                                          . ,(attribute other-reqs))))
   (pattern something-else
            #:with erased this-syntax))
 
