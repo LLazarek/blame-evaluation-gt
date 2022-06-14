@@ -42,11 +42,13 @@
 ;; type-diff
 (struct td () #:transparent)
 (struct td:-> td (argument-index-map result-index-map) #:transparent)
+(struct td:->* td (mandatory-arg-count optional-argument-index-map) #:transparent)
 (struct td:base td (original new) #:transparent)
 (struct td:vector td (index-map) #:transparent)
 (struct td:struct td (index-map) #:transparent)
 (struct td:listof td (sub-td) #:transparent)
 (struct td:parameterof td (sub-td) #:transparent)
+(struct td:class td (init-field-td-map method-td-map) #:transparent)
 (define (sexp->type-diff a-sexp-diff)
   (define (list->td-index-map a-list)
     (match a-list
@@ -69,6 +71,26 @@
                                                     (list result-tds))))
          (and (or (not (empty? arg-map)) (not (empty? result-map)))
               (td:-> arg-map result-map))]
+        [(list '->*
+               (app (mapping recur)
+                    (list mandatory-arg-tds ...))
+               (app (mapping recur)
+                    (list optional-arg-tds ...))
+               (or (and (? list?)
+                        (app (mapping recur) (list* 'values result-tds)))
+                   (app recur result-tds)))
+         (define mandatory-arg-map (list->td-index-map mandatory-arg-tds))
+         (define optional-arg-map (list->td-index-map optional-arg-tds))
+         (define result-map (list->td-index-map (if (list? result-tds)
+                                                    result-tds
+                                                    (list result-tds))))
+         (cond [(not (empty? optional-arg-map))
+                (td:->* (length mandatory-arg-tds)
+                        optional-arg-map)]
+               [(or (not (empty? mandatory-arg-map))
+                    (not (empty? result-map)))
+                (td:-> mandatory-arg-map result-map)]
+               [else #f])]
         [(list* 'Vector (and (list _ ... (? td?) _ ... #f)
                              sub-tds))
          (td:vector (list->td-index-map sub-tds))]
@@ -77,10 +99,25 @@
         [(list 'Parameterof (app recur sub-td))
          (and sub-td (td:parameterof sub-td))]
         [(list '#:struct name (list [list fields ': (app recur sub-tds)] ...))
-         #;(define (indexes->fields index-map)
-             (for/list ([{i td} (in-dict index-map)])
-               (cons (field (list-ref fields i) i) td)))
          (td:struct (list->td-index-map sub-tds))]
+        [(list* 'Class
+                (list (list 'init-field
+                            (list init-field-names (app recur init-field-sub-tds))
+                            ...)
+                      (list method-names (app recur method-sub-tds))
+                      ...))
+         (define init-field-dict
+           (for/list ([name (in-list init-field-names)]
+                      [sub-td (in-list init-field-sub-tds)]
+                      #:when (td? sub-td))
+             (cons name sub-td)))
+         (define method-dict
+           (for/list ([name (in-list method-names)]
+                      [sub-td (in-list method-sub-tds)]
+                      #:when (td? sub-td))
+             (cons name sub-td)))
+         (td:class init-field-dict
+                   method-dict)]
         [(difference original new)
          (td:base original new)]
         [(list* 'values (app (mapping recur)
@@ -173,7 +210,24 @@
                                           '(Listof A))))
     (test-equal? (sexp->type-diff (sexp-diff '(Parameterof A)
                                              '(Parameterof B)))
-                 (td:parameterof (td:base 'A 'B)))))
+                 (td:parameterof (td:base 'A 'B)))
+
+    (test-equal? (sexp->type-diff (sexp-diff '(->* (A) (C) R)
+                                             '(->* (B) (C) R)))
+                 (td:-> `((0 . ,(td:base 'A 'B)))
+                        '()))
+    (test-equal? (sexp->type-diff (sexp-diff '(->* (A) (C) R)
+                                             '(->* (A) (B) R)))
+                 (td:->* 1 `((0 . ,(td:base 'C 'B)))))
+
+    (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field) (sign-up (->* (A) (C) R)))
+                                             '(Class (init-field) (sign-up (->* (A) (B) R)))))
+                 (td:class '()
+                           `((sign-up . ,(td:->* 1 `((0 . ,(td:base 'C 'B))))))))
+    (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field [a X]) (sign-up (->* (A) (C) R)))
+                                             '(Class (init-field [a Y]) (sign-up (->* (A) (B) R)))))
+                 (td:class `((a . ,(td:base 'X 'Y)))
+                           `((sign-up . ,(td:->* 1 `((0 . ,(td:base 'C 'B))))))))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -244,7 +298,16 @@
       [{(recur) (td:listof sub-td)}
        (delegating-listof (loop sub-td))]
       [{(recur) (td:parameterof sub-td)}
-       (delegating-parameter/c (loop sub-td))])))
+       (delegating-parameter/c (loop sub-td))]
+      [{(recur) (td:->* n optional-arg-index-map)}
+       (delegating->* n
+                      (for/list ([{i td} (in-dict optional-arg-index-map)])
+                        (cons i (loop td))))]
+      [{(recur) (td:class init-field-td-map method-td-map)}
+       (delegating-class/c (for/list ([{i td} (in-dict init-field-td-map)])
+                             (cons i (loop td)))
+                           (for/list ([{i td} (in-dict method-td-map)])
+                             (cons i (loop td))))])))
 
 ;; sexp? symbol? contract? -> contract?
 ;; Generate a contract that delegates on `name` to `ctc`.
@@ -346,33 +409,50 @@
   (->stx adapted))
 
 (struct adapter/c ())
-(struct transform/c adapter/c (transformer from-type to-type)
-  #:property prop:contract
-  (build-contract-property
-   #:name (const 'transform/c)
-   #:late-neg-projection
-   (λ (this)
-     (define transform (transform/c-transformer this))
-     (λ (blame)
-       (λ (v neg-party)
-         (transform v)))))
-  #:methods gen:adapted
-  [(define (->stx this)
-     #`(make-base-type-adapter '#,(transform/c-from-type this)
-                               '#,(transform/c-to-type this)))])
+
+(define-simple-macro (define-adapter name (field-name ...)
+                       #:name name-e
+                       #:->stx make-stx-fn
+                       {~or* {~seq #:full-projection full-proj-e}
+                             ({~literal λ} (value-name:id) proj-body ...)})
+  #:with [field-accessor ...] (for/list ([sub-name (in-list (attribute field-name))])
+                                (format-id sub-name "~a-~a" #'name sub-name))
+  (struct name adapter/c (field-name ...)
+    #:property prop:contract
+    (build-contract-property
+     #:name (λ (this)
+              (define field-name (field-accessor this)) ...
+              name-e)
+     #:late-neg-projection
+     {~? full-proj-e
+         (λ (this)
+           (define field-name (field-accessor this)) ...
+           (λ (blame)
+             (λ (value-name neg-party)
+               proj-body ...)))})
+    #:methods gen:adapted
+    [(define/generic generic->stx ->stx)
+     (define (->stx this)
+       (define field-name (field-accessor this)) ...
+       (make-stx-fn generic->stx))]))
+
+(define-simple-macro (define-simple-delegating-adapter name [sub-ctc-name ...]
+                       ({~literal λ} (value-name:id) proj-body ...))
+  (define-adapter name [sub-ctc-name ...]
+    #:name (list 'name (contract-name sub-ctc-name) ...)
+    #:->stx (λ (->stx) #`(name #,(->stx sub-ctc-name) ...))
+    (λ (value-name) proj-body ...)))
+
+(define-adapter transform/c (transformer from-type to-type)
+  #:name 'transform/c
+  #:->stx (λ _ #`(make-base-type-adapter '#,from-type '#,to-type))
+  (λ (v) (transformer v)))
+
 (struct sealed ())
-(struct sealing-adapter adapter/c ()
-  #:property prop:contract
-  (build-contract-property
-   #:name (const 'sealing-adapter)
-   #:late-neg-projection
-   (λ (this)
-     (λ (blame)
-       (λ (v neg-party)
-         (sealed)))))
-  #:methods gen:adapted
-  [(define (->stx this)
-     #`(sealing-adapter))])
+(define-adapter sealing-adapter ()
+  #:name 'sealing-adapter
+  #:->stx (λ _ #`(sealing-adapter))
+  (λ (v) (sealed)))
 
 ;; (struct-instance? -> (values (or/c #f (-> list? list?))
 ;;                              (or/c #f (-> list? list?))))
@@ -406,55 +486,114 @@
         (impersonate-procedure v
                                impersonator-wrapper)))))
 
-;; doesn't support keyword mutations
-(struct delegating-> adapter/c (arg-index-ctc-pairs result-index-ctc-pairs)
-  #:property prop:contract
-  (build-contract-property
-   #:name (λ (this)
-            (list 'delegating->
-                  (for/list ([{index ctc} (in-dict (delegating->-arg-index-ctc-pairs this))])
-                    (list index (contract-name ctc)))
-                  (for/list ([{index ctc} (in-dict (delegating->-result-index-ctc-pairs this))])
-                    (list index (contract-name ctc)))))
-   #:late-neg-projection
-   (simple->adapter-projection
-    (λ (this)
-      (define arg-index-ctc-pairs (delegating->-arg-index-ctc-pairs this))
-      (define result-index-ctc-pairs (delegating->-result-index-ctc-pairs this))
-      (values (and (not (empty? arg-index-ctc-pairs))
-                   (λ (args) (apply-contracts-in-list args arg-index-ctc-pairs)))
-              (and (not (empty? result-index-ctc-pairs))
-                   (λ (results) (apply-contracts-in-list results result-index-ctc-pairs)))))))
-  #:methods gen:adapted
-  [(define/generic generic->stx ->stx)
-   (define (->stx this)
-     #`(delegating-> (list #,@(for/list ([{i ctc} (in-dict (delegating->-arg-index-ctc-pairs this))])
-                                #`(cons #,i #,(generic->stx ctc))))
-                     (list #,@(for/list ([{i ctc} (in-dict (delegating->-result-index-ctc-pairs this))])
-                                #`(cons #,i #,(generic->stx ctc))))))])
+(define (index-ctc-pairs->names index-ctc-pairs)
+  (for/list ([{index ctc} (in-dict index-ctc-pairs)])
+    (list index (contract-name ctc))))
+(define (index-ctc-pairs->stx index-ctc-pairs ->stx)
+  #`(list #,@(for/list ([{index ctc} (in-dict index-ctc-pairs)])
+               #`(cons #,index #,(->stx ctc)))))
 
-(struct swap-> adapter/c (argument? i1 i2)
-  #:property prop:contract
-  (build-contract-property
-   #:name (λ (this)
+;; doesn't support keyword mutations
+(define-adapter delegating-> (arg-index-ctc-pairs result-index-ctc-pairs)
+  #:name (list 'delegating->
+               (index-ctc-pairs->names arg-index-ctc-pairs)
+               (index-ctc-pairs->names result-index-ctc-pairs))
+  #:->stx (λ (->stx)
+            #`(delegating-> #,(index-ctc-pairs->stx arg-index-ctc-pairs ->stx)
+                            #,(index-ctc-pairs->stx result-index-ctc-pairs ->stx)))
+  #:full-projection
+  (simple->adapter-projection
+   (λ (this)
+     (define arg-index-ctc-pairs (delegating->-arg-index-ctc-pairs this))
+     (define result-index-ctc-pairs (delegating->-result-index-ctc-pairs this))
+     (values (and (not (empty? arg-index-ctc-pairs))
+                  (λ (args) (apply-contracts-in-list args arg-index-ctc-pairs)))
+             (and (not (empty? result-index-ctc-pairs))
+                  (λ (results) (apply-contracts-in-list results result-index-ctc-pairs)))))))
+
+(define-adapter swap-> (argument? i1 i2)
+  #:name (λ (this)
             (list (if (swap->-argument? this)
                       'swap->arg
                       'swap->result)
                   (swap->-i1 this)
                   (swap->-i2 this)))
-   #:late-neg-projection
-   (simple->adapter-projection
-    (λ (this)
-      (define argument? (swap->-argument? this))
-      (define i1 (swap->-i1 this))
-      (define i2 (swap->-i2 this))
-      (define swapper (λ (args/results) (swap-in-list args/results i1 i2)))
-      (if argument?
-          (values swapper #f)
-          (values #f swapper)))))
-  #:methods gen:adapted
-  [(define (->stx this)
-     #`(swap-> #,(swap->-argument? this) #,(swap->-i1 this) #,(swap->-i2 this)))])
+  #:->stx (λ (->stx) #`(swap-> #,argument? #,i1 #,i2))
+  #:full-projection
+  (simple->adapter-projection
+   (λ (this)
+     (define argument? (swap->-argument? this))
+     (define i1 (swap->-i1 this))
+     (define i2 (swap->-i2 this))
+     (define swapper (λ (args/results) (swap-in-list args/results i1 i2)))
+     (if argument?
+         (values swapper #f)
+         (values #f swapper)))))
+
+(define-adapter delegating->* (mandatory-arg-count optional-arg-index-ctc-pairs)
+  #:name (list 'delegating->*
+               mandatory-arg-count
+               (index-ctc-pairs->names optional-arg-index-ctc-pairs))
+  #:->stx (λ (->stx)
+            #`(delegating->* #,mandatory-arg-count
+                             #,(index-ctc-pairs->stx optional-arg-index-ctc-pairs ->stx)))
+  #:full-projection
+  (simple->adapter-projection
+   (λ (this)
+     (define mandatory-arg-count (delegating->*-mandatory-arg-count this))
+     (define optional-arg-index-ctc-pairs (delegating->*-optional-arg-index-ctc-pairs this))
+     (values (and (not (empty? optional-arg-index-ctc-pairs))
+                  (λ (args)
+                    (define-values {mandatory optional} (split-at args mandatory-arg-count))
+                    (append mandatory
+                            (apply-contracts-in-list optional
+                                                     optional-arg-index-ctc-pairs))))
+             #f))))
+
+(require (only-in rackunit require/expose))
+(require/expose racket/private/class-c-old (build-class/c
+                                            build-internal-class/c))
+(define-adapter delegating-class/c (init-field-index-ctc-pairs method-index-ctc-pairs)
+  #:name (list 'delegating-class/c
+               (index-ctc-pairs->names init-field-index-ctc-pairs)
+               (index-ctc-pairs->names method-index-ctc-pairs))
+  #:->stx (λ (->stx)
+            #`(delegating-class/c #,(index-ctc-pairs->stx init-field-index-ctc-pairs)
+                                  #,(index-ctc-pairs->stx method-index-ctc-pairs)))
+  (λ (c)
+    (define (shift-index-map-indices map [Δ 1])
+      (for/list ([{i c} (in-dict map)])
+        (cons (+ i Δ) c)))
+    (define (fixup->-arg-adapter-indices-for-this-argument adapter)
+      (match adapter
+        [(delegating-> arg-map result-map)
+         (delegating-> (shift-index-map-indices arg-map)
+                       result-map)]
+        [(delegating->* n arg-map)
+         (delegating->* n (shift-index-map-indices arg-map))]
+        [other other]))
+
+    ;; This magic derived from looking at
+    ;; (syntax->datum (expand-once (expand-once #'(class/c (init-field [a number?]) [get-a (-> number?)]))))
+    (define methods (map car method-index-ctc-pairs))
+    (define method-ctcs (map (compose1 fixup->-arg-adapter-indices-for-this-argument cdr)
+                             method-index-ctc-pairs))
+    (define init-fields (map car init-field-index-ctc-pairs))
+    (define init-field-ctcs (map cdr init-field-index-ctc-pairs))
+    (contract (build-class/c methods
+                             method-ctcs
+                             init-fields
+                             init-field-ctcs
+                             init-fields
+                             init-field-ctcs
+                             (list)
+                             (list)
+                             (build-internal-class/c (list) (list) (list) (list) (list) (list) (list) (list) (list) (list) (list) (list) (list) (list))
+                             #f
+                             #f)
+              c
+              #f
+              #f)))
 
 (define (transform-struct-fields v transform)
   ;; lltodo: this is a mess and wrong.
@@ -478,87 +617,31 @@
   (apply (struct-type-make-constructor struct-type)
          (transform fields)))
 
-(struct delegating-struct adapter/c (index-ctc-pairs)
-  #:property prop:contract
-  (build-contract-property
-   #:name (λ (this) (list 'delegating-struct
-                          (for/list ([{field ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
-                            (cons field (contract-name ctc)))))
-   #:late-neg-projection
-   (λ (this)
-     (define index-map (delegating-struct-index-ctc-pairs this))
-     (λ (blame)
-       (λ (v neg-party)
-         (transform-struct-fields v
-                                  (λ (fields)
-                                    (apply-contracts-in-list fields
-                                                             index-map)))))))
-  #:methods gen:adapted
-  [(define/generic generic->stx ->stx)
-   (define (->stx this)
-     #`(delegating-struct
-        (list #,@(for/list ([{f ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
-                   #`(cons #,f #,(generic->stx ctc))))))])
+(define-adapter delegating-struct (index-ctc-pairs)
+  #:name (list 'delegating-struct
+               (index-ctc-pairs->names index-ctc-pairs))
+  #:->stx (λ (->stx)
+            #`(delegating-struct #,(index-ctc-pairs->stx index-ctc-pairs ->stx)))
+  (λ (v)
+    (transform-struct-fields v
+                             (λ (fields)
+                               (apply-contracts-in-list fields
+                                                        index-ctc-pairs)))))
 
-(define-simple-macro (define-simple-delegating-adapter name [sub-ctc-name ...]
-                       (λ (value-name:id) proj-body ...))
-  #:with [sub-ctc-accessor ...] (for/list ([sub-name (in-list (attribute sub-ctc-name))])
-                                  (format-id sub-name "~a-~a" #'name sub-name))
-  (struct name adapter/c (sub-ctc-name ...)
-    #:property prop:contract
-    (build-contract-property
-     #:name (λ (this) (list 'name
-                            (contract-name (sub-ctc-accessor this))
-                            ...))
-     #:late-neg-projection
-     (λ (this)
-       (define sub-ctc-name (sub-ctc-accessor this)) ...
-       (λ (blame)
-         (λ (value-name neg-party)
-           proj-body ...))))
-    #:methods gen:adapted
-    [(define/generic generic->stx ->stx)
-     (define (->stx this)
-       #`(name #,(generic->stx (sub-ctc-accessor this)) ...))]))
-#;(struct delegating-listof adapter/c (sub-ctc)
-  #:property prop:contract
-  (build-contract-property
-   #:name (λ (this) (list 'delegating-listof
-                          (contract-name (delegating-listof-sub-ctc this))))
-   #:late-neg-projection
-   (λ (this)
-     (define sub-ctc (delegating-listof-sub-ctc this))
-     (λ (blame)
-       (λ (v neg-party)
-         (contract (listof sub-ctc) v #f #f)))))
-  #:methods gen:adapted
-  [(define/generic generic->stx ->stx)
-   (define (->stx this)
-     #`(delegating-listof #,(generic->stx (delegating-listof-sub-ctc this))))])
 (define-simple-delegating-adapter delegating-listof [sub-ctc]
   (λ (v) (contract (listof sub-ctc) v #f #f)))
+
 (define-simple-delegating-adapter delegating-parameter/c [sub-ctc]
   (λ (p)
     (make-derived-parameter p
                             (λ (new-v) (contract sub-ctc new-v #f #f))
                             (λ (inner-v) (contract sub-ctc inner-v #f #f)))))
 
-(struct swap-struct-field adapter/c (i1 i2)
-  #:property prop:contract
-  (build-contract-property
-   #:name (λ (this) (list 'delegating-struct
-                          (for/list ([{field ctc} (in-dict (delegating-struct-index-ctc-pairs this))])
-                            (cons field (contract-name ctc)))))
-   #:late-neg-projection
-   (λ (this)
-     (define i1 (swap-struct-field-i1 this))
-     (define i2 (swap-struct-field-i2 this))
-     (λ (blame)
-       (λ (v neg-party)
-         (transform-struct-fields v (λ (fields) (swap-in-list fields i1 i2)))))))
-  #:methods gen:adapted
-  [(define (->stx this)
-     #`(swap-struct-field #,(swap-struct-field-i1 this) #,(swap-struct-field-i2 this)))])
+(define-adapter swap-struct-field (i1 i2)
+  #:name (list 'delegating-struct i1 i2)
+  #:->stx (λ _ #`(swap-struct-field #,i1 #,i2))
+  (λ (v)
+    (transform-struct-fields v (λ (fields) (swap-in-list fields i1 i2)))))
 
 #;(struct swap-vector adapter/c (i1 i2)
   #:property prop:contract
@@ -578,12 +661,21 @@
 ;; Returns `vs`, but with the elements at each index in `index-ctc-pairs`
 ;; contracted with the corresponding contract.
 (define (apply-contracts-in-list vs index-ctc-pairs)
-  (for/fold ([vs vs])
-            ([{index ctc} (in-dict index-ctc-pairs)])
-    (list-update vs
-                 index
-                 (λ (old-v)
-                   (contract ctc old-v #f #f)))))
+  (for/fold ([result empty]
+             [remaining-ctcs (sort index-ctc-pairs < #:key car)]
+             #:result (reverse result))
+            ([v (in-list vs)]
+             [i (in-naturals)])
+    (match remaining-ctcs
+      ['() (values (cons v result)
+                   empty)]
+      [(cons (cons ctc-i ctc) rest)
+       #:when (= ctc-i i)
+       (values (cons (contract ctc v #f #f) result)
+               rest)]
+      [else
+       (values (cons v result)
+               remaining-ctcs)])))
 
 (define (swap-in-list vs index1 index2)
   (define v1 (list-ref vs index1))
@@ -593,11 +685,24 @@
             v1))
 
 (module+ test
+  (test-begin
+    #:name apply-contracts-in-list
+    (test-equal? (apply-contracts-in-list '() '())
+                 '())
+    (test-equal? (apply-contracts-in-list '() `((0 . ,any/c)))
+                 '())
+    (test-equal? (apply-contracts-in-list '(1) `((0 . ,any/c)))
+                 '(1))
+    (test-match (apply-contracts-in-list '(1) `((0 . ,(sealing-adapter))))
+                (list (? sealed?))))
+
   (define-test-syntax (test-adapter-contract
                        [name:id test-value:expr
                                 #:with-contract ctc:expr]
+                       e ...
                        check:expr)
     #'(let ([name (contract ctc test-value #f #f)])
+        e ...
         check))
 
   (test-begin
@@ -841,5 +946,48 @@
        (and/test (parameter? p)
                  (sealed? (p))
                  (begin (p "hello")
-                        (sealed? (outer-p))))))))
+                        (sealed? (outer-p)))))))
+
+  (test-begin
+    #:name delegating->*
+    (let ([outer-f (λ (x y [z "hi"])
+                     z)])
+      (test-adapter-contract
+       [f outer-f
+          #:with-contract (generate-adapter-ctc
+                           (mutated-interface-type '(->* (Number String) (String) String)
+                                                   '(->* (Number String) (Number) String)
+                                                   type:base-type-substitution))]
+       (and/test (procedure? f)
+                 (string? (f 1 "a"))
+                 (sealed? (f 1 "a" 42))))))
+
+  (test-begin
+    #:name delegating-class/c
+    (let ([outer-c (class object% (super-new) (init-field a) (define/public (m x y) y))])
+      (test-adapter-contract
+       [c outer-c
+          #:with-contract (generate-adapter-ctc
+                           (mutated-interface-type '(Class (init-field [a Number])
+                                                           (m (-> Number String String)))
+                                                   '(Class (init-field [a Number])
+                                                           (m (-> Number Number String)))
+                                                   type:base-type-substitution))]
+       (and/test/message
+        [(class? c) "not a class"]
+        [(sealed? (send (new c [a 5]) m 5 55)) "used optional arg"])))
+    (let ([outer-c (class object% (super-new) (init-field a) (define/public (m x y [z "hello"]) z))])
+      (test-adapter-contract
+       [c outer-c
+          #:with-contract (generate-adapter-ctc
+                           (mutated-interface-type '(Class (init-field [a Number])
+                                                           (m (->* (Number String) (String) String)))
+                                                   '(Class (init-field [a Number])
+                                                           (m (->* (Number String) (Number) String)))
+                                                   type:base-type-substitution))]
+       (pretty-write (send (new c [a 5]) m 5 "hi" 55))
+       (and/test/message
+        [(class? c) "not a class"]
+        [(string? (send (new c [a 5]) m 5 "hi")) "unused optional arg"]
+        [(sealed? (send (new c [a 5]) m 5 "hi" 55)) "used optional arg"])))))
 
