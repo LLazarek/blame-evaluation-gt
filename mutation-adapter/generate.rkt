@@ -1,6 +1,7 @@
 #lang at-exp racket
 
 (require "../mutate/type-api-mutators.rkt"
+         "util.rkt"
          syntax/parse/define
          (for-syntax syntax/parse)
          racket/struct)
@@ -147,13 +148,6 @@
 
 (define (mapping f)
   (λ (l) (map f l)))
-
-(define-match-expander binding
-  (syntax-parser
-    [(_ pat {~seq #:with [name:id val:expr]} ...)
-     #'(and pat
-            (app (const val) name)
-            ...)]))
 
 (struct field (name index) #:transparent)
 

@@ -1,6 +1,7 @@
 #lang at-exp racket
 
-(provide assert)
+(provide assert
+         binding)
 
 (require syntax/parse/define)
 
@@ -10,3 +11,10 @@
                              ...)
   (unless c
     (error (or name 'unknown-function) message)))
+
+(define-match-expander binding
+  (syntax-parser
+    [(_ pat {~seq #:with [name:id val:expr]} ...)
+     #'(and pat
+            (app (const val) name)
+            ...)]))
