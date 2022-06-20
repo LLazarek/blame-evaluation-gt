@@ -54,22 +54,19 @@
 (struct td:listof td (sub-td) #:transparent)
 (struct td:vectorof td (sub-td) #:transparent)
 (struct td:parameterof td (sub-td) #:transparent)
+(struct td:setof td (sub-td) #:transparent)
 (struct td:pairof td (left right) #:transparent)
 ;; lltodo: support field types too
 (struct td:class td (init-field-td-map method-td-map) #:transparent)
 
-;; used to merge together tds for things that we actually don't care about the details of.
-;; Example:
-;; (-> (U A B) (U C D) R) mutated by arg-swap to
-;; (-> (U C D) (U A B) R)
-;; makes sexp diff:
-;; (-> (U {A C} {B D}) (U {C A} {D B}) R)
-;; but we don't care about the details of all these little parts of the diff here.
-;; We really just want to get out
-;; (-> <some-td> <some-td> R)
-;; which is enough, knowing that the mutator was arg-swap.
-;; So td:opaque fills that role.
-(struct td:opaque td () #:transparent)
+;; used to support diffs that we may not otherwise support, produced by arg swapping.
+;; e.g. Swapping `(Listof A) (Setof A)` produces a diff
+;; `((difference Listof Setof) A)`
+;; Really all that matters for handling swaps tho is knowing that there is a diff between
+;; two arg positions, so wrap it up in this td to notice that later.
+;; If the mutation is really of a new type requiring more support, the error will still show up
+;; later in `type-diff->contract`.
+(struct td:unknown-type td (sub-tds) #:transparent)
 
 (define (sexp->type-diff a-sexp-diff)
   (define (list->td-index-map a-list)
@@ -141,7 +138,9 @@
         [(list 'Listof (app recur sub-td))
          (and sub-td (td:listof sub-td))]
         [(list 'Vectorof (app recur sub-td))
-         (and sub-td (td:vectorof sub-td))]
+         (and sub-td {td:vectorof sub-td})]
+        [(list 'Setof (app recur sub-td))
+         (and sub-td (td:setof sub-td))]
         [(list 'Pairof (app recur car) (app recur cdr))
          (and (or car cdr)
               (td:pairof car cdr))]
@@ -182,12 +181,11 @@
                              result-tds))
          (and (ormap td? result-tds)
               (cons 'values result-tds))]
-        [(list* 'U
-                (app (mapping recur)
-                     (list _ ... (? td?) _ ...)))
-         (td:base '<U> '<mutated-U>)]
         [(or (? symbol?) #t #f) #f]
-        [(? list? (app (mapping recur) (list #f ...))) #f]
+        [(? list? (app (mapping recur) (and sub-tds (list-no-order (? td?) _ ...))))
+         (td:unknown-type (filter values sub-tds))]
+        [(? list?) ;; no sub-tds since the above case didn't match
+         #f]
         [something-else
          (error 'sexp->type-diff
                 @~a{
@@ -330,8 +328,8 @@
 
     (test-equal? (sexp->type-diff (sexp-diff '(-> (U A B) (U C D) C)
                                              '(-> (U C D) (U A B) C)))
-                 (td:-> `((0 . ,(td:base '<U> '<mutated-U>))
-                          (1 . ,(td:base '<U> '<mutated-U>)))
+                 (td:-> `((0 . ,(td:unknown-type (list (td:base 'A 'C) (td:base 'B 'D))))
+                          (1 . ,(td:unknown-type (list (td:base 'C 'A) (td:base 'D 'B)))))
                         '()))
 
     (test-equal? (sexp->type-diff (sexp-diff '[#:struct
@@ -344,6 +342,9 @@
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
                  (td:listof (td:base 'A 'B)))
+    (test-equal? (sexp->type-diff (sexp-diff '(Setof A)
+                                             '(Setof B)))
+                 (td:setof (td:base 'A 'B)))
     (test-exn exn?
               (sexp->type-diff (sexp-diff '(Listof A)
                                           '(Listof A))))
@@ -432,7 +433,12 @@
                                                       (->* (A) (Z) C))))
                  (td:->* 1
                          `((0 . ,(td:base 'B 'Z)))
-                         '()))))
+                         '()))
+
+    (test-equal? (sexp->type-diff (sexp-diff '(-> (A B C) R)
+                                             '(-> (A Z C) R)))
+                 (td:-> `((0 . ,(td:unknown-type (list (td:base 'B 'Z)))))
+                        '()))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -505,6 +511,8 @@
        (delegating-listof (loop sub-td))]
       [{(recur) (td:vectorof sub-td)}
        (delegating-vectorof (loop sub-td))]
+      [{(recur) (td:setof sub-td)}
+       (delegating-setof (loop sub-td))]
       [{(recur) (td:pairof left right)}
        (delegating-pairof (if left (loop left) (any/c-adapter))
                           (if right (loop right) (any/c-adapter)))]
@@ -872,6 +880,10 @@
 
 (define-simple-delegating-adapter delegating-vectorof [sub-ctc]
   (λ (v) (apply-contract (vectorof sub-ctc) v)))
+(define-simple-delegating-adapter delegating-setof [sub-ctc]
+  (λ (v)
+    (for/set ([el (in-set v)])
+      (apply-contract sub-ctc v))))
 (define-simple-delegating-adapter delegating-pairof [car-ctc cdr-ctc]
   (λ (v) (apply-contract (cons/c car-ctc cdr-ctc) v)))
 
@@ -1147,7 +1159,19 @@
                                                       (Listof Integer))
                                                  type:function-arg-swap))]
      (let ([v (f 1 "two")])
-       (test-equal? v (list "two")))))
+       (test-equal? v (list "two"))))
+    (test-adapter-contract
+     [f (λ (a b) a)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> (Listof String)
+                                                      (Setof String)
+                                                      (Listof Integer))
+                                                 '(-> (Setof String)
+                                                      (Listof String)
+                                                      (Listof Integer))
+                                                 type:function-arg-swap))]
+     (let ([v (f 1 "two")])
+       (test-equal? v "two"))))
 
   (test-begin
    #:name delegating-struct
@@ -1206,6 +1230,16 @@
                                                  type:base-type-substitution))]
      (and/test (vector? v)
                (andmap sealed? (vector->list v)))))
+  (test-begin
+    #:name delegating-setof
+    (test-adapter-contract
+     [l (set 1 2 3)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(Setof Number)
+                                                 '(Setof String)
+                                                 type:base-type-substitution))]
+     (and/test (set? l)
+               (andmap sealed? (set->list l)))))
   (test-begin
     #:name delegating-pairof
     (test-adapter-contract
