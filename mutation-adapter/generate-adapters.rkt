@@ -70,14 +70,17 @@
   (match entry
     [(list '#:struct name _ ...) (name+type name entry #t)]
     [(list name t)               (name+type name t #f)]))
+;; (or/c syntax? sexp?) -> (listof name+type?)
+(define (top-level-form->types form)
+  (match (if (syntax? form)
+             (syntax->datum form)
+             form)
+    [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
+     (map r/t/p-entry->name+type entries)]
+    [(list 'define-type name t)
+     (list (name+type name t #t))]
+    [other empty]))
 (define (interface-types a-mod-stx)
-  (define (top-level-form->types form)
-    (match form
-      [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
-       (map r/t/p-entry->name+type entries)]
-      [(list 'define-type name t)
-       (list (name+type name t #t))]
-      [other empty]))
   (match (syntax->datum a-mod-stx)
     [(or (list 'module name lang (list '#%module-begin top-level-forms ...))
          (list 'module name lang top-level-forms ...))
@@ -377,6 +380,10 @@
     (for/list ([form (in-list original-interface-r/t/c/p-forms)])
       ;; munge the bindings so that they line up with the import of r/t/c/p below
       (munge-location+bindings (r/t/c/p-redirect #''contracted form))))
+  (define all-r/t/c/p-ids
+    (for*/list ([form (in-list original-interface-r/t/c/p-forms)]
+                [n+t (in-list (top-level-form->types form))])
+      (datum->syntax stx-for-location+bindings (name+type-name n+t))))
   (munge-location+bindings
     #`(module mutation-adapter typed/racket
       (#%module-begin
@@ -389,6 +396,8 @@
                         #`[#,id #,(->stx adapter)]))))
        (require "../../../utilities/require-typed-check-provide.rkt")
        #,@original-interface-require-forms
+       (require (except-in 'contracted #,@all-r/t/c/p-ids))
+       (provide (all-from-out 'contracted))
        #,@redirected-interface-r/t/c/p-forms))))
 
 ;; syntax? syntax? -> syntax?
@@ -412,7 +421,9 @@
                       (require "interface.rkt")
                       (provide (except-out (all-from-out "interface.rkt")))
                       (provide (contract-out)))
-                    (require "../../../utilities/require-typed-check-provide.rkt"))))
+                    (require "../../../utilities/require-typed-check-provide.rkt")
+                    (require (except-in 'contracted))
+                    (provide (all-from-out 'contracted)))))
    (test-equal?
     (syntax->datum
      (adapter-ctcs->module-stx
@@ -443,6 +454,8 @@
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../base/base-types.rkt")
         (reprovide "../base/more-types.rkt")
+        (require (except-in 'contracted foo bar baz))
+        (provide (all-from-out 'contracted))
         (require/typed/check/provide
          'contracted
          [foo Integer]
