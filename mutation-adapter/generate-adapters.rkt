@@ -68,7 +68,7 @@
 (struct name+type (name type definition?) #:transparent)
 (define (r/t/p-entry->name+type entry)
   (match entry
-    [(list '#:struct name _ ...) (name+type name entry #t)]
+    [(list '#:struct (or (list name _) (? symbol? name)) _ ...) (name+type name entry #t)]
     [(list name t)               (name+type name t #f)]))
 ;; (or/c syntax? sexp?) -> (listof name+type?)
 (define (top-level-form->types form)
@@ -85,6 +85,30 @@
     [(or (list 'module name lang (list '#%module-begin top-level-forms ...))
          (list 'module name lang top-level-forms ...))
      (append* (map top-level-form->types top-level-forms))]))
+
+(module+ test
+  (require ruinit)
+  (test-begin
+    #:name top-level-form->types
+    (test-equal? (top-level-form->types '(require/typed/check/provide foobar
+                                                                      [x A]
+                                                                      [y B]))
+                 (list (name+type 'x 'A #f)
+                       (name+type 'y 'B #f)))
+    (test-equal? (top-level-form->types '(require/typed/check/provide foobar
+                                                                      [#:struct s ([f F])]
+                                                                      [x A]
+                                                                      [y B]))
+                 (list (name+type 's '[#:struct s ([f F])] #t)
+                       (name+type 'x 'A #f)
+                       (name+type 'y 'B #f)))
+    (test-equal? (top-level-form->types '(require/typed/check/provide foobar
+                                                                      [#:struct (s blah) ([f F])]
+                                                                      [x A]
+                                                                      [y B]))
+                 (list (name+type 's '[#:struct (s blah) ([f F])] #t)
+                       (name+type 'x 'A #f)
+                       (name+type 'y 'B #f)))))
 
 ;; syntax? syntax? -> mutated-type?
 (define (find-mutated-type original-mod-stx new-mod-stx)
@@ -108,7 +132,6 @@
                  })))
 
 (module+ test
-  (require ruinit)
   (test-begin
     #:name find-mutated-type
     (test-equal? (find-mutated-type

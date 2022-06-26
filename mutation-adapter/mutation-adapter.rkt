@@ -182,6 +182,11 @@
          (and (ormap td? result-tds)
               (cons 'values result-tds))]
         [(or (? symbol?) #t #f) #f]
+        [(list* 'U
+                (app (mapping recur)
+                     (list _ ... (? td?) _ ...)))
+         ;; Union branch mutations just turn into a seal of the whole thing
+         (td:base '<U> '<mutated-U>)]
         [(? list? (app (mapping recur) (and sub-tds (list-no-order (? td?) _ ...))))
          (td:unknown-type (filter values sub-tds))]
         [(? list?) ;; no sub-tds since the above case didn't match
@@ -492,12 +497,12 @@
 ;; or asks to continue unpacking the tree by producing `(recur)`.
 ;; All layers above the base contract will simply delegate down to the base.
 (define (type-diff->contract td instantiator)
-  (let loop ([td td])
+  (let loop ([inner-td td])
     (define (loop-over-dict-values d)
       (for/list ([{k td} (in-dict d)])
         (cons k (loop td))))
 
-    (match* {(instantiator td) td}
+    (match* {(instantiator inner-td) inner-td}
       [{(and (not (recur)) result) _} result]
       [{(recur) (? td:base? base)}
        (error 'type-diff->contract
@@ -524,7 +529,14 @@
                       (loop-over-dict-values optional-kw-arg-map))]
       [{(recur) (td:class init-field-td-map method-td-map)}
        (delegating-class/c (loop-over-dict-values init-field-td-map)
-                           (loop-over-dict-values method-td-map))])))
+                           (loop-over-dict-values method-td-map))]
+      [{_ _}
+       (error 'type-diff->contract
+              @~a{
+                  Unexpected instantiator request to recur from @instantiator
+                  on @~s[inner-td]
+                  which is part of @~s[td]
+                  })])))
 
 ;; sexp? symbol? contract? -> contract?
 ;; Generate a contract that delegates on `name` to `ctc`.

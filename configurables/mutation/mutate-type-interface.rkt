@@ -38,7 +38,7 @@
                 [name #,new-type])))]
       [[#:opaque name:id pred]
        (t+r #'() (const pair))]
-      [[#:struct struct-name:id ([field-name:id {~datum :} field-type] ...)]
+      [[#:struct {~or* struct-name:id (struct-name:id _:id)} ([field-name:id {~datum :} field-type] ...)]
        (t+r this-syntax identity)]
       [other
        (raise-user-error 'parse-name+types
