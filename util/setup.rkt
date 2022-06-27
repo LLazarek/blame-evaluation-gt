@@ -366,7 +366,7 @@
 
   (displayln "Checking require-typed-check version...")
   (define r/t/c-ok?
-    (with-handlers ([exn:fail? (thunk #f)])
+    (with-handlers ([exn:fail? (λ _ #f)])
       (dynamic-require 'require-typed-check/test/struct-binding/main (void))
       #t))
 
