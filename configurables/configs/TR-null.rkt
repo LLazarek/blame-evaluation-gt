@@ -15,6 +15,7 @@
   (configure! bt-root-sampling         pre-selected
               "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
   (configure! trail-completion         any-type-error/blamed-at-max)
+  (configure! configurations           module-types)
 
   (configure! module-instrumentation   none)
   (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module))

@@ -22,6 +22,7 @@
   (configure! bt-root-sampling         pre-selected
               "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
   (configure! trail-completion         any-type-error/blamed-at-max)
+  (configure! configurations           module-types)
 
   (configure! module-instrumentation   none)
   ;; We need to insert the TR adapter module to check for a type error, but we

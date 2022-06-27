@@ -119,3 +119,18 @@
     #:module "bt-root-sampling/subset-random-w-replacement.rkt"
     #:parameters [root-config-filter]))
 
+(define-configurable configurations
+  #:provides [serialize-config
+              deserialize-config
+              config-at-max-precision-for?
+              increment-config-precision-for
+
+              benchmark-configuration->program
+              benchmark->mutatable-modules
+              make-max-bench-config
+              configure-benchmark]
+
+  (define-implementation module-types
+    #:module "configurations/module-types.rkt")
+  (define-implementation top-level-id-ctcs
+    #:module "configurations/top-level-id-ctcs.rkt"))

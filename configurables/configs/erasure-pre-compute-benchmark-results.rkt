@@ -22,6 +22,7 @@
   (configure! bt-root-sampling         pre-selected
               "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
   (configure! trail-completion         any-type-error/blamed-at-max)
+  (configure! configurations           module-types)
 
   ;; Only the interface and adapter modules will be in #lang tr, so this will
   ;; only affect those two

@@ -10,4 +10,5 @@
   (configure! mutant-sampling          pre-selected "../dbs/code-mutations/mutant-samples.rktdb")
   (configure! module-instrumentation   none)
   (configure! benchmark-runner         run-it)
-  (configure! bt-root-sampling         random-with-replacement))
+  (configure! bt-root-sampling         random-with-replacement)
+  (configure! configurations           module-types))

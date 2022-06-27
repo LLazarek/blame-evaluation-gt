@@ -498,7 +498,7 @@
        (increment-config-precision-for-all (set-intersect locations-selected-as-blamed
                                                           (hash-keys config))
                                            config
-                                           #:increment-types-error? #f))
+                                           #:increment-max-error? #f))
      (define (spawn-the-blame-following-mutant a-process-q
                                                #:timeout/s [timeout/s #f]
                                                #:memory/gb [memory/gb #f])

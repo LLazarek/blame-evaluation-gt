@@ -21,5 +21,6 @@
               select-all-blamed)
   (configure! bt-root-sampling         random-with-replacement)
   (configure! trail-completion         any-type-error/blamed-at-max)
+  (configure! configurations           module-types)
 
   (configure! program-instrumentation  just-instrument-modules))
