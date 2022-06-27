@@ -23,12 +23,8 @@
   (define adapter-ctcs (generate-adapter-ctcs-for-mutation original-mod-stx
                                                            mutated-mod-stx
                                                            mutation-type))
-  (define interface-r/t/c/p-forms (extract-r/t/c/p-forms original-mod-stx))
-  (define interface-requires (extract-requires original-mod-stx))
   (adapter-ctcs->module-stx adapter-ctcs
                             mod-name
-                            interface-r/t/c/p-forms
-                            interface-requires
                             original-mod-stx))
 
 ;; syntax? syntax? mutation-type? -> (listof (cons identifier? contract?))
@@ -46,30 +42,30 @@
       #;(adapt-all-referencing-provides mutated-mod-stx name adapter)
       (list (cons name adapter))))
 
-(define extract-r/t/c/p-forms
+(define r/t/c/p-form?
+  (syntax-parser
+    [({~datum require/typed/check/provide} _ ...) #t]
+    [else #f]))
+
+(define require/provide-form?
+  (syntax-parser
+    [({~or {~datum require} {~datum reprovide} {~datum provide}} _ ...) #t]
+    [else #f]))
+
+(define extract-top-level-forms
   (syntax-parser
     [(module _ _
        (#%module-begin
-        {~alt {~and forms ({~datum require/typed/check/provide} _ ...)}
-              _}
-        ...))
-     (attribute forms)]))
-
-(define extract-requires
-  (syntax-parser
-    [(module _ _
-       (#%module-begin
-        {~alt {~and forms ({~or {~datum require} {~datum reprovide}} _ ...)}
-              _}
+        forms
         ...))
      (attribute forms)]))
 
 
-(struct name+type (name type definition?) #:transparent)
+(struct name+type (name type definition? struct?) #:transparent)
 (define (r/t/p-entry->name+type entry)
   (match entry
-    [(list '#:struct (or (list name _) (? symbol? name)) _ ...) (name+type name entry #t)]
-    [(list name t)               (name+type name t #f)]))
+    [(list '#:struct (or (list name _) (? symbol? name)) _ ...) (name+type name entry #f #t)]
+    [(list name t)               (name+type name t #f #f)]))
 ;; (or/c syntax? sexp?) -> (listof name+type?)
 (define (top-level-form->types form)
   (match (if (syntax? form)
@@ -78,7 +74,7 @@
     [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
      (map r/t/p-entry->name+type entries)]
     [(list 'define-type name t)
-     (list (name+type name t #t))]
+     (list (name+type name t #t #f))]
     [other empty]))
 (define (interface-types a-mod-stx)
   (match (syntax->datum a-mod-stx)
@@ -93,22 +89,22 @@
     (test-equal? (top-level-form->types '(require/typed/check/provide foobar
                                                                       [x A]
                                                                       [y B]))
-                 (list (name+type 'x 'A #f)
-                       (name+type 'y 'B #f)))
+                 (list (name+type 'x 'A #f #f)
+                       (name+type 'y 'B #f #f)))
     (test-equal? (top-level-form->types '(require/typed/check/provide foobar
                                                                       [#:struct s ([f F])]
                                                                       [x A]
                                                                       [y B]))
-                 (list (name+type 's '[#:struct s ([f F])] #t)
-                       (name+type 'x 'A #f)
-                       (name+type 'y 'B #f)))
+                 (list (name+type 's '[#:struct s ([f F])] #f #t)
+                       (name+type 'x 'A #f #f)
+                       (name+type 'y 'B #f #f)))
     (test-equal? (top-level-form->types '(require/typed/check/provide foobar
                                                                       [#:struct (s blah) ([f F])]
                                                                       [x A]
                                                                       [y B]))
-                 (list (name+type 's '[#:struct (s blah) ([f F])] #t)
-                       (name+type 'x 'A #f)
-                       (name+type 'y 'B #f)))))
+                 (list (name+type 's '[#:struct (s blah) ([f F])] #f #t)
+                       (name+type 'x 'A #f #f)
+                       (name+type 'y 'B #f #f)))))
 
 ;; syntax? syntax? -> mutated-type?
 (define (find-mutated-type original-mod-stx new-mod-stx)
@@ -120,7 +116,8 @@
              (mutated-type (name+type-name t1)
                            (name+type-type t1)
                            (name+type-type t2)
-                           (name+type-definition? t1))))
+                           (or (name+type-definition? t1)
+                               (name+type-struct? t1)))))
       (error 'find-mutated-type
              @~a{
                  Couldn't find mutated type between the original and new mods.
@@ -251,12 +248,13 @@
   (test-begin
     #:name extract-r/t/c/p-forms
     (test-equal? (map syntax->datum
-                      (extract-r/t/c/p-forms
-                       #'(module type-interface typed-racket
-                           (#%module-begin
-                            (require "../../../utilities/require-typed-check-provide.rkt")
-                            (require/typed/check/provide "library.rkt"
-                                                         [x Integer])))))
+                      (filter r/t/c/p-form?
+                              (extract-top-level-forms
+                               #'(module type-interface typed-racket
+                                   (#%module-begin
+                                    (require "../../../utilities/require-typed-check-provide.rkt")
+                                    (require/typed/check/provide "library.rkt"
+                                                                 [x Integer]))))))
                  '((require/typed/check/provide "library.rkt" [x Integer])))))
 
 (define (sexp-contains? s id)
@@ -273,7 +271,8 @@
                                       #:when (sexp-contains? (name+type-type n+t) name))
                              n+t))
   (define (another-name+type-definition? a-name+type)
-    (and (name+type-definition? a-name+type)
+    (and (or (name+type-definition? a-name+type)
+             (name+type-struct? a-name+type))
          (not (equal? (name+type-name a-name+type)
                       name))))
   (assert (not (ormap another-name+type-definition? referencing-name))
@@ -392,21 +391,27 @@
 ;; (dictof identifier? contract?) syntax? (listof syntax) [syntax?] -> syntax?
 (define (adapter-ctcs->module-stx adapter-ctcs
                                   interface-mod-name
-                                  original-interface-r/t/c/p-forms
-                                  original-interface-require-forms
-                                  [stx-for-location+bindings #'here])
+                                  interface-mod-stx)
   (define (munge-location+bindings stx)
-    (datum->syntax stx-for-location+bindings
+    (datum->syntax interface-mod-stx
                    (syntax->datum stx)
-                   stx-for-location+bindings))
+                   interface-mod-stx))
+
+  (define original-interface-top-level-forms (extract-top-level-forms interface-mod-stx))
+  (define original-interface-r/t/c/p-forms (filter r/t/c/p-form?
+                                                   original-interface-top-level-forms))
+  (define original-interface-req/prov-forms (filter require/provide-form?
+                                                    original-interface-top-level-forms))
+
   (define redirected-interface-r/t/c/p-forms
     (for/list ([form (in-list original-interface-r/t/c/p-forms)])
       ;; munge the bindings so that they line up with the import of r/t/c/p below
       (munge-location+bindings (r/t/c/p-redirect #''contracted form))))
-  (define all-r/t/c/p-ids
-    (for*/list ([form (in-list original-interface-r/t/c/p-forms)]
-                [n+t (in-list (top-level-form->types form))])
-      (datum->syntax stx-for-location+bindings (name+type-name n+t))))
+  (define interface-typedefs
+    (for*/list ([form (in-list original-interface-top-level-forms)]
+                [n+t (in-list (top-level-form->types form))]
+                #:when (name+type-definition? n+t))
+      (datum->syntax interface-mod-stx (name+type-name n+t))))
   (munge-location+bindings
     #`(module mutation-adapter typed/racket
       (#%module-begin
@@ -418,9 +423,9 @@
                    #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
                         #`[#,id #,(->stx adapter)]))))
        (require "../../../utilities/require-typed-check-provide.rkt")
-       #,@original-interface-require-forms
-       (require (except-in 'contracted #,@all-r/t/c/p-ids))
-       (provide (all-from-out 'contracted))
+       #,@original-interface-req/prov-forms
+       (require (only-in 'contracted #,@interface-typedefs))
+       (provide #,@interface-typedefs)
        #,@redirected-interface-r/t/c/p-forms))))
 
 ;; syntax? syntax? -> syntax?
@@ -435,8 +440,7 @@
    (test-equal? (syntax->datum
                  (adapter-ctcs->module-stx empty
                                            "interface.rkt"
-                                           empty
-                                           empty))
+                                           #'(module ifce tr (mod-begin #f))))
                 `(module mutation-adapter typed/racket
                    (#%module-begin
                     (module contracted racket
@@ -445,21 +449,24 @@
                       (provide (except-out (all-from-out "interface.rkt")))
                       (provide (contract-out)))
                     (require "../../../utilities/require-typed-check-provide.rkt")
-                    (require (except-in 'contracted))
-                    (provide (all-from-out 'contracted)))))
+                    (require (only-in 'contracted))
+                    (provide))))
    (test-equal?
     (syntax->datum
      (adapter-ctcs->module-stx
       `((foo . ,(make-base-type-adapter 'Integer 'Real))
         (bar . ,(delegating-> (list (cons 1 (make-base-type-adapter 'Integer 'Real))) empty)))
       "interface.rkt"
-      (list #'(require/typed/check/provide
-               "server.rkt"
-               [foo Integer]
-               [bar (-> Boolean Integer Void)]
-               [baz (-> Real String)]))
-      (list #'(require "../base/base-types.rkt")
-            #'(reprovide "../base/more-types.rkt"))))
+      #'(module ifce tr
+          (mod-begin
+           (require "../base/base-types.rkt")
+           (reprovide "../base/more-types.rkt")
+           (define-type FOOBAR Natural)
+           (require/typed/check/provide
+            "server.rkt"
+            [foo Integer]
+            [bar (-> Boolean Integer Void)]
+            [baz (-> FOOBAR String)])))))
     `(module mutation-adapter typed/racket
        (#%module-begin
         (module contracted racket
@@ -477,10 +484,10 @@
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../base/base-types.rkt")
         (reprovide "../base/more-types.rkt")
-        (require (except-in 'contracted foo bar baz))
-        (provide (all-from-out 'contracted))
+        (require (only-in 'contracted FOOBAR))
+        (provide FOOBAR)
         (require/typed/check/provide
          'contracted
          [foo Integer]
          [bar (-> Boolean Integer Void)]
-         [baz (-> Real String)]))))))
+         [baz (-> FOOBAR String)]))))))
