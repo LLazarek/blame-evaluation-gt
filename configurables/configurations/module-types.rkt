@@ -59,7 +59,8 @@
   (1-to-1-map->converters 'types #\1
                           'none  #\0))
 (define serialize-config (make-config-serializer level->digit))
-(define deserialize-config (make-config-deserializer digit->level))
+(define deserialize-config (make-config-deserializer digit->level
+                                                     benchmark->mutatable-modules))
 
 
 (module+ test
@@ -128,16 +129,19 @@
   (make-program (benchmark-configuration-main c-bench)
                 (benchmark-configuration-others c-bench)))
 
-;; Produces the names of the mutatable modules in `a-benchmark`
-(define (benchmark->mutatable-modules a-benchmark #:include-both? [include-both? #t])
+(define (benchmark->module-names a-benchmark #:include-both? [include-both? #t])
   (map file-name-string-from-path
        (append (if include-both?
                    (benchmark-both->files (benchmark-both a-benchmark))
                    empty)
                (benchmark-typed a-benchmark))))
 
+;; Produces the names of the mutatable modules in `a-benchmark`
+(define (benchmark->mutatable-modules a-benchmark)
+  (benchmark->module-names a-benchmark #:include-both? #t))
+
 (define (make-max-bench-config a-benchmark)
-  (define mods (benchmark->mutatable-modules a-benchmark #:include-both? #f))
+  (define mods (benchmark->module-names a-benchmark #:include-both? #f))
   (for/hash ([mod (in-list mods)])
     (values mod 'types)))
 

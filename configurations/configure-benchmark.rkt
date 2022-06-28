@@ -6,7 +6,7 @@
           [read-benchmark
            (path-to-existant-directory? . -> . (or/c #f benchmark/c))]
           [benchmark->name
-           (benchmark/c . -> . string?)]
+           ((or/c benchmark/c benchmark-configuration/c) . -> . string?)]
           [benchmark->program/no-common
            (benchmark/c . -> . program/c)]
           [benchmark-configuration->program
@@ -94,10 +94,16 @@
                           all-files)]
                  [else #f]))))
 
-(define (benchmark->name a-benchmark)
-  (match (benchmark-typed a-benchmark)
-    [(list* (app explode-path/string
-                 (list _ ... name "typed" _)) _)
+(define (benchmark->name b)
+  (match b
+    [(struct* benchmark
+              ([typed (list* (app explode-path/string
+                                  (list _ ... name "typed" _))
+                             _)]))
+     name]
+    [(struct* benchmark-configuration
+              ([main (app explode-path/string
+                          (list _ ... name (or "typed" "untyped") _))]))
      name]))
 
 
@@ -201,8 +207,8 @@
 
 (define (benchmark-configuration->program c-bench)
   ((configured:benchmark-configuration->program) c-bench))
-(define (benchmark->mutatable-modules a-benchmark #:include-both? [include-both? #t])
-  ((configured:benchmark->mutatable-modules) a-benchmark #:include-both? include-both?))
+(define (benchmark->mutatable-modules a-benchmark)
+  ((configured:benchmark->mutatable-modules) a-benchmark))
 (define (make-max-bench-config a-benchmark)
   ((configured:make-max-bench-config) a-benchmark))
 (define (configure-benchmark bench config)

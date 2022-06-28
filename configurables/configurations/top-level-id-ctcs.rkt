@@ -66,62 +66,66 @@
                            @~a{Given config with value @name already at max level: @config})]
                    [else mod-config]))))
 
-;; (define-values {level->digit digit->level}
-;;   (1-to-1-map->converters 'max   #\2
-;;                           'types #\1
-;;                           'none  #\0))
-;; (define serialize-config (make-config-serializer (make-config-serializer level->digit
-;;                                                                          symbol<?)))
-;; (define (deserialize-config config-number
+(define-values {level->digit digit->level}
+  (1-to-1-map->converters 'max   #\2
+                          'types #\1
+                          'none  #\0))
+(define serialize-config (make-config-serializer (make-config-serializer level->digit
+                                                                         symbol<?)))
+(define (deserialize-config config-number
+                            #:benchmark reference-benchmark)
+  (define mods (benchmark->mutatable-modules reference-benchmark))
+  (define ordered-mods (reverse (sort mods string<?)))
+  (define ordered-mod-chars (reverse (string->list (~a config-number))))
+  (let loop ([remaining-mods ordered-mods]
+             [current-mod #f]
+             [remaining-ids-in-mod empty]
+             [remaining-digits ordered-mod-chars]
+
+             [config (hash)]
+             [sub-config (hash)])
+    (match (list remaining-mods remaining-ids-in-mod remaining-digits)
+      [(list '() '() '())
+       (if current-mod
+           (hash-set config current-mod sub-config)
+           config)]
+      [(or (list (not '())     '()      '())
+           (list      '() (not '())     '())
+           (list      '()      '() (not '())))
+       (error 'deserialize-config
+              @~a{
+                  deserialization mismatch between config number @;
+                  @config-number @;
+                  and benchmark @;
+                  @reference-benchmark
+                  })]
+      [(list (cons mod more-mods) '() _)
+       (loop more-mods
+             mod
+             (module->configurable-ids (find-module-path-by-name reference-benchmark
+                                                                 mod))
+             remaining-digits
+
+             (hash-set config current-mod sub-config)
+             (hash))]
+      [(list _ (cons id more-ids) (cons n more-digits))
+       (loop remaining-mods
+             current-mod
+             more-ids
+             more-digits
+
+             config
+             (hash-set sub-config id (digit->level n)))])))
+
+(define (find-module-path-by-name a-benchmark mod-name)
+  (findf (path-ends-with mod-name)
+         (benchmark-untyped a-benchmark)))
+
+;; (define (serialize-config config) config)
+;; (define (deserialize-config config
 ;;                             #:reference [reference-config #f]
-;;                             #:modules [mods (hash-keys reference-config)])
-;;   (define ordered-mods (reverse (sort mods string<?)))
-;;   (define ordered-mod-chars (reverse (string->list (~a config-number))))
-;;   (let loop ([remaining-mods ordered-mods]
-;;              [current-mod #f]
-;;              [remaining-ids-in-mod empty]
-;;              [remaining-digits ordered-mod-chars]
-
-;;              [config (hash)]
-;;              [sub-config (hash)])
-;;     (match (list remaining-mods remaining-ids-in-mod remaining-digits)
-;;       [(list '() '() '())
-;;        (if current-mod
-;;            (hash-set config current-mod sub-config)
-;;            config)]
-;;       [(or (list (not '())     '()      '())
-;;            (list      '() (not '())     '())
-;;            (list      '()      '() (not '())))
-;;        (error 'deserialize-config
-;;               @~a{
-;;                   deserialization-mismatch
-;;                   config-number: @config-number
-;;                   reference config:
-;;                   @pretty-format[reference-config]
-;;                   })]
-;;       [(list (cons mod more-mods) '() _)
-;;        (loop more-mods
-;;              mod
-;;              (mod->ids LLTODO: need the benchmark to be included somehow with the number)
-;;              remaining-digits
-
-;;              (hash-set config current-mod sub-config)
-;;              (hash))]
-;;       [(list _ (cons id more-ids) (cons n more-digits))
-;;        (loop remaining-mods
-;;              current-mod
-;;              more-ids
-;;              more-digits
-
-;;              config
-;;              (hash-set sub-config id (digit->level n)))])))
-
-;; ll: for now, just don't serialize
-(define (serialize-config config) config)
-(define (deserialize-config config
-                            #:reference [reference-config #f]
-                            #:modules [mods #f])
-  config)
+;;                             #:modules [mods #f])
+;;   config)
 
 (module+ test
   (require ruinit
@@ -167,7 +171,9 @@
     (config-at-max-precision-for?
      (list "main.rkt" 'baz)
      (hash "main.rkt" (hash 'baz 'max
-                            'bazzle 'types)))))
+                            'bazzle 'types))))
+  ;; lltodo: tests for serialization/deserialization
+  )
 
 
 
@@ -199,8 +205,14 @@
                                           (benchmark-configuration-config c-bench)))
 
 (define (insert-program-configuration-selection a-program program-config)
-  (program (insert-mod-configuration-selection (program-main a-program))
-           (map insert-mod-configuration-selection
+  (program (insert-mod-configuration-selection (program-main a-program)
+                                               (hash-ref program-config
+                                                         "main.rkt"))
+           (map (λ (mod)
+                  (insert-mod-configuration-selection
+                   mod
+                   (hash-ref program-config
+                             (file-name-string-from-path (mod-path mod)))))
                 (program-others a-program))))
 
 (define (insert-mod-configuration-selection a-mod mod-config)
@@ -210,8 +222,7 @@
           #`(module name lang (mod-begin (define-for-syntax ctc-config #,mod-config) . rest))])))
 
 ;; Produces the names of the mutatable modules in `a-benchmark`
-;; `include-both?` is ignored for this mode of configuration, `both/` modules are never mutated
-(define (benchmark->mutatable-modules a-benchmark #:include-both? [include-both? #t])
+(define (benchmark->mutatable-modules a-benchmark)
   (map file-name-string-from-path (benchmark-untyped a-benchmark)))
 
 (define (make-max-bench-config a-benchmark)
@@ -256,7 +267,6 @@
              [b       (build-path untyped "b.rkt")    "#lang racket b"]
              [adapter (build-path both "adapter.rkt") "#lang racket adapter"]))
 
-  (define a-benchmark (read-benchmark a-benchmark-dir))
 
   (test-begin
     #:name configure-benchmark
@@ -264,7 +274,8 @@
     #:before (setup!)
     #:after (cleanup!)
 
-    (ignore (define config-1 (hash (file-name-string-from-path main)
+    (ignore   (define a-benchmark (read-benchmark a-benchmark-dir))
+              (define config-1 (hash (file-name-string-from-path main)
                                    (hash 'x 'none
                                          'f 'none)
                                    (file-name-string-from-path a)
@@ -282,7 +293,7 @@
                                          (== config-1)))
     (ignore (define a-types-config (hash-update config-1
                                                 (file-name-string-from-path a)
-                                                (λ (c) (hash-set 'x 'types)))))
+                                                (λ (c) (hash-set c 'x 'types)))))
     (test-match (configure-benchmark a-benchmark
                                      a-types-config)
                 (benchmark-configuration (== main paths=?)
@@ -298,6 +309,7 @@
     #:before (setup!)
     #:after (cleanup!)
 
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
     (test-match
      (benchmark-configuration->program
       (configure-benchmark a-benchmark
@@ -336,6 +348,7 @@
     #:before (setup!)
     #:after (cleanup!)
 
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
     (test-equal? (make-max-bench-config a-benchmark)
                  (hash "a.rkt" (hash 'x 'max 'f 'max)
                        "b.rkt" (hash 'y 'max 'g 'max))))
@@ -346,5 +359,6 @@
     #:before (setup!)
     #:after (cleanup!)
 
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
     (test-equal? (list->set (benchmark->mutatable-modules a-benchmark))
                  (set "main.rkt" "a.rkt" "b.rkt" "adapter.rkt"))))
