@@ -28,6 +28,20 @@
        (module name tr/no-check . body))]
     [other this-syntax]))
 
+(define-syntax-class adapter-req
+  #:description "adapter module require path"
+  (pattern path:str
+           #:do [(define path-str (syntax->datum #'path))]
+           #:when (regexp-match? #rx".+-adapt(e|o)(r|d).rkt$" path-str)
+           #:with erased (datum->syntax this-syntax
+                                        (regexp-replace #rx"-adapt(e|o)(r|d).rkt$"
+                                                        path-str
+                                                        ".rkt")))
+  (pattern "typed-data.rkt"
+           #:with erased #'"data.rkt")
+  (pattern ({~and e-i {~datum except-in}} r:adapter-req name ...)
+           #:with erased #'(e-i r.erased name ...)))
+
 (define-syntax-class tlf
   #:description "top level form"
   (pattern ({~datum require} {~alt "../../../utilities/require-typed-check-provide.rkt"
@@ -38,6 +52,11 @@
                                         `(require
                                           "../../../utilities/require-typed-check-provide-erased.rkt"
                                           . ,(attribute other-reqs))))
+  (pattern ({~datum reprovide} {~alt adapter:adapter-req other-reqs} ...)
+           #:with erased (datum->syntax this-syntax
+                                        `(require
+                                          ,@(append (attribute adapter.erased)
+                                                    (attribute other-reqs)))))
   (pattern something-else
            #:with erased this-syntax))
 
