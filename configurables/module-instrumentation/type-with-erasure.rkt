@@ -54,7 +54,7 @@
                                           . ,(attribute other-reqs))))
   (pattern ({~datum reprovide} {~alt adapter:adapter-req other-reqs} ...)
            #:with erased (datum->syntax this-syntax
-                                        `(require
+                                        `(reprovide
                                           ,@(append (attribute adapter.erased)
                                                     (attribute other-reqs)))))
   (pattern something-else

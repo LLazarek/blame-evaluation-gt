@@ -78,12 +78,19 @@
        (define the-module-to-mutate
          (find-unified-module-to-mutate module-to-mutate-path
                                         the-program-mods))
+       (define rs (run-with-mutated-module the-program
+                                           the-module-to-mutate
+                                           index
+                                           config
+                                           #:timeout/s (default-timeout/s)
+                                           #:memory/gb (default-memory-limit/gb)
+                                           #:suppress-output? #t))
+       (when (equal? (run-status-outcome rs) 'syntax-error)
+         (eprintf @~a{
+
+                      Warning: @mod-name @"@" @index produces syntax-error
+
+                      }))
        (values (mutant #f mod-name index)
-               (run-with-mutated-module the-program
-                                        the-module-to-mutate
-                                        index
-                                        config
-                                        #:timeout/s (default-timeout/s)
-                                        #:memory/gb (default-memory-limit/gb)
-                                        #:suppress-output? #t))))
+               rs)))
    (db:set! results-db bench-name mutant-results-hash)))
