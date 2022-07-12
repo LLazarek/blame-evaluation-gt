@@ -70,49 +70,53 @@
   (1-to-1-map->converters 'max   #\2
                           'types #\1
                           'none  #\0))
-(define serialize-config (make-config-serializer (make-config-serializer level->digit
-                                                                         symbol<?)))
+(define (serialize-config config)
+  (define ordered-mods (sort (hash-keys config) string<?))
+  (string->number
+   (list->string
+    (for*/list ([mod (in-list ordered-mods)]
+                [mod-config (in-value (hash-ref config mod))]
+                [id (in-list (sort (hash-keys mod-config) symbol<?))])
+      (level->digit (hash-ref mod-config id))))))
 (define (deserialize-config config-number
                             #:benchmark reference-benchmark)
   (define mods (benchmark->mutatable-modules reference-benchmark))
   (define ordered-mods (reverse (sort mods string<?)))
-  (define ordered-mod-chars (reverse (string->list (~a config-number))))
+  (define (maybe-add-sub-config config current-mod sub-config)
+    (if current-mod
+        (hash-set config current-mod sub-config)
+        config))
   (let loop ([remaining-mods ordered-mods]
              [current-mod #f]
              [remaining-ids-in-mod empty]
-             [remaining-digits ordered-mod-chars]
+             [remaining-digits (sequence->stream
+                                ;; leading 0 digits of course disappear in the numeric repr
+                                ;; we can just add back as many as needed by reading digits in reverse
+                                (in-sequences (reverse (string->list (~a config-number)))
+                                              (in-cycle (in-value #\0))))]
 
              [config (hash)]
              [sub-config (hash)])
-    (match (list remaining-mods remaining-ids-in-mod remaining-digits)
-      [(list '() '() '())
-       (if current-mod
-           (hash-set config current-mod sub-config)
-           config)]
-      [(or (list (not '())     '()      '())
-           (list      '() (not '())     '())
-           (list      '()      '() (not '())))
-       (error 'deserialize-config
-              @~a{
-                  deserialization mismatch between config number @;
-                  @config-number @;
-                  and benchmark @;
-                  @reference-benchmark
-                  })]
-      [(list (cons mod more-mods) '() _)
+    (match (list remaining-mods remaining-ids-in-mod)
+      [(list '() '())
+       (maybe-add-sub-config config current-mod sub-config)]
+      [(list (cons mod more-mods) '())
        (loop more-mods
              mod
-             (module->configurable-ids (find-module-path-by-name reference-benchmark
-                                                                 mod))
+             (reverse (sort (module->configurable-ids
+                             (find-module-path-by-name reference-benchmark
+                                                       mod))
+                            symbol<?))
              remaining-digits
 
-             (hash-set config current-mod sub-config)
+             (maybe-add-sub-config config current-mod sub-config)
              (hash))]
-      [(list _ (cons id more-ids) (cons n more-digits))
+      [(list _ (cons id more-ids))
+       (define n (stream-first remaining-digits))
        (loop remaining-mods
              current-mod
              more-ids
-             more-digits
+             (stream-rest remaining-digits)
 
              config
              (hash-set sub-config id (digit->level n)))])))
@@ -172,8 +176,123 @@
      (list "main.rkt" 'baz)
      (hash "main.rkt" (hash 'baz 'max
                             'bazzle 'types))))
-  ;; lltodo: tests for serialization/deserialization
-  )
+
+
+  (define-test-env
+    [setup! cleanup!]
+    #:directories ([test-temp "./test-temp"]
+                   [a-benchmark-dir "./test-temp/a-benchmark"]
+                   [typed "./test-temp/a-benchmark/typed"]
+                   [untyped "./test-temp/a-benchmark/untyped"]
+                   [both "./test-temp/a-benchmark/both"]
+                   [base "./test-temp/a-benchmark/base"]
+
+                   [not-a-benchmark "./test-temp/not-a-benchmark"])
+    #:files ([main/t  (build-path typed "main.rkt")   ""]
+             [a/t     (build-path typed "a.rkt")      ""]
+             [b/t     (build-path typed "b.rkt")      ""]
+             [garbage (build-path typed "garbage")    "some dumb garbage"]
+             [main    (build-path untyped "main.rkt") @~a{#lang racket
+                                                          (define/configurable-ctc a any/c 5)
+                                                          (define/configurable-ctc (f x) any/c 5)}]
+             [a       (build-path untyped "a.rkt")    @~a{#lang racket
+                                                          (define/configurable-ctc y any/c 5)
+                                                          (define/configurable-ctc ((g) x) any/c 5)}]
+             [b       (build-path untyped "b.rkt")    "#lang racket b"]
+             [adapter (build-path both "adapter.rkt") "#lang racket adapter"]))
+
+  (test-begin
+    #:name serialization
+    #:before (setup!)
+    #:after (cleanup!)
+
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
+
+    (test-equal? (serialize-config (hash (file-name-string-from-path main)
+                                     (hash 'a 'none
+                                           'f 'none)
+                                     (file-name-string-from-path a)
+                                     (hash 'y 'none
+                                           'g 'none)
+                                     (file-name-string-from-path b)
+                                     (hash)))
+                 ; 0000
+                 0)
+    (test-equal? (serialize-config (hash (file-name-string-from-path main)
+                                     (hash 'a 'max
+                                           'f 'max)
+                                     (file-name-string-from-path a)
+                                     (hash 'y 'max
+                                           'g 'max)
+                                     (file-name-string-from-path b)
+                                     (hash)))
+                 2222)
+    (test-equal? (serialize-config (hash (file-name-string-from-path main)
+                                         (hash 'a 'types
+                                               'f 'max)
+                                         (file-name-string-from-path a)
+                                         (hash 'y 'none
+                                               'g 'types)
+                                         (file-name-string-from-path b)
+                                         (hash)))
+                 1012)
+    (test-equal? (serialize-config (hash (file-name-string-from-path main)
+                                         (hash 'a 'types
+                                               'f 'max)
+                                         (file-name-string-from-path a)
+                                         (hash 'y 'types
+                                               'g 'none)
+                                         (file-name-string-from-path b)
+                                         (hash)))
+                 ; 0112
+                 112)
+
+    ;; lltodo: more tests
+    (test-equal? (deserialize-config 0 #:benchmark a-benchmark)
+                 (hash (file-name-string-from-path main)
+                       (hash 'a 'none
+                             'f 'none)
+                       (file-name-string-from-path a)
+                       (hash 'y 'none
+                             'g 'none)
+                       (file-name-string-from-path b)
+                       (hash)))
+    (test-equal? (deserialize-config 112 #:benchmark a-benchmark)
+                 (hash (file-name-string-from-path main)
+                       (hash 'a 'types
+                             'f 'max)
+                       (file-name-string-from-path a)
+                       (hash 'y 'types
+                             'g 'none)
+                       (file-name-string-from-path b)
+                       (hash)))
+
+    (ignore (define-simple-test (test-roundtrip config)
+              (define id (serialize-config config))
+              (test-equal? (deserialize-config id #:benchmark a-benchmark)
+                           config)))
+    (test-roundtrip (hash (file-name-string-from-path main)
+                          (hash 'a 'max
+                                'f 'max)
+                          (file-name-string-from-path a)
+                          (hash 'y 'max
+                                'g 'max)
+                          (file-name-string-from-path b)
+                          (hash)))
+    (test-roundtrip (hash (file-name-string-from-path main)
+                          (hash 'a 'types
+                                'f 'max)
+                          (file-name-string-from-path a)
+                          (hash 'y 'none
+                                'g 'types)
+                          (file-name-string-from-path b)
+                          (hash)))
+    ; ~> 2      1      0   1
+    ; == main:f main:a a:y a:g
+    #;(hash 'main (hash 'a 'types 'f 'max)
+            'a (hash 'g 'types 'y 'none)
+            'b (hash))
+    ))
 
 
 
@@ -208,11 +327,16 @@
   (program (insert-mod-configuration-selection (program-main a-program)
                                                (hash-ref program-config
                                                          "main.rkt"))
-           (map (λ (mod)
-                  (insert-mod-configuration-selection
-                   mod
-                   (hash-ref program-config
-                             (file-name-string-from-path (mod-path mod)))))
+           (map (λ (m)
+                  (match m
+                    [(mod (app explode-path/string (list _ ... "both" _))
+                          _)
+                     m]
+                    [(mod path _)
+                     (insert-mod-configuration-selection
+                      m
+                      (hash-ref program-config
+                                (file-name-string-from-path path)))]))
                 (program-others a-program))))
 
 (define (insert-mod-configuration-selection a-mod mod-config)
@@ -241,33 +365,9 @@
 (define (module->configurable-ids a-mod-path)
   (syntax-parse (mod-stx (make-mod a-mod-path))
     [(module name lang (mod-begin {~or* e:configurable-def _} ...))
-     (attribute e.id)]))
+     (map syntax->datum (filter values (attribute e.id)))]))
 
 (module+ test
-  (define-test-env
-    [setup! cleanup!]
-    #:directories ([test-temp "./test-temp"]
-                   [a-benchmark-dir "./test-temp/a-benchmark"]
-                   [typed "./test-temp/a-benchmark/typed"]
-                   [untyped "./test-temp/a-benchmark/untyped"]
-                   [both "./test-temp/a-benchmark/both"]
-                   [base "./test-temp/a-benchmark/base"]
-
-                   [not-a-benchmark "./test-temp/not-a-benchmark"])
-    #:files ([main/t  (build-path typed "main.rkt")   ""]
-             [a/t     (build-path typed "a.rkt")      ""]
-             [b/t     (build-path typed "b.rkt")      ""]
-             [garbage (build-path typed "garbage")    "some dumb garbage"]
-             [main    (build-path untyped "main.rkt") @~a{#lang racket
-                                                          (define/configurable-ctc x any/c 5)
-                                                          (define/configurable-ctc (f x) any/c 5)}]
-             [a       (build-path untyped "a.rkt")    @~a{#lang racket
-                                                          (define/configurable-ctc y any/c 5)
-                                                          (define/configurable-ctc ((g) x) any/c 5)}]
-             [b       (build-path untyped "b.rkt")    "#lang racket b"]
-             [adapter (build-path both "adapter.rkt") "#lang racket adapter"]))
-
-
   (test-begin
     #:name configure-benchmark
     #:short-circuit
@@ -314,7 +414,7 @@
      (benchmark-configuration->program
       (configure-benchmark a-benchmark
                            (hash (file-name-string-from-path main)
-                                 (hash 'x 'max
+                                 (hash 'a 'max
                                        'f 'none)
                                  (file-name-string-from-path a)
                                  (hash 'y 'types
@@ -323,24 +423,30 @@
                                  (hash))))
      (program (mod (== main paths=?)
                    (app syntax->datum
-                        `(module ,_ racket
+                        `(module main racket
                            (#%module-begin
-                            (define-for-syntax ctc-config ,(== #hash((x . max) (f . none))))
-                            (define/configurable-ctc x any/c 5)
+                            (define-for-syntax ctc-config ,(== #hash((a . max) (f . none))))
+                            (define/configurable-ctc a any/c 5)
                             (define/configurable-ctc (f x) any/c 5)))))
               (list-no-order
                (mod (== a paths=?)
                     (app syntax->datum
-                         `(module ,_ racket
+                         `(module a racket
                             (#%module-begin
                              (define-for-syntax ctc-config ,(== #hash((y . types) (g . types))))
                              (define/configurable-ctc y any/c 5)
                              (define/configurable-ctc ((g) x) any/c 5)))))
                (mod (== b paths=?)
                     (app syntax->datum
-                         `(module ,_ racket
+                         `(module b racket
                             (#%module-begin
-                             (define-for-syntax ctc-config ,(== #hash()))))))))))
+                             (define-for-syntax ctc-config ,(== #hash()))
+                             b))))
+               (mod (== adapter paths=?)
+                    (app syntax->datum
+                         `(module adapter racket
+                            (#%module-begin
+                             adapter))))))))
 
   (test-begin
     #:name make-max-bench-config
@@ -350,8 +456,9 @@
 
     (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
     (test-equal? (make-max-bench-config a-benchmark)
-                 (hash "a.rkt" (hash 'x 'max 'f 'max)
-                       "b.rkt" (hash 'y 'max 'g 'max))))
+                 (hash "main.rkt" (hash 'a 'max 'f 'max)
+                       "a.rkt" (hash 'y 'max 'g 'max)
+                       "b.rkt" (hash))))
 
   (test-begin
     #:name benchmark->mutatable-modules
@@ -361,4 +468,4 @@
 
     (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
     (test-equal? (list->set (benchmark->mutatable-modules a-benchmark))
-                 (set "main.rkt" "a.rkt" "b.rkt" "adapter.rkt"))))
+                 (set "main.rkt" "a.rkt" "b.rkt"))))
