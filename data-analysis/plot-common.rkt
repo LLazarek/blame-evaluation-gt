@@ -60,6 +60,7 @@
          (prefix-in db: "../db/db.rkt")
          "../configurables/configurables.rkt"
          "../runner/mutation-runner-data.rkt"
+         "../configurables/program-instrumentation/type-interface-module-names.rkt"
 
          "read-data.rkt")
 
@@ -145,8 +146,14 @@
                  values
                  empty)))
 
+(define-logger bt-hypoth-options)
 (define (satisfies-BT-hypothesis? bt)
   (define end-mutant-summary (first (blame-trail-mutant-summaries bt)))
+  (define mode (blame-trail-mode-config-name bt))
+  (define type-interface-mod?
+    (match-lambda [(or (== type-interface-file-name)
+                       (== type-interface-file-rename)) #t]
+                  [else #f]))
   (match end-mutant-summary
     [(mutant-summary _
                      (struct* run-status ([mutated-module mutated-mod-name]
@@ -159,6 +166,42 @@
           (list? blamed)
           (member mutated-mod-name blamed))
      #t]
+    [(mutant-summary _
+                     (struct* run-status ([mutated-module mutated-mod-name]
+                                          [outcome 'blamed]
+                                          [blamed blamed]))
+                     config)
+     #:when (member mode '("TR.rkt" "transient-newest.rkt" "transient-oldest.rkt"))
+     (match* {mode (remove-duplicates blamed)}
+       [{_ (list (? type-interface-mod?))}
+        #t]
+       [{"transient-newest.rkt" (list* (? type-interface-mod?) _)}
+        #t]
+       [{"transient-oldest.rkt" (list _ ... (? type-interface-mod?))}
+        #t]
+       [{_ other-blamed-list}
+        (when (member type-interface-file-name other-blamed-list)
+          (log-bt-hypoth-options-info
+           @~a{mode @mode, blamed contains interface somewhere in middle}))
+        #f])]
+    [(mutant-summary _
+                     (struct* run-status ([mutated-module mutated-mod-name]
+                                          [outcome (and outcome
+                                                        (or 'runtime-error
+                                                            'blamed))]
+                                          [context-stack stack]))
+                     config)
+     #:when (or (member mode '("TR-stack-first.rkt"
+                               "transient-stack-first.rkt"
+                               "erasure-stack-first.rkt"))
+                (and (member mode '("TR.rkt" "transient-newest.rkt" "transient-oldest.rkt"))
+                     (equal? outcome 'runtime-error)))
+     (define stack/no-typed-mods
+       (filter (λ (m) (equal? (hash-ref config m 'untyped) 'untyped))
+               stack))
+     (match stack/no-typed-mods
+       [(list* (? type-interface-mod?) _) #t]
+       [else #f])]
     [else #f]))
 
 (module+ test
@@ -169,6 +212,7 @@
     (satisfies-BT-hypothesis?
      (blame-trail '#s(mutant "acquire" "board.rkt" 5659)
                   87
+                  "TR.rkt"
                   (map adapt-mutant-summary
                        '(#s(mutant-summary 26565 #s(run-status "board.rkt" 5659 what-kind-of-spot type-error ("board.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . types) ("basics.rkt" . types) ("board.rkt" . types) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
                          #s(mutant-summary 26454 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("board.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . types) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
@@ -181,6 +225,7 @@
     (not (satisfies-BT-hypothesis?
           (blame-trail '#s(mutant "acquire" "board.rkt" 5659)
                        87
+                       "TR.rkt"
                        (map adapt-mutant-summary
                             '(#s(mutant-summary 26256 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("admin.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
                               #s(mutant-summary 26167 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("state.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))

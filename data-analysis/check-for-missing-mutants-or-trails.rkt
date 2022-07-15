@@ -19,6 +19,7 @@
     (remove-duplicates
      (filter-map (match-lambda [(blame-trail (and id (mutant (== bench-name) _ _))
                                              _
+                                             _
                                              _)
                                 id]
                                [else #f])

@@ -9,10 +9,12 @@
   (match a-bt
     [(blame-trail mutant-id
                   trail-id
+                  mode-name
                   summaries)
      (define filtered-summaries (bt-summaries->filtered-version summaries))
      (blame-trail mutant-id
                   trail-id
+                  mode-name
                   filtered-summaries)]))
 
 (define (bt-summaries->filtered-version summaries)

@@ -14,18 +14,21 @@
 (require (prefix-in db: "../db/db.rkt")
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../experiment/blame-trail-data.rkt"
+         "../experiment/integrity-metadata.rkt"
          "../util/mutant-util.rkt"
          "data-adapter.rkt"
          racket/hash
          rscript)
 
-(struct benchmark-data-files (name data-dir log progress-log)
+(struct benchmark-data-files (name data-dir log progress-log metadata)
   #:transparent)
 
 (struct blame-trail (mutant-id
                      trail-id
+                     mode-config-name
                      ; Note: summaries are in reverse order! Last summary of trail is first.
-                     mutant-summaries) #:transparent)
+                     mutant-summaries)
+  #:transparent)
 
 (define mutator-name? string?)
 
@@ -38,6 +41,7 @@
 (define (find-data-files mode-data-dir)
   ;; lltodo: it would be better if this info was recorded in the metadata file,
   ;; and this just found and read from those files
+  ;; Just remove support for the old format data at that point.
   (define (find-new-format-data)
     ;; new format: directory per benchmark, directory has
     ;; {$bench.log $bench-progress.log data/}
@@ -51,13 +55,16 @@
                         (benchmark-path benchmark)))
                   (define log (benchmark-path (~a benchmark ".log")))
                   (define progress-log (benchmark-path (~a benchmark "-progress.log")))
+                  (define metadata-file (benchmark-path (~a benchmark "-metadata.rktd")))
                   (and (path-to-existant-directory? data-dir)
                        (path-to-existant-file? log)
                        (path-to-existant-file? progress-log)
+                       (path-to-existant-file? metadata-file)
                        (benchmark-data-files (~a benchmark)
                                              data-dir
                                              log
-                                             progress-log)))))
+                                             progress-log
+                                             metadata-file)))))
   (define (find-old-format-data)
     ;; old format: each benchmark has
     ;; {$bench.log $bench-progress.log $bench/}
@@ -75,7 +82,8 @@
                        (benchmark-data-files (~a benchmark)
                                              data-dir
                                              log
-                                             progress-log)))))
+                                             progress-log
+                                             #f)))))
   (match (find-new-format-data)
     ['() (find-old-format-data)]
     [some-data some-data]))
@@ -140,12 +148,17 @@
 
 (define (blame-trail-summaries->blame-trails trail-summaries the-benchmark-data-files)
   (define benchmark-name (benchmark-data-files-name the-benchmark-data-files))
+  (define mode-config-name (and (benchmark-data-files-metadata the-benchmark-data-files)
+                                (metadata-id-config-name
+                                 (file->value
+                                  (benchmark-data-files-metadata the-benchmark-data-files)))))
   (map (match-lambda [(blame-trail-summary mod-name
                                            index
                                            id
                                            mutant-summaries)
                       (blame-trail (mutant benchmark-name mod-name index)
                                    id
+                                   mode-config-name
                                    (map adapt-mutant-summary
                                         mutant-summaries))])
        trail-summaries))
