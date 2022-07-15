@@ -113,8 +113,7 @@
     (bt-length-distributions-for key data
                                  #:normalize? normalize?
                                  #:dump-to dump-port
-                                 #:partition-by-success? color-by-success?
-                                 #:colors success-colors))
+                                 #:partition-by-success? color-by-success?))
 
   (stacked-histogram partitioned-trail-proportions-by-length/sorted/with-0
                      #:colors success-colors))

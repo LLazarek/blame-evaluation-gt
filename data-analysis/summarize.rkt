@@ -193,7 +193,7 @@
                        (struct* run-status ([outcome 'blamed]
                                             [blamed '()]))
                        _)
-       "blame disappeared"]
+       "blame disappeared (empty)"]
       [(mutant-summary _
                        (struct* run-status ([outcome outcome]
                                             [blamed (and (not '()) (? list? mods))]))
@@ -213,6 +213,10 @@
        #:when (for/and ([blamed-mod (in-list mods)])
                 (equal? 'types (hash-ref config blamed-mod 'types)))
        @~a{runtime-error with only typed mod(s) on stack}]
+      [(mutant-summary _
+                       (struct* run-status ([outcome (and outcome (or 'type-error 'completed))]))
+                       _)
+       @~a{immediate @outcome}]
       [else "other?"]))
 
   (define (0-length? bt) (= (length (blame-trail-mutant-summaries bt)) 1))
