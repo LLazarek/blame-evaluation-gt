@@ -78,8 +78,9 @@
   (define module-to-mutate-path
     (pick-file-by-name (list* main-path others-paths)
                        mutated-module-name))
-  (define the-program (make-unified-program main-path
-                                            others-paths))
+  (define the-benchmark-program
+    ((configured:benchmark-configuration->program) the-benchmark-configuration))
+  (define the-program (unify-program-for-running the-benchmark-program))
   (define the-program-mods (program->mods the-program))
   (define the-module-to-mutate
     (find-unified-module-to-mutate module-to-mutate-path

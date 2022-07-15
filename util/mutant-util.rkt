@@ -63,24 +63,9 @@
 
                              #:write-modules-to [dump-dir-path #f]
                              #:force-module-write? [force-module-write? #f])
-  (match-define (benchmark-configuration main others* base-dir bench-config)
-    a-benchmark-configuration)
   (define module-to-mutate
     (resolve-configured-benchmark-module a-benchmark-configuration
                                          module-to-mutate-name))
-  (define others
-    (map (match-lambda [(? path? p)
-                        (path->string p)]
-                       [other (~a other)])
-         others*
-         ;; This isn't necessary: only the base, typed, and untyped dirs have code.
-         #;(match base-dir
-           [#f others*]
-           [dir (append others*
-                        ;; base-dir sometimes contains other files, like
-                        ;; workload replay histories; skip them.
-                        (filter (λ (p) (regexp-match? #rx"\\.rkt$" p))
-                                (directory-list dir #:build? #t)))])))
   (call-with-output-file outfile #:mode 'text #:exists 'replace
     (λ (outfile-port)
       (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
@@ -102,16 +87,14 @@
                         empty)
                     (list "--"
                           mutant-runner-path
-                          "-m" main
-                          "-o" (~s others)
+                          "-b" (~s a-benchmark-configuration)
                           "-M" module-to-mutate
                           "-i" (~a mutation-index)
                           "-t" (~a (or timeout/s
                                        (default-timeout/s)))
                           "-g" (~a (or memory/gb
                                        (default-memory-limit/gb)))
-                          "-c" config-path
-                          "-C" (~s bench-config))
+                          "-c" config-path)
                     (if output-path
                         (list "-O" output-path)
                         empty)

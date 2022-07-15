@@ -132,5 +132,7 @@
 
   (define-implementation module-types
     #:module "configurations/module-types.rkt")
+  (define-implementation module-export-ctcs
+    #:module "configurations/module-export-ctcs.rkt")
   (define-implementation top-level-id-ctcs
     #:module "configurations/top-level-id-ctcs.rkt"))

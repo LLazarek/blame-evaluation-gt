@@ -10,7 +10,8 @@
          "../runner/mutation-runner.rkt"
          "../runner/unify-program.rkt"
          "../util/program.rkt"
-         "../configurables/configurables.rkt")
+         "../configurables/configurables.rkt"
+         "../configurations/configure-benchmark.rkt")
 
 (define (fail fmt-str . fmt-args)
   (apply eprintf
@@ -19,8 +20,7 @@
   (exit 1))
 
 (module+ main
-  (define main-module (make-parameter #f))
-  (define other-modules (make-parameter #f))
+  (define the-benchmark-configuration (make-parameter #f))
   (define module-to-mutate (make-parameter #f))
   (define mutation-index (make-parameter #f))
   (define write-modules-to (make-parameter #f))
@@ -28,29 +28,21 @@
   (define timeout/s (make-parameter #f))
   (define memory/gb (make-parameter #f))
   (define mutant-output-path (make-parameter #f))
-  (define bench-config (make-parameter #f))
   (define configuration-path (make-parameter #f))
 
   (command-line
    #:once-each
-   [("-m" "--main-module")
-    main-path
-    ("Main module path."
-     "This is a mandatory argument.")
-    (main-module main-path)]
-   [("-o" "--other-modules")
-    other-module-path-list
-    ("`write` form of a list of other module paths."
+   [("-b" "--benchmark-configuration")
+    benchmark-configuration-str
+    ("`write` form of the `benchmark-configuration` to run."
      "This is a mandatory argument.")
     (with-handlers ([exn:fail:read?
                      (λ _
                        (fail
                         @~a{
-                            Unable to read path list
-                            Provided: @~v[other-module-path-list]}))])
-      (other-modules
-       (call-with-input-string other-module-path-list
-                               read)))]
+                            Unable to read benchmark configuration
+                            Provided: @~v[benchmark-configuration-str]}))])
+      (the-benchmark-configuration (with-input-from-string benchmark-configuration-str read)))]
    [("-M" "--module-to-mutate")
     mutate-path
     ("Module to mutate path."
@@ -86,13 +78,7 @@
     path
     ("The configuration with which to run the mutant."
      "This is a mandatory argument.")
-    (configuration-path path)]
-
-   [("-C" "--bench-config")
-    config-str
-    ("The `write`n form of the benchmark configuration."
-     "This is a mandatory argument.")
-    (bench-config (call-with-input-string config-str read))])
+    (configuration-path path)])
 
   (define mutant-output-path-port
     (match (mutant-output-path)
@@ -106,13 +92,11 @@
         (get-port)))
 
   (define missing-arg
-    (for/first ([arg (in-list (list (main-module)
-                                    (other-modules)
+    (for/first ([arg (in-list (list (the-benchmark-configuration)
                                     (module-to-mutate)
                                     (mutation-index)
-                                    (configuration-path)
-                                    (bench-config)))]
-                [flag (in-list '(-m -o -M -i -c -C))]
+                                    (configuration-path)))]
+                [flag (in-list '(-b -M -i -c))]
                 #:unless arg)
       flag))
 
@@ -123,8 +107,9 @@
   (install-configuration! (configuration-path))
 
   (define the-program
-    (make-unified-program (main-module)
-                          (other-modules)))
+    (unify-program-for-running
+     ((configured:benchmark-configuration->program)
+      (the-benchmark-configuration))))
 
   (define the-program-mods (program->mods the-program))
 
@@ -150,7 +135,7 @@
          the-program
          the-module-to-mutate
          (mutation-index)
-         (bench-config)
+         (benchmark-configuration-config (the-benchmark-configuration))
          #:timeout/s (timeout/s)
          #:memory/gb (memory/gb)
          #:modules-base-path (find-program-base-path the-program)

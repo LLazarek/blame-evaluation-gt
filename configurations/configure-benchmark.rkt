@@ -39,9 +39,9 @@
          "../configurables/configurables.rkt")
 
 (struct benchmark (typed untyped base both)
-  #:transparent)
+  #:prefab)
 (struct benchmark-configuration (main others base-dir config)
-  #:transparent)
+  #:prefab)
 
 (define benchmark/c
   (struct/c benchmark
