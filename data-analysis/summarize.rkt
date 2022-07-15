@@ -1,14 +1,24 @@
 #lang at-exp rscript
 
+(provide summarize
+         format-summary)
+
 (require "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../configurables/configurables.rkt"
          "../experiment/blame-trail-data.rkt"
          "../runner/mutation-runner-data.rkt"
          "../util/for.rkt"
+         "../configurables/program-instrumentation/type-interface-module-names.rkt"
 
          "plot-common.rkt"
          "read-data.rkt"
-         "bt-length-distributions.rkt")
+         "bt-length-distributions.rkt"
+
+         text-table
+         syntax/parse/define)
+
+(define-runtime-paths
+  [data-analysis-dir "."])
 
 (define summary/c
   (hash/c symbol? any/c))
@@ -27,8 +37,8 @@
   (define stat:mutant-count
     (length (group-by blame-trail-mutant-id all-bts)))
   (define stat:outcome-counts (count-outcomes all-bts))
-  (define stat:start-outcome-counts (start-outcome-counts all-bts))
-  (define stat:end-outcome-counts (end-outcome-counts all-bts))
+  (define stat:start-outcome-summary (start-outcome-summary all-bts))
+  (define stat:end-outcome-summary (end-outcome-summary all-bts))
   (define stat:bts-switching-runtime-error->blame (blame-switch-bts all-bts))
   (define stat:runtime-error-only-bts (runtime-error-only-bts all-bts))
   (define stat:trails-ending-with-no-blame
@@ -52,7 +62,10 @@
                                                                             blamed)]
                                                                [outcome 'blamed]))
                                           config}
-                                         (set-empty? (set-intersect blamed (hash-keys config)))]
+                                         (set-empty? (set-intersect blamed
+                                                                    ;; lltodo: this is kind of a hack. Really the right thing to do is to get ahold of the benchmark modules with benchmark->mutatable-modules
+                                                                    (cons type-interface-file-name
+                                                                          (hash-keys config))))]
                                         [{_ _} #f])
                         all-bts))
   (define stat:resource-limits (summarize-resource-limit-occurrences all-bts))
@@ -61,6 +74,13 @@
 
   (define stat:bt-failures-blaming-typed-code (bt-failures-blaming-typed-code all-bts))
 
+  (define stat:uncategorized-bt-failures (set-subtract (append* (hash-values stat:bt-failure-outcomes))
+                                                       stat:trails-ending-with-no-blame
+                                                       stat:bt-failures-blaming-typed-code
+                                                       stat:runtime-err-search-failures
+                                                       stat:blame-but-none-in-program
+                                                       (append* (hash-values stat:resource-limits))))
+
   (define stat:blamed-sizes (summarize-blamed-sizes all-bts))
   (define stat:blamed-sizes-untyped (summarize-blamed-sizes all-bts #:filter-by-mod-level 'none))
   (define stat:root-stack-sizes (summarize-root-context-sizes all-bts))
@@ -68,8 +88,8 @@
   (hash 'total-bt-count stat:total-bt-count
         'total-mutant-count stat:mutant-count
         'outcomes stat:outcome-counts
-        'start-outcomes stat:start-outcome-counts
-        'end-outcomes stat:end-outcome-counts
+        'start-outcomes stat:start-outcome-summary
+        'end-outcomes stat:end-outcome-summary
         'bts-switching-runtime-error->blame stat:bts-switching-runtime-error->blame
         'runtime-error-only-bts stat:runtime-error-only-bts
         'trails-ending-with-empty-blamed stat:trails-ending-with-no-blame
@@ -81,7 +101,8 @@
         'bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code
         'blamed-sizes stat:blamed-sizes
         'blamed-sizes-untyped stat:blamed-sizes-untyped
-        'root-stack-sizes stat:root-stack-sizes))
+        'root-stack-sizes stat:root-stack-sizes
+        'uncategorized-bt-failures stat:uncategorized-bt-failures))
 
 (define (lengths-summary bts)
   (define (len bt) (bt-length bt #t))
@@ -98,21 +119,21 @@
     (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _) mutant)
     (values outcome 1)))
 
-(define (start-outcome-counts bts)
+(define (start-outcome-summary bts)
   (for/hash/fold ([bt (in-list bts)])
-    #:combine +
-    #:default 0
+    #:combine cons
+    #:default empty
     (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _)
       (last (blame-trail-mutant-summaries bt)))
-    (values outcome 1)))
+    (values outcome bt)))
 
-(define (end-outcome-counts bts)
+(define (end-outcome-summary bts)
   (for/hash/fold ([bt (in-list bts)])
-    #:combine +
-    #:default 0
+    #:combine cons
+    #:default empty
     (match-define (mutant-summary _ (struct* run-status ([outcome outcome])) _)
       (first (blame-trail-mutant-summaries bt)))
-    (values outcome 1)))
+    (values outcome bt)))
 
 (define mutant-outcome (compose1 run-status-outcome mutant-summary-run-status))
 (define (blame-switch-bts bts)
@@ -177,8 +198,9 @@
                        (struct* run-status ([outcome outcome]
                                             [blamed (and (not '()) (? list? mods))]))
                        config)
-       #:when (for/and ([blamed-mod (in-list mods)])
-                (equal? 'types (hash-ref config blamed-mod 'types)))
+       #:when (and (for/and ([blamed-mod (in-list mods)])
+                     (equal? 'types (hash-ref config blamed-mod 'types)))
+                   (not (equal? mods (list type-interface-file-name))))
        @~a{@outcome blame on wrong typed mod(s)}]
       [(mutant-summary _
                        (struct* run-status ([outcome (and limit-type (or 'timeout 'oom))]))
@@ -258,101 +280,184 @@
       [(list _ ... (struct* mutant-summary
                             ([run-status (struct* run-status
                                                   ([context-stack (? list? stack)]))])))
-       (values (length stack) bt)]
+       (values (length (remove-duplicates stack)) bt)]
       [else (values 'N/A bt)])))
 
-(define (format-summary summary)
-  (match-define (hash-table ['total-bt-count stat:total-bt-count]
-                            ['total-mutant-count stat:mutants]
-                            ['outcomes stat:outcome-counts]
-                            ['start-outcomes stat:start-outcome-counts]
-                            ['end-outcomes stat:end-outcome-counts]
-                            ['bts-switching-runtime-error->blame stat:bts-switching-runtime-error->blame]
-                            ['runtime-error-only-bts stat:runtime-error-only-bts]
-                            ['trails-ending-with-empty-blamed stat:trails-ending-with-empty-blamed]
-                            ['stack-search-failures stat:runtime-err-search-failures]
-                            ['blame-but-none-in-program stat:blame-but-none-in-program]
-                            ['resource-limits stat:resource-limits]
-                            ['0-length-bts stat:0-length-bts]
-                            ['bt-failure-outcomes stat:bt-failure-outcomes]
-                            ['bt-failures-blaming-typed-code stat:bt-failures-blaming-typed-code]
-                            ['blamed-sizes stat:blamed-sizes]
-                            ['blamed-sizes-untyped stat:blamed-sizes-untyped]
-                            ['root-stack-sizes stat:root-stack-sizes])
-    summary)
-  (define failing-trail-count (apply + (map length (hash-values stat:bt-failure-outcomes))))
-  (define trails-ending-with-empty-blamed-count (length stat:trails-ending-with-empty-blamed))
-  (define runtime-err-disappearances-count (length stat:runtime-err-search-failures))
-  (define resource-limit-disappearances-count (apply + (map length (hash-values stat:resource-limits))))
-  (define blamed-but-empty-count (length stat:blame-but-none-in-program))
+(define (default-summary-formatter v)
   (define (summary->counts hash)
     (for/hash ([{k bts} (in-hash hash)])
       (values k (length bts))))
-  (define (pretty-format/indent v indent)
-    (define str (pretty-format v))
-    (string-replace str "\n" (~a "\n" (make-string indent #\space))))
-  @~a{
-      Total mutants:                               @stat:mutants
-      Total blame trails:                          @stat:total-bt-count
+  (match v
+    [(hash-table [_ (? list?)] ...)
+     (summary->counts v)]
+    [(? list? l)
+     (length l)]
+    [other other]))
 
-      Total run outcome counts:                    @(pretty-format/indent stat:outcome-counts 45)
+(begin-for-syntax
+  (require syntax/parse)
+  (define-splicing-syntax-class stat-row
+    #:commit
+    (pattern {~seq #:section section:str}
+             #:with parts #'section)
+    (pattern {~seq descr:str stat-id:id {~optional {~seq #:format formatter} #:defaults ([formatter #'default-summary-formatter])}}
+             #:with parts #'(list 'stat-id descr formatter))))
 
-      Blamed mod list size counts:                 @(pretty-format/indent
-                                                     (summary->counts stat:blamed-sizes)
-                                                     45)
-      Blamed untyped mod list size counts:         @(pretty-format/indent
-                                                     (summary->counts stat:blamed-sizes-untyped)
-                                                     45)
+(define-simple-macro (define-stat-table {table-id keys-id}
+                       #:from stat-table:id
+                       r:stat-row ...)
+  (begin
+    (define-values {temp table-id}
+      (for/lists {l1 l2}
+                 ([parts (list r.parts ...)]
+                  [i (in-naturals)])
+                 (if (string? parts)
+                     (values #f
+                             (list "\n\n=" (~a "\n\n" parts) "\n\n="))
+                     (values (list i (first parts))
+                             (list (~a "[" i "]")
+                                   (~a (second parts) ":")
+                                   ((third parts)
+                                    (hash-ref stat-table (first parts))))))))
+    (define keys-id (for/hash ([maybe-index+key (in-list temp)]
+                               #:when maybe-index+key)
+                      (values (first maybe-index+key)
+                              (second maybe-index+key))))))
 
-      Trail starting outcome counts:               @(pretty-format/indent stat:start-outcome-counts 45)
-      Trail ending outcome counts:                 @(pretty-format/indent stat:end-outcome-counts 45)
-      Trails start w/ runtime-err, end w/ blame:   @(length stat:bts-switching-runtime-error->blame)
-      ... lengths:                                 @(pretty-format/indent
-                                                     (lengths-summary stat:bts-switching-runtime-error->blame)
-                                                     45)
-      Trails consisting of only runtime-errs:      @(length stat:runtime-error-only-bts)
-      ... lengths:                                 @(pretty-format/indent
-                                                     (lengths-summary stat:runtime-error-only-bts)
-                                                     45)
-      ... mutants for those trails:                @(length (remove-duplicates (map blame-trail-mutant-id stat:runtime-error-only-bts)))
+(define (format-summary summary #:with-keys [with-keys? #f])
+  (match-define (hash-table ['runtime-error-only-bts stat:runtime-error-only-bts]
+                            ['bt-failure-outcomes stat:bt-failure-outcomes]
+                            ['resource-limits stat:resource-limits]
+                            _ ...)
+    summary)
+  (define summary*
+    (hash-set* summary
+               'mutants-for-runtime-error-only-bts
+               (remove-duplicates (map blame-trail-mutant-id stat:runtime-error-only-bts))
 
-      Total blame trail failures:                  @failing-trail-count
 
-      Blame trail failures by outcome:             @(pretty-format/indent
-                                                     (summary->counts stat:bt-failure-outcomes)
-                                                     45)
+               'bt-failure-count
+               (apply + (map length (hash-values stat:bt-failure-outcomes)))
 
-      Failed trails ending with...
-      blame on typed code:                         @(length stat:bt-failures-blaming-typed-code)
-      blame, but empty:                            @trails-ending-with-empty-blamed-count
-      blame outside program:                       @blamed-but-empty-count
-      runtime-error + empty (filtered) stack:      @runtime-err-disappearances-count
-      resource limits:                             @resource-limit-disappearances-count
+               'resource-limit-failure-count
+               (apply + (map length (hash-values stat:resource-limits)))))
+  (define-stat-table {table index->key}
+    #:from summary*
+    #:section "Overall summary"
+    "Total mutants"                                total-mutant-count
+    "Total blame trails"                           total-bt-count
+    "Total blame trail failures"                   bt-failure-count
 
-      ... remaining trail failures:                @(- failing-trail-count
-                                                       (length stat:bt-failures-blaming-typed-code)
-                                                       trails-ending-with-empty-blamed-count
-                                                       runtime-err-disappearances-count
-                                                       blamed-but-empty-count
-                                                       resource-limit-disappearances-count)
+    #:section "Failing bt stats"
+    "Blame trail failures by outcome"              bt-failure-outcomes
+    #:section "Failed trails ending with"
+    "... blame on typed code"                      bt-failures-blaming-typed-code
+    "... blame, but empty"                         trails-ending-with-empty-blamed
+    "... blame outside program"                    blame-but-none-in-program
+    "... runtime-error + empty (filtered) stack"   stack-search-failures
+    "... resource limits"                          resource-limit-failure-count
+    "... remaining trail failures"                 uncategorized-bt-failures
 
-      0-length blame trails:                       @(pretty-format/indent
-                                                     (summary->counts stat:0-length-bts)
-                                                     45)
+    #:section "General run stats"
+    "Total run outcome counts"                     outcomes
+    "Blamed list size distribution"                blamed-sizes
+    "Untyped-only blamed list size distribution"   blamed-sizes-untyped
 
-      Root stack sizes:                            @(pretty-format/indent
-                                                     (summary->counts stat:root-stack-sizes)
-                                                     45)
-      })
+    #:section "General bt stats"
+    "Trail starting outcomes"                      start-outcomes
+    "Trail ending outcome counts"                  end-outcomes
+    "Trails start w/ runtime-err, end w/ blame"    bts-switching-runtime-error->blame
+    "... lengths"                                  bts-switching-runtime-error->blame #:format lengths-summary
+    "Trails consisting of only runtime-errs"       runtime-error-only-bts
+    "... lengths"                                  runtime-error-only-bts #:format lengths-summary
+    "# of mutants having runtime-err-only trails"  mutants-for-runtime-error-only-bts
+    "0-length blame trails"                        0-length-bts
+    "Root stack sizes (w/o duplicates)"            root-stack-sizes)
+
+  (define str (simple-table->string table
+                                    #:->string (λ (v)
+                                                 (pretty-format v 50))))
+  (if with-keys?
+      (values str index->key)
+      str)
+
+  ;; (define failing-trail-count )
+  ;; (define trails-ending-with-empty-blamed-count (length stat:trails-ending-with-empty-blamed))
+  ;; (define runtime-err-disappearances-count (length stat:runtime-err-search-failures))
+  ;; (define resource-limit-disappearances-count )
+  ;; (define blamed-but-empty-count (length stat:blame-but-none-in-program))
+  ;; (define (summary->counts hash)
+  ;;   (for/hash ([{k bts} (in-hash hash)])
+  ;;     (values k (length bts))))
+  ;; (define (pretty-format/indent v indent)
+  ;;   (define str (pretty-format v))
+  ;;   (string-replace str "\n" (~a "\n" (make-string indent #\space))))
+  ;; @~a{
+  ;;     [key] description:                               value
+  ;;     ======================================================
+  ;;     [_] Total mutants:                               @stat:mutants
+  ;;     [0] Total blame trails:                          @stat:total-bt-count
+
+  ;;     [_] Total run outcome counts:                    @(pretty-format/indent stat:outcome-counts 45)
+
+  ;;     [1] Blamed mod list size counts:                 @(pretty-format/indent
+  ;;                                                        (summary->counts stat:blamed-sizes)
+  ;;                                                        45)
+  ;;     [2] Blamed untyped mod list size counts:         @(pretty-format/indent
+  ;;                                                        (summary->counts stat:blamed-sizes-untyped)
+  ;;                                                        45)
+
+  ;;     [3] Trail starting outcome counts:               @(pretty-format/indent
+  ;;                                                        (summary->counts stat:start-outcome-summary)
+  ;;                                                        45)
+  ;;     [4] Trail ending outcome counts:                 @(pretty-format/indent
+  ;;                                                        (summary->counts stat:end-outcome-summary)
+  ;;                                                        45)
+  ;;     [5] Trails start w/ runtime-err, end w/ blame:   @(length stat:bts-switching-runtime-error->blame)
+  ;;     ... lengths:                                     @(pretty-format/indent
+  ;;                                                        (lengths-summary stat:bts-switching-runtime-error->blame)
+  ;;                                                        45)
+  ;;     [6] Trails consisting of only runtime-errs:      @(length stat:runtime-error-only-bts)
+  ;;     ... lengths:                                     @(pretty-format/indent
+  ;;                                                        (lengths-summary stat:runtime-error-only-bts)
+  ;;                                                        45)
+  ;;     ... mutants for those trails:                @(length (remove-duplicates (map blame-trail-mutant-id stat:runtime-error-only-bts)))
+
+  ;;     [_] Total blame trail failures:                  @failing-trail-count
+
+  ;;     [7] Blame trail failures by outcome:             @(pretty-format/indent
+  ;;                                                        (summary->counts stat:bt-failure-outcomes)
+  ;;                                                        45)
+
+  ;;     Failed trails ending with...
+  ;;     [8] blame on typed code:                         @(length stat:bt-failures-blaming-typed-code)
+  ;;     [9] blame, but empty:                            @trails-ending-with-empty-blamed-count
+  ;;     [10]blame outside program:                       @blamed-but-empty-count
+  ;;     [11]runtime-error + empty (filtered) stack:      @runtime-err-disappearances-count
+  ;;     [12]resource limits:                             @resource-limit-disappearances-count
+
+  ;;     [13]... remaining trail failures:                @(length stat:uncategorized-bt-failures)
+
+  ;;     0-length blame trails:                       @(pretty-format/indent
+  ;;                                                    (summary->counts stat:0-length-bts)
+  ;;                                                    45)
+
+  ;;     Root stack sizes (w/o duplicates):           @(pretty-format/indent
+  ;;                                                    (summary->counts stat:root-stack-sizes)
+  ;;                                                    45)
+  ;;     }
+  )
 
 (main
  #:arguments ([(hash-table ['config   config-path]
-                           ['summaries-db summaries-db-path]
-                           ['mutant-samples-db mutant-samples-db-path]
-                           ['root-samples-db root-samples-db-path]
+                           ['summaries-db (app simple-form-path summaries-db-path)]
+                           ['mutant-samples-db (or (and #f mutant-samples-db-path)
+                                                   (app simple-form-path mutant-samples-db-path))]
+                           ['root-samples-db (or (and #f root-samples-db-path)
+                                                 (app simple-form-path root-samples-db-path))]
                            ['run-checks? run-checks?]
                            ['dump-values values-to-dump])
-               data-dirs]
+               (app (λ (l) (map simple-form-path l)) data-dirs)]
               #:once-each
               [("-c" "--config")
                'config
@@ -399,10 +504,12 @@
      (define missing-mutants-output (open-output-string))
      (define errors-output (open-output-string))
      (parameterize ([current-output-port missing-mutants-output]
-                    [current-error-port missing-mutants-output])
+                    [current-error-port missing-mutants-output]
+                    [current-directory data-analysis-dir])
        (system* "/usr/bin/fish"
                 "-c"
                 @~a{
+                    cd @data-analysis-dir > /dev/null ; @;
                     rt check-for-missing-mutants-or-trails.rkt -s @mutant-samples-db-path -S @summaries-db-path -r @root-samples-db-path -p '@data-dir'
                     }))
      (parameterize ([current-output-port errors-output]
@@ -410,6 +517,7 @@
        (system* "/usr/bin/fish"
                 "-c"
                 @~a{
+                    cd @data-analysis-dir > /dev/null ; @;
                     rt check-for-errors.rkt '@data-dir'
                     }))
      (displayln @~a{
