@@ -166,7 +166,9 @@
                       name
                       status-file
                       record-outcomes?)
-  (displayln @~a{Running mode @mode-name on @host})
+  (displayln @~a{Running mode @mode-name on @host @(if record-outcomes?
+                                                       "with outcome recording"
+                                                       "with outcome checking")})
   (displayln @~a{Checking that @host is in a clean state...})
   (check-host-empty! host
                      (λ _

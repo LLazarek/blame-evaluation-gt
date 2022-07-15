@@ -635,7 +635,7 @@
                     @(if include-configuration-outcomes?
                          @~a{
                              cp -r @;
-                             ./blame-evaluation-gt/dbs/code-mutations/configuration-outcomes @;
+                             ./blame-evaluation-gt/dbs/@|db-installation-directory-name|/configuration-outcomes @;
                              ./experiment-output/configuration-outcomes &&@" "
                              }
                          "") @;
@@ -779,6 +779,9 @@
   (define host-repo-path
     (build-path (get-field host-project-path a-host)
                 "blame-evaluation-gt"))
+  (define host-benchmarks-path
+    (build-path (get-field host-project-path a-host)
+                "gtp-benchmarks"))
   (define host-project-raco.rkt-path
     (build-path (get-field host-utilities-path a-host)
                 "project-raco.rkt"))
@@ -788,11 +791,13 @@
   (for ([step (in-list '("Stashing current dbs..."
                          "Unpacking dbs..."
                          "Updating implementation..."
+                         "Updating benchmarks..."
                          "Recompiling and checking status..."))]
         [cmd (in-list
               (list
                @~a{
                    rm -r '@host-dbs-destination'/last-dbs ; @;
+                   mkdir -p '@host-dbs-unpacked-dir-path' ; @; in case there weren't any before
                    mv '@host-dbs-unpacked-dir-path' '@host-dbs-destination'/last-dbs
                    }
                @~a{
@@ -802,6 +807,11 @@
                    }
                @~a{
                    cd '@host-repo-path' && @;
+                   git pull && @;
+                   echo "Done."
+                   }
+               @~a{
+                   cd '@host-benchmarks-path' && @;
                    git pull && @;
                    echo "Done."
                    }
