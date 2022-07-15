@@ -601,7 +601,7 @@ Giving up.
             @mod @"@" @index {@blame-trail-id}. @;
             Giving up on following the trail.
             Mutant: [@dead-succ-id] and config:
-            @~v[dead-succ-config]
+            @~v[(serialize-config dead-succ-config)]
 
             Result: @(run-status-outcome result) on @(run-status-blamed result)
             })
@@ -615,7 +615,7 @@ Giving up.
             @mod @"@" @index {@blame-trail-id}. @;
             Giving up on following the trail.
             Mutant: [@dead-succ-id] and config:
-            @~v[dead-succ-config]
+            @~v[(serialize-config dead-succ-config)]
 
             Blamed: @(run-status-blamed result)
             })
@@ -626,7 +626,7 @@ Giving up.
         @~a{
             Mutant in middle of blame trail completes or syntax-errors.
             Mutant: @mod @"@" @index [@dead-succ-id] {@blame-trail-id}.
-            Config: @dead-succ-config
+            Config: @(serialize-config dead-succ-config)
 
             Predecessor (id [@id]) had result @result
             })
@@ -741,7 +741,7 @@ Giving up.
                   (mutant->process-will mutant-will)))
   (log-factory
    debug
-   @~a{    Mutant [@mutant-id] has config @~v[precision-config]})
+   @~a{    Mutant [@mutant-id] has config @~v[(serialize-config precision-config)]})
 
   ;; lower priority means schedule sooner
   (define this-mutant-priority
@@ -826,7 +826,7 @@ Giving up.
                            [(struct* run-status
                                      ([outcome o]))
                             o]), @;
-                        config: @~s[config]
+                        config: @~s[(serialize-config config)]
                         })
        (define dead-mutant-proc
          (dead-mutant-process (mutant #f mod index)
@@ -869,7 +869,7 @@ Giving up.
 ~v"
                       revival-count MAX-REVIVALS
                       id mod index
-                      config)
+                      (serialize-config config))
          (maybe-abort "Revival failed to resolve mutant errors"
                       process-q)]
         [else
@@ -882,7 +882,7 @@ Exited with ~a and produced result: ~v
 Attempting revival ~a / ~a
 "
                       id mod index
-                      config
+                      (serialize-config config)
                       status maybe-result
                       (add1 revival-count) MAX-REVIVALS)
          (spawn-mutant process-q
@@ -961,7 +961,9 @@ Attempting revival ~a / ~a
                           ([id id]
                            [result result]
                            [config config]))
-                 (mutant-summary id result config)]))
+                 (mutant-summary id
+                                 result
+                                 (serialize-config config))]))
 
 ;; Adds `dead-proc` at the end of `the-blame-trail/without-dead-proc` and
 ;; records the resulting trail
@@ -1001,7 +1003,7 @@ Mutant: [~a] ~a @ ~a with config:
 "
                  (file->string path)
                  id mod index
-                 config)
+                 (serialize-config config))
     eof)
   (with-handlers ([exn:fail:read? report-malformed-output])
     (match (with-input-from-file path read)
@@ -1090,7 +1092,7 @@ Mutant: [~a] ~a @ ~a with config:
       @~a{
           Found that a configuration produces @real-outcome, but configuration outcomes db @;
           says that it should produce @expected-outcome
-          Mutant: @mutant @config
+          Mutant: @mutant @(serialize-config config)
           }
       (void))]
 

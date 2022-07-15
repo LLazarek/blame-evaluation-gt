@@ -16,7 +16,9 @@
          "../experiment/blame-trail-data.rkt"
          "../experiment/integrity-metadata.rkt"
          "../util/mutant-util.rkt"
+         "../configurations/config.rkt"
          "data-adapter.rkt"
+         "experiment-info.rkt"
          racket/hash
          rscript)
 
@@ -148,10 +150,16 @@
 
 (define (blame-trail-summaries->blame-trails trail-summaries the-benchmark-data-files)
   (define benchmark-name (benchmark-data-files-name the-benchmark-data-files))
+  (define benchmark (benchmark-name->benchmark benchmark-name))
   (define mode-config-name (and (benchmark-data-files-metadata the-benchmark-data-files)
                                 (metadata-id-config-name
                                  (file->value
                                   (benchmark-data-files-metadata the-benchmark-data-files)))))
+  (define (deserialize-mutant-summary ms)
+    (match ms
+      [(struct* mutant-summary ([config (? serialized-config? n)]))
+       (struct-copy mutant-summary ms [config (deserialize-config n #:benchmark benchmark)])]
+      [else ms]))
   (map (match-lambda [(blame-trail-summary mod-name
                                            index
                                            id
@@ -159,7 +167,8 @@
                       (blame-trail (mutant benchmark-name mod-name index)
                                    id
                                    mode-config-name
-                                   (map adapt-mutant-summary
+                                   (map (compose1 deserialize-mutant-summary
+                                                  adapt-mutant-summary)
                                         mutant-summaries))])
        trail-summaries))
 

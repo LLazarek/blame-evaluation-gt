@@ -3,9 +3,12 @@
 (provide modes
          benchmarks
          scenario-samples-per-mutant
-         configured:active-mutator-names)
+         configured:active-mutator-names
+         benchmark-name->benchmark)
 
-(require "../configurables/configurables.rkt")
+(require "../configurables/configurables.rkt"
+         "../configurations/configure-benchmark.rkt"
+         racket/runtime-path)
 
 (define modes
   '("null" "TR" "TR-stack-first" "transient-newest" "transient-oldest" #;"transient-all" "transient-stack-first" "erasure-stack-first")
@@ -24,6 +27,10 @@
   #;'("acquire"
     "kcfa"
     "take5"))
+
+(define-runtime-path benchmarks-dir "../../gtp-benchmarks/benchmarks")
+(define (benchmark-name->benchmark name)
+  (read-benchmark (build-path benchmarks-dir name)))
 
 (define scenario-samples-per-mutant 100)
 

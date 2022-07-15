@@ -41,6 +41,8 @@
                        (benchmark-untyped the-benchmark)))
      (for/hash ([mod (in-list mods)])
        (values mod level))]
+    [(? serialized-config? n)
+     (deserialize-config n #:benchmark the-benchmark)]
     [other
      (raise-user-error
       @~a{Unable to extract configuration from identifier: @~v[other]})]))

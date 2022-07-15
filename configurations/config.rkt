@@ -1,10 +1,12 @@
 #lang at-exp racket/base
 
-(require "../configurables/configurables.rkt")
+(require "../configurables/configurables.rkt"
+         (only-in racket/math positive-integer?))
 
 (provide (all-defined-out))
 
 (define config/c hash?)
+(define serialized-config? positive-integer?)
 
 (define (config-at-max-precision-for? name config)
   ((configured:config-at-max-precision-for?) name config))
@@ -20,9 +22,7 @@
 (define (serialize-config config)
   ((configured:serialize-config) config))
 (define (deserialize-config config-number
-                            #:reference [reference-config #f]
-                            #:modules [mods (hash-keys reference-config)])
+                            #:benchmark reference-benchmark)
   ((configured:deserialize-config) config-number
-                                   #:reference reference-config
-                                   #:modules mods))
+                                   #:benchmark reference-benchmark))
 
