@@ -10,14 +10,15 @@
 
 
 (define (select-modules-to-mutate bench)
-  (define mutatable-module-names (benchmark->mutatable-modules bench #:include-both? #t))
+  (define mutatable-module-names (benchmark->mutatable-modules bench))
   (unless (member type-interface-file-name mutatable-module-names)
     (raise-user-error 'select-modules-to-mutate:interface-module-only
                       @~a{
                           the interface-module-only configuration is set for @;
                           module-selection-for-mutation, but the current benchmark @;
-                          does not have an interface module to mutate.
-                          Its modules:
+                          does not have an interface module to mutate, or the currently configured @;
+                          configuration module does not consider the interface module mutatable.
+                          The mutatable modules reported by `benchmark->mutatable-modules` are:
                           @mutatable-module-names
                           }))
   (list type-interface-file-name))

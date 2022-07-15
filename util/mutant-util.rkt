@@ -87,7 +87,7 @@
                         empty)
                     (list "--"
                           mutant-runner-path
-                          "-b" (~s a-benchmark-configuration)
+                          "-b" (serialize-benchmark-configuration a-benchmark-configuration)
                           "-M" module-to-mutate
                           "-i" (~a mutation-index)
                           "-t" (~a (or timeout/s

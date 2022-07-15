@@ -55,6 +55,17 @@
             @~a{Given config with value @name already at types: @config})]
     [else config]))
 
+(define (benchmark->module-names a-benchmark #:include-both? [include-both? #t])
+  (map file-name-string-from-path
+       (append (if include-both?
+                   (benchmark-both->files (benchmark-both a-benchmark))
+                   empty)
+               (benchmark-typed a-benchmark))))
+
+;; Produces the names of the mutatable modules in `a-benchmark`
+(define (benchmark->mutatable-modules a-benchmark)
+  (benchmark->module-names a-benchmark #:include-both? #t))
+
 (define-values {level->digit digit->level}
   (1-to-1-map->converters 'types #\1
                           'none  #\0))
@@ -129,16 +140,6 @@
   (make-program (benchmark-configuration-main c-bench)
                 (benchmark-configuration-others c-bench)))
 
-(define (benchmark->module-names a-benchmark #:include-both? [include-both? #t])
-  (map file-name-string-from-path
-       (append (if include-both?
-                   (benchmark-both->files (benchmark-both a-benchmark))
-                   empty)
-               (benchmark-typed a-benchmark))))
-
-;; Produces the names of the mutatable modules in `a-benchmark`
-(define (benchmark->mutatable-modules a-benchmark)
-  (benchmark->module-names a-benchmark #:include-both? #t))
 
 (define (make-max-bench-config a-benchmark)
   (define mods (benchmark->module-names a-benchmark #:include-both? #f))

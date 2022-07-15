@@ -13,7 +13,7 @@
            (benchmark-configuration/c . -> . program/c)]
 
           [benchmark->mutatable-modules
-           ({benchmark/c} {#:include-both? boolean?} . ->* . (listof string?))]
+           (benchmark/c . -> . (listof string?))]
           [make-max-bench-config
            (->i ([bench benchmark/c])
                 [result {bench}
@@ -26,7 +26,9 @@
                 (or (->bool (findf (path-ends-with "main.rkt")
                                    (benchmark-typed bench)))
                     "Benchmark does not have a main.rkt module.")
-                [result benchmark-configuration/c])])
+                [result benchmark-configuration/c])]
+          [serialize-benchmark-configuration
+           (benchmark-configuration/c . -> . string?)])
 
          (struct-out benchmark-configuration)
          (struct-out benchmark)
@@ -213,3 +215,11 @@
   ((configured:make-max-bench-config) a-benchmark))
 (define (configure-benchmark bench config)
   ((configured:configure-benchmark) bench config))
+
+(define (serialize-benchmark-configuration a-benchmark-configuration)
+  (match-define (benchmark-configuration main-path others-paths base-dir-path config)
+    a-benchmark-configuration)
+  (~s (benchmark-configuration (~a main-path)
+                               (map ~a others-paths)
+                               (~a base-dir-path)
+                               config)))

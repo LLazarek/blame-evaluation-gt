@@ -7,4 +7,4 @@
 (provide (contract-out [select-modules-to-mutate module-selector/c]))
 
 (define (select-modules-to-mutate bench)
-  (benchmark->mutatable-modules bench #:include-both? #f))
+  (benchmark->mutatable-modules bench))
