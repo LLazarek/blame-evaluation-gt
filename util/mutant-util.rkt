@@ -49,7 +49,7 @@
 (define mutant-error-log (make-parameter "./mutant-errors.txt"))
 
 (define default-memory-limit/gb (make-parameter 3))
-(define default-timeout/s (make-parameter (* 2 60)))
+(define default-timeout/s (make-parameter (* 5 60)))
 
 (define (spawn-mutant-runner a-benchmark-configuration
                              module-to-mutate-name
