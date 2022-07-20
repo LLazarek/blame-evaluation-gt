@@ -24,7 +24,7 @@
       [(regexp #px"(?m:Running on benchmark (.+)$)" (list _ path))
        #:when (path-to-existant-directory? path)
        path]
-      [(regexp #px"(?m:Running on benchmark #\\(struct:benchmark (.+)$)" (list _ benchmark-parts-str))
+      [(regexp #px"(?m:Running on benchmark #s\\(benchmark (.+)$)" (list _ benchmark-parts-str))
        (define benchmark-parts (call-with-input-string (~a "(" benchmark-parts-str) read))
        (define a-mod-path-symbol (first (first benchmark-parts)))
        (simple-form-path (build-path (~a a-mod-path-symbol) ".." ".."))]
