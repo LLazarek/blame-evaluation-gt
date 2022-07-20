@@ -241,6 +241,8 @@
  #:check [(member (current-mode) '(erasure-interesting erasure-any natural))
           @~a{@(current-mode) isn't a valid mode}]
 
+ (install-configuration! erasure-config-path)
+
  (log-mutant-dynamic-errors-info @~a{Mode: @(current-mode)})
 
  (define progress
