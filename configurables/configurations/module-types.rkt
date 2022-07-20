@@ -70,12 +70,15 @@
   (1-to-1-map->converters 'types #\1
                           'none  #\0))
 (define serialize-config (make-config-serializer level->digit))
-(define deserialize-config (make-config-deserializer digit->level
-                                                     benchmark->mutatable-modules))
+(define deserialize-config
+  (make-config-deserializer digit->level
+                            (λ (b)
+                              (benchmark->module-names b #:include-both? #f))))
 
 
 (module+ test
-  (require ruinit)
+  (require ruinit
+           (submod "../../configurations/configure-benchmark.rkt" test-env))
 
   (test-begin
     #:name test:increment-config-precision-for
@@ -100,7 +103,33 @@
     (config-at-max-precision-for?
      "baz.rkt"
      (hash "baz.rkt" 'types
-           "bazzle.rkt" 'types))))
+           "bazzle.rkt" 'types)))
+
+  (test-begin
+    #:name serialize/deserialize-config
+    #:short-circuit
+    #:before (setup!)
+    #:after (cleanup!)
+    (ignore (define a-benchmark (read-benchmark a-benchmark-dir)))
+    (test-equal? (serialize-config #hash(("main.rkt" . types)
+                                         ("a.rkt" . none)
+                                         ("b.rkt" . types)))
+                 11)
+    (test-equal? (serialize-config #hash(("main.rkt" . none)
+                                         ("a.rkt" . none)
+                                         ("b.rkt" . types)))
+                 10)
+    (test-equal? (serialize-config #hash(("main.rkt" . none)
+                                         ("a.rkt" . types)
+                                         ("b.rkt" . none)))
+                 100)
+    (ignore (define-simple-test (test-round-trip config)
+              (test-equal? (deserialize-config (serialize-config config)
+                                               #:benchmark a-benchmark)
+                           config)))
+    (test-round-trip #hash(("main.rkt" . types) ("a.rkt" . none) ("b.rkt" . types)))
+    (test-round-trip #hash(("main.rkt" . none) ("a.rkt" . none) ("b.rkt" . types)))
+    (test-round-trip #hash(("main.rkt" . none) ("a.rkt" . types) ("b.rkt" . none)))))
 
 
 
