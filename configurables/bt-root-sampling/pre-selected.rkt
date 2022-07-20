@@ -5,6 +5,7 @@
          "../../db/util.rkt"
          "../../util/optional-contracts.rkt"
          "../../configurations/configure-benchmark.rkt"
+         "../../configurations/config.rkt"
          "../../util/experiment-exns.rkt"
          racket/runtime-path
          "make-bt-root-sampler.rkt")
@@ -26,11 +27,16 @@
   (define resolved-db-path (build-path configurables
                                        (pre-selected-bt-root-db)))
   (define db (db:get resolved-db-path))
+  (define the-benchmark (bench-info-benchmark bench-info))
   (define pre-selected-roots-by-mutant
     (db:read db
-             (benchmark->name (bench-info-benchmark bench-info))))
-  (define pre-selected-roots
+             (benchmark->name the-benchmark)))
+  (define serialized-pre-selected-roots
     (hash-ref pre-selected-roots-by-mutant mutant))
+  (define pre-selected-roots
+    (for/list ([serialized-config (in-list serialized-pre-selected-roots)])
+      (deserialize-config serialized-config
+                          #:benchmark the-benchmark)))
   (λ (n)
     (unless (= n (length pre-selected-roots))
       (raise-experiment-user-error

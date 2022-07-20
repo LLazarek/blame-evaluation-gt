@@ -7,6 +7,7 @@
          "../../util/for.rkt"
          "../../configurations/configure-benchmark.rkt"
          "../../configurations/config.rkt"
+         "../../configurables/configurables.rkt"
          "../../mutation-analysis/debugging-scenarios.rkt"
          "random-config.rkt")
 
@@ -63,7 +64,8 @@
                            ['samples-db mutant-samples-db-path]
                            ['interesting-scenarios-db-path interesting-scenarios-db-path]
                            ['outdb-path outdb-path]
-                           ['root-sample-size (app string->number root-sample-size)])
+                           ['root-sample-size (app string->number root-sample-size)]
+                           ['config-path config-path])
                args]
               #:once-each
               [("-b" "--benchmarks")
@@ -94,7 +96,12 @@
                'root-sample-size
                ("How many roots to select?"
                 @~a{Default: @(sample-size)})
-               #:collect {"N" take-latest (~a (sample-size))}]}
+               #:collect {"N" take-latest (~a (sample-size))}]
+              [("-c" "--config")
+               'config-path
+               "The config to use for generating mutants."
+               #:mandatory
+               #:collect ["path" take-latest #f]]}
  #:check [(path-to-existant-directory? benchmarks-dir)
           @~a{@benchmarks-dir is not a directory.}]
  #:check [(db:path-to-db? mutant-samples-db-path)
@@ -102,6 +109,8 @@
  #:check [(or (not interesting-scenarios-db-path)
               (db:path-to-db? interesting-scenarios-db-path))
           @~a{@interesting-scenarios-db-path does not look like a db.}]
+
+ (install-configuration! config-path)
 
  (define mutant-samples-db (db:get mutant-samples-db-path))
  (define interesting-scenarios-db (and interesting-scenarios-db-path
@@ -120,8 +129,16 @@
                                     (db:read interesting-scenarios-db bench-name))))
      (values bench-name selected-roots-by-mutant)))
 
+ (define serialized-roots-by-benchmark
+   (for/hash ([{bench-name roots-by-mutant} (in-hash roots-by-benchmark)])
+     (values bench-name
+             (for/hash ([{mutant roots} (in-hash roots-by-mutant)])
+               (values mutant (map serialize-config roots))))))
+
  (db:new! outdb-path)
  (define outdb (db:get outdb-path))
- (void (db:write! outdb roots-by-benchmark #:writer (λ (v f)
-                                                      (with-output-to-file f
-                                                        (thunk (pretty-write v)))))))
+ (void (db:write! outdb
+                  serialized-roots-by-benchmark
+                  #:writer (λ (v f)
+                             (with-output-to-file f
+                               (thunk (pretty-write v)))))))
