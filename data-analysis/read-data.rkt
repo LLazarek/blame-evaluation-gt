@@ -159,7 +159,14 @@
     (match ms
       [(struct* mutant-summary ([config (? serialized-config? n)]))
        (struct-copy mutant-summary ms [config (deserialize-config n #:benchmark benchmark)])]
-      [else ms]))
+      [(struct* mutant-summary ([config (? hash? n)])) ms]
+      [else
+       (error 'blame-trail-summaries->blame-trails
+              @~a{
+                  Got a mutant summary with a config that satisfies neither @;
+                  `serialized-config?` nor `hash?`:
+                  @~s[ms]
+                  })]))
   (map (match-lambda [(blame-trail-summary mod-name
                                            index
                                            id

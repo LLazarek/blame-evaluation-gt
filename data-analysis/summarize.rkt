@@ -498,6 +498,7 @@
  #:check [(andmap path-to-existant-directory? data-dirs)
           @~a{Can't find @(filter-not path-to-existant-directory? data-dirs)}]
  (install-configuration! config-path)
+ (define full-config-path (simple-form-path config-path))
 
  (for ([data-dir (in-list data-dirs)])
    (displayln @~a{-------------------- @(basename data-dir) --------------------})
@@ -514,7 +515,7 @@
                 "-c"
                 @~a{
                     cd @data-analysis-dir > /dev/null ; @;
-                    rt check-for-missing-mutants-or-trails.rkt -s @mutant-samples-db-path -S @summaries-db-path -r @root-samples-db-path -p '@data-dir'
+                    rt check-for-missing-mutants-or-trails.rkt -s @mutant-samples-db-path -S @summaries-db-path -r @root-samples-db-path -c '@full-config-path' -p '@data-dir'
                     }))
      (parameterize ([current-output-port errors-output]
                     [current-error-port errors-output])

@@ -1,12 +1,12 @@
 #lang at-exp racket/base
 
 (require "../configurables/configurables.rkt"
-         (only-in racket/math positive-integer?))
+         (only-in racket/math nonnegative-integer?))
 
 (provide (all-defined-out))
 
 (define config/c hash?)
-(define serialized-config? positive-integer?)
+(define serialized-config? nonnegative-integer?)
 
 (define (config-at-max-precision-for? name config)
   ((configured:config-at-max-precision-for?) name config))

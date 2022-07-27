@@ -2,6 +2,7 @@
 
 (require "../configurables/mutant-sampling/use-pre-selected-samples.rkt"
          "../configurables/bt-root-sampling/pre-selected.rkt"
+         "../configurables/configurables.rkt"
          (prefix-in db: "../db/db.rkt")
          "read-data.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"
@@ -115,6 +116,7 @@
 (main
  #:arguments {[(hash-table ['interactive? interactive?]
                            ['parallel?    parallel?]
+                           ['config       config-path]
                            _ ...)
                dirs-to-check]
               #:once-each
@@ -148,6 +150,11 @@
                'parallel?
                "Check each directory in parallel?"
                #:record]
+              [("-c" "--config")
+               'config
+               ("Config for deserializing configurations.")
+               #:collect {"path" take-latest #f}
+               #:mandatory]
               #:args data-dirs-to-check}
 
  (cond [(and parallel?
@@ -165,6 +172,8 @@
                               (mutation-analysis-summaries-db)
                               "-r"
                               (pre-selected-bt-root-db)
+                              "-c"
+                              config-path
                               dir))
             (close-output-port stdin)
             (list stdout ctl)))
@@ -183,6 +192,7 @@
                         (displayln output-string)
                         still-alive])))))]
        [else
+        (install-configuration! config-path)
         (file-stream-buffer-mode (current-output-port) 'line)
 
         (define mutants-by-mutator (read-mutants-by-mutator (mutation-analysis-summaries-db)))
