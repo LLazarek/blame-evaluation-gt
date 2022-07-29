@@ -28,7 +28,8 @@
          syntax/parse/define
          (for-syntax syntax/parse
                      racket/syntax)
-         racket/struct)
+         racket/struct
+         syntax/location)
 
 (struct mutated-interface-type (original mutated mutation-type)
   #:transparent)
@@ -674,11 +675,20 @@
   #:->stx (λ _ #`(make-base-type-adapter '#,from-type '#,to-type))
   (λ (v) (transformer v)))
 
-(struct sealed ())
+(define transient-register-adapted-value? (make-parameter #t))
+(struct sealed (v) #:prefab)
 (define-adapter sealing-adapter ()
   #:name 'sealing-adapter
   #:->stx (λ _ #`(sealing-adapter))
-  (λ (v) (sealed)))
+  (λ (v)
+    (define sealed-v (sealed v))
+    ;; an alternative option for cooperating with transient blame tracking;
+    ;; deferred for now in favor of using a prefab `sealed` struct
+    #;(when (transient-register-adapted-value?)
+      (define transient-assert
+        (dynamic-require 'typed-racket/utils/transient-contract 'transient-assert))
+      (transient-assert sealed-v values '??? (quote-source-file) (cons v 'noop)))
+    sealed-v))
 
 (define-simple-delegating-adapter any/c-adapter ()
   (λ (v) v))
