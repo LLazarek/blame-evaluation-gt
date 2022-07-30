@@ -10,21 +10,17 @@
          notify-phone!
 
          zythos
-         benbox
-
-         experiment-benchmarks
-         needed-benchmarks/14)
+         benbox)
 
 (require syntax/parse/define
          racket/date
-         "option.rkt")
+         "../util/option.rkt"
+         "experiment-info.rkt")
 
 (define-runtime-paths
   [store-path "../../experiment-data/experiment-manager"]
-  [default-data-path "../../experiment-data/results/code-mutations"]
-  [default-dbs-path "../../experiment-data/dbs/code-mutations"])
-
-(define db-installation-directory-name "code-mutations")
+  [default-data-path "../../experiment-data/results/type-api-mutations"]
+  [default-dbs-path "../../experiment-data/dbs/type-api-mutations"])
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -578,25 +574,6 @@
         (restart+record! job-info)
         (record-skipped-start! job-info))))
 
-(define needed-benchmarks/14
-  '("dungeon"
-    "jpeg"
-    "zordoz"
-    "lnm"
-    "suffixtree"
-    "kcfa"
-    "snake"
-    "take5"
-    "acquire"
-    "tetris"
-    "synth"
-    "gregor"
-    "quadT"
-    "quadU"))
-(define experiment-benchmarks
-  ;; ll: for now
-  '("sieve"))
-
 (define (summary-empty? summary)
   (match summary
     [(hash-table [_ '()] ...) #t]
@@ -635,7 +612,7 @@
                     @(if include-configuration-outcomes?
                          @~a{
                              cp -r @;
-                             ./blame-evaluation-gt/dbs/@|db-installation-directory-name|/configuration-outcomes @;
+                             ./blame-evaluation-gt/dbs/@|remote-host-db-installation-directory-name|/configuration-outcomes @;
                              ./experiment-output/configuration-outcomes &&@" "
                              }
                          "") @;
@@ -787,7 +764,7 @@
     (handle-failure! @~a{Failed to upload db archive to @a-host}))
 
   (define host-dbs-unpacked-dir-path (build-path host-dbs-destination
-                                                 db-installation-directory-name))
+                                                 remote-host-db-installation-directory-name))
   (define host-repo-path
     (build-path (get-field host-project-path a-host)
                 "blame-evaluation-gt"))

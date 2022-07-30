@@ -17,22 +17,11 @@
 
 (struct experiment-config (dbs-dir download-dir))
 
-;; (define zythos (new (class object% (super-new) (define/public (setup-job-management!) (displayln 'setup-job-management!)))))
-;; (define benbox (new (class object% (super-new) (define/public (setup-job-management!) (displayln 'setup-job-management!)))))
-;; (define update-host! (λ args (writeln (list 'setup-host! args))))
-;; (define launch-benchmarks! (λ args (writeln (list 'launch-benchmarks! args))))
-;; (define wait-for-current-jobs-to-finish (λ args (writeln (list 'wait-for-benchmarks! args)) 'complete))
-;; (define download-results! (λ (#:name [name #f] . args) (writeln (list 'download-results! name args))))
-;; (define ensure-host-empty! (λ args (writeln (list 'ensure-host-empty! args))))
-;; (define help!:continue? (λ args (writeln (list 'help!:continue? args))))
-;; (define notify-phone! (λ args (writeln (list 'notify-phone! args))))
-
-
 (begin-for-syntax
   (require racket/runtime-path
            racket/format
            racket/path
-           (rename-in (only-in "experiment-manager.rkt" experiment-benchmarks)
+           (rename-in (only-in "experiment-info.rkt" experiment-benchmarks)
                       [experiment-benchmarks all-benchmarks]))
   (define-syntax-class benchmark-id
     #:description "a benchmark name"
