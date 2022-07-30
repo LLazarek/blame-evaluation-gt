@@ -692,46 +692,58 @@
   (when print?
     (displayln @~a{Waiting for current jobs to finish on @host ...}))
   (let loop ()
-    (option-let*
-     ([summary (summarize-experiment-status host)]
-      [jobs (send host get-jobs 'both)])
+    (define current-status
+      (option-let*
+       ([summary (summarize-experiment-status host)]
+        [jobs (send host get-jobs 'both)])
 
-     (match-define (list active-jobs pending-jobs) jobs)
-     (periodic-action! host jobs summary)
-     (define no-jobs? (and (empty? active-jobs) (empty? pending-jobs)))
-     (cond [(and no-jobs? (config/mode-complete? summary expected-benchmarks))
-            'complete]
-           [(and no-jobs? (summary-empty? summary))
-            'empty]
-           [(and no-jobs? (summary-has-errors? summary))
-            (if (help!:continue? @~a{@host has errors}
-                                 @~a{
-                                     Found errors on @host, summary:
-                                     @(format-status host summary)
-                                     Resume waiting for finish? (No means abort): 
-                                     })
-                (loop)
-                'error)]
-           [no-jobs?
-            (if (help!:continue? @~a{@host lost jobs}
-                                 @~a{
-                                     @host seems to have lost jobs. @;
-                                     Expected to find jobs for all of @expected-benchmarks;
-                                     Summary:
-                                     @(format-status host summary)
-                                     Re-run the missing jobs manually, and then continue.
-                                     Resume waiting for finish? (No means abort): 
-                                     })
-                (loop)
-                'error)]
-           [else
-            (when print?
-              (printf "~a Sleeping for ~a min~nCurrent status:~n~a~n"
-                      (date->string (current-date) #t)
-                      sleep-period
-                      (format-status host summary jobs)))
-            (sleep (* sleep-period 60))
-            (loop)]))))
+       (match-define (list active-jobs pending-jobs) jobs)
+       (periodic-action! host jobs summary)
+       (define no-jobs? (and (empty? active-jobs) (empty? pending-jobs)))
+       (cond [(and no-jobs? (config/mode-complete? summary expected-benchmarks))
+              'complete]
+             [(and no-jobs? (summary-empty? summary))
+              'empty]
+             [(and no-jobs? (summary-has-errors? summary))
+              (if (help!:continue? @~a{@host has errors}
+                                   @~a{
+                                       Found errors on @host, summary:
+                                       @(format-status host summary)
+                                       Resume waiting for finish? (No means abort): 
+                                       })
+                  (loop)
+                  'error)]
+             [no-jobs?
+              (if (help!:continue? @~a{@host lost jobs}
+                                   @~a{
+                                       @host seems to have lost jobs. @;
+                                       Expected to find jobs for all of @expected-benchmarks;
+                                       Summary:
+                                       @(format-status host summary)
+                                       Re-run the missing jobs manually, and then continue.
+                                       Resume waiting for finish? (No means abort): 
+                                       })
+                  (loop)
+                  'error)]
+             [else
+              (when print?
+                (printf "~a Sleeping for ~a min~nCurrent status:~n~a~n"
+                        (date->string (current-date) #t)
+                        sleep-period
+                        (format-status host summary jobs)))
+              (sleep (* sleep-period 60))
+              (loop)])))
+    (match current-status
+      ['continue (loop)]
+      [(? absent?)
+       (displayln
+        @~a{
+            Unable to get summary or jobs, likely due to missing internet connection, @;
+            just continuing to wait
+            })
+       (sleep (* sleep-period 60))
+       (loop)]
+      [other other])))
 
 (define (help!:continue? notification prompt)
   (notify-phone! notification)

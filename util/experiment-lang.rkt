@@ -117,17 +117,18 @@
                                    (update-host! the-host
                                                  the-dbs
                                                  (handle-host-update-failure! the-dbs))))
-  (let ([the-host host]
-        [the-dbs (experiment-config-dbs-dir configuration)]
-        [the-download-dir (experiment-config-download-dir configuration)]
-        [the-status-file {~? status-file-path #f}])
-    maybe-host-update
-    (syntax-parameterize ([current-host (syntax-id-rules () [_ the-host])]
-                          [current-dbs  (syntax-id-rules () [_ the-dbs])]
-                          [current-download-dir (syntax-id-rules () [_ the-download-dir])]
-                          [current-status-file (syntax-id-rules () [_ the-status-file])])
-      first-mode.implementation
-      more-modes.implementation ...)))
+  (module+ main
+    (let ([the-host host]
+          [the-dbs (experiment-config-dbs-dir configuration)]
+          [the-download-dir (experiment-config-download-dir configuration)]
+          [the-status-file {~? status-file-path #f}])
+      maybe-host-update
+      (syntax-parameterize ([current-host (syntax-id-rules () [_ the-host])]
+                            [current-dbs  (syntax-id-rules () [_ the-dbs])]
+                            [current-download-dir (syntax-id-rules () [_ the-download-dir])]
+                            [current-status-file (syntax-id-rules () [_ the-status-file])])
+        first-mode.implementation
+        more-modes.implementation ...))))
 
 (define ((handle-host-update-failure! dbs-path) msg)
   (unless (help!:continue? msg
