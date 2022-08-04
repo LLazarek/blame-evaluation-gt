@@ -21,6 +21,8 @@
                      racket/format
                      syntax/location))
 
+(struct unconfigured-configurable (name) #:prefab)
+
 (define-simple-macro (define-configurable name
                        #:provides [provided:id ...]
                        {~and body ({~literal define-implementation} . impl-body)} ...)
@@ -29,7 +31,7 @@
   #:with install-params! (datum->syntax #'name 'install-params!)
   #:with provides (datum->syntax #'name 'provides)
   (begin
-    (define provided-param (make-parameter #f)) ...
+    (define provided-param (make-parameter (unconfigured-configurable 'provided-param))) ...
     (provide provided-param ...)
     (module+ name
       (module+ provides (provide provided-param ...))
