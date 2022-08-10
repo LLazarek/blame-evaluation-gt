@@ -178,7 +178,7 @@
   (define TR-subpaths
     (for/list ([dir (in-list '("source-syntax"
                                "typed-racket-compatibility"
-                               "typed-racket-doc"
+                               ;; "typed-racket-doc" ;; originally had this, but it may cause problems with newer versions of Racket and isn't really needed
                                "typed-racket-lib"
                                "typed-racket-more"
                                "typed-racket"))])
