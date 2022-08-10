@@ -1,14 +1,13 @@
 #lang racket/base
 
-(require "../configurables.rkt"
-         "blame-following-common.rkt")
+(require "../configurables.rkt")
 
 (provide install!)
 
 (define (install!)
-  (configure! mutation                 type-mistakes-in-code)
-  (configure! mutant-sampling          pre-selected "../dbs/code-mutations/mutant-samples.rktdb")
-  (configure! module-instrumentation   none)
+  (configure! mutation                 type-interface-mistakes)
   (configure! benchmark-runner         run-it)
   (configure! bt-root-sampling         random-with-replacement)
-  (configure! configurations           module-types))
+  (configure! configurations           module-types)
+  (configure! module-instrumentation   none)
+  (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module))
