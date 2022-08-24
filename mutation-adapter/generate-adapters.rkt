@@ -4,10 +4,11 @@
 
 (require "mutation-adapter.rkt"
          "util.rkt"
+         "../mutate/type-api-mutators.rkt"
          racket/runtime-path
          syntax/parse)
 
-(struct mutated-type (name original-type new-type definition?) #:transparent)
+(struct mutated-type (name original-type new-type struct? definition?) #:transparent)
 
 ;; plan: just rename the original interface module to a new name, which then
 ;; gets passed in here as `mod-path`, and save the resulting adapter module as
@@ -31,16 +32,21 @@
 (define (generate-adapter-ctcs-for-mutation original-mod-stx
                                             mutated-mod-stx
                                             mutation-type)
-  (match-define (mutated-type name original-type new-type mutated-definition?)
+  (match-define (mutated-type name original-type new-type mutated-struct? mutated-definition?)
     (find-mutated-type original-mod-stx mutated-mod-stx))
   (define mit (mutated-interface-type original-type new-type mutation-type))
-  (define adapter (generate-adapter-ctc mit))
-  (if mutated-definition?
-      (raise-user-error 'generate-adapter-ctcs-for-mutation
-                        "Mutated a type definition, which we haven't really figured out yet.")
-      ;; lltodo: is this really right?
-      #;(adapt-all-referencing-provides mutated-mod-stx name adapter)
-      (list (cons name adapter))))
+  (cond [mutated-definition?
+         ;; lltodo: is this really right?
+         #;(adapt-all-referencing-provides mutated-mod-stx name adapter)
+         (raise-user-error 'generate-adapter-ctcs-for-mutation
+                           "Mutated a type definition, which we haven't really figured out yet.")]
+        [mutated-struct?
+         ;; lltodo: temporary: just a dummy ctc in order to analyze mutation in an ideal scenario
+         (list (cons name (delegating-> #f (list (cons 0 (sealing-adapter))))))
+         #;(raise-user-error 'generate-adapter-ctcs-for-mutation
+                           "Mutated a struct type, which we haven't really figured out yet.")
+         #;(struct-adapter-ctcs mit)]
+        [else (list (cons name (generate-adapter-ctc mit)))]))
 
 (define r/t/c/p-form?
   (syntax-parser
@@ -61,10 +67,16 @@
      (attribute forms)]))
 
 
-(struct name+type (name type definition? struct?) #:transparent)
+(struct name+type (name type struct? definition?) #:transparent)
 (define (r/t/p-entry->name+type entry)
   (match entry
-    [(list '#:struct (or (list name _) (? symbol? name)) _ ...) (name+type name entry #f #t)]
+    [(list '#:struct (or (list name _) (? symbol? name)) _ ...)
+     #;(name+type name entry #t #f)
+     (raise-user-error 'interface-types
+                       @~a{
+                           Found #:struct require/typed/check clause in type interface, @;
+                           which are unsupported. Use prefab structs instead.
+                           })]
     [(list name t)               (name+type name t #f #f)]))
 ;; (or/c syntax? sexp?) -> (listof name+type?)
 (define (top-level-form->types form)
@@ -74,7 +86,9 @@
     [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
      (map r/t/p-entry->name+type entries)]
     [(list 'define-type name t)
-     (list (name+type name t #t #f))]
+     (list (name+type name t #f #t))]
+    [(and struct (list (or 'struct: 'struct) (or (? symbol? name) (list name _)) _ ...))
+     (list (name+type name struct #t #f))]
     [other empty]))
 (define (interface-types a-mod-stx)
   (match (syntax->datum a-mod-stx)
@@ -91,20 +105,15 @@
                                                                       [y B]))
                  (list (name+type 'x 'A #f #f)
                        (name+type 'y 'B #f #f)))
-    (test-equal? (top-level-form->types '(require/typed/check/provide foobar
-                                                                      [#:struct s ([f F])]
-                                                                      [x A]
-                                                                      [y B]))
-                 (list (name+type 's '[#:struct s ([f F])] #f #t)
-                       (name+type 'x 'A #f #f)
-                       (name+type 'y 'B #f #f)))
-    (test-equal? (top-level-form->types '(require/typed/check/provide foobar
-                                                                      [#:struct (s blah) ([f F])]
-                                                                      [x A]
-                                                                      [y B]))
-                 (list (name+type 's '[#:struct (s blah) ([f F])] #f #t)
-                       (name+type 'x 'A #f #f)
-                       (name+type 'y 'B #f #f)))))
+    (test-exn exn:fail:user?
+              (top-level-form->types '(require/typed/check/provide foobar
+                                                                   [#:struct s ([f F])]
+                                                                   [x A]
+                                                                   [y B])))
+    (test-equal? (top-level-form->types '(struct (s blah) ([f : F])))
+                 (list (name+type 's '(struct (s blah) ([f : F])) #t #f)))
+    (test-equal? (top-level-form->types '(struct s ([f : F])))
+                 (list (name+type 's '(struct s ([f : F])) #t #f)))))
 
 ;; syntax? syntax? -> mutated-type?
 (define (find-mutated-type original-mod-stx new-mod-stx)
@@ -116,8 +125,8 @@
              (mutated-type (name+type-name t1)
                            (name+type-type t1)
                            (name+type-type t2)
-                           (or (name+type-definition? t1)
-                               (name+type-struct? t1)))))
+                           (name+type-struct? t1)
+                           (name+type-definition? t1))))
       (error 'find-mutated-type
              @~a{
                  Couldn't find mutated type between the original and new mods.
@@ -138,7 +147,7 @@
                   #'(module A racket
                       (require/typed/provide "x.rkt"
                         [f String])))
-                 (mutated-type 'f 'Number 'String #f))
+                 (mutated-type 'f 'Number 'String #f #f))
     (test-equal? (find-mutated-type
                   #'(module A racket
                       (require/typed/check/provide "x.rkt"
@@ -150,7 +159,7 @@
                         [f X]
                         [f String]
                         [f Y])))
-                 (mutated-type 'f 'Number 'String #f))
+                 (mutated-type 'f 'Number 'String #f #f))
     (test-equal? (find-mutated-type
                   #'(module A racket
                       (define-type Z Real)
@@ -164,7 +173,7 @@
                         [f X]
                         [f String]
                         [f Y])))
-                 (mutated-type 'f 'Number 'String #f))
+                 (mutated-type 'f 'Number 'String #f #f))
     (test-equal? (find-mutated-type
                   #'(module A racket
                       (define-type Z Real)
@@ -183,6 +192,7 @@
                  (mutated-type 'f
                                '(-> String (-> Number Number))
                                '(-> String (-> Real Number))
+                               #f
                                #f))
     (test-equal? (find-mutated-type
                   #'(module A racket
@@ -202,32 +212,40 @@
                  (mutated-type 'Z
                                '(-> String (-> Number Number))
                                '(-> String (-> Real Number))
+                               #f
                                #t))
     (test-equal? (find-mutated-type
                   #'(module A racket
                       (define-type Z Real)
+                      (struct foobar ([a : Real]
+                                      [b : Real])
+                        #:prefab)
+                      (provide (struct-out foobar))
                       (require/typed/provide "x.rkt"
                         [f X]
-                        [#:struct foobar ([a : Real]
-                                          [b : Real])]
                         [f (-> String (-> Number Number))]
                         [f Y])
                       (define-type Z (-> String (-> Number Number))))
                   #'(module A racket
                       (define-type Z Real)
+                      (struct foobar ([a : Real]
+                                      [b : Number])
+                        #:prefab)
+                      (provide (struct-out foobar))
                       (require/typed/provide "x.rkt"
                         [f X]
-                        [#:struct foobar ([a : Real]
-                                          [b : Number])]
                         [f (-> String (-> Number Number))]
                         [f Y])
                       (define-type Z (-> String (-> Number Number)))))
                  (mutated-type 'foobar
-                               '[#:struct foobar ([a : Real]
-                                          [b : Real])]
-                               '[#:struct foobar ([a : Real]
-                                          [b : Number])]
-                               #t))
+                               '(struct foobar ([a : Real]
+                                                [b : Real])
+                                  #:prefab)
+                               '(struct foobar ([a : Real]
+                                                [b : Number])
+                                  #:prefab)
+                               #t
+                               #f))
 
     (test-equal? (find-mutated-type
                   #'(module main racket
@@ -243,6 +261,7 @@
                  (mutated-type 'f
                                '(-> Number Real String)
                                '(-> Real Number String)
+                               #f
                                #f)))
 
   (test-begin
@@ -297,10 +316,11 @@
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
+                     (struct foobar ([a : Real]
+                                     [b : Number])
+                       #:prefab)
                      (require/typed/provide "x.rkt"
                        [a X]
-                       [#:struct foobar ([a : Real]
-                                         [b : Number])]
                        [b (-> String (-> Foo Number))]
                        [c Y])
                      (define-type Z2 (-> String (-> Number Number))))
@@ -319,10 +339,12 @@
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
+                     (struct foobar ([a : Real]
+                                     [b : Number])
+                       #:prefab)
+                     (provide (struct-out foobar))
                      (require/typed/provide "x.rkt"
                        [a (-> Number Foo)]
-                       [#:struct foobar ([a : Real]
-                                         [b : Number])]
                        [b (-> String (-> Foo Number))]
                        [c Y])
                      (define-type Z2 (-> String (-> Number Number))))
@@ -351,10 +373,12 @@
               (adapt-all-referencing-provides
                #'(module A racket
                    (define-type Z Real)
+                   (struct foobar ([a : Real]
+                                   [b : Number])
+                     #:prefab)
+                   (provide (struct-out foobar))
                    (require/typed/provide "x.rkt"
                      [a (-> Number Foo)]
-                     [#:struct foobar ([a : Real]
-                                       [b : Number])]
                      [b (-> String (-> Foo Number))]
                      [c Y])
                    (define-type Z2 (-> Foo (-> Number Number))))
@@ -365,9 +389,11 @@
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
+                     (struct foobar ([a : Real]
+                                     [b : Number])
+                       #:prefab)
+                     (provide (struct-out foobar))
                      (require/typed/provide "x.rkt"
-                       [#:struct foobar ([a : Real]
-                                         [b : Number])]
                        [something (-> Natural (-> stream) stream)]
                        [c Y])
                      (define-type Z2 (-> String (-> Number Number))))
@@ -491,3 +517,10 @@
          [foo Integer]
          [bar (-> Boolean Integer Void)]
          [baz (-> FOOBAR String)]))))))
+
+#;(define (struct-adapter-ctcs mit)
+  (match-define (mutated-interface-type original-type new-type mutation-type)
+    mit)
+  (cond [(equal? mutation-type type:struct-field-swap)
+         (list (cons ))]))
+

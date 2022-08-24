@@ -25,12 +25,11 @@
   (define stx (mod-stx/replace-special-cases a-mod))
   (define instrumented-stx
     (syntax-parse stx
-      [(module name {~and {~or* {~datum typed/racket}
-                                {~datum typed/racket/base}}
-                          tr}
+      [(module name {~or* {~datum typed/racket}
+                          {~datum typed/racket/base}}
          (#%module-begin . body))
        (syntax/loc this-syntax
-         (module name tr (#%module-begin #:transient . body)))]
+         (module name typed/racket/shallow (#%module-begin . body)))]
       [other this-syntax]))
   (struct-copy mod a-mod
                [stx instrumented-stx]))
@@ -73,7 +72,7 @@
                        (instrument-module
                         (mod "foo/typed/main.rkt"
                              #'(module foo typed/racket (#%module-begin 42))))))
-       '(module foo typed/racket (#%module-begin #:transient 42)))
+       '(module foo typed/racket/shallow (#%module-begin 42)))
       (test-equal?
        (syntax->datum (mod-stx
                        (instrument-module
@@ -86,5 +85,5 @@
                        (instrument-module
                         (mod "lnm/typed/lnm-plot.rkt"
                              #'(module lnm-plot typed/racket (#%module-begin 42))))))
-       `(module ,_ typed/racket/base
-          (#%module-begin #:transient . ,_))))))
+       `(module ,_ typed/racket/shallow
+          (#%module-begin . ,_))))))

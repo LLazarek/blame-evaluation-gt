@@ -180,9 +180,9 @@
                      #'(module type-interface typed/racket
                          (#%module-begin
                           (require "../../../utilities/require-typed-check-provide.rkt")
+                          (struct stream ((first : Natural) (rest : (-> stream))) #:prefab)
                           (require/typed/check/provide
                            "streams.rkt"
-                           (#:struct stream ((first : Natural) (rest : (-> stream))))
                            (make-stream (-> Natural (-> stream) stream))
                            (stream-unfold (-> stream (values Natural stream)))
                            (stream-get (-> stream Natural Natural))
@@ -255,6 +255,8 @@
                                 (provide (contract-out
                                           [f (swap-> #t 0 1)])))
                               (require "../../../utilities/require-typed-check-provide.rkt")
+                              (require (only-in 'contracted))
+                              (provide)
                               (require/typed/check/provide 'contracted
                                                            [f (-> Number Real String)])))
 

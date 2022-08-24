@@ -64,7 +64,7 @@
                    ;; if we can't load the transient exn module, it's not
                    ;; installed and we definitely can't get transient blames
                    (const #f)])
-    (dynamic-require 'typed-racket/utils/transient-contract-struct
+    (dynamic-require 'typed-racket/utils/shallow-contract-struct
                      'exn:fail:contract:blame:transient?)))
 
 (define/contract (make-mutated-program-runner a-program
@@ -124,7 +124,7 @@
     ;; those
     (when (try-dynamic-require-transient-blame-exn-predicate!)
       (namespace-attach-module (current-namespace)
-                               'typed-racket/utils/transient-contract-struct
+                               'typed-racket/utils/shallow-contract-struct
                                ns)))
 
   (define configured-instrumenter (configured:instrument-module))
@@ -880,6 +880,7 @@
     ;; actual contract violations from transient. This is an example that caught
     ;; me:
     (ignore
+     (local-require (for-syntax (only-in racket #%module-begin)))
      (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
                         #'(module a racket
                             (#%module-begin

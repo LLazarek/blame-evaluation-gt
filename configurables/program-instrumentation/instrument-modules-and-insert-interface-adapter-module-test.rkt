@@ -135,7 +135,10 @@
           (provide (contract-out
                     [x #;(make-base-type-adapter 'Integer 'String)
                        (sealing-adapter)])))
-        (require "../../../utilities/require-typed-check-provide.rkt")
+        (require "../../../utilities/require-typed-check-provide.rkt") ;; inserted unconditionally
+        (require "../../../utilities/require-typed-check-provide.rkt") ;; copied over from original
+        (require (only-in 'contracted)) ;; original has no typedefs, so nothing in
+        (provide)                       ;; these two
         (require/typed/check/provide 'contracted
                                      [x Integer])})))
 
@@ -169,6 +172,9 @@
                                     (sealing-adapter)))
                         (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
+        (require "../../../utilities/require-typed-check-provide.rkt")
+        (require (only-in 'contracted))
+        (provide)
         (require/typed/check/provide 'contracted
                                      [f (-> Integer String Integer)])})))
 
@@ -202,6 +208,9 @@
           (provide (contract-out
                     [f (swap-> #t 0 1)])))
         (require "../../../utilities/require-typed-check-provide.rkt")
+        (require "../../../utilities/require-typed-check-provide.rkt")
+        (require (only-in 'contracted))
+        (provide)
         (require/typed/check/provide 'contracted
                                      [f (-> Integer String Integer)]
                                      [g (-> Any Any)])}))))

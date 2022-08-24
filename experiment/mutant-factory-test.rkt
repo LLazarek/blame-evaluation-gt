@@ -275,10 +275,10 @@
        (list
         (mutant-summary 1206
                         (dead-mutant-process-result dm0/follow)
-                        (dead-mutant-process-config dm0/follow))
+                        (serialize-config (dead-mutant-process-config dm0/follow)))
         (mutant-summary 1205
                         (dead-mutant-process-result dm0)
-                        (dead-mutant-process-config dm0))))))
+                        (serialize-config (dead-mutant-process-config dm0)))))))
   (define new-aggregate-file-contents
     (file->list aggregate-trail-file)))
  (test-= (length new-aggregate-file-contents) 2)
@@ -987,7 +987,7 @@
                                             (struct* run-status
                                                      ([outcome 'blamed]
                                                       [blamed '("main.rkt")]))
-                                            (== mutant-with-config-blaming-main.rkt:config))
+                                            (== (serialize-config mutant-with-config-blaming-main.rkt:config)))
                             _ ___)]))
                 _ ___))
 

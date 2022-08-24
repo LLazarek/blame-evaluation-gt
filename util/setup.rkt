@@ -13,13 +13,13 @@
 ;; ==================================================
 
 (define PKG-DEPENDENCIES
-  '("https://github.com/LLazarek/require-typed-check.git"
+  '(#;"https://github.com/LLazarek/require-typed-check.git"
     "custom-load"
     "https://github.com/LLazarek/ruinit.git"
     "https://github.com/LLazarek/rscript.git"
     "pfds"))
 
-(define racket-version "7.8")
+(define racket-version "8.6")
 (define racket-download-url
   @~a{https://mirror.racket-lang.org/installers/@|racket-version|/racket-@|racket-version|-x86_64-linux-cs.sh})
 
@@ -34,7 +34,7 @@
                                "transient-special-cases.rktdb" #f))
   (hash))
 
-(define expected-TR-branch "transient-blame")
+(define expected-TR-branch "transient-blame2")
 (define expected-gtp-branch "library-split")
 (define expected-blgt-branch "dev")
 
@@ -198,10 +198,45 @@
               "require-contract.rkt"))
 (define (modify-TR TR-dir)
   (displayln "Modifying typed-racket...")
-  (unless (dry-run?)
-    (replace-in-file! (build-path TR-dir TR-modified-module-rel-path)
-                      (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm))})
-                      @~a{'(interface for #,(syntax->datum #'nm.nm) from #,(syntax->datum #'lib))}))
+  (define file-path (build-path TR-dir TR-modified-module-rel-path))
+  (define file-contents (file->string file-path))
+  ;; `dry-run?` check pushed down so that the else-branch error can be detected
+  ;; even in a dry run
+  (cond [(regexp-match? (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm))})
+                        file-contents)
+         (unless (dry-run?)
+           (replace-in-file!
+            file-path
+            (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm))})
+            @~a{'(interface for #,(syntax->datum #'nm.nm) from #,(syntax->datum #'lib))}))]
+        [(and (regexp-match? (regexp-quote @~a{[name-datum (syntax->datum #'nm.nm)]})
+                             file-contents)
+              (regexp-match? (regexp-quote @~a{'(interface for name-datum)})
+                             file-contents))
+         (unless (dry-run?)
+           ;; First prepare the with-syntax to add the extra parts to `name-datum`
+           (replace-in-file!
+            file-path
+            (regexp-quote @~a{[name-datum (syntax->datum #'nm.nm)]})
+            @~a{[(name-datum ...) (list (syntax->datum #'nm.nm) 'from (syntax->datum #'lib))]})
+           ;; Then add ellipses to the `name-datum` use in the syntax template
+           (replace-in-file!
+            file-path
+            #rx"interface for name-datum"
+            "interface for name-datum ..."))]
+        [(or (regexp-match? (regexp-quote @~a{'(interface for #,(syntax->datum #'nm.nm) from #,(syntax->datum #'lib))})
+                            file-contents)
+             (and (regexp-match? (regexp-quote @~a{[(name-datum ...) (list (syntax->datum #'nm.nm) 'from (syntax->datum #'lib))]})
+                                 file-contents)
+                  (regexp-match? (regexp-quote @~a{'(interface for name-datum ...)})
+                                 file-contents)))
+         (displayln "TR already modified, skipping...")]
+        [else
+         (raise-user-error 'setup
+                           @~a{
+                               Error: unsupported TR version at @TR-dir
+                               Can't find the place to modify TR to add extra blame location info.
+                               })])
   (displayln "Done."))
 
 (define (install-gtp-repo gtp-dir)
@@ -239,14 +274,14 @@
       (dynamic-require `(submod (file ,(quote-source-file)) check-modified-TR) #f)
       #f))
 
-  (define transient-kw-accepted?
-    (with-handlers ([exn:fail:syntax? (const #f)])
-      (eval #'(module test typed/racket (#%module-begin #:transient (+ 2 2))))
+  (define transient-lang-accepted?
+    (with-handlers ([exn:fail? (const #f)])
+      (eval #'(module test typed/racket/shallow (#%module-begin (+ 2 2))))
       #t))
 
   (define transient-blame-present?
     (with-handlers ([exn:fail:filesystem:missing-module? (const #f)])
-      (and (dynamic-require 'typed-racket/utils/transient-contract-struct
+      (and (dynamic-require 'typed-racket/utils/shallow-contract-struct
                             'exn:fail:contract:blame:transient
                             (const #f))
            #t)))
@@ -259,7 +294,7 @@
          ERROR: The modified version of typed-racket is not installed or active.
          Run this setup script to install it.
          }))
-  (when (and (not transient-kw-accepted?)
+  (when (and (not transient-lang-accepted?)
              display-failures?)
     (displayln
      @~a{
@@ -279,7 +314,7 @@
          Run me to fix it.
          }))
   (and modified-TR-active?
-       transient-kw-accepted?
+       transient-lang-accepted?
        transient-blame-present?))
 
 (module check-modified-TR typed/racket
@@ -364,11 +399,11 @@
   (define TR-branch-ok? (equal? TR-active-branch expected-TR-branch))
   (define TR-up-to-date? (repo-branch-up-to-date-with-remote? TR-dir TR-active-branch))
 
-  (displayln "Checking require-typed-check version...")
-  (define r/t/c-ok?
-    (with-handlers ([exn:fail? (λ _ #f)])
-      (dynamic-require 'require-typed-check/test/struct-binding/main (void))
-      #t))
+  ;; (displayln "Checking require-typed-check version...")
+  ;; (define r/t/c-ok?
+    ;; (with-handlers ([exn:fail? (λ _ #f)])
+      ;; (dynamic-require 'require-typed-check/test/struct-binding/main (void))
+      ;; #t))
 
   (displayln "Checking dbs...")
   (define dbs-ok? (check-expected-dbs))
@@ -384,7 +419,7 @@
   (report-repo-status repo-path blgt-active-branch expected-blgt-branch blgt-up-to-date?)
   (report-repo-status gtp-dir gtp-active-branch expected-gtp-branch gtp-up-to-date?)
   (report-repo-status TR-dir TR-active-branch expected-TR-branch TR-up-to-date?)
-  (unless r/t/c-ok?
+  #;(unless r/t/c-ok?
     (displayln @~a{
                    The wrong version of require-typed-check is installed!
                    Expected the fork at @(first PKG-DEPENDENCIES), which works around @;
@@ -402,7 +437,7 @@
        TR-branch-ok?
        TR-up-to-date?
        dbs-ok?
-       r/t/c-ok?
+       ;; r/t/c-ok?
        (check-TR-install racket-dir TR-dir #:display-failures? #t)))
 
 (define (check-expected-dbs)

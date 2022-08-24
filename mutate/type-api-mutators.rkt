@@ -85,7 +85,10 @@
 (define-mutator (struct-field-swap stx mutation-index counter) #:type [type type:struct-field-swap]
   (log-mutation-type type)
   (syntax-parse stx
-    [({~and #:struct head} name:id ... ([field-name:id {~datum :} field-t] ...))
+    [({~and {~or* {~datum struct} {~datum struct:}} head}
+      {~and name* {~or name:id (name:id parent:id)}}
+      ([field-name:id {~datum :} field-t] ...)
+      extras ...)
      (define field-t-stxs (attribute field-t))
      (mdo* (def rearranged-field-stxs (rearrange-in-seq field-t-stxs
                                                         mutation-index
@@ -93,7 +96,7 @@
            [return
             (with-syntax ([[new-field-t ...] rearranged-field-stxs])
               (quasisyntax/loc stx
-                (head name ... ([field-name : new-field-t] ...))))])]
+                (head name* ([field-name : new-field-t] ...) extras ...)))])]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -196,29 +199,35 @@
   (test-begin
     #:name struct-field-swap
     (test-mutator* struct-field-swap
-                   #'[#:struct foo ([x : Number]
-                                    [y : String]
-                                    [z : Bar])]
-                   (list #'[#:struct foo ([x : String]
-                                          [y : Number]
-                                          [z : Bar])]
-                         #'[#:struct foo ([x : Number]
-                                          [y : String]
-                                          [z : Bar])]))
+                   #'(struct: foo ([x : Number]
+                                   [y : String]
+                                   [z : Bar])
+                       #:prefab
+                       #:type-name Foo)
+                   (list #'(struct: foo ([x : String]
+                                         [y : Number]
+                                         [z : Bar])
+                             #:prefab
+                             #:type-name Foo)
+                         #'(struct: foo ([x : Number]
+                                         [y : String]
+                                         [z : Bar])
+                             #:prefab
+                             #:type-name Foo)))
     (test-mutator* struct-field-swap
-                   #'[#:struct foo ([x : Number]
-                                    [y : String]
-                                    [z : Bar]
-                                    [e : Woozle])]
-                   (list #'[#:struct foo ([x : String]
-                                          [y : Number]
-                                          [z : Bar]
-                                          [e : Woozle])]
-                         #'[#:struct foo ([x : Number]
-                                          [y : String]
-                                          [z : Woozle]
-                                          [e : Bar])]
-                         #'[#:struct foo ([x : Number]
-                                          [y : String]
-                                          [z : Bar]
-                                          [e : Woozle])]))))
+                   #'(struct foo ([x : Number]
+                                  [y : String]
+                                  [z : Bar]
+                                  [e : Woozle]))
+                   (list #'(struct foo ([x : String]
+                                        [y : Number]
+                                        [z : Bar]
+                                        [e : Woozle]))
+                         #'(struct foo ([x : Number]
+                                        [y : String]
+                                        [z : Woozle]
+                                        [e : Bar]))
+                         #'(struct foo ([x : Number]
+                                        [y : String]
+                                        [z : Bar]
+                                        [e : Woozle]))))))

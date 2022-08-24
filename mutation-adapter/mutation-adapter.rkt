@@ -147,7 +147,7 @@
               (td:pairof car cdr))]
         [(list 'Parameterof (app recur sub-td))
          (and sub-td (td:parameterof sub-td))]
-        [(list '#:struct name (list [list fields ': (app recur sub-tds)] ...))
+        [(list (or 'struct 'struct:) name (list [list fields ': (app recur sub-tds)] ...) _ ...)
          (td:struct (list->td-index-map sub-tds))]
         [(list* 'Class
                 (app parse-class-parts
@@ -334,16 +334,18 @@
 
     (test-equal? (sexp->type-diff (sexp-diff '(-> (U A B) (U C D) C)
                                              '(-> (U C D) (U A B) C)))
-                 (td:-> `((0 . ,(td:unknown-type (list (td:base 'A 'C) (td:base 'B 'D))))
-                          (1 . ,(td:unknown-type (list (td:base 'C 'A) (td:base 'D 'B)))))
+                 (td:-> `((0 . ,(td:base '<U> '<mutated-U>))
+                          (1 . ,(td:base '<U> '<mutated-U>)))
                         '()))
 
-    (test-equal? (sexp->type-diff (sexp-diff '[#:struct
+    (test-equal? (sexp->type-diff (sexp-diff '(struct
                                                stream
-                                               ((first : Natural) (rest : (-> stream)))]
-                                             '[#:struct
+                                                ((first : Natural) (rest : (-> stream)))
+                                                #:prefab)
+                                             '(struct
                                                stream
-                                               ((first : Index) (rest : (-> stream)))]))
+                                                ((first : Index) (rest : (-> stream)))
+                                                #:prefab)))
                  (td:struct `((0 . ,(td:base 'Natural 'Index)))))
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
@@ -603,7 +605,7 @@
 (define (struct-field-swap-adapter type-diff)
   (match type-diff
     [(td:struct `((,i1 . ,(td:base t1-orig t1-new))
-                   (,i2 . ,(td:base t2-orig t2-new))))
+                  (,i2 . ,(td:base t2-orig t2-new))))
      (assert (and (equal? t1-orig t2-new)
                   (equal? t2-orig t1-new))
              #:name 'function-arg-swap-adapter
@@ -684,9 +686,9 @@
     (define sealed-v (sealed v))
     ;; an alternative option for cooperating with transient blame tracking;
     ;; deferred for now in favor of using a prefab `sealed` struct
-    #;(when (transient-register-adapted-value?)
+    (when (transient-register-adapted-value?)
       (define transient-assert
-        (dynamic-require 'typed-racket/utils/transient-contract 'transient-assert))
+        (dynamic-require 'typed-racket/utils/shallow-contract 'shallow-shape-check))
       (transient-assert sealed-v values '??? (quote-source-file) (cons v 'noop)))
     sealed-v))
 
@@ -1201,8 +1203,8 @@
    (test-adapter-contract
      [t (temp 5.5 "hello" 2.3)
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type '[#:struct temp ([x : Real] [y : String] [z : Real])]
-                                                 '[#:struct temp ([x : Integer] [y : String] [z : Real])]
+                         (mutated-interface-type '(struct temp ([x : Real] [y : String] [z : Real]))
+                                                 '(struct temp ([x : Integer] [y : String] [z : Real]))
                                                  type:base-type-substitution))]
      (and/test (temp? t)
                (sealed? (temp-x t))
@@ -1224,8 +1226,8 @@
    (test-adapter-contract
      [t (temp 5.5 "hello" 2.3)
         #:with-contract (generate-adapter-ctc
-                         (mutated-interface-type '[#:struct temp ([x : Integer] [y : String] [z : Real])]
-                                                 '[#:struct temp ([y : String] [x : Integer] [z : Real])]
+                         (mutated-interface-type '(struct temp ([x : Integer] [y : String] [z : Real]))
+                                                 '(struct temp ([y : String] [x : Integer] [z : Real]))
                                                  type:struct-field-swap))]
      (and/test (temp? t)
                (test-equal? (temp-y t) 5.5)

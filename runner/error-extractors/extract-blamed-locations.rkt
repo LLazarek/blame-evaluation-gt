@@ -6,7 +6,7 @@
           [make-extract-blamed-locations
            (blamed-location-extractor/c-for exn:fail:contract:blame?)]))
 
-(require typed-racket/utils/transient-contract-struct
+(require typed-racket/utils/shallow-contract-struct
          "../../util/path-utils.rkt")
 
 (define (make-extract-blamed-locations the-program
