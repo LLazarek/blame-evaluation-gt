@@ -65,7 +65,7 @@
 
 (define (blamed-is-interesting? blamed-list a-config mutant)
   (match (current-mode)
-    ['erasure-any #t]
+    [(or 'erasure-any 'natural-top 'natural-bot) #t]
     ['erasure-interesting
      (define blamed-mods-in-program
        (filter (λ (blamed) (hash-has-key? a-config blamed)) blamed-list))
@@ -75,8 +75,7 @@
       @~a{
           @mutant blamed interesting?, blamed: @blamed-mods-in-program : @3-unique-mods-on-stack?
           })
-     3-unique-mods-on-stack?]
-    ['natural #t]))
+     3-unique-mods-on-stack?]))
 
 (struct dynamic-error ())
 (struct other-outcome ())
@@ -106,14 +105,18 @@
                                #:log-progress log-progress!)
   (define benchmark-name (benchmark->name benchmark))
   (define max-configuration (make-max-bench-config benchmark))
+  (define min-configuration (for/hash ([mod (in-hash-keys max-configuration)])
+                              (values mod 'none)))
   (define-values {run-configuration config-path}
     (match (current-mode)
       [(or 'erasure-interesting 'erasure-any)
-       (values (for/hash ([mod (in-hash-keys max-configuration)])
-                 (values mod 'none))
+       (values min-configuration
                erasure-config-path)]
-      ['natural
+      ['natural-top
        (values (hash-set max-configuration (mutant-module mutant) 'none)
+               natural-config-path)]
+      ['natural-bot
+       (values min-configuration
                natural-config-path)]))
 
   (define ((mutant-spawner config will))
@@ -232,13 +235,14 @@
                ("Set the mode of filtering. Options are:"
                 "  erasure-interesting : using erasure, interesting dynamic errors"
                 "  erasure-any : using erasure, any dynamic errors"
-                "  natural : using natural with all but mutated @ types, any dynamic error"
+                "  natural-top : using natural with all but mutated @ types, any dynamic error"
+                "  natural-bot : using natural with all @ none, any dynamic error"
                 @~a{Default: @(current-mode)})
                #:collect {"name" (set-parameter current-mode string->symbol) #f}])
 
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
- #:check [(member (current-mode) '(erasure-interesting erasure-any natural))
+ #:check [(member (current-mode) '(erasure-interesting erasure-any natural-top natural-bot))
           @~a{@(current-mode) isn't a valid mode}]
 
  (install-configuration! erasure-config-path)
