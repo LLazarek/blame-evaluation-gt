@@ -880,7 +880,6 @@
     ;; actual contract violations from transient. This is an example that caught
     ;; me:
     (ignore
-     (local-require (for-syntax (only-in racket #%module-begin)))
      (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
                         #'(module a racket
                             (#%module-begin

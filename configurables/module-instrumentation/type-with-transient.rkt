@@ -25,11 +25,13 @@
   (define stx (mod-stx/replace-special-cases a-mod))
   (define instrumented-stx
     (syntax-parse stx
-      [(module name {~or* {~datum typed/racket}
-                          {~datum typed/racket/base}}
-         (#%module-begin . body))
+      [(module name {~and {~or* {~datum typed/racket}
+                                {~datum typed/racket/base}}
+                          lang}
+         (mod-begin . body))
+       #:with t/r/s (datum->syntax #'lang 'typed/racket/shallow)
        (syntax/loc this-syntax
-         (module name typed/racket/shallow (#%module-begin . body)))]
+         (module name t/r/s (mod-begin . body)))]
       [other this-syntax]))
   (struct-copy mod a-mod
                [stx instrumented-stx]))
