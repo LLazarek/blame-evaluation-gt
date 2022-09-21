@@ -629,6 +629,20 @@
 (define (function-arg/result-swap-adapter type-diff)
   (type-diff->contract
    type-diff
+   ;; It would be nice to check some relationship betw `td1` and `td2`, to make
+   ;; sure that this really does look like a swap, but that's not possible
+   ;; unfortunately, because the td algo often does things like this:
+   ;; (-> (Listof A) (Listof B) R)
+   ;; ~>
+   ;; (-> (Listof B) (Listof A) R)
+   ;; becomes the td:
+   ;; (td:-> ((0 . (td:listof (td:base A B)))
+   ;;         (1 . (td:listof (td:base B A)))))
+   ;; or, for some mutations, even worse:
+   ;; (td:-> ((0 . (td:unknown-type (list (td:base A B) ...)))
+   ;;         (1 . (td:unknown-type (list (td:base B A) ...)))))
+   ;;
+   ;; So it's not clear how to check this in general.
    (match-lambda [(or (binding (td:-> `((,i1 . ,td1)
                                         (,i2 . ,td2))
                                       '())
@@ -648,14 +662,8 @@
 
 (define (struct-field-swap-adapter type-diff)
   (match type-diff
-    [(td:struct `((,i1 . ,(td:base t1-orig t1-new))
-                  (,i2 . ,(td:base t2-orig t2-new))))
-     (assert (and (equal? t1-orig t2-new)
-                  (equal? t2-orig t1-new))
-             #:name 'function-arg-swap-adapter
-             @~a{Mutation type is struct field swap but diff doesn't look like a swap:
-                          @t1-orig -> @t1-new
-                          @t2-orig -> @t2-new})
+    [(td:struct `((,i1 . ,td1)
+                  (,i2 . ,td2))) ;; See note above about function arg/result swap sub-tds
      (swap-struct-field i1 i2)]
     [other
      (error 'struct-field-swap-adapter
