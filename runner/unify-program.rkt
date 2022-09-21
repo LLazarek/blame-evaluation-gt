@@ -30,23 +30,29 @@
     [else #f]))
 
 (define (unified-mod/c #:base-or-both-ok? base-both-ok?)
-  (simple-flat-contract-with-explanation
-   (λ (m)
-     ((and/c
-       path-string?
-       (if base-both-ok?
-           (or/c (and/c (not/c path-to-existant-file?)
-                        (path-to-file-in/c unification-directory-name))
-                 (path-to-file-in/c "base")
-                 (path-to-file-in/c "both"))
-           (and/c (not/c path-to-existant-file?)
-                  (path-to-file-in/c unification-directory-name))))
-      (mod-path m)))
+  (suggest/c
+   (simple-flat-contract-with-explanation
+    (λ (m)
+      ((and/c
+        path-string?
+        (if base-both-ok?
+            (or/c (and/c (not/c path-to-existant-file?)
+                         (path-to-file-in/c unification-directory-name))
+                  (path-to-file-in/c "base")
+                  (path-to-file-in/c "both"))
+            (and/c (not/c path-to-existant-file?)
+                   (path-to-file-in/c unification-directory-name))))
+       (mod-path m)))
+    @~a{
+        a mod/c in the unification directory (@unification-directory-name) @;
+        @(if base-both-ok?
+             "or base/ or both/"
+             "")
+        })
+   "suggestion"
    @~a{
-       a mod/c in the unification directory (@unification-directory-name) @;
-       @(if base-both-ok?
-            "or base/ or both/"
-            "")
+       if the mod path looks right, check if the unification directory already exists. @;
+       It should not exist!
        }))
 
 (define unified-benchmark/c
