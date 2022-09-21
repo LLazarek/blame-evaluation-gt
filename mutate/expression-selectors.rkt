@@ -254,14 +254,15 @@
   (require "../util/for.rkt")
   (test-begin
     #:name select-exprs-as-if-untyped/random-testing
-    (not (for/first* ([i (in-range 1000)])
-                     (define random-stx-datum
-                       (contract-random-generate (listof symbol?) 1))
-                     (define stx
-                       (datum->syntax #f random-stx-datum))
-                     (define seems-untyped? (member ': random-stx-datum))
-                     (and seems-untyped?
-                          (test-fail? (test-selector select-exprs-as-if-untyped
-                                                     stx
-                                                     stx))
-                          random-stx-datum)))))
+    (test-equal? (for/first* ([i (in-range 100000)])
+                   (define random-stx-datum
+                     (contract-random-generate (listof symbol?) 1))
+                   (define stx
+                     (datum->syntax #f random-stx-datum))
+                   (define seems-untyped? (not (member ': random-stx-datum)))
+                   (and seems-untyped?
+                        (test-fail? (test-selector select-exprs-as-if-untyped
+                                                   stx
+                                                   stx))
+                        random-stx-datum))
+                 #f)))

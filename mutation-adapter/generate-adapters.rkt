@@ -16,7 +16,7 @@
 
 
 ;; syntax? syntax? mutation-type? string? -> syntax?
-;; `mod-name` should be the of the interface module corresponding to `original-mod-stx`.
+;; `mod-name` should be the name of the interface module corresponding to `original-mod-stx`.
 (define (generate-adapter-module-for-mutation original-mod-stx
                                               mutated-mod-stx
                                               mutation-type
@@ -37,15 +37,13 @@
   (define mit (mutated-interface-type original-type new-type mutation-type))
   (cond [mutated-definition?
          ;; lltodo: is this really right?
-         #;(adapt-all-referencing-provides mutated-mod-stx name adapter)
+         #;(adapt-all-negative-referencing-provides mutated-mod-stx name adapter)
          (raise-user-error 'generate-adapter-ctcs-for-mutation
                            "Mutated a type definition, which we haven't really figured out yet.")]
         [mutated-struct?
-         ;; lltodo: temporary: just a dummy ctc in order to analyze mutation in an ideal scenario
-         (list (cons name (delegating-> #f (list (cons 0 (sealing-adapter))))))
-         #;(raise-user-error 'generate-adapter-ctcs-for-mutation
-                           "Mutated a struct type, which we haven't really figured out yet.")
-         #;(struct-adapter-ctcs mit)]
+         (adapt-all-negative-referencing-provides mutated-mod-stx
+                                                  name
+                                                  (generate-adapter-ctc mit))]
         [else (list (cons name (generate-adapter-ctc mit)))]))
 
 (define r/t/c/p-form?
@@ -282,12 +280,26 @@
       [(? symbol? sym) (equal? sym id)]
       [(list sub-exps ...) (ormap loop sub-exps)]
       [other #f])))
+(define (negative-reference? type id)
+  (let loop ([subtype type]
+             [negative? #f])
+    (match subtype
+      [(list '-> arg-ts ... res-t)
+       (or (ormap (λ (t) (loop t (not negative?))) arg-ts)
+           (loop res-t negative?))]
+      [(list '->* mandatory-arg-ts optional-arg-ts res-t)
+       (or (ormap (λ (t) (loop t (not negative?)))
+                  (append mandatory-arg-ts optional-arg-ts))
+           (loop res-t negative?))]
+      [(? list? sub-exps) (ormap (λ (t) (loop t negative?)) sub-exps)]
+      [(? symbol? sym) (and (equal? sym id) negative?)]
+      [other #f])))
 
 ;; syntax? identifier? contract? -> (listof (cons identifier? contract?))
-(define (adapt-all-referencing-provides module-stx name ctc)
+(define (adapt-all-negative-referencing-provides module-stx name ctc)
   (define all-interface-types (interface-types module-stx))
   (define referencing-name (for/list ([n+t (in-list all-interface-types)]
-                                      #:when (sexp-contains? (name+type-type n+t) name))
+                                      #:when (negative-reference? (name+type-type n+t) name))
                              n+t))
   (define (another-name+type-definition? a-name+type)
     (and (or (name+type-definition? a-name+type)
@@ -295,7 +307,7 @@
          (not (equal? (name+type-name a-name+type)
                       name))))
   (assert (not (ormap another-name+type-definition? referencing-name))
-          #:name 'adapt-all-referencing-provides
+          #:name 'adapt-all-negative-referencing-provides
           @~a{
               Found one or more type definitions that refer to a mutated type.
               Chaining definition adapters to support this is not implemented yet.
@@ -306,14 +318,14 @@
               })
   (for/list ([ref (in-list referencing-name)])
     (cons (name+type-name ref)
-          (generate-delegating-adapter-ctc (name+type-type ref)
-                                           name
-                                           ctc))))
+          (generate-negative-delegating-adapter-ctc (name+type-type ref)
+                                                    name
+                                                    ctc))))
 
 (module+ test
   (test-begin
-    #:name adapt-all-referencing-provides
-    (test-match (adapt-all-referencing-provides
+    #:name adapt-all-negative-referencing-provides
+    (test-match (adapt-all-negative-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
                      (struct foobar ([a : Real]
@@ -336,7 +348,7 @@
                                             (cons 0 #;(make-base-type-adapter 'Integer 'Real)
                                                   (sealing-adapter)))
                                            (list)))))))))
-    (test-match (adapt-all-referencing-provides
+    (test-match (adapt-all-negative-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
                      (struct foobar ([a : Real]
@@ -351,13 +363,6 @@
                  'Foo
                  (make-base-type-adapter 'Integer 'Real))
                 (list-no-order
-                 (cons 'a
-                       (app (compose1 syntax->datum ->stx)
-                            '(delegating->
-                              (list)
-                              (list
-                               (cons 0 #;(make-base-type-adapter 'Integer 'Real)
-                                     (sealing-adapter))))))
                  (cons 'b
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
@@ -370,7 +375,7 @@
                                         (list)))))))))
     (test-exn (λ (e) (string-contains? (exn-message e)
                                        "not implemented"))
-              (adapt-all-referencing-provides
+              (adapt-all-negative-referencing-provides
                #'(module A racket
                    (define-type Z Real)
                    (struct foobar ([a : Real]
@@ -385,8 +390,7 @@
                'Foo
                any/c))
 
-    ;; This adaptation of `something` requires adapting both arguments and results.
-    (test-match (adapt-all-referencing-provides
+    (test-match (adapt-all-negative-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
                      (struct foobar ([a : Real]
@@ -408,13 +412,11 @@
                                         (list)
                                         (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
                                                     (sealing-adapter))))))
-                              (list
-                               (cons 0 #;(make-base-type-adapter 'Integer 'Index)
-                                     (sealing-adapter))))))))))
+                              (list))))))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
-;; (dictof identifier? contract?) syntax? (listof syntax) [syntax?] -> syntax?
+;; (dictof identifier? contract?) syntax? (listof syntax) -> syntax?
 (define (adapter-ctcs->module-stx adapter-ctcs
                                   interface-mod-name
                                   interface-mod-stx)
@@ -423,36 +425,42 @@
                    (syntax->datum stx)
                    interface-mod-stx))
 
-  (define original-interface-top-level-forms (extract-top-level-forms interface-mod-stx))
-  (define original-interface-r/t/c/p-forms (filter r/t/c/p-form?
-                                                   original-interface-top-level-forms))
-  (define original-interface-req/prov-forms (filter require/provide-form?
-                                                    original-interface-top-level-forms))
+  (define interface-top-level-forms (extract-top-level-forms interface-mod-stx))
+  (define interface-r/t/c/p-forms (filter r/t/c/p-form?
+                                          interface-top-level-forms))
+  (define interface-req/prov-forms (filter require/provide-form?
+                                           interface-top-level-forms))
 
   (define redirected-interface-r/t/c/p-forms
-    (for/list ([form (in-list original-interface-r/t/c/p-forms)])
+    (for/list ([form (in-list interface-r/t/c/p-forms)])
       ;; munge the bindings so that they line up with the import of r/t/c/p below
       (munge-location+bindings (r/t/c/p-redirect #''contracted form))))
   (define interface-typedefs
-    (for*/list ([form (in-list original-interface-top-level-forms)]
+    (for*/list ([form (in-list interface-top-level-forms)]
                 [n+t (in-list (top-level-form->types form))]
                 #:when (name+type-definition? n+t))
       (datum->syntax interface-mod-stx (name+type-name n+t))))
+  (define interface-structs
+    (for*/list ([form (in-list interface-top-level-forms)]
+                [n+t (in-list (top-level-form->types form))]
+                #:when (name+type-struct? n+t))
+      (datum->syntax interface-mod-stx (name+type-type n+t))))
   (munge-location+bindings
-    #`(module mutation-adapter typed/racket
-      (#%module-begin
-       (module contracted racket
-         (require (file #,(path->string type-api-mutators.rkt)))
-         (require #,interface-mod-name)
-         (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
-         (provide (contract-out
-                   #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
-                        #`[#,id #,(->stx adapter)]))))
-       (require "../../../utilities/require-typed-check-provide.rkt")
-       #,@original-interface-req/prov-forms
-       (require (only-in 'contracted #,@interface-typedefs))
-       (provide #,@interface-typedefs)
-       #,@redirected-interface-r/t/c/p-forms))))
+   #`(module mutation-adapter typed/racket
+       (#%module-begin
+        (module contracted racket
+          (require (file #,(path->string type-api-mutators.rkt)))
+          (require #,interface-mod-name)
+          (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
+          (provide (contract-out
+                    #,@(for/list ([{id adapter} (in-dict adapter-ctcs)])
+                         #`[#,id #,(->stx adapter)]))))
+        (require "../../../utilities/require-typed-check-provide.rkt")
+        #,@interface-req/prov-forms
+        (require (only-in 'contracted #,@interface-typedefs))
+        (provide #,@interface-typedefs)
+        #,@interface-structs
+        #,@redirected-interface-r/t/c/p-forms))))
 
 ;; syntax? syntax? -> syntax?
 (define (r/t/c/p-redirect to stx)
@@ -488,6 +496,7 @@
            (require "../base/base-types.rkt")
            (reprovide "../base/more-types.rkt")
            (define-type FOOBAR Natural)
+           (struct YMD ([y : Integer]) #:prefab)
            (require/typed/check/provide
             "server.rkt"
             [foo Integer]
@@ -512,6 +521,7 @@
         (reprovide "../base/more-types.rkt")
         (require (only-in 'contracted FOOBAR))
         (provide FOOBAR)
+        (struct YMD ([y : Integer]) #:prefab)
         (require/typed/check/provide
          'contracted
          [foo Integer]

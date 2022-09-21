@@ -2,7 +2,7 @@
 
 (provide generate-adapter-ctc
          ->stx
-         generate-delegating-adapter-ctc
+         generate-negative-delegating-adapter-ctc
 
          (struct-out mutated-interface-type)
 
@@ -10,6 +10,7 @@
          swap->
          swap-struct-field
          sealing-adapter
+         no-adapter
 
          delegating->
          delegating->*
@@ -541,10 +542,53 @@
                   which is part of @~s[td]
                   })])))
 
+(define (replace-name-in-negative-types type name replacement)
+  (let loop ([subtype type]
+             [negative? #f])
+    (match subtype
+      [(list '-> arg-ts ... res-t)
+       (append (list '->)
+               (map (λ (t) (loop t (not negative?))) arg-ts)
+               (list (loop res-t negative?)))]
+      [(list '->* mandatory-arg-ts optional-arg-ts res-t)
+       (append (list '->*)
+               (list (map (λ (t) (loop t (not negative?))) mandatory-arg-ts)
+                     (map (λ (t) (loop t (not negative?))) optional-arg-ts))
+               (list (loop res-t negative?)))]
+      [(? list? sub-exps) (map (λ (t) (loop t negative?)) sub-exps)]
+      [(== name)
+       #:when negative?
+       replacement]
+      [other other])))
+
+(module+ test
+  (test-begin
+    #:name replace-name-in-negative-types
+    (test-equal? (replace-name-in-negative-types '(A B C (D E (B) G) (H I J))
+                                                 'B
+                                                 'X)
+                 '(A B C (D E (B) G) (H I J)))
+    (test-equal? (replace-name-in-negative-types '(-> A B C (D E (B) G) (H I J))
+                                                 'B
+                                                 'X)
+                 '(-> A X C (D E (X) G) (H I J)))
+    (test-equal? (replace-name-in-negative-types '(A B C (-> D E (-> B) G) (H I J))
+                                                 'B
+                                                 'X)
+                 '(A B C (-> D E (-> X) G) (H I J)))
+    (test-equal? (replace-name-in-negative-types '(-> A B C (-> D E (-> B R) G) (H I J))
+                                                 'B
+                                                 'X)
+                 '(-> A X C (-> D E (-> X R) G) (H I J)))
+    (test-equal? (replace-name-in-negative-types '(-> A B C (-> D E (-> B B) G) (H I J))
+                                                 'B
+                                                 'X)
+                 '(-> A X C (-> D E (-> X B) G) (H I J)))))
+
 ;; sexp? symbol? contract? -> contract?
-;; Generate a contract that delegates on `name` to `ctc`.
-(define (generate-delegating-adapter-ctc type name ctc)
-  (define td (sexp->type-diff (sexp-diff type (replace-name-in-sexp type name (gensym name)))))
+;; Generate a contract that delegates on `name` in *negative positions only* to `ctc`.
+(define (generate-negative-delegating-adapter-ctc type name ctc)
+  (define td (sexp->type-diff (sexp-diff type (replace-name-in-negative-types type name (gensym name)))))
   (type-diff->contract td
                        (match-lambda [(? td:base?) ctc]
                                      [else (recur)])))
@@ -691,6 +735,10 @@
         (dynamic-require 'typed-racket/utils/shallow-contract 'shallow-shape-check))
       (transient-assert sealed-v values '??? (quote-source-file) (cons v 'noop)))
     sealed-v))
+(define-adapter no-adapter ()
+  #:name 'no-adapter
+  #:->stx (λ _ #`any/c)
+  (λ (v) v))
 
 (define-simple-delegating-adapter any/c-adapter ()
   (λ (v) v))
@@ -861,24 +909,19 @@
                     c)))
 
 (define (transform-struct-fields v transform)
-  ;; lltodo: this is a mess and wrong.
-
-  ;; problem getting struct type info
-  ;; Let's assume that all structs must be prefab and mutable.
-  ;; ll: this actually can't be done with `impersonate-struct`, even with those assumptions.
-  ;; Because the redirector proc can't know the index that the original accessor proc got.
+  ;; Problem getting struct type info here...
+  ;; So let's assume that all structs must be prefab.
+  ;; Even with the assumption of prefab, and if we added mutability, this actually can't be done with `impersonate-struct`.
+  ;; The redirector proc can't know the index that the original accessor proc got.
   ;; and the accessor can't be wrapped in a function that communicates that info to the redirector, due to the ctc of `impersonate-struct`.
   (define fields (struct->list v))
   (define key (prefab-struct-key v))
   (define struct-type (prefab-key->struct-type key (length fields)))
   (define-values {name init-field-cnt auto-field-cnt accessor-proc mutator-proc immutable-k-list super-type skipped?}
     (struct-type-info struct-type))
-  #;(impersonate-struct v
-                        accessor-proc
-                        ???)
-  ;; so all we can do is make a new one. This is *wrong!* if anything uses eq?, but maybe none of the benchmarks check struct eq?
-  ;; at least the simple ones don't.
-  ;; this approach at least doesn't demand structs to be mutable.
+  ;; so all we can do is make a new copy of the struct.
+  ;; This is *wrong!* if anything uses eq?, but let's assume none of the benchmarks check struct eq?.
+  ;; At least the simple ones don't.
   (apply (struct-type-make-constructor struct-type)
          (transform fields)))
 
