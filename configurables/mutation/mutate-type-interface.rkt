@@ -40,9 +40,10 @@
       [[#:opaque name:id pred]
        (t+r #'() (const pair))]
       [[#:struct {~or* struct-name:id (struct-name:id _:id)} ([field-name:id {~datum :} field-type] ...)]
-       #;(t+r this-syntax identity)
-       (raise-user-error 'parse-name+types
-                         @~a{#:struct clauses in require/typed/check are not supported, use prefab structs instead})]
+       ;; See related comment in generate-adapters.rkt::r/t/p-entry->name+type
+       #;(raise-user-error 'parse-name+types
+                         @~a{#:struct clauses in require/typed/check are not supported, use prefab structs instead})
+       (t+r #'() (const pair))]
       [other
        (raise-user-error 'parse-name+types
                          @~a{Missing handler for r/t/c /p case: @~s[(syntax->datum #'other)]})])))

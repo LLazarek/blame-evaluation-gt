@@ -69,20 +69,23 @@
 (define (r/t/p-entry->name+type entry)
   (match entry
     [(list '#:struct (or (list name _) (? symbol? name)) _ ...)
-     #;(name+type name entry #t #f)
-     (raise-user-error 'interface-types
+     ;; Would like to do this, but sieve can't apparently support prefabs. It
+     ;; slows down to the point of being un-runnable.
+     #;(raise-user-error 'interface-types
                        @~a{
                            Found #:struct require/typed/check clause in type interface, @;
                            which are unsupported. Use prefab structs instead.
-                           })]
-    [(list name t)               (name+type name t #f #f)]))
+                           })
+     #f]
+    [(list name t)
+     (name+type name t #f #f)]))
 ;; (or/c syntax? sexp?) -> (listof name+type?)
 (define (top-level-form->types form)
   (match (if (syntax? form)
              (syntax->datum form)
              form)
     [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
-     (map r/t/p-entry->name+type entries)]
+     (filter-map r/t/p-entry->name+type entries)]
     [(list 'define-type name t)
      (list (name+type name t #f #t))]
     [(and struct (list (or 'struct: 'struct) (or (? symbol? name) (list name _)) _ ...))
