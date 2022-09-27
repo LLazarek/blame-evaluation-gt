@@ -106,11 +106,12 @@
                                                                       [y B]))
                  (list (name+type 'x 'A #f #f)
                        (name+type 'y 'B #f #f)))
-    (test-exn exn:fail:user?
-              (top-level-form->types '(require/typed/check/provide foobar
-                                                                   [#:struct s ([f F])]
-                                                                   [x A]
-                                                                   [y B])))
+    (test-equal? (top-level-form->types '(require/typed/check/provide foobar
+                                                                      [#:struct s ([f F])]
+                                                                      [x A]
+                                                                      [y B]))
+                 (list (name+type 'x 'A #f #f)
+                       (name+type 'y 'B #f #f)))
     (test-equal? (top-level-form->types '(struct (s blah) ([f : F])))
                  (list (name+type 's '(struct (s blah) ([f : F])) #t #f)))
     (test-equal? (top-level-form->types '(struct s ([f : F])))
@@ -294,6 +295,11 @@
        (or (ormap (λ (t) (loop t (not negative?)))
                   (append mandatory-arg-ts optional-arg-ts))
            (loop res-t negative?))]
+      [(list (or 'struct 'struct: 'define-type)
+             (or (binding (? symbol?) #:with [names empty])
+                 (list* _ names))
+             more ...)
+       (loop (append names more) #t)]
       [(? list? sub-exps) (ormap (λ (t) (loop t negative?)) sub-exps)]
       [(? symbol? sym) (and (equal? sym id) negative?)]
       [other #f])))
@@ -415,7 +421,76 @@
                                         (list)
                                         (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
                                                     (sealing-adapter))))))
-                              (list))))))))
+                              (list))))))
+    (test-exn (λ (e) (string-contains? (exn-message e)
+                                       "not implemented"))
+              (adapt-all-negative-referencing-provides
+               #'(module A racket
+                   (struct YMD ([y : Natural]
+                                [m : Month]
+                                [d : Natural])
+                     #:prefab)
+                   (struct Date ([ymd : YMD]
+                                 [jdn : Integer])
+                     #:prefab)
+                   (struct DateTime ([date : Date])
+                     #:prefab)
+                   (provide (struct-out YMD))
+                   (provide (struct-out Date))
+                   (provide (struct-out DateTime))
+                   (require/typed/provide "x.rkt"
+                     [a (-> Number Date)]
+                     [b (-> String (-> DateTime Number))]
+                     [c Y]))
+               'YMD
+               any/c))
+    (test-match (adapt-all-negative-referencing-provides
+                 #'(module A racket
+                     (struct YMD ([y : Natural]
+                                  [m : Month]
+                                  [d : Natural])
+                       #:prefab)
+                     (struct Date ([ymd : YMD]
+                                   [jdn : Integer])
+                       #:prefab)
+                     (struct DateTime ([date : Date])
+                       #:prefab)
+                     (struct Moment ([dt : DateTime])
+                       #:prefab)
+                     (provide (struct-out YMD))
+                     (provide (struct-out Date))
+                     (provide (struct-out DateTime))
+                     (provide (struct-out Moment))
+                     (require/typed/provide "x.rkt"
+                       [a (-> Number Moment)]
+                       [moment
+                        (->*
+                         (Natural)
+                         (Month
+                          Natural
+                          Natural
+                          Natural
+                          Natural
+                          Natural
+                          #:tz
+                          (U tz #f)
+                          #:resolve-offset
+                          (-> (U tzgap tzoverlap) DateTime (U String #f) (U #f Moment) Moment))
+                         Moment)]
+                       [c Y]))
+                 'Moment
+                 (sealing-adapter))
+                (list
+                 (cons 'moment
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->*
+                              1
+                              (list)
+                              (list
+                               (cons '#:resolve-offset
+                                     (delegating->
+                                      (list)
+                                      (list (cons 0 (sealing-adapter)))))))))))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")

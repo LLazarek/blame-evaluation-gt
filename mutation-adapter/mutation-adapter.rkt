@@ -796,9 +796,12 @@
 (define (index-ctc-pairs->names index-ctc-pairs)
   (for/list ([{index ctc} (in-dict index-ctc-pairs)])
     (list index (contract-name ctc))))
-(define (index-ctc-pairs->stx index-ctc-pairs ->stx)
+(define (index-ctc-pairs->stx index-ctc-pairs ->stx [quote-index? #f])
   #`(list #,@(for/list ([{index ctc} (in-dict index-ctc-pairs)])
-               #`(cons #,index #,(->stx ctc)))))
+               #`(cons #,(if quote-index?
+                             #`'#,index
+                             index)
+                       #,(->stx ctc)))))
 
 (define-adapter delegating-> (arg-index-ctc-pairs result-index-ctc-pairs)
   #:name (list 'delegating->
@@ -848,7 +851,7 @@
   #:->stx (λ (->stx)
             #`(delegating->* #,mandatory-arg-count
                              #,(index-ctc-pairs->stx optional-arg-index-ctc-pairs ->stx)
-                             #,(index-ctc-pairs->stx optional-arg-kw-ctc-pairs ->stx)))
+                             #,(index-ctc-pairs->stx optional-arg-kw-ctc-pairs ->stx #t)))
   #:full-projection
   (simple->adapter-projection
    (λ (this)
