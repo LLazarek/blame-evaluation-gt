@@ -542,7 +542,26 @@
                   which is part of @~s[td]
                   })])))
 
-(define (replace-name-in-negative-types type name replacement)
+(define (type-sexp-not-containing-struct-subexps? s)
+  (let loop ([s s]
+             [top #t])
+    (match s
+      [(list* (or 'struct 'struct:) _ more)
+       (and top
+            (loop more #f))]
+      [(? list? l)
+       (andmap (λ (e) (loop e #f)) l)]
+      [datum #t])))
+
+(define/contract (replace-name-in-negative-types type name replacement)
+  (type-sexp-not-containing-struct-subexps? ;; `struct` handling below assumes
+                                            ;; that `struct` decls must be at
+                                            ;; the top level of a type
+   symbol?
+   any/c
+   . -> .
+   any/c)
+
   (let loop ([subtype type]
              [negative? #f])
     (match subtype
@@ -555,6 +574,9 @@
                (list (map (λ (t) (loop t (not negative?))) mandatory-arg-ts)
                      (map (λ (t) (loop t (not negative?))) optional-arg-ts))
                (list (loop res-t negative?)))]
+      [(list* (and struct (or 'struct 'struct:)) name field-types)
+       ;; Literal #t for `negative?` here bc this can only appear at the top level!
+       `(,struct ,name . ,(map (λ (t) (loop t #t)) field-types))]
       [(? list? sub-exps) (map (λ (t) (loop t negative?)) sub-exps)]
       [(== name)
        #:when negative?
@@ -562,6 +584,13 @@
       [other other])))
 
 (module+ test
+  (test-begin
+    #:name type-sexp-not-containing-struct-subexps?
+    (type-sexp-not-containing-struct-subexps? '())
+    (type-sexp-not-containing-struct-subexps? 'A)
+    (type-sexp-not-containing-struct-subexps? '(-> A B C))
+    (type-sexp-not-containing-struct-subexps? '(struct s ([x : Nat] [y : Int])))
+    (not (type-sexp-not-containing-struct-subexps? '(-> (struct s ([x : Nat] [y : Int]))))))
   (test-begin
     #:name replace-name-in-negative-types
     (test-equal? (replace-name-in-negative-types '(A B C (D E (B) G) (H I J))
@@ -583,7 +612,11 @@
     (test-equal? (replace-name-in-negative-types '(-> A B C (-> D E (-> B B) G) (H I J))
                                                  'B
                                                  'X)
-                 '(-> A X C (-> D E (-> X B) G) (H I J)))))
+                 '(-> A X C (-> D E (-> X B) G) (H I J)))
+    (test-equal? (replace-name-in-negative-types '(struct Date ((ymd : YMD) (jdn : Integer)) #:prefab)
+                                                 'YMD
+                                                 '???)
+                 '(struct Date ((ymd : ???) (jdn : Integer)) #:prefab))))
 
 ;; sexp? symbol? contract? -> contract?
 ;; Generate a contract that delegates on `name` in *negative positions only* to `ctc`.

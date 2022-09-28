@@ -304,18 +304,19 @@
       [(? symbol? sym) (and (equal? sym id) negative?)]
       [other #f])))
 
+(define-logger adapter-generation)
 ;; syntax? identifier? contract? -> (listof (cons identifier? contract?))
 (define (adapt-all-negative-referencing-provides module-stx name ctc)
   (define all-interface-types (interface-types module-stx))
   (define referencing-name (for/list ([n+t (in-list all-interface-types)]
                                       #:when (negative-reference? (name+type-type n+t) name))
                              n+t))
-  (define (another-name+type-definition? a-name+type)
-    (and (or (name+type-definition? a-name+type)
-             (name+type-struct? a-name+type))
+  (define ((another-name+type-satisfying? pred) a-name+type)
+    (and (pred a-name+type)
          (not (equal? (name+type-name a-name+type)
                       name))))
-  (assert (not (ormap another-name+type-definition? referencing-name))
+  (assert (not (ormap (another-name+type-satisfying? name+type-definition?)
+                      referencing-name))
           #:name 'adapt-all-negative-referencing-provides
           @~a{
               Found one or more type definitions that refer to a mutated type.
@@ -323,13 +324,35 @@
 
               Mutated type name: @name
               Definitions referring to it:
-              @~s[(filter another-name+type-definition? referencing-name)]
+              @~s[(filter (another-name+type-satisfying? name+type-definition?) referencing-name)]
               })
-  (for/list ([ref (in-list referencing-name)])
-    (cons (name+type-name ref)
-          (generate-negative-delegating-adapter-ctc (name+type-type ref)
-                                                    name
-                                                    ctc))))
+  (log-adapter-generation-info @~a{Adapting all references to @name ...})
+  (define-values {indirect-references direct-references}
+    (partition (another-name+type-satisfying? name+type-struct?)
+               referencing-name))
+  (define direct-adaptations
+    (for/list ([ref (in-list direct-references)])
+      (cons (name+type-name ref)
+            (generate-negative-delegating-adapter-ctc (name+type-type ref)
+                                                      name
+                                                      ctc))))
+  (define (add-delegating-struct-layer ref)
+    (log-adapter-generation-info
+     @~a{Adding delegating struct layer to adapt references to @name via @(name+type-name ref)})
+    ;; todo: this is all fine if it's two independent structs where one contains
+    ;; the other as a field. it doesn't work for child structs! That demands an
+    ;; entirely different kind of delegating-struct-adapter...
+    (generate-negative-delegating-adapter-ctc (name+type-type ref)
+                                              name
+                                              ctc))
+  (define indirect-adaptations
+    (append*
+     (for/list ([ref (in-list indirect-references)])
+       (adapt-all-negative-referencing-provides module-stx
+                                                (name+type-name ref)
+                                                (add-delegating-struct-layer ref)))))
+  (append direct-adaptations
+          indirect-adaptations))
 
 (module+ test
   (test-begin
@@ -422,28 +445,53 @@
                                         (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
                                                     (sealing-adapter))))))
                               (list))))))
-    (test-exn (λ (e) (string-contains? (exn-message e)
-                                       "not implemented"))
-              (adapt-all-negative-referencing-provides
-               #'(module A racket
-                   (struct YMD ([y : Natural]
-                                [m : Month]
-                                [d : Natural])
-                     #:prefab)
-                   (struct Date ([ymd : YMD]
-                                 [jdn : Integer])
-                     #:prefab)
-                   (struct DateTime ([date : Date])
-                     #:prefab)
-                   (provide (struct-out YMD))
-                   (provide (struct-out Date))
-                   (provide (struct-out DateTime))
-                   (require/typed/provide "x.rkt"
-                     [a (-> Number Date)]
-                     [b (-> String (-> DateTime Number))]
-                     [c Y]))
-               'YMD
-               any/c))
+    (test-match (adapt-all-negative-referencing-provides
+                 #'(module A racket
+                     (struct YMD ([y : Natural]
+                                  [m : Month]
+                                  [d : Natural])
+                       #:prefab)
+                     (struct Date ([ymd : YMD]
+                                   [jdn : Integer])
+                       #:prefab)
+                     (struct DateTime ([date : Date])
+                       #:prefab)
+                     (provide (struct-out YMD))
+                     (provide (struct-out Date))
+                     (provide (struct-out DateTime))
+                     (require/typed/provide "x.rkt"
+                       [a (-> Date Number)]
+                       [b (-> String (-> DateTime Number))]
+                       [c Y]))
+                 'YMD
+                 (delegating-struct (list (cons 0 (sealing-adapter)))))
+                (list-no-order
+                 (cons 'a
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (delegating-struct
+                                        (list
+                                         (cons 0 (delegating-struct
+                                                  (list
+                                                   (cons 0 (sealing-adapter)))))))))
+                              (list))))
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list)
+                              (list
+                               (cons 0
+                                     (delegating->
+                                      (list
+                                       (cons 0 (delegating-struct
+                                                (list
+                                                 (cons 0 (delegating-struct
+                                                          (list
+                                                           (cons 0 (delegating-struct
+                                                                    (list
+                                                                     (cons 0 (sealing-adapter))))))))))))
+                                      (list)))))))))
     (test-match (adapt-all-negative-referencing-provides
                  #'(module A racket
                      (struct YMD ([y : Natural]
@@ -479,7 +527,7 @@
                          Moment)]
                        [c Y]))
                  'Moment
-                 (sealing-adapter))
+                 (delegating-struct (list (cons 0 (sealing-adapter)))))
                 (list
                  (cons 'moment
                        (app (compose1 syntax->datum ->stx)
@@ -490,7 +538,40 @@
                                (cons '#:resolve-offset
                                      (delegating->
                                       (list)
-                                      (list (cons 0 (sealing-adapter)))))))))))))
+                                      (list (cons 0 (delegating-struct
+                                                     (list
+                                                      (cons 0 (sealing-adapter))))))))))))))
+    (test-match (adapt-all-negative-referencing-provides
+                 #'(module A racket
+                     (struct exp () #:prefab)
+                     (struct app exp ([fun : exp]
+                                      [arg : Integer])
+                       #:prefab)
+                     (struct annotated-app app ([ann : Integer])
+                       #:prefab)
+                     (require/typed/provide "x.rkt"
+                       [a (-> app Number)]
+                       [b (-> annotated-app Number)]
+                       [c Y]))
+                 'app
+                 (delegating-struct (list (cons 1 (sealing-adapter)))))
+                (list-no-order
+                 (cons 'a
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (delegating-struct
+                                        (list
+                                         (cons 0 (sealing-adapter))))))
+                              (list))))
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (delegating-struct-via-parent ???-todo
+                                        (list
+                                         (cons 0 (sealing-adapter))))))
+                              (list))))))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
