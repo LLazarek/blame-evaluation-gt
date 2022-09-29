@@ -3,6 +3,7 @@
 (provide generate-adapter-ctc
          ->stx
          generate-negative-delegating-adapter-ctc
+         expand-field-count-for-child-fields
 
          (struct-out mutated-interface-type)
 
@@ -52,7 +53,7 @@
   #:transparent)
 (struct td:base td (original new) #:transparent)
 (struct td:vector td (index-map) #:transparent)
-(struct td:struct td (index-map) #:transparent)
+(struct td:struct td (field-count index-map) #:transparent)
 (struct td:listof td (sub-td) #:transparent)
 (struct td:vectorof td (sub-td) #:transparent)
 (struct td:parameterof td (sub-td) #:transparent)
@@ -148,8 +149,12 @@
               (td:pairof car cdr))]
         [(list 'Parameterof (app recur sub-td))
          (and sub-td (td:parameterof sub-td))]
-        [(list (or 'struct 'struct:) name (list [list fields ': (app recur sub-tds)] ...) _ ...)
-         (td:struct (list->td-index-map sub-tds))]
+        [(list* (or 'struct 'struct:)
+                (? symbol? name)
+                (or          (list* (? symbol? parent) (list [list fields ': (app recur sub-tds)] ...) _)
+                    (binding (list*                    (list [list fields ': (app recur sub-tds)] ...) _)
+                             #:with [parent #f])))
+         (td:struct (length fields) (list->td-index-map sub-tds))]
         [(list* 'Class
                 (app parse-class-parts
                      (list (list (list init-field-names (app recur init-field-sub-tds))
@@ -347,7 +352,18 @@
                                                stream
                                                 ((first : Index) (rest : (-> stream)))
                                                 #:prefab)))
-                 (td:struct `((0 . ,(td:base 'Natural 'Index)))))
+                 (td:struct 2 `((0 . ,(td:base 'Natural 'Index)))))
+    (test-equal? (sexp->type-diff (sexp-diff '(struct
+                                               stream
+                                                parent
+                                                ((first : Natural) (rest : (-> stream)))
+                                                #:prefab)
+                                             '(struct
+                                               stream
+                                                parent
+                                                ((first : Index) (rest : (-> stream)))
+                                                #:prefab)))
+                 (td:struct 2 `((0 . ,(td:base 'Natural 'Index)))))
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
                  (td:listof (td:base 'A 'B)))
@@ -514,8 +530,8 @@
       [{(recur) (td:-> arg-index-map result-index-map)}
        (delegating-> (loop-over-dict-values arg-index-map)
                      (loop-over-dict-values result-index-map))]
-      [{(recur) (td:struct index-map)}
-       (delegating-struct (loop-over-dict-values index-map))]
+      [{(recur) (td:struct field-count index-map)}
+       (delegating-struct field-count (loop-over-dict-values index-map))]
       [{(recur) (td:listof sub-td)}
        (delegating-listof (loop sub-td))]
       [{(recur) (td:vectorof sub-td)}
@@ -695,9 +711,10 @@
 
 (define (struct-field-swap-adapter type-diff)
   (match type-diff
-    [(td:struct `((,i1 . ,td1)
+    [(td:struct field-count
+                `((,i1 . ,td1)
                   (,i2 . ,td2))) ;; See note above about function arg/result swap sub-tds
-     (swap-struct-field i1 i2)]
+     (swap-struct-field field-count i1 i2)]
     [other
      (error 'struct-field-swap-adapter
             @~a{Should be impossible: got a td that isn't td:struct?: @~e[other]})]))
@@ -952,33 +969,68 @@
                              #f)
                     c)))
 
-(define (transform-struct-fields v transform)
-  ;; Problem getting struct type info here...
-  ;; So let's assume that all structs must be prefab.
-  ;; Even with the assumption of prefab, and if we added mutability, this actually can't be done with `impersonate-struct`.
+(define/contract (transform-struct-fields v           ;; an instance of a struct...
+                                          field-count ;; ... which has this many fields of its own
+                                                      ;;     (i.e. not from parents)
+                                          transform   ;; a function to transform those fields
+                                          )
+  (->i ([v struct?]
+        [field-count natural?]
+        [transform {field-count}
+                   ((and/c list? (property/c length (=/c field-count)))
+                    . -> .
+                    (and/c list? (property/c length (=/c field-count))))])
+       [result struct?])
+
+  ;; Problem getting struct type info here, so we assume that all structs must be prefab.
+  ;; Even with the assumption of prefab, and if we added mutability, this actually can't be done
+  ;; with `impersonate-struct`.
   ;; The redirector proc can't know the index that the original accessor proc got.
-  ;; and the accessor can't be wrapped in a function that communicates that info to the redirector, due to the ctc of `impersonate-struct`.
-  (define fields (struct->list v))
+  ;; and the accessor can't be wrapped in a function that communicates that info to the redirector,
+  ;; due to the ctc of `impersonate-struct`.
+
+  ;; fields are in order of inheritance chain (root, child, child's child, ...)
+  ;; so the fields of the most-specific struct this is an instance of are last
+  (define all-fields-including-parents (struct->list v))
+  (assert (>= (length all-fields-including-parents) field-count)
+          @~a{
+              internal adapter error:
+              expected at least @field-count fields for struct @~s[v], @;
+              but struct->list only reports @(length all-fields-including-parents)
+              })
+  (define-values {parents-fields this-structs-own-fields}
+    (split-at all-fields-including-parents
+              (- (length all-fields-including-parents) field-count)))
   (define key (prefab-struct-key v))
-  (define struct-type (prefab-key->struct-type key (length fields)))
-  (define-values {name init-field-cnt auto-field-cnt accessor-proc mutator-proc immutable-k-list super-type skipped?}
-    (struct-type-info struct-type))
+  (define struct-type (prefab-key->struct-type key (length all-fields-including-parents)))
+  ;; (define-values {name init-field-cnt auto-field-cnt accessor-proc mutator-proc immutable-k-list super-type skipped?}
+    ;; (struct-type-info struct-type))
   ;; so all we can do is make a new copy of the struct.
   ;; This is *wrong!* if anything uses eq?, but let's assume none of the benchmarks check struct eq?.
   ;; At least the simple ones don't.
   (apply (struct-type-make-constructor struct-type)
-         (transform fields)))
+         (append parents-fields
+                 (transform this-structs-own-fields))))
 
-(define-adapter delegating-struct (index-ctc-pairs)
+(define-adapter delegating-struct (field-count index-ctc-pairs)
   #:name (list 'delegating-struct
+               field-count
                (index-ctc-pairs->names index-ctc-pairs))
   #:->stx (λ (->stx)
-            #`(delegating-struct #,(index-ctc-pairs->stx index-ctc-pairs ->stx)))
+            #`(delegating-struct #,field-count #,(index-ctc-pairs->stx index-ctc-pairs ->stx)))
   (λ (v)
     (transform-struct-fields v
+                             field-count
                              (λ (fields)
                                (apply-contracts-in-list fields
                                                         index-ctc-pairs)))))
+
+(define (expand-field-count-for-child-fields a-ds offset)
+  (match a-ds
+    [(delegating-struct field-count index-ctc-pairs)
+     (delegating-struct (+ field-count offset) index-ctc-pairs)]
+    [(swap-struct-field field-count i1 i2)
+     (swap-struct-field (+ field-count offset) i1 i2)]))
 
 (define-simple-delegating-adapter delegating-listof [sub-ctc]
   (λ (v) (apply-contract (listof sub-ctc) v)))
@@ -998,11 +1050,11 @@
 (define-simple-delegating-adapter delegating-pairof [car-ctc cdr-ctc]
   (λ (v) (apply-contract (cons/c car-ctc cdr-ctc) v)))
 
-(define-adapter swap-struct-field (i1 i2)
+(define-adapter swap-struct-field (field-count i1 i2)
   #:name (list 'delegating-struct i1 i2)
-  #:->stx (λ _ #`(swap-struct-field #,i1 #,i2))
+  #:->stx (λ _ #`(swap-struct-field #,field-count #,i1 #,i2))
   (λ (v)
-    (transform-struct-fields v (λ (fields) (swap-in-list fields i1 i2)))))
+    (transform-struct-fields v field-count (λ (fields) (swap-in-list fields i1 i2)))))
 
 #;(struct swap-vector adapter/c (i1 i2)
   #:property prop:contract
@@ -1286,7 +1338,8 @@
 
   (test-begin
    #:name delegating-struct
-   (ignore (struct temp (x y z) #:prefab))
+   (ignore (struct temp (x y z) #:prefab)
+           (struct temp-child temp (a b c) #:prefab))
    (test-adapter-contract
      [t (temp 5.5 "hello" 2.3)
         #:with-contract (generate-adapter-ctc
@@ -1306,7 +1359,53 @@
      (and/test (temp? t)
                (test-equal? (temp-x t) (round->exact 5.5))
                (test-equal? (temp-y t) "hello")
-               (test-equal? (temp-z t) 2.3))))
+               (test-equal? (temp-z t) 2.3)))
+
+   ;; Child struct adaptation
+   (test-adapter-contract
+    [t (temp-child 5.5 "hello" 2.3 'a 'b 'c)
+       #:with-contract (generate-adapter-ctc
+                        (mutated-interface-type '(struct temp-child temp ([a : Real] [b : String] [c : Real]))
+                                                '(struct temp-child temp ([a : Integer] [b : String] [c : Real]))
+                                                type:base-type-substitution))]
+    (and/test/message [(temp-child? t) "not a temp-child"]
+                      [(sealed? (temp-child-a t)) "field a not sealed"]
+                      [(test-equal? (temp-x t) 5.5) "other field sealed: x"]
+                      [(test-equal? (temp-y t) "hello") "other field sealed: y"]
+                      [(test-equal? (temp-z t) 2.3) "other field sealed: z"]
+                      [(test-equal? (temp-child-b t) 'b) "other field sealed: b"]
+                      [(test-equal? (temp-child-c t) 'c) "other field sealed: c"]))
+   ;; Child struct adaptation for a parent's field
+   (test-adapter-contract
+    [t (temp-child 5.5 "hello" 2.3 'a 'b 'c)
+       #:with-contract (expand-field-count-for-child-fields
+                        (generate-adapter-ctc
+                         (mutated-interface-type '(struct temp ([x : Real] [y : String] [z : Real]))
+                                                 '(struct temp ([x : Real] [y : Integer] [z : Real]))
+                                                 type:base-type-substitution))
+                        3)]
+    (and/test/message [(temp-child? t) "not a temp-child"]
+                      [(test-equal? (temp-x t) 5.5) "other field sealed: x"]
+                      [(sealed? (temp-y t)) "field y not sealed"]
+                      [(test-equal? (temp-z t) 2.3) "other field sealed: z"]
+                      [(test-equal? (temp-child-a t) 'a) "other field sealed: a"]
+                      [(test-equal? (temp-child-b t) 'b) "other field sealed: b"]
+                      [(test-equal? (temp-child-c t) 'c) "other field sealed: c"]))
+   (test-adapter-contract
+    [t (temp-child 5.5 "hello" 2.3 'a 'b 'c)
+       #:with-contract (expand-field-count-for-child-fields
+                        (generate-adapter-ctc
+                         (mutated-interface-type '(struct temp ([x : Real] [y : String] [z : Real]))
+                                                 '(struct temp ([x : Real] [y : Real] [z : String]))
+                                                 type:struct-field-swap))
+                        3)]
+    (and/test/message [(temp-child? t) "not a temp-child"]
+                      [(test-equal? (temp-x t) 5.5) "other field wrong: x"]
+                      [(test-equal? (temp-y t) 2.3) "field y not swapped"]
+                      [(test-equal? (temp-z t) "hello") "field z not swapped"]
+                      [(test-equal? (temp-child-a t) 'a) "other field wrong: a"]
+                      [(test-equal? (temp-child-b t) 'b) "other field wrong: b"]
+                      [(test-equal? (temp-child-c t) 'c) "other field wrong: c"])))
   (test-begin
    #:name swap-struct-fields
    (ignore (struct temp (x y z) #:prefab))

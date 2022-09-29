@@ -65,7 +65,9 @@
      (attribute forms)]))
 
 
-(struct name+type (name type struct? definition?) #:transparent)
+(struct name+type (name type) #:transparent)
+(struct struct-type name+type (parent) #:transparent)
+(struct typedef name+type () #:transparent)
 (define (r/t/p-entry->name+type entry)
   (match entry
     [(list '#:struct (or (list name _) (? symbol? name)) _ ...)
@@ -78,7 +80,7 @@
                            })
      #f]
     [(list name t)
-     (name+type name t #f #f)]))
+     (name+type name t)]))
 ;; (or/c syntax? sexp?) -> (listof name+type?)
 (define (top-level-form->types form)
   (match (if (syntax? form)
@@ -87,9 +89,13 @@
     [(list (or 'require/typed/provide 'require/typed/check/provide) _ entries ...)
      (filter-map r/t/p-entry->name+type entries)]
     [(list 'define-type name t)
-     (list (name+type name t #f #t))]
-    [(and struct (list (or 'struct: 'struct) (or (? symbol? name) (list name _)) _ ...))
-     (list (name+type name struct #t #f))]
+     (list (typedef name t))]
+    [(and struct (list (or 'struct: 'struct)
+                       (? symbol? name)
+                       (or (? symbol? parent)
+                           (binding (? list?) #:with [parent #f]))
+                       _ ...))
+     (list (struct-type name struct parent))]
     [other empty]))
 (define (interface-types a-mod-stx)
   (match (syntax->datum a-mod-stx)
@@ -104,18 +110,18 @@
     (test-equal? (top-level-form->types '(require/typed/check/provide foobar
                                                                       [x A]
                                                                       [y B]))
-                 (list (name+type 'x 'A #f #f)
-                       (name+type 'y 'B #f #f)))
+                 (list (name+type 'x 'A)
+                       (name+type 'y 'B)))
     (test-equal? (top-level-form->types '(require/typed/check/provide foobar
                                                                       [#:struct s ([f F])]
                                                                       [x A]
                                                                       [y B]))
-                 (list (name+type 'x 'A #f #f)
-                       (name+type 'y 'B #f #f)))
-    (test-equal? (top-level-form->types '(struct (s blah) ([f : F])))
-                 (list (name+type 's '(struct (s blah) ([f : F])) #t #f)))
+                 (list (name+type 'x 'A)
+                       (name+type 'y 'B)))
+    (test-equal? (top-level-form->types '(struct s blah ([f : F])))
+                 (list (struct-type 's '(struct s blah ([f : F])) 'blah)))
     (test-equal? (top-level-form->types '(struct s ([f : F])))
-                 (list (name+type 's '(struct s ([f : F])) #t #f)))))
+                 (list (struct-type 's '(struct s ([f : F])) #f)))))
 
 ;; syntax? syntax? -> mutated-type?
 (define (find-mutated-type original-mod-stx new-mod-stx)
@@ -127,8 +133,8 @@
              (mutated-type (name+type-name t1)
                            (name+type-type t1)
                            (name+type-type t2)
-                           (name+type-struct? t1)
-                           (name+type-definition? t1))))
+                           (struct-type? t1)
+                           (typedef? t1))))
       (error 'find-mutated-type
              @~a{
                  Couldn't find mutated type between the original and new mods.
@@ -315,7 +321,7 @@
     (and (pred a-name+type)
          (not (equal? (name+type-name a-name+type)
                       name))))
-  (assert (not (ormap (another-name+type-satisfying? name+type-definition?)
+  (assert (not (ormap (another-name+type-satisfying? typedef?)
                       referencing-name))
           #:name 'adapt-all-negative-referencing-provides
           @~a{
@@ -324,33 +330,54 @@
 
               Mutated type name: @name
               Definitions referring to it:
-              @~s[(filter (another-name+type-satisfying? name+type-definition?) referencing-name)]
+              @~s[(filter (another-name+type-satisfying? typedef?) referencing-name)]
               })
+
   (log-adapter-generation-info @~a{Adapting all references to @name ...})
-  (define-values {indirect-references direct-references}
-    (partition (another-name+type-satisfying? name+type-struct?)
+  (define-values {indirect-references-via-a-struct direct-references}
+    (partition (another-name+type-satisfying? struct-type?)
                referencing-name))
+
   (define direct-adaptations
     (for/list ([ref (in-list direct-references)])
       (cons (name+type-name ref)
             (generate-negative-delegating-adapter-ctc (name+type-type ref)
                                                       name
                                                       ctc))))
+
+  ;; Indirect reference helpers
   (define (add-delegating-struct-layer ref)
     (log-adapter-generation-info
-     @~a{Adding delegating struct layer to adapt references to @name via @(name+type-name ref)})
-    ;; todo: this is all fine if it's two independent structs where one contains
-    ;; the other as a field. it doesn't work for child structs! That demands an
-    ;; entirely different kind of delegating-struct-adapter...
+     @~a{
+         Adding delegating struct layer to adapt references to @name @;
+         via a field of @(name+type-name ref)
+         })
     (generate-negative-delegating-adapter-ctc (name+type-type ref)
                                               name
                                               ctc))
+  (define (make-adapter-treat-children-as-instances-of-this-struct-with-extra-fields child-ref)
+    (log-adapter-generation-info
+     @~a{
+         Expanding field count of adapter for @name @;
+         so that it can adapt references to child struct @(name+type-name child-ref)
+         })
+    (define child-field-count (match (name+type-type child-ref)
+                                [(list* struct name (? symbol? parent) (? list? fields) _)
+                                 (length fields)]))
+    (expand-field-count-for-child-fields ctc child-field-count))
+  (define (make-indirect-struct-adapter-via ref)
+    (match (struct-type-parent ref)
+      [(== name) ;; reference via inheritance
+       (make-adapter-treat-children-as-instances-of-this-struct-with-extra-fields ref)]
+      [else      ;; reference via field
+       (add-delegating-struct-layer ref)]))
+
   (define indirect-adaptations
     (append*
-     (for/list ([ref (in-list indirect-references)])
+     (for/list ([ref (in-list indirect-references-via-a-struct)])
        (adapt-all-negative-referencing-provides module-stx
                                                 (name+type-name ref)
-                                                (add-delegating-struct-layer ref)))))
+                                                (make-indirect-struct-adapter-via ref)))))
   (append direct-adaptations
           indirect-adaptations))
 
@@ -464,15 +491,17 @@
                        [b (-> String (-> DateTime Number))]
                        [c Y]))
                  'YMD
-                 (delegating-struct (list (cons 0 (sealing-adapter)))))
+                 (delegating-struct 3 (list (cons 0 (sealing-adapter)))))
                 (list-no-order
                  (cons 'a
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
                               (list
-                               (cons 0 (delegating-struct
+                               (cons 0 (delegating-struct ; Date
+                                        2
                                         (list
-                                         (cons 0 (delegating-struct
+                                         (cons 0 (delegating-struct ; YMD
+                                                  3
                                                   (list
                                                    (cons 0 (sealing-adapter)))))))))
                               (list))))
@@ -484,11 +513,14 @@
                                (cons 0
                                      (delegating->
                                       (list
-                                       (cons 0 (delegating-struct
+                                       (cons 0 (delegating-struct ; DateTime
+                                                1
                                                 (list
-                                                 (cons 0 (delegating-struct
+                                                 (cons 0 (delegating-struct ; Date
+                                                          2
                                                           (list
-                                                           (cons 0 (delegating-struct
+                                                           (cons 0 (delegating-struct ; YMD
+                                                                    3
                                                                     (list
                                                                      (cons 0 (sealing-adapter))))))))))))
                                       (list)))))))))
@@ -527,7 +559,7 @@
                          Moment)]
                        [c Y]))
                  'Moment
-                 (delegating-struct (list (cons 0 (sealing-adapter)))))
+                 (delegating-struct 1 (list (cons 0 (sealing-adapter)))))
                 (list
                  (cons 'moment
                        (app (compose1 syntax->datum ->stx)
@@ -539,6 +571,7 @@
                                      (delegating->
                                       (list)
                                       (list (cons 0 (delegating-struct
+                                                     1
                                                      (list
                                                       (cons 0 (sealing-adapter))))))))))))))
     (test-match (adapt-all-negative-referencing-provides
@@ -554,23 +587,25 @@
                        [b (-> annotated-app Number)]
                        [c Y]))
                  'app
-                 (delegating-struct (list (cons 1 (sealing-adapter)))))
+                 (delegating-struct 2 (list (cons 1 (sealing-adapter)))))
                 (list-no-order
                  (cons 'a
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
                               (list
                                (cons 0 (delegating-struct
+                                        2
                                         (list
-                                         (cons 0 (sealing-adapter))))))
+                                         (cons 1 (sealing-adapter))))))
                               (list))))
                  (cons 'b
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
                               (list
-                               (cons 0 (delegating-struct-via-parent ???-todo
+                               (cons 0 (delegating-struct
+                                        3
                                         (list
-                                         (cons 0 (sealing-adapter))))))
+                                         (cons 1 (sealing-adapter))))))
                               (list))))))))
 
 
@@ -597,12 +632,12 @@
   (define interface-typedefs
     (for*/list ([form (in-list interface-top-level-forms)]
                 [n+t (in-list (top-level-form->types form))]
-                #:when (name+type-definition? n+t))
+                #:when (typedef? n+t))
       (datum->syntax interface-mod-stx (name+type-name n+t))))
   (define interface-structs
     (for*/list ([form (in-list interface-top-level-forms)]
                 [n+t (in-list (top-level-form->types form))]
-                #:when (name+type-struct? n+t))
+                #:when (struct-type? n+t))
       (datum->syntax interface-mod-stx (name+type-type n+t))))
   (munge-location+bindings
    #`(module mutation-adapter typed/racket
