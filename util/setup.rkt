@@ -1,7 +1,8 @@
 #lang at-exp rscript
 
 (require syntax/location
-         (prefix-in db: "../db/db.rkt"))
+         (prefix-in db: "../db/db.rkt")
+         "../orchestration/experiment-info.rkt")
 
 (define-runtime-paths
   [repo-parent-path "../../"]
@@ -23,8 +24,7 @@
 (define racket-download-url
   @~a{https://mirror.racket-lang.org/installers/@|racket-version|/racket-@|racket-version|-x86_64-linux-cs.sh})
 
-(define expected-benchmark-names
-  (map ~a '(suffixtree kcfa snake take5 acquire tetris synth gregor quadT quadU)))
+(define expected-benchmark-names experiment-benchmarks)
 
 (define expected-dbs
   ;;    dir                    db                        entry-per-bench?
