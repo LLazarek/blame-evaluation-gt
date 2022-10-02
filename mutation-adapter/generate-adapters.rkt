@@ -721,10 +721,3 @@
          [foo Integer]
          [bar (-> Boolean Integer Void)]
          [baz (-> FOOBAR String)]))))))
-
-#;(define (struct-adapter-ctcs mit)
-  (match-define (mutated-interface-type original-type new-type mutation-type)
-    mit)
-  (cond [(equal? mutation-type type:struct-field-swap)
-         (list (cons ))]))
-

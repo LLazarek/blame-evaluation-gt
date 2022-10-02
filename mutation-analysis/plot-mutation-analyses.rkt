@@ -35,7 +35,7 @@
      (define benchmark-success-hashes
        (for/hash ([log-file (in-list log-files)])
          (values (path->benchmark-name log-file)
-                 (hash-ref (log->data log-file) 'success))))
+                 (hash-ref (log->data log-file) 'success (hash)))))
      (for/list ([mutator (in-list (current-mutation-types))])
        (define success-counts-per-benchmark
          (for/list ([{benchmark success-data-hash} (in-hash benchmark-success-hashes)])
@@ -107,9 +107,10 @@
   (define hit+miss-data
     (log->data path))
   (define all-hits
-    (hash-ref hit+miss-data 'success))
+    (hash-ref hit+miss-data 'success (hash)))
   (define all-misses
-    (hash-ref hit+miss-data 'fail))
+    (hash-ref hit+miss-data 'fail (hash)))
+  (define total-count (hash-ref hit+miss-data 'total 0))
   (define ratios
     (for/list ([type (in-list (current-mutation-types))])
       (define ratio
@@ -120,7 +121,7 @@
           [{hits misses 'success-ratios}
            (/ hits (+ hits misses))]
           [{hits misses 'total-counts}
-           (match (hash-ref hit+miss-data 'total)
+           (match total-count
              [0 0]
              [total (/ (+ hits misses) total)])]))
       (cons type ratio)))
@@ -128,7 +129,9 @@
     (data-annotations all-hits all-misses))
   (when (equal? data-type 'total-counts)
     (define sum (apply + (dict-values ratios)))
-    (unless (< (abs (- sum 1)) 0.001)
+    (unless (or (< (abs (- sum 1)) 0.001)
+                (zero? sum) ;; there are no mutants at all
+                )
       (raise-user-error
        'plot-mutation-analyses
        @~a{
@@ -140,7 +143,7 @@
            @(pretty-format (dict-keys ratios))
            })))
   (values ratios
-          (hash-ref hit+miss-data 'total)
+          total-count
           (apply + (hash-values all-hits))
           annotations))
 
@@ -248,6 +251,7 @@
                   "boolean-op-swap" "boolean"
                   "negate-conditional" "negate-cond"
                   "force-conditional" "force-cond")
+            mutator-name
             mutator-name))
 
 (main
