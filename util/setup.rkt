@@ -14,13 +14,13 @@
 ;; ==================================================
 
 (define PKG-DEPENDENCIES
-  '(#;"https://github.com/LLazarek/require-typed-check.git"
+  '("require-typed-check"
     "custom-load"
     "https://github.com/LLazarek/ruinit.git"
     "https://github.com/LLazarek/rscript.git"
     "pfds"))
 
-(define racket-version "8.6")
+(define racket-version "8.6") ;; minimum needed for TR bug fixes
 (define racket-download-url
   @~a{https://mirror.racket-lang.org/installers/@|racket-version|/racket-@|racket-version|-x86_64-linux-cs.sh})
 
@@ -399,12 +399,6 @@
   (define TR-branch-ok? (equal? TR-active-branch expected-TR-branch))
   (define TR-up-to-date? (repo-branch-up-to-date-with-remote? TR-dir TR-active-branch))
 
-  ;; (displayln "Checking require-typed-check version...")
-  ;; (define r/t/c-ok?
-    ;; (with-handlers ([exn:fail? (λ _ #f)])
-      ;; (dynamic-require 'require-typed-check/test/struct-binding/main (void))
-      ;; #t))
-
   (displayln "Checking dbs...")
   (define dbs-ok? (check-expected-dbs))
 
@@ -419,15 +413,6 @@
   (report-repo-status repo-path blgt-active-branch expected-blgt-branch blgt-up-to-date?)
   (report-repo-status gtp-dir gtp-active-branch expected-gtp-branch gtp-up-to-date?)
   (report-repo-status TR-dir TR-active-branch expected-TR-branch TR-up-to-date?)
-  #;(unless r/t/c-ok?
-    (displayln @~a{
-                   The wrong version of require-typed-check is installed!
-                   Expected the fork at @(first PKG-DEPENDENCIES), which works around @;
-                   a TR bug.
-                   Either re-run setup from a fresh state, or run the following commands to fix:
-                     raco pkg remove require-typed-check
-                     raco pkg install @(first PKG-DEPENDENCIES)
-                   }))
 
   (and racket-version-ok?
        blgt-branch-ok?
@@ -437,7 +422,6 @@
        TR-branch-ok?
        TR-up-to-date?
        dbs-ok?
-       ;; r/t/c-ok?
        (check-TR-install racket-dir TR-dir #:display-failures? #t)))
 
 (define (check-expected-dbs)
