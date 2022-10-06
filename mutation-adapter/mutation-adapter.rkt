@@ -58,6 +58,7 @@
 (struct td:vectorof td (sub-td) #:transparent)
 (struct td:parameterof td (sub-td) #:transparent)
 (struct td:setof td (sub-td) #:transparent)
+(struct td:option td (sub-td) #:transparent)
 (struct td:pairof td (left right) #:transparent)
 ;; lltodo: support field types too
 (struct td:class td (init-field-td-map method-td-map) #:transparent)
@@ -144,6 +145,8 @@
          (and sub-td {td:vectorof sub-td})]
         [(list 'Setof (app recur sub-td))
          (and sub-td (td:setof sub-td))]
+        [(list 'Option (app recur sub-td))
+         (and sub-td (td:option sub-td))]
         [(list 'Pairof (app recur car) (app recur cdr))
          (and (or car cdr)
               (td:pairof car cdr))]
@@ -644,7 +647,8 @@
 
 (define (base-type-substitution-adapter type-diff)
   (type-diff->contract type-diff
-                       (match-lambda [(td:base original new)
+                       (match-lambda [(or (td:base original new)
+                                          (td:option (td:base original new)))
                                       (make-base-type-adapter original new)]
                                      [else (recur)])))
 
