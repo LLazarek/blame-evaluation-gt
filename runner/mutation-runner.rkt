@@ -12,6 +12,7 @@
 (require racket/runtime-path
          syntax/parse
          syntax/strip-context
+         (only-in typed-racket/utils/tc-utils delay-errors?)
          "mutation-runner-data.rkt"
          "../configurables/configurables.rkt"
          "../mutate/mutated.rkt"
@@ -67,6 +68,18 @@
     (dynamic-require 'typed-racket/utils/shallow-contract-struct
                      'exn:fail:contract:blame:transient?)))
 
+(define (no-TR-delayed-errors-instrumenter a-mod)
+  (match a-mod
+    [(mod path stx)
+     (mod path
+          (syntax-parse stx
+            [(module name {~and tr {~datum typed/racket}}
+               (mb . tlfs))
+             ;; Be warned: this mod-begin keyword is undocumented!
+             #'(module name tr
+                 (mb #:no-delay-errors . tlfs))]
+            [else stx]))]))
+
 (define/contract (make-mutated-program-runner a-program
                                               module-to-mutate
                                               mutation-index
@@ -120,6 +133,9 @@
     #;(eval '(require (lib "errortrace")) ns)
     (parameterize ([current-namespace ns])
       (namespace-require '(lib "errortrace")))
+    ;; Attach the module defining TR's `delay-errors?` parameter, so that we can
+    ;; set it to false.
+    (delay-errors? #f)
     ;; Also attach transient blame exn definition module so we can inspect
     ;; those
     (when (try-dynamic-require-transient-blame-exn-predicate!)
@@ -139,6 +155,11 @@
     (make-instrumented-runner
      a-program
      (compose1 mod-stx
+               ;; TR by default bundles up several errors, but that behavior
+               ;; doesn't cooperate well with the error message inspection
+               ;; needed by `type-checker-failure?` because it just prints each
+               ;; error's message directly to stdout. So we suppress that.
+               no-TR-delayed-errors-instrumenter
                configured-instrumenter
                mutate-and-record-id)
      #:setup-namespace setup-namespace!
@@ -166,9 +187,10 @@
 
 
 (define (type-checker-failure? e)
+  (define msg (exn-message e))
   (and (exn:fail:syntax? e)
-       (regexp-match? "Type Checker:"
-                      (exn-message e))))
+       (regexp-match? "Type Checker:" msg)
+       (not (regexp-match? "Type Checker: parse error in type" msg))))
 
 (define/contract (run-with-mutated-module a-program
                                           module-to-mutate
@@ -331,7 +353,10 @@
       (λ _
         (with-handlers
           (;; see configurables/benchmark-runner/load-pre-computed-result.rkt
-           [run-status? values]
+           [run-status? (λ (rs)
+                          (log-mutation-runner-info
+                           @~a{Run raised pre-computed result, returning it as-is})
+                          rs)]
 
            [experiment-internal-error? raise]
            [(exn:fail:runner-wrapped? experiment-internal-error?) (compose1 raise
@@ -389,7 +414,7 @@
     (hash "a.rkt" 'none
           "b.rkt" 'none
           "c.rkt" 'none))
-  (test-begin
+  #;(test-begin
     #:name run-with-mutated-module/mutations
     (ignore
      (define a (mod "./test-mods/a.rkt"
@@ -490,7 +515,7 @@
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'oom]))))))
 
-  (test-begin
+  #;(test-begin
     #:name run-with-mutated-module/ctc-violations
     (ignore
      (define main (mod "./test-mods/main.rkt"
@@ -539,7 +564,7 @@
     (mod path
          (replace-stx-location stx path)))
 
-  (test-begin
+  #;(test-begin
     #:name run-with-mutated-module/type-error
     (ignore
      (define a (mod/loc "./test-mods/a.rkt"
@@ -680,7 +705,7 @@
                           (+ (- x) z))
                         }]))
   (require "../util/read-module.rkt")
-  (test-begin
+  #;(test-begin
     #:name mod/loc-vs-file
     #:before (setup-test-env!)
     #:after (cleanup-test-env!)
@@ -744,7 +769,7 @@
                                                [blamed #f]
                                                [errortrace-stack (list* "a.rkt" _)]
                                                [context-stack (list* "a.rkt" _)]))))))
-  (test-begin
+  #;(test-begin
     #:name run-with-mutated-module/runtime-error-locations
     ;; #:before (setup-test-env!)
     ;; #:after (cleanup-test-env!)
@@ -852,7 +877,7 @@
                                                [context-stack (list* "d.rkt" _)]))))))
 
 
-  (test-begin
+  #;(test-begin
     #:name run-with-mutated-module/runtime-error-locations-with-blame
     (ignore
      (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
@@ -908,7 +933,37 @@
                                    #:suppress-output? #f))))
      (λ (r) (test-match r (struct* run-status ([outcome 'blamed]
                                                [blamed '("b.rkt"
-                                                         "a.rkt")])))))))
+                                                         "a.rkt")]))))))
+
+  (test-begin
+    #:name parse-errors-from-the-type-checker-should-be-syntax-errors
+    (ignore
+     (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
+                        #'(module a typed/racket
+                            (#%module-begin
+                             (: f (-> Number * Number))
+                             (define (f . xs) 0)
+                             (f 1 2 3)))))
+     (define p (program a empty)))
+    (test-match (run-with-mutated-module p
+                                         a
+                                         0
+                                         (hash 'a 'types)
+                                         #:mutator
+                                         (λ (m i #:in p)
+                                           (values (syntax-parse (mod-stx m)
+                                                     [(module name tr
+                                                        (#%mod-begin
+                                                         ({~datum :} f (-> N * N2))
+                                                         def
+                                                         app))
+                                                      #'(module name tr
+                                                          (#%mod-begin
+                                                           (: f (-> * N N2))
+                                                           def
+                                                           app))])
+                                                   'f)))
+                (struct* run-status ([outcome 'syntax-error])))))
 
 
 ;; for debugging
