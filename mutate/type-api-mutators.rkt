@@ -26,15 +26,34 @@
 ;; - drop fields from a struct, then the adaptor produces False? <-- not well typed, but perhaps something similar
 ;;   ^ forgetting to document a field, or adding a field that isn't there
 
+;; This is the set of base types that appear on the benchmark interfaces
+#;'(Symbol
+    Natural
+    String
+    Boolean
+    Index
+    Integer
+    Real
+    Exact-Rational
+    Float
+    Nonnegative-Integer
+    Positive-Integer)
 (define type:base-type-substitution "known-type-generalization-restriction")
 (define-id-mutator base-type-gen/restr
   #:type type:base-type-substitution
-  [Number #:<-> Real]
-  [Real #:<-> Integer]
-  [Integer #:<-> Natural]
-  [Index #:<-> Integer]
-  [Index #:<-> Natural]
-  [Index #:<-> Exact-Rational])
+  [Real #:-> Any]
+  [Integer #:-> Any]
+  [Natural #:-> Any]
+  [Nonnegative-Integer #:-> Any]
+  [Positive-Integer #:-> Any]
+  [Index #:-> Any]
+  [Exact-Rational #:-> Any]
+  [Float #:-> Any]
+
+  [Symbol #:-> Any]
+  [String #:-> Any]
+  [Boolean #:-> Any]
+  )
 
 (define type:function-arg-swap "function-arg-swap")
 (define-mutator (function-arg-swap stx mutation-index counter) #:type [type type:function-arg-swap]
