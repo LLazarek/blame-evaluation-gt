@@ -938,8 +938,8 @@
                (index-ctc-pairs->names init-field-index-ctc-pairs)
                (index-ctc-pairs->names method-index-ctc-pairs))
   #:->stx (λ (->stx)
-            #`(delegating-class/c #,(index-ctc-pairs->stx init-field-index-ctc-pairs)
-                                  #,(index-ctc-pairs->stx method-index-ctc-pairs)))
+            #`(delegating-class/c #,(index-ctc-pairs->stx init-field-index-ctc-pairs ->stx #t)
+                                  #,(index-ctc-pairs->stx method-index-ctc-pairs ->stx #t)))
   (λ (c)
     (define (shift-index-map-indices map [Δ 1])
       (for/list ([{i c} (in-dict map)])
@@ -1542,5 +1542,18 @@
                                                    type:base-type-substitution))]
        (and/test/message
         [(class? c) "not a class"]
-        [(sealed? (get-field a (new c [a 5]))) "getting field out"])))))
+        [(sealed? (get-field a (new c [a 5]))) "getting field out"])))
+    (test-equal? (syntax->datum
+                  (->stx
+                   (generate-adapter-ctc
+                    (mutated-interface-type '(Class (init-field [a Number])
+                                                    (m (-> Number String String)))
+                                            '(Class (init-field [a Number])
+                                                    (m (-> Number Number String)))
+                                            type:base-type-substitution))))
+                 '(delegating-class/c (list)
+                                      (list (cons 'm
+                                                  (delegating->
+                                                   (list (cons 1 (sealing-adapter)))
+                                                   (list))))))))
 
