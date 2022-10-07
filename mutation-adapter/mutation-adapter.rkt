@@ -53,6 +53,7 @@
 (struct td:->* td (mandatory-arg-count optional-argument-index-map optional-kw-argument-map)
   #:transparent)
 (struct td:base td (original new) #:transparent)
+(struct td:parametric td (vars sub-td) #:transparent)
 (struct td:vector td (index-map) #:transparent)
 (struct td:struct td (field-count index-map) #:transparent)
 (struct td:listof td (sub-td) #:transparent)
@@ -138,6 +139,8 @@
         [(list* 'case->
                 (app (mapping recur) case-tds))
          (findf values case-tds)]
+        [(list 'All vars (app recur sub-td))
+         (and sub-td (td:parametric vars sub-td))]
         [(list* 'Vector (and (list _ ... (? td?) _ ... #f)
                              sub-tds))
          (td:vector (list->td-index-map sub-tds))]
@@ -537,6 +540,12 @@
       [{(recur) (td:-> arg-index-map result-index-map)}
        (delegating-> (loop-over-dict-values arg-index-map)
                      (loop-over-dict-values result-index-map))]
+      [{(recur) (td:parametric vars sub-td)}
+       ;; We won't mutate a type variable (unless of course it's spelled the
+       ;; same as a base type... let's hope not) so we can just treat it as a
+       ;; non-parametric type for the adapter's purposes.
+       ;; i.e. just ignore it the parametric part!
+       (loop sub-td)]
       [{(recur) (td:struct field-count index-map)}
        (delegating-struct field-count (loop-over-dict-values index-map))]
       [{(recur) (td:listof sub-td)}
