@@ -37,6 +37,15 @@
                           result)
                     tail-1
                     tail-2)]
+             [{(list* first-1 second-1 tail-1)
+               (list* first-2 second-2 tail-2)}
+              #:when (and (equal? first-1 second-2)
+                          (equal? second-1 first-2))
+              (loop (append (list (compare second-1 second-2) ;; reverse order because `result`
+                                  (compare first-1 first-2))  ;; is being built backwards!
+                            result)
+                    tail-1
+                    tail-2)]
              [{(cons (? list? head-1) tail-1)
                (cons (? list? head-2) tail-2)}
               ;; different length heads. Something was dropped.
@@ -134,7 +143,19 @@
                  `((1 ,(difference 2 (nothing)) 3)))
     (test-equal? (sexp-diff '(1 2 3)
                             '(1 3))
-                 `(1 ,(difference 2 (nothing)) 3))))
+                 `(1 ,(difference 2 (nothing)) 3))
+    (test-equal? (sexp-diff '(-> A B Array)
+                            '(-> B A Array))
+                 `(-> ,(difference 'A 'B)
+                      ,(difference 'B 'A)
+                      Array))
+    (test-equal? (sexp-diff '(-> (Vectorof Integer) (-> (Vectorof Integer) Float) Array)
+                            '(-> (-> (Vectorof Integer) Float) (Vectorof Integer) Array))
+                 `(-> ,(difference '(Vectorof Integer)
+                                   '(-> (Vectorof Integer) Float))
+                      ,(difference '(-> (Vectorof Integer) Float)
+                                   '(Vectorof Integer))
+                      Array))))
 
 ;; sexp? symbol? symbol? -> sexp?
 (define (replace-name-in-sexp sexp name new-name)
