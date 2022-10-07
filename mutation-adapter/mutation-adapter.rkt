@@ -18,6 +18,7 @@
          delegating-struct
          delegating-listof
          delegating-vectorof
+         delegating-boxof
          delegating-pairof
          delegating-class/c
          delegating-parameter/c
@@ -56,6 +57,7 @@
 (struct td:struct td (field-count index-map) #:transparent)
 (struct td:listof td (sub-td) #:transparent)
 (struct td:vectorof td (sub-td) #:transparent)
+(struct td:boxof td (sub-td) #:transparent)
 (struct td:parameterof td (sub-td) #:transparent)
 (struct td:setof td (sub-td) #:transparent)
 (struct td:option td (sub-td) #:transparent)
@@ -142,7 +144,9 @@
         [(list 'Listof (app recur sub-td))
          (and sub-td (td:listof sub-td))]
         [(list 'Vectorof (app recur sub-td))
-         (and sub-td {td:vectorof sub-td})]
+         (and sub-td (td:vectorof sub-td))]
+        [(list 'Boxof (app recur sub-td))
+         (and sub-td (td:boxof sub-td))]
         [(list 'Setof (app recur sub-td))
          (and sub-td (td:setof sub-td))]
         [(list 'Option (app recur sub-td))
@@ -539,6 +543,8 @@
        (delegating-listof (loop sub-td))]
       [{(recur) (td:vectorof sub-td)}
        (delegating-vectorof (loop sub-td))]
+      [{(recur) (td:boxof sub-td)}
+       (delegating-boxof (loop sub-td))]
       [{(recur) (td:setof sub-td)}
        (delegating-setof (loop sub-td))]
       [{(recur) (td:pairof left right)}
@@ -1047,6 +1053,8 @@
 
 (define-simple-delegating-adapter delegating-vectorof [sub-ctc]
   (λ (v) (apply-contract (vectorof sub-ctc) v)))
+(define-simple-delegating-adapter delegating-boxof [sub-ctc]
+  (λ (v) (apply-contract (box/c sub-ctc) v)))
 (define-simple-delegating-adapter delegating-setof [sub-ctc]
   (λ (v)
     (for/set ([el (in-set v)])
@@ -1444,6 +1452,16 @@
                                                  type:base-type-substitution))]
      (and/test (vector? v)
                (andmap sealed? (vector->list v)))))
+  (test-begin
+    #:name delegating-boxof
+    (test-adapter-contract
+     [v (box 1)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(Boxof Number)
+                                                 '(Boxof String)
+                                                 type:base-type-substitution))]
+     (and/test (box? v)
+               (sealed? (unbox v)))))
   (test-begin
     #:name delegating-setof
     (test-adapter-contract
