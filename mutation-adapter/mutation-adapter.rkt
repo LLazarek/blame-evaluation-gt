@@ -671,27 +671,29 @@
 (define round->exact (compose1 inexact->exact round))
 (define realize-delta 0.00001)
 (define (make-base-type-adapter original-type new-type)
-  ;; see notes: sealing makes more consistent sense for base types
-  #;(let ([transform/c (λ (f) (transform/c f original-type new-type))])
-    (match (difference original-type new-type)
-      [(difference 'Number 'Real) (transform/c real-part)]
-      [(difference 'Real 'Number) (transform/c (λ (x) (+ x 0+1i)))]
-      [(difference 'Real 'Integer) (transform/c round->exact)]
-      [(difference 'Integer 'Real) (transform/c (λ (x) (+ x realize-delta)))]
-      [(or (difference 'Integer 'Natural)
-           (difference 'Integer 'Index)) (transform/c abs)]
-      [(difference 'Exact-Rational 'Index)
-       (transform/c (compose1 abs round->exact))]
-      [(or (difference 'Natural 'Integer)
-           (difference 'Index 'Integer)) (transform/c -)]
-      [(or (difference 'Index 'Natural)
-           (difference 'Index 'Exact-Rational)) (transform/c (const (add1 largest-possible-vector-size)))]
-      [(difference 'Natural 'Index) (transform/c (λ (x)
-                                                   (if (< x largest-possible-vector-size)
-                                                       x
-                                                       0)))]
+  ;; Commented out: See note in ../mutate/type-api-mutators.rkt at `base-type-gen/restr`.
+  ;;
+  ;; Must handle all of the ids that that mutator mutates.
+  ;; (define transfomer
+  ;;   (match (difference original-type new-type)
+  ;;     [(difference _ 'String)                               ~a]
+  ;;     [(difference _ 'Number)                               (λ (n) (+ n 0+1i))]
+  ;;     [(difference _ 'One)                                  (const 1)]
 
-      [(difference 'Integer 'String) (transform/c ~a)]))
+  ;;     [(difference 'Real 'Integer)                          truncate]
+  ;;     [(difference 'Integer 'Natural)                       abs]
+  ;;     [(difference 'Nonnegative-Integer 'Positive-Integer)  add1]
+  ;;     [(difference 'Exact-Rational 'Integer)                round]
+  ;;     [(difference 'Float 'Integer)                         (compose1 inexact->exact truncate)]
+
+  ;;     [(difference 'String 'Symbol)                         string->symbol]
+  ;;     [(difference 'Boolean 'Natural)                       (λ (b) (if b 1 0))]
+
+  ;;     ;; lltodo: consider doing something better for unions
+  ;;     [(difference '<U> '<mutated-U>)                       (const (sealed '?))]))
+  ;; (transform/c transfomer
+  ;;              original-type
+  ;;              new-type)
   (sealing-adapter))
 
 (define (function-arg/result-swap-adapter type-diff)

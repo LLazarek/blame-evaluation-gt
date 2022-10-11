@@ -155,7 +155,15 @@
                                    '(-> (Vectorof Integer) Float))
                       ,(difference '(-> (Vectorof Integer) Float)
                                    '(Vectorof Integer))
-                      Array))))
+                      Array))
+    (test-equal? (sexp-diff '(case-> (-> (Listof Indexes) Indexes)
+                                     (-> (Listof Indexes) (U #f #t 'permissive) Indexes))
+                            '(case-> (-> (Listof Indexes) Indexes)
+                                     (-> (U #f #t 'permissive) (Listof Indexes) Indexes)))
+                 `(case-> (-> (Listof Indexes) Indexes)
+                          (-> ,(difference '(Listof Indexes) '(U #f #t 'permissive))
+                              ,(difference '(U #f #t 'permissive) '(Listof Indexes))
+                              Indexes)))))
 
 ;; sexp? symbol? symbol? -> sexp?
 (define (replace-name-in-sexp sexp name new-name)

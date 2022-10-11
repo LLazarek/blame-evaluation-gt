@@ -41,6 +41,48 @@
 (define type:base-type-substitution "known-type-generalization-restriction")
 (define-id-mutator base-type-gen/restr
   #:type type:base-type-substitution
+  ;; Alternative, leveraging the complexity of the numeric tower types
+  ;; we decided not to go this route to better match the simplicity of
+  ;; popular languages' numeric types, contrast with Racket's.
+  ;;
+  ;; Pattern: generalize, then restrict
+  ;; [Real #:-> Number]
+  ;; [Real #:-> Integer]
+  ;; [Real #:-> String]
+
+  ;; [Integer #:-> Number]
+  ;; [Integer #:-> Natural]
+  ;; [Integer #:-> String]
+
+  ;; [Natural #:-> Number]
+  ;; [Natural #:-> One]
+  ;; [Natural #:-> String]
+
+  ;; [Nonnegative-Integer #:-> Number]
+  ;; [Nonnegative-Integer #:-> Positive-Integer]
+  ;; [Nonnegative-Integer #:-> String]
+
+  ;; [Positive-Integer #:-> Number]
+  ;; [Positive-Integer #:-> One]
+  ;; [Positive-Integer #:-> String]
+
+  ;; [Index #:-> Number]
+  ;; [Index #:-> One]
+  ;; [Index #:-> String]
+
+  ;; [Exact-Rational #:-> Number]
+  ;; [Exact-Rational #:-> Integer]
+  ;; [Exact-Rational #:-> String]
+
+  ;; [Float #:-> Number]
+  ;; [Float #:-> Integer]
+  ;; [Float #:-> String]
+
+  ;; [Symbol #:-> String]
+  ;; [String #:-> Symbol]
+  ;; [Boolean #:-> Natural]
+
+
   [Real #:-> Any]
   [Integer #:-> Any]
   [Natural #:-> Any]
