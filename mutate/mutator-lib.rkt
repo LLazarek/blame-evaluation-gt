@@ -50,6 +50,9 @@
                                  (any/c . -> . any/c)
                                  . -> .
                                  mutator/c)]
+          [make-stream-mutator ((any/c . -> . stream?)
+                                . -> .
+                                mutator/c)]
           ;; Composes the given mutators into one which applies each of the
           ;; mutators *in the given order*
           [compose-mutators (mutator/c ... . -> . mutator/c)]
@@ -67,6 +70,7 @@
 (require racket/dict
          racket/format
          racket/match
+         racket/stream
          syntax/parse
          syntax/parse/define
          (for-syntax racket/base)
@@ -222,6 +226,30 @@
                             counter)
         (mutated orig-v
                  counter)))
+  the-mutator)
+
+(define (make-stream-mutator make-stream #:type type)
+  ;; One might think we could take a shortcut here by just calling
+  ;; `(next-mutation stx (- mutation-index counter))`
+  ;; This doesn't work because some change in between there might
+  ;; produce a syntactically equivalent mutant!
+  (define-mutator (the-mutator stx mutation-index counter) #:type [type type]
+    (let loop ([mutated-so-far (no-mutation stx mutation-index counter)]
+               [stream (make-stream stx)])
+      (cond [(> (mutated-new-counter mutated-so-far) mutation-index)
+             mutated-so-far]
+            [(stream-empty? stream)
+             mutated-so-far]
+            [else
+             (log-mutation-type type)
+             (define next (mbind (λ (stx-so-far current-counter)
+                                   (maybe-mutate stx-so-far
+                                                 (stream-first stream)
+                                                 mutation-index
+                                                 current-counter))
+                                 mutated-so-far))
+             (loop next
+                   (stream-rest stream))])))
   the-mutator)
 
 ;; See note about limitation of simple mutators above `make-guarded-mutator`
