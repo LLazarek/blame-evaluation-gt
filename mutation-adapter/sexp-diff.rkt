@@ -163,7 +163,13 @@
                  `(case-> (-> (Listof Indexes) Indexes)
                           (-> ,(difference '(Listof Indexes) '(U #f #t 'permissive))
                               ,(difference '(U #f #t 'permissive) '(Listof Indexes))
-                              Indexes)))))
+                              Indexes)))
+    (test-equal? (sexp-diff '(-> Natural (-> String Number) (Listof String))
+                            '(-> Natural Any (Listof String)))
+                 `(-> Natural ,(difference '(-> String Number) 'Any) (Listof String)))
+    (test-equal? (sexp-diff '(-> Natural (-> String Number) (Listof String))
+                            '(-> Natural (-> String Number) Any))
+                 `(-> Natural (-> String Number) ,(difference '(Listof String) 'Any)))))
 
 ;; sexp? symbol? symbol? -> sexp?
 (define (replace-name-in-sexp sexp name new-name)

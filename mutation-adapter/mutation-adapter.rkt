@@ -473,6 +473,10 @@
     (test-equal? (sexp->type-diff (sexp-diff '(-> (A B C) R)
                                              '(-> (A Z C) R)))
                  (td:-> `((0 . ,(td:unknown-type (list (td:base 'B 'Z)))))
+                        '()))
+    (test-equal? (sexp->type-diff (sexp-diff '(-> A (-> Z Z Z) C)
+                                             '(-> A Any C)))
+                 (td:-> `((1 . ,(td:base '(-> Z Z Z) 'Any)))
                         '()))))
 
 ;; mutated-interface-type? -> contract?
@@ -492,7 +496,8 @@
   (define type-diff (sexp->type-diff (sexp-diff original mutated)))
   (define full-combinator
     (match mutation-type
-      [(== type:base-type-substitution)
+      [(or (== type:base-type-substitution)
+           (== type:complex-type->Any))
        (base-type-substitution-adapter type-diff)]
       [(== type:function-arg-swap)
        (function-arg/result-swap-adapter type-diff)]
@@ -1265,6 +1270,18 @@
                                                       (values Integer Real))
                                                  '(-> String
                                                       (-> Integer Integer)
+                                                      (values Integer Real))
+                                                 type:base-type-substitution))]
+     (let-values ([{v1 v2} (f "" (λ _ 5.2))])
+       (sealed? v2)))
+    (test-adapter-contract
+     [f (λ (s g) (values 2 g))
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> String
+                                                      (-> Integer Real)
+                                                      (values Integer Real))
+                                                 '(-> String
+                                                      Any
                                                       (values Integer Real))
                                                  type:base-type-substitution))]
      (let-values ([{v1 v2} (f "" (λ _ 5.2))])
