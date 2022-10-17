@@ -5,12 +5,14 @@
          type:function-arg-swap
          type:function-result-swap
          type:struct-field-swap
+         type:class-field-swap
 
          base-type->Any
          complex-type->Any
          function-arg-swap
          function-result-swap
          struct-field-swap
+         class-field-swap
          ;; ll: write tests for the others before providing/using them!
          )
 
@@ -179,12 +181,12 @@
 (define type:class-field-swap "class-field-swap")
 (define-swapping-mutator class-field-swap type:class-field-swap
   ({~and {~or {~datum init-field}
-                  {~datum field}}
-             field}
-       [field-id:id {~datum :} field-type:expr]
-       ...)
+              {~datum field}}
+         field}
+   [field-id:id field-type:expr]
+   ...)
   field-type #:-> new-field-type
-  (field [field-id : new-field-type]
+  (field [field-id new-field-type]
          ...))
 
 (module+ test
@@ -195,25 +197,25 @@
      (extend-test-message
       (test-mutator* class-field-swap
                      #`(#,field-name
-                        [a : T1]
-                        [b : T2]
-                        [c : T3])
+                        [a T1]
+                        [b T2]
+                        [c T3])
                      (list #`(#,field-name
-                              [a : T2]
-                              [b : T1]
-                              [c : T3])
+                              [a T2]
+                              [b T1]
+                              [c T3])
                            #`(#,field-name
-                              [a : T3]
-                              [b : T2]
-                              [c : T1])
+                              [a T3]
+                              [b T2]
+                              [c T1])
                            #`(#,field-name
-                              [a : T1]
-                              [b : T3]
-                              [c : T2])
+                              [a T1]
+                              [b T3]
+                              [c T2])
                            #`(#,field-name
-                              [a : T1]
-                              [b : T2]
-                              [c : T3])))
+                              [a T1]
+                              [b T2]
+                              [c T3])))
       @~a{Field: @field-name}))))
 
 (module+ test

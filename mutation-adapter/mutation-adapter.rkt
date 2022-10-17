@@ -32,6 +32,7 @@
          (for-syntax syntax/parse
                      racket/syntax)
          racket/struct
+         racket/syntax
          syntax/location)
 
 (struct mutated-interface-type (original mutated mutation-type)
@@ -63,8 +64,7 @@
 (struct td:setof td (sub-td) #:transparent)
 (struct td:option td (sub-td) #:transparent)
 (struct td:pairof td (left right) #:transparent)
-;; lltodo: support field types too
-(struct td:class td (init-field-td-map method-td-map) #:transparent)
+(struct td:class td (init-field-td-map field-td-map method-td-map) #:transparent)
 
 ;; used to support diffs that we may not otherwise support, produced by arg swapping.
 ;; e.g. Swapping `(Listof A) (Setof A)` produces a diff
@@ -183,14 +183,13 @@
                       [sub-td (in-list field-sub-tds)]
                       #:when (td? sub-td))
              (cons name sub-td)))
-         (assert (empty? field-dict)
-                 "Have to handle class field mutations too...")
          (define method-dict
            (for/list ([name (in-list method-names)]
                       [sub-td (in-list method-sub-tds)]
                       #:when (td? sub-td))
              (cons name sub-td)))
          (td:class init-field-dict
+                   field-dict
                    method-dict)]
         [(difference original new)
          (td:base original new)]
@@ -240,26 +239,39 @@
      (list only-positional-args
            empty)]))
 
+;; Assumption: all fields/init-fields are grouped together under a single
+;; field/init-field block, and those blocks (if any) appear before all methods.
 (define (parse-class-parts class-type-body)
   (match class-type-body
-    [(or (list (list 'init-field init-fields ...)
-               (list 'field fields ...)
-               methods ...)
-         (list (list 'field fields ...)
+    [(or (list (not (? list?)) ... ;; e.g. #:implements FooBar
                (list 'init-field init-fields ...)
-               methods ...)
-         (binding (list (list 'init-field init-fields ...)
-                        methods ...)
+               (list 'field fields ...)
+               (and methods (list (? symbol?) _)) ...)
+         (list (not (? list?)) ...
+               (list 'field fields ...)
+               (list 'init-field init-fields ...)
+               (and methods (list (? symbol?) _)) ...)
+         (binding (list (not (? list?)) ...
+                        (list 'init-field init-fields ...)
+                        (and methods (list (? symbol?) _)) ...)
                   #:with [fields empty])
-         (binding (list (list 'field fields ...)
-                        methods ...)
+         (binding (list (not (? list?)) ...
+                        (list 'field fields ...)
+                        (and methods (list (? symbol?) _)) ...)
                   #:with [init-fields empty])
-         (binding (list methods ...)
+         (binding (list (not (? list?)) ...
+                        (and methods (list (? symbol?) _)) ...)
                   #:with [init-fields empty]
                   #:with [fields empty]))
      (list init-fields
            fields
-           methods)]))
+           methods)]
+    [else
+     (error 'parse-class-parts
+            @~a{
+                one or more assumptions about the shape of class types have been violated in:
+                @~s[(cons 'Class class-type-body)]
+                })]))
 
 (define (normalize->-types t)
   (match t
@@ -408,34 +420,50 @@
     (test-equal? (sexp->type-diff (sexp-diff '(Class (sign-up (->* (A) (C) R)))
                                              '(Class (sign-up (->* (A) (B) R)))))
                  (td:class '()
+                           '()
                            `((sign-up . ,(td:->* 1
                                                  `((0 . ,(td:base 'C 'B)))
                                                  '())))))
     (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field) (sign-up (->* (A) (C) R)))
                                              '(Class (init-field) (sign-up (->* (A) (B) R)))))
                  (td:class '()
+                           '()
                            `((sign-up . ,(td:->* 1
                                                  `((0 . ,(td:base 'C 'B)))
                                                  '())))))
     (test-equal? (sexp->type-diff (sexp-diff '(Class (field) (sign-up (->* (A) (C) R)))
                                              '(Class (field) (sign-up (->* (A) (B) R)))))
                  (td:class '()
+                           '()
                            `((sign-up . ,(td:->* 1
                                                  `((0 . ,(td:base 'C 'B)))
                                                  '())))))
     (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field [a X]) (sign-up (->* (A) (C) R)))
                                              '(Class (init-field [a Y]) (sign-up (->* (A) (B) R)))))
                  (td:class `((a . ,(td:base 'X 'Y)))
+                           '()
                            `((sign-up . ,(td:->* 1
                                                  `((0 . ,(td:base 'C 'B)))
                                                  '())))))
     (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field [a X]))
                                              '(Class (init-field [a Y]))))
                  (td:class `((a . ,(td:base 'X 'Y)))
+                           '()
+                           '()))
+    (test-equal? (sexp->type-diff (sexp-diff '(Class (field [a X]))
+                                             '(Class (field [a Y]))))
+                 (td:class '()
+                           `((a . ,(td:base 'X 'Y)))
                            '()))
     (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field [a X]) (field [i Any]))
                                              '(Class (init-field [a Y]) (field [i Any]))))
                  (td:class `((a . ,(td:base 'X 'Y)))
+                           '()
+                           '()))
+    (test-equal? (sexp->type-diff (sexp-diff '(Class (init-field [i Any]) (field [a X]))
+                                             '(Class (init-field [i Any]) (field [a Y]))))
+                 (td:class '()
+                           `((a . ,(td:base 'X 'Y)))
                            '()))
     (test-equal? (sexp->type-diff
                   (sexp-diff '(Class (init-field (next-tile (-> (Listof Tile) Tile)))
@@ -447,6 +475,7 @@
                                      (show-players (-> (Listof String)))
                                      (run (->* (Integer) (#:show (-> Void)) RunResult)))))
                  (td:class '()
+                           '()
                            `((run . ,(td:-> `((0 . ,(td:base 'Natural 'Integer)))
                                             '())))))
 
@@ -505,6 +534,8 @@
        (function-arg/result-swap-adapter type-diff)]
       [(== type:struct-field-swap)
        (struct-field-swap-adapter type-diff)]
+      [(== type:class-field-swap)
+       (class-field-swap-adapter type-diff)]
       ;; [(== type:vector-arg-swap)
       ;;  (vector-swap-adapter type-diff)]
       ;; [type:function-arg-drop
@@ -570,8 +601,9 @@
        (delegating->* n
                       (loop-over-dict-values optional-arg-index-map)
                       (loop-over-dict-values optional-kw-arg-map))]
-      [{(recur) (td:class init-field-td-map method-td-map)}
+      [{(recur) (td:class init-field-td-map field-td-map method-td-map)}
        (delegating-class/c (loop-over-dict-values init-field-td-map)
+                           (loop-over-dict-values field-td-map)
                            (loop-over-dict-values method-td-map))]
       [{_ _}
        (error 'type-diff->contract
@@ -745,6 +777,21 @@
      (error 'struct-field-swap-adapter
             @~a{Should be impossible: got a td that isn't td:struct?: @~e[other]})]))
 
+(define (class-field-swap-adapter type-diff)
+  (match type-diff
+    [(or (td:class `((,i1 . ,td1)
+                     (,i2 . ,td2)) ;; See note above about function arg/result swap sub-tds
+                   '()
+                   _)
+         (td:class '() ;; See note above about function arg/result swap sub-tds
+                   `((,i1 . ,td1)
+                     (,i2 . ,td2))
+                   _))
+     (swap-class-field i1 i2)]
+    [other
+     (error 'class-field-swap-adapter
+            @~a{Should be impossible: got a td that isn't td:class?: @~e[other]})]))
+
 
 #;(define (vector-swap-adapter type-diff)
   (match type-diff
@@ -827,9 +874,12 @@
 (define-simple-delegating-adapter any/c-adapter ()
   (λ (v) v))
 
+(struct dependent-result-adapter (maker) ;; (-> list? (-> list? list?))
+  #:transparent)
+
 ;; (struct-instance? -> (values (or/c #f (case-> (-> list? list?)
 ;;                                               (-> list? list? list? (values list? list?))))
-;;                              (or/c #f (-> list? list?))))
+;;                              (or/c #f (-> list? list?) dependent-result-adapter?)))
 ;; ->
 ;; (struct-instance? -> late-neg-projection?)
 ;;
@@ -837,6 +887,9 @@
 ;; the first can transform the arguments, and the second can transform the results.
 ;; In transforming arguments, if the procedure accepts 3 args then it gets kw-args too.
 ;; Otherwise, it only gets positional args and kw-args are left untouched.
+;;
+;; The result transformer can be parameterized by the argument values, in which
+;; case it should be wrapped with dependent-result-adapter.
 ;;
 ;; Either function being #f means that that step is not necessary
 ;; (which might make things more efficient).
@@ -858,12 +911,17 @@
            (if (empty? kw-args)
                new-args
                (append (list new-kw-args) new-args)))
-         (if (procedure? result-adapter)
-             (apply values
-                    (λ results
-                      (apply values (result-adapter results)))
-                    impersonator-arg-results)
-             (apply values impersonator-arg-results)))))
+         (cond [result-adapter
+                (define adapter-fn
+                  (match result-adapter
+                    [(dependent-result-adapter maker)
+                     (maker args)]
+                    [plain plain]))
+                (apply values
+                       (λ results
+                         (apply values (adapter-fn results)))
+                       impersonator-arg-results)]
+               [else (apply values impersonator-arg-results)]))))
     (λ (blame)
       (λ (v neg-party)
         (impersonate-procedure v
@@ -955,12 +1013,16 @@
 (require (only-in rackunit require/expose))
 (require/expose racket/private/class-c-old (build-class/c
                                             build-internal-class/c))
-(define-adapter delegating-class/c (init-field-index-ctc-pairs method-index-ctc-pairs)
+(define-adapter delegating-class/c (init-field-index-ctc-pairs
+                                    field-index-ctc-pairs
+                                    method-index-ctc-pairs)
   #:name (list 'delegating-class/c
                (index-ctc-pairs->names init-field-index-ctc-pairs)
+               (index-ctc-pairs->names field-index-ctc-pairs)
                (index-ctc-pairs->names method-index-ctc-pairs))
   #:->stx (λ (->stx)
             #`(delegating-class/c #,(index-ctc-pairs->stx init-field-index-ctc-pairs ->stx #t)
+                                  #,(index-ctc-pairs->stx field-index-ctc-pairs ->stx #t)
                                   #,(index-ctc-pairs->stx method-index-ctc-pairs ->stx #t)))
   (λ (c)
     (define (shift-index-map-indices map [Δ 1])
@@ -976,16 +1038,18 @@
         [other other]))
 
     ;; This magic derived from looking at
-    ;; (syntax->datum (expand-once (expand-once #'(class/c (init-field [a number?]) [get-a (-> number?)]))))
+    ;; (syntax->datum (expand-once (expand-once #'(class/c (init-field [a number?]) (field [f string?]) [get-a (-> number?)]))))
     (define methods (map car method-index-ctc-pairs))
     (define method-ctcs (map (compose1 fixup->-arg-adapter-indices-for-this-argument cdr)
                              method-index-ctc-pairs))
     (define init-fields (map car init-field-index-ctc-pairs))
     (define init-field-ctcs (map cdr init-field-index-ctc-pairs))
+    (define fields (map car field-index-ctc-pairs))
+    (define field-ctcs (map cdr field-index-ctc-pairs))
     (apply-contract (build-class/c methods
                              method-ctcs
-                             init-fields
-                             init-field-ctcs
+                             (append init-fields fields)
+                             (append init-field-ctcs field-ctcs)
                              init-fields
                              init-field-ctcs
                              (list)
@@ -1098,6 +1162,93 @@
        (λ (v neg-party)
          (impersonate-vector v
                              impersonator-procedure))))))
+
+(define-adapter class-getter-for (field-id)
+  #:name (list 'class-getter-for field-id)
+  #:->stx (λ _ #`(class-getter-for '#,field-id))
+  #:full-projection
+  (simple->adapter-projection
+   (λ (this)
+     (define field-id (class-getter-for-field-id this))
+     (values #f
+             (dependent-result-adapter
+              (match-lambda
+                [(list object-instance)
+                 (λ (original-results)
+                   (list (dynamic-get-field field-id object-instance)))]))))))
+(define-adapter class-setter-for (field-id instead-of-field-id)
+  #:name (list 'class-setter-for field-id instead-of-field-id)
+  #:->stx (λ _ #`(class-setter-for '#,field-id '#,instead-of-field-id))
+  #:full-projection
+  (simple->adapter-projection
+   (λ (this)
+     (define field-id (class-setter-for-field-id this))
+     (define instead-of-field-id (class-setter-for-instead-of-field-id this))
+     (values #f
+             ;; This is gross. Instead of redirecting the set-field to the new
+             ;; field, and letting the underlying setter do the work, we have to
+             ;; let the underlying setter do the wrong thing, and then fix it up
+             ;; afterwards and do the right thing instead.
+             ;; What we'd really like is to replace the method that's getting
+             ;; called here, but that doesn't seem possible.
+             (dependent-result-adapter
+              (match-lambda
+                [(list object-instance v)
+                 (define original-instead-of-field-value
+                   (dynamic-get-field instead-of-field-id object-instance))
+                 (λ (original-results)
+                   ;; restore the value of the instead-of-field
+                   (dynamic-set-field! instead-of-field-id
+                                       object-instance
+                                       original-instead-of-field-value)
+                   ;; and set the one we actually want to be set
+                   (dynamic-set-field! field-id object-instance v)
+                   (list (void)))]))))))
+(define-adapter swap-class-field (field-id1 field-id2)
+  #:name (list 'swap-class-field field-id1 field-id2)
+  ;; This indirection through the syntax is unfortunately necessary, because we
+  ;; the field accesses are hapening through named methods - for which we only
+  ;; have symbols at this level, and racket's class system doesn't offer a way
+  ;; to do things like override a dynamically-computed method in a superclass.
+  ;;
+  ;; It would be nice to instead have all method accesses go through a generic
+  ;; dynamic getter/setter (akin to `dynamic-get-field`), so that we could just
+  ;; subclass dynamically and override those methods (like the commented code
+  ;; below), but those generic access methods aren't typeable, so we're stuck
+  ;; with this.
+  #:->stx (λ _
+            (with-syntax ([{get-field1
+                            set-field1
+                            get-field2
+                            set-field2}
+                           (list (format-id #'here "get-field:~a" field-id1)
+                                 (format-id #'here "set-field:~a" field-id1)
+                                 (format-id #'here "get-field:~a" field-id2)
+                                 (format-id #'here "set-field:~a" field-id2))])
+              #`(class/c
+                 [get-field2 (class-getter-for '#,field-id1)]
+                 [set-field2 (class-setter-for '#,field-id1 '#,field-id2)]
+                 [get-field1 (class-getter-for '#,field-id2)]
+                 [set-field1 (class-setter-for '#,field-id2 '#,field-id1)]))
+            #;#`(swap-class-field '#,field-id1 '#,field-id2))
+  (λ (v)
+    ;; Wrong! These dynamic methods can't be typed!
+    #;(class v
+      (define/override (get-field name)
+        (dynamic-get-field (match name
+                             [(== field-id1) field-id2]
+                             [(== field-id2) field-id1]
+                             [other other])
+                           this))
+      (define/override (set-field! name v)
+        (dynamic-set-field! (match name
+                              [(== field-id1) field-id2]
+                              [(== field-id2) field-id1]
+                              [other other])
+                            this
+                            v)))
+    (error 'swap-class-field
+           "should never be called!")))
 
 ;; Returns `vs`, but with the elements at each index in `index-ctc-pairs`
 ;; contracted with the corresponding contract.
@@ -1598,8 +1749,98 @@
                                                     (m (-> Number Number String)))
                                             type:base-type-substitution))))
                  '(delegating-class/c (list)
+                                      (list)
                                       (list (cons 'm
                                                   (delegating->
                                                    (list (cons 1 (sealing-adapter)))
-                                                   (list))))))))
+                                                   (list)))))))
+
+  (define-test (test:eval-class-with-ctc/get/set-object-fields original-type
+                                                               mutated-type)
+    (define ns (make-base-namespace))
+    (eval #'(require "mutation-adapter.rkt" rackunit racket racket/class)
+          ns)
+    (eval #'(require/expose "mutation-adapter.rkt" [apply-contract])
+          ns)
+    (eval #`(define c (apply-contract #,(->stx (generate-adapter-ctc
+                                                (mutated-interface-type
+                                                 original-type
+                                                 mutated-type
+                                                 type:class-field-swap)))
+                                      (class object%
+                                        (super-new)
+                                        (init-field a b c)
+                                        (define/public (m n s) s)
+                                        (define/public (get-field:a) a)
+                                        (define/public (get-field:b) b)
+                                        (define/public (get-field:c) c)
+                                        (define/public (set-field:a v) (set! a v))
+                                        (define/public (set-field:b v) (set! b v))
+                                        (define/public (set-field:c v) (set! c v)))))
+          ns)
+    (eval #`(define o (new c [a 5] [b "hello"] [c 42]))
+          ns)
+    (define before-set
+      (eval #'(list (send o get-field:a)
+                    (send o get-field:b)
+                    (send o get-field:c))
+            ns))
+    (eval #`(send o set-field:b "hi") ;; this gets redirected to a set of `a`...
+          ns)
+    (define after-set
+      (eval #'(list (send o get-field:a)
+                    (send o get-field:b)
+                    (send o get-field:c))
+            ns))
+    (and/test/message [(test-equal? before-set '("hello" 5 42))
+                       "before set-field"]
+                      ;; ... which appears as the value of `b` externally.
+                      [(test-equal? after-set '("hello" "hi" 42))
+                       "after set-field"]))
+  (test-begin
+    #:name swap-class-field
+    (test:eval-class-with-ctc/get/set-object-fields
+     '(Class (init-field [a Number]
+                         [b String]
+                         [c Number])
+             (m (-> Number String String)))
+     '(Class (init-field [a String]
+                         [b Number]
+                         [c Number])
+             (m (-> Number String String))))
+    (test:eval-class-with-ctc/get/set-object-fields
+     '(Class
+       #:implements FooBar
+       (init-field [a Number]
+                   [b String]
+                   [c Number])
+       (m (-> Number String String)))
+     '(Class
+       #:implements FooBar
+       (init-field [a String]
+                   [b Number]
+                   [c Number])
+       (m (-> Number String String))))
+    (test:eval-class-with-ctc/get/set-object-fields
+     '(Class (field [a Number]
+                    [b String]
+                    [c Number])
+             (m (-> Number String String)))
+     '(Class (field [a String]
+                    [b Number]
+                    [c Number])
+             (m (-> Number String String))))
+    (test:eval-class-with-ctc/get/set-object-fields
+     '(Class (init-field [i1 Real]
+                         [i2 String])
+             (field [a Number]
+                    [b String]
+                    [c Number])
+             (m (-> Number String String)))
+     '(Class (init-field [i1 Real]
+                         [i2 String])
+             (field [a String]
+                    [b Number]
+                    [c Number])
+             (m (-> Number String String))))))
 
