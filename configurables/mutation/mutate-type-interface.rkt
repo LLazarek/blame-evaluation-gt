@@ -15,15 +15,12 @@
          "../../mutate/mutate-program.rkt"
          "../../mutate/mutator-lib.rkt")
 
-(define active-mutators (list base-type-gen/restr
+(define active-mutators (list base-type->Any
+                              complex-type->Any
                               function-arg-swap
                               function-result-swap
                               struct-field-swap
-                              ;; function-arg-drop
-                              ;; function-result-drop
-                              ;; union-branch-drop
-                              vector-arg-swap
-                              ))
+                              class-field-swap))
 (define active-mutator-names (map mutator-type active-mutators))
 
 (define mutate-type-expr (make-expr-mutator (apply compose-mutators active-mutators)))
