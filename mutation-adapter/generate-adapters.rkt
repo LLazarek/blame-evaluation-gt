@@ -3,6 +3,7 @@
 (provide generate-adapter-module-for-mutation)
 
 (require "mutation-adapter.rkt"
+         (only-in (submod "mutation-adapter.rkt" tds) td:base?)
          "util.rkt"
          "../mutate/type-api-mutators.rkt"
          racket/runtime-path
@@ -35,15 +36,11 @@
   (match-define (mutated-type name original-type new-type mutated-struct? mutated-definition?)
     (find-mutated-type original-mod-stx mutated-mod-stx))
   (define mit (mutated-interface-type original-type new-type mutation-type))
-  (cond [mutated-definition?
-         ;; lltodo: is this really right?
-         #;(adapt-all-negative-referencing-provides mutated-mod-stx name adapter)
-         (raise-user-error 'generate-adapter-ctcs-for-mutation
-                           "Mutated a type definition, which we haven't really figured out yet.")]
-        [mutated-struct?
-         (adapt-all-negative-referencing-provides mutated-mod-stx
-                                                  name
-                                                  (generate-adapter-ctc mit))]
+  (cond [(or mutated-definition?
+             mutated-struct?)
+         (adapt-all-referencing-provides mutated-mod-stx
+                                         name
+                                         mit)]
         [else (list (cons name (generate-adapter-ctc mit)))]))
 
 (define r/t/c/p-form?
@@ -97,6 +94,7 @@
                        _ ...))
      (list (struct-type name struct parent))]
     [other empty]))
+;; syntax? -> (listof name+type?)
 (define (interface-types a-mod-stx)
   (match (syntax->datum a-mod-stx)
     [(or (list 'module name lang (list '#%module-begin top-level-forms ...))
@@ -284,107 +282,421 @@
                                                                  [x Integer]))))))
                  '((require/typed/check/provide "library.rkt" [x Integer])))))
 
-(define (sexp-contains? s id)
-  (let loop ([s s])
-    (match s
-      [(? symbol? sym) (equal? sym id)]
-      [(list sub-exps ...) (ormap loop sub-exps)]
-      [other #f])))
-(define (negative-reference? type id)
-  (let loop ([subtype type]
-             [negative? #f])
-    (match subtype
-      [(list '-> arg-ts ... res-t)
-       (or (ormap (λ (t) (loop t (not negative?))) arg-ts)
-           (loop res-t negative?))]
-      [(list '->* mandatory-arg-ts optional-arg-ts res-t)
-       (or (ormap (λ (t) (loop t (not negative?)))
-                  (append mandatory-arg-ts optional-arg-ts))
-           (loop res-t negative?))]
-      [(list (or 'struct 'struct: 'define-type)
-             (or (binding (? symbol?) #:with [names empty])
-                 (list* _ names))
-             more ...)
-       (loop (append names more) #t)]
-      [(? list? sub-exps) (ormap (λ (t) (loop t negative?)) sub-exps)]
-      [(? symbol? sym) (and (equal? sym id) negative?)]
-      [other #f])))
 
 (define-logger adapter-generation)
-;; syntax? identifier? contract? -> (listof (cons identifier? contract?))
-(define (adapt-all-negative-referencing-provides module-stx name ctc)
+
+(define (adapt-all-referencing-provides module-stx name mit)
   (define all-interface-types (interface-types module-stx))
-  (define referencing-name (for/list ([n+t (in-list all-interface-types)]
-                                      #:when (negative-reference? (name+type-type n+t) name))
-                             n+t))
-  (define ((another-name+type-satisfying? pred) a-name+type)
-    (and (pred a-name+type)
-         (not (equal? (name+type-name a-name+type)
-                      name))))
-  (assert (not (ormap (another-name+type-satisfying? typedef?)
-                      referencing-name))
-          #:name 'adapt-all-negative-referencing-provides
-          @~a{
-              Found one or more type definitions that refer to a mutated type.
-              Chaining definition adapters to support this is not implemented yet.
+  (define interface-types/except-name
+    (filter (match-lambda [(name+type (== name) _) #f]
+                          [else #t])
+            all-interface-types))
+  (define ctc (generate-adapter-ctc mit))
+  (define mutation-position-in-mit (mutation-position mit))
 
-              Mutated type name: @name
-              Definitions referring to it:
-              @~s[(filter (another-name+type-satisfying? typedef?) referencing-name)]
-              })
+  (adapt-types-referencing name
+                           (flip mutation-position-in-mit)
 
-  (log-adapter-generation-info @~a{Adapting all references to @name ...})
-  (define-values {indirect-references-via-a-struct direct-references}
-    (partition (another-name+type-satisfying? struct-type?)
-               referencing-name))
+                           interface-types/except-name
+                           ctc))
 
-  (define direct-adaptations
-    (for/list ([ref (in-list direct-references)])
-      (cons (name+type-name ref)
-            (generate-negative-delegating-adapter-ctc (name+type-type ref)
-                                                      name
-                                                      ctc))))
+;; mutated-interface-type? -> position?
+(define (mutation-position mit)
+  (match-define (mutated-interface-type original-type new-type mutation-type) mit)
+  (define td (sexp->type-diff (sexp-diff original-type new-type)))
+  (define pos-of-mutation-td
+    (let/ec return
+      (type-diff->adapter/delegate
+       td
+       (hash-ref mutation-type->td-leaf-predicate-hash mutation-type)
+       (match-lambda** [{_ pos} (return pos)]))))
+  (if (equal? mutation-type type:function-arg-swap)
+      ;; The td of a function arg swap is the whole -> type, but the mutation is
+      ;; really of the ->'s arguments -- ie "one more left" / swap
+      (flip pos-of-mutation-td)
+      pos-of-mutation-td))
 
-  ;; Indirect reference helpers
-  (define (add-delegating-struct-layer ref)
-    (log-adapter-generation-info
-     @~a{
-         Adding delegating struct layer to adapt references to @name @;
-         via a field of @(name+type-name ref)
-         })
-    (generate-negative-delegating-adapter-ctc (name+type-type ref)
-                                              name
-                                              ctc))
-  (define (make-adapter-treat-children-as-instances-of-this-struct-with-extra-fields child-ref)
-    (log-adapter-generation-info
-     @~a{
-         Expanding field count of adapter for @name @;
-         so that it can adapt references to child struct @(name+type-name child-ref)
-         })
-    (define child-field-count (match (name+type-type child-ref)
-                                [(list* struct name (? symbol? parent) (? list? fields) _)
-                                 (length fields)]))
-    (expand-field-count-for-child-fields ctc child-field-count))
-  (define (make-indirect-struct-adapter-via ref)
-    (match (struct-type-parent ref)
-      [(== name) ;; reference via inheritance
-       (make-adapter-treat-children-as-instances-of-this-struct-with-extra-fields ref)]
-      [else      ;; reference via field
-       (add-delegating-struct-layer ref)]))
+(define (adapt-types-referencing name
+                                 reference-positions-to-adapt
 
-  (define indirect-adaptations
-    (append*
-     (for/list ([ref (in-list indirect-references-via-a-struct)])
-       (adapt-all-negative-referencing-provides module-stx
-                                                (name+type-name ref)
-                                                (make-indirect-struct-adapter-via ref)))))
-  (append direct-adaptations
-          indirect-adaptations))
+                                 all-interface-types
+                                 ctc)
+  (log-adapter-generation-info
+   @~a{Adapting all references to @name in @reference-positions-to-adapt positions...})
+
+  (define simple-interface-types
+    (substitute-type-defs+structs* all-interface-types))
+  (define references (for/list ([n+t (in-list simple-interface-types)]
+                                #:when (reference? (name+type-type n+t)
+                                                   name
+                                                   reference-positions-to-adapt))
+                       n+t))
+  (for/list ([ref (in-list references)])
+    (cons (name+type-name ref)
+          (generate-delegating-adapter-ctc/references-in-position
+           (name+type-type ref)
+           name
+           ctc
+           reference-positions-to-adapt))))
+
+(define (reference? type name position [overall-type-position 'pos])
+  (not (set-empty? (references-in/of type (list name) position overall-type-position))))
+
+(define (generate-delegating-adapter-ctc/references-in-position type name ctc position)
+  (define type* (type-substitute (list (typedef name (gensym name))) type position))
+  (define td (sexp->type-diff (sexp-diff type type*)))
+  (type-diff->adapter/delegate td
+                               (match-lambda** [{(? td:base?) pos} #t]
+                                               [{_ _} #f])
+                               (λ _ ctc)))
+
+(define (listof-non-recursive-name+types? l)
+  (define definitions (filter (disjoin struct-type? typedef?) l))
+  (define defined-names (map name+type-name definitions))
+  (define (collect-all-recursive-references t)
+    (let loop ([ts-todo (list t)]
+               [refs (set)])
+      (match ts-todo
+        [(cons t more-todo)
+         (define t-refs (references-in/of t defined-names))
+         (define new-refs (set-subtract t-refs refs))
+         (loop (append more-todo (set->list new-refs))
+               (set-union refs new-refs))]
+        ['() refs])))
+  (define defs-to-refs
+    (for/hash ([def (in-list definitions)])
+      (values (name+type-name def)
+              (collect-all-recursive-references (name+type-type def)))))
+  ;; name? -> (name? -> boolean?)
+  (define (def-refers-transitively-to? target def-name)
+    (let loop ([todo (list def-name)]
+               [seen (set def-name)])
+      (match todo
+        [(cons name more-todo)
+         (define def-refs (hash-ref defs-to-refs name))
+         (or (set-member? def-refs target)
+             (loop (append more-todo (set->list (set-subtract def-refs seen)))
+                   (set-union seen def-refs)))]
+        ['() #f])))
+  (for/and ([def (in-list definitions)])
+    (define name (name+type-name def))
+    (not (def-refers-transitively-to? name name))))
+
+(define (lookup-def name definitions)
+  (for/first ([def (in-list definitions)]
+              #:when (equal? (name+type-name def) name))
+    (name+type-type def)))
+
+;; (symbol? -> (or/c #f sexp?))
+;; sexp?
+;; [position? position?]
+;; ->
+;; sexp?
+(define (type-substitute/lookup lookup t [position 'any] [overall-type-position 'pos])
+  (let loop ([t t]
+             [current-position overall-type-position])
+    (match t
+      [(? symbol? name)
+       (or (and (position-match? current-position position)
+                (lookup name))
+           name)]
+      [(list (and struct (or 'struct 'struct:))
+             (? symbol? name)
+             (and parent (or (? symbol?) (list* (or 'struct 'struct:) _))) ...
+             (list (list field-names ': field-ts) ...)
+             opts ...)
+       (append (list struct name)
+               (map (λ (sub-t) (loop sub-t current-position)) parent)
+               (list (map (λ (field-name t) (list field-name ': t))
+                          field-names
+                          (map (λ (sub-t) (loop sub-t current-position)) field-ts))))]
+      [(and (list (or 'struct 'struct:) _ ...) unparsed-struct-type)
+       ;; it has bitten me enough times to warrant this case
+       (error 'type-substitute/lookup
+              @~a{unhandled struct type shape: @~s[unparsed-struct-type]})]
+      [(list (and -> (or '-> '->*)) arg-ts ... res-t)
+       (append (list ->)
+               (map (λ (sub-t) (loop sub-t (flip current-position))) arg-ts)
+               (list (loop res-t current-position)))]
+      [(? list? sub-ts)
+       (map (λ (sub-t) (loop sub-t current-position)) sub-ts)]
+      [other other])))
+(define/contract (type-substitute definitions t [position 'any] [overall-type-position 'pos])
+  ({(listof name+type?) any/c} {position? position?} . ->* . any/c)
+
+  (type-substitute/lookup (λ (name) (lookup-def name definitions))
+                          t
+                          position
+                          overall-type-position))
+(define ((n+t-type-substitutor definitions [position 'any] [overall-type-position 'pos]) n+t)
+  (match-define (name+type name t) n+t)
+  (define substituted-t (type-substitute definitions t position overall-type-position))
+  (match n+t
+    [(struct-type _ _ parent)
+     (struct-type name substituted-t parent)]
+    [(? typedef?)
+     (typedef name substituted-t)]
+    [else
+     (name+type name substituted-t)]))
 
 (module+ test
   (test-begin
-    #:name adapt-all-negative-referencing-provides
-    (test-match (adapt-all-negative-referencing-provides
+    #:name type-substitute
+    (test-equal? (type-substitute (list (typedef 'Z 'Real)
+                                        (struct-type
+                                         'foobar
+                                         '(struct foobar ((a : Real) (b : Number)) #:prefab)
+                                         #f)
+                                        (typedef 'Z2 '(-> String (-> Number Number))))
+                                  'X)
+                 'X)
+    (test-equal? (type-substitute (list (typedef 'Z 'Real)
+                                        (struct-type
+                                         'foobar
+                                         '(struct foobar ((a : Real) (b : Number)) #:prefab)
+                                         #f)
+                                        (typedef 'Z2 '(-> String (-> Number Number))))
+                                  '(-> String (-> Foo Number)))
+                 '(-> String (-> Foo Number)))))
+
+(define/contract (substitute-type-defs+structs* all-interface-types)
+  (listof-non-recursive-name+types? . -> . (and/c listof-non-recursive-name+types?
+                                                  (listof (not/c (or/c struct-type? typedef?)))))
+  (define-values {definitions others}
+    (partition (disjoin struct-type? typedef?) all-interface-types))
+  ;; Substitute the definitions themselves iteratively to a fix point,
+  ;; so that then we can just make a single pass over all the other types.
+  (define fully-substituted-definitions
+    (let loop ([defs definitions])
+      (define new-defs (map (n+t-type-substitutor defs) defs))
+      (if (equal? defs new-defs)
+          defs
+          (loop new-defs))))
+  (map (n+t-type-substitutor fully-substituted-definitions) others))
+
+(module+ test
+  (test-begin
+    #:name listof-non-recursive-name+types?
+    (listof-non-recursive-name+types? empty)
+    (listof-non-recursive-name+types? (list (name+type 'f
+                                                       '(-> A B C))))
+    (listof-non-recursive-name+types? (list (typedef 'f
+                                                     '(-> A B C))))
+    (not (listof-non-recursive-name+types? (list (typedef 'f
+                                                          '(-> A f C)))))
+    (listof-non-recursive-name+types?
+     (list (struct-type 's
+                        '(struct s ([a : Number]))
+                        #f)))
+    (not (listof-non-recursive-name+types?
+          (list (struct-type 's
+                             '(struct s ([a : s]))
+                             #f))))
+    (listof-non-recursive-name+types? (list (name+type 'f
+                                                       '(-> A B C))
+                                            (name+type 'g
+                                                       '(-> A B C))
+                                            (name+type 'h
+                                                       '(-> A B C))
+                                            (name+type 'i
+                                                       '(-> A B C))))
+    (listof-non-recursive-name+types? (list (name+type 'f
+                                                       '(-> A B C))
+                                            (name+type 'g
+                                                       '(-> Natural String))
+                                            (name+type 'c 'Number)))
+    (listof-non-recursive-name+types? (list (name+type 'f
+                                                       '(-> A B C))
+                                            (typedef 'B
+                                                     '(-> A String))
+                                            (typedef 'A '(-> String String))))
+    (not (listof-non-recursive-name+types? (list (name+type 'f
+                                                            '(-> A B C))
+                                                 (typedef 'B
+                                                          '(-> A String))
+                                                 (typedef 'A '(-> B String)))))
+    (listof-non-recursive-name+types?
+     (list (name+type 'f
+                      '(-> A B C))
+           (typedef 'B
+                    '(-> A S))
+           (typedef 'A '(-> String Number))
+           (struct-type 'S
+                        '(struct S ([a : Natural]
+                                    [b : A]))
+                        #f)))
+    (not (listof-non-recursive-name+types?
+          (list (name+type 'f
+                           '(-> A B C))
+                (typedef 'B
+                         '(-> A S))
+                (typedef 'A '(-> String S))
+                (struct-type 'S
+                             '(struct S ([a : Natural]
+                                         [b : A]))
+                             #f))))
+    (listof-non-recursive-name+types?
+     (list (typedef 'Z 'Real)
+           (struct-type 'foobar '(struct foobar ((a : Real) (b : Number)) #:prefab) #f)
+           (name+type 'a 'X)
+           (name+type 'b '(-> String (-> Foo Number)))
+           (name+type 'c 'Y)
+           (typedef 'Z2 '(-> String (-> Number Number))))))
+  (test-begin
+    #:name reference?
+    (reference? 'A 'A 'pos 'pos)
+    (not (reference? 'A 'A 'neg 'pos))
+    (not (reference? 'A 'A 'pos 'neg))
+    (reference? '(Listof (Boxof A)) 'A 'pos 'pos)
+    (not (reference? '(Listof (Boxof A)) 'A 'neg 'pos))
+    (not (reference? '(Listof (Boxof A)) 'A 'pos 'neg))
+    (not (reference? '(-> A B C) 'A 'pos 'pos))
+    (reference? '(-> A B C) 'A 'neg 'pos)
+    (not (reference? '(-> A B C) 'A 'neg 'neg))
+    (reference? '(-> B C A) 'A 'pos 'pos)
+    (not (reference? '(-> B C A) 'A 'pos 'neg))
+    (reference? '(-> B C (-> A B)) 'A 'neg)
+    (reference? '(-> B C (-> (struct s (struct s-parent ([a : A])) ([suba : NotA])) B)) 'A 'neg))
+  (test-begin
+    #:name substitute-type-defs+structs*
+    (test-equal? (substitute-type-defs+structs* empty)
+                 empty)
+    (test-equal? (substitute-type-defs+structs* (list (name+type 'f
+                                                                 '(-> A B C))))
+                 (list (name+type 'f
+                                  '(-> A B C))))
+    (test-match (substitute-type-defs+structs* (list (name+type 'f
+                                                                '(-> A B C))
+                                                     (name+type 'g
+                                                                '(-> Natural String))
+                                                     (name+type 'c 'Number)))
+                (list-no-order (name+type 'f
+                                          '(-> A B C))
+                               (name+type 'g
+                                          '(-> Natural String))
+                               (name+type 'c 'Number)))
+    (test-match (substitute-type-defs+structs* (list (name+type 'f
+                                                                '(-> A B C))
+                                                     (name+type 'g
+                                                                '(-> Natural String))
+                                                     (typedef 'A '(-> String String))))
+                (list-no-order (name+type 'f
+                                          '(-> (-> String String) B C))
+                               (name+type 'g
+                                          '(-> Natural String))))
+    (test-equal? (substitute-type-defs+structs* (list (name+type 'f
+                                                                 '(-> A B C))
+                                                      (typedef 'B
+                                                               '(-> A String))
+                                                      (typedef 'A '(-> String String))))
+                 (list (name+type 'f
+                                  '(-> (-> String String) (-> (-> String String) String) C))))
+    (test-equal? (substitute-type-defs+structs* (list (name+type 'f
+                                                                 '(-> A B C))
+                                                      (typedef 'B
+                                                               '(-> A S))
+                                                      (typedef 'A '(-> String Number))
+                                                      (struct-type 'S
+                                                                   '(struct S ([a : Natural]
+                                                                               [b : A]))
+                                                                   #f)))
+                 (list (name+type 'f
+                                  '(-> (-> String Number)
+                                       (-> (-> String Number)
+                                           (struct S ([a : Natural]
+                                                      [b : (-> String Number)])))
+                                       C))))
+    (test-equal? (substitute-type-defs+structs* (list (typedef 'Z 'Real)
+                                                      (struct-type
+                                                       'foobar
+                                                       '(struct foobar ((a : Real) (b : Number)) #:prefab)
+                                                       #f)
+                                                      (name+type 'a 'X)
+                                                      (name+type 'b '(-> String (-> Foo Number)))
+                                                      (name+type 'c 'Y)
+                                                      (typedef 'Z2 '(-> String (-> Number Number)))))
+                 (list (name+type 'a 'X)
+                       (name+type 'b '(-> String (-> Foo Number)))
+                       (name+type 'c 'Y)))))
+
+;; sexp? (listof symbol?) -> (set/c symbol?)
+(define (references-in/of type names [position 'any] [overall-type-position 'pos])
+  ;; I know, I know, but this is better than having two functions that walk the
+  ;; type tree looking for occurrences of certain names!
+  (define names* (apply set names))
+  (define refs (mutable-set))
+  (void (type-substitute/lookup (λ (name)
+                                  (when (set-member? names* name)
+                                    (set-add! refs name))
+                                  #f)
+                                type
+                                position
+                                overall-type-position))
+  (for/set ([r (in-mutable-set refs)]) r))
+
+(module+ test
+  (test-begin
+    #:name mutation-position
+    (test-equal? (mutation-position (mutated-interface-type
+                                     'Number
+                                     'Any
+                                     type:base-type-substitution))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(Listof Number)
+                                     '(Listof Any)
+                                     type:base-type-substitution))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(Parameterof (Listof (Boxof Number)))
+                                     '(Parameterof (Listof (Boxof Any)))
+                                     type:base-type-substitution))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(struct s parent
+                                        ([c-field : Number]))
+                                     '(struct s parent
+                                        ([c-field : Any]))
+                                     type:base-type-substitution))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> Number String)
+                                     '(-> Any String)
+                                     type:base-type-substitution))
+                 'neg)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> Number String Void)
+                                     '(-> String Number Void)
+                                     type:function-arg-swap))
+                 'neg)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> (Values Number String Void))
+                                     '(-> (Values String Number Void))
+                                     type:function-result-swap))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> (-> Number String))
+                                     '(-> (-> Any String))
+                                     type:base-type-substitution))
+                 'neg)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> String Number)
+                                     '(-> String Any)
+                                     type:base-type-substitution))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> (-> Number String) Void)
+                                     '(-> (-> Any String) Void)
+                                     type:base-type-substitution))
+                 'pos)
+    (test-equal? (mutation-position (mutated-interface-type
+                                     '(-> (-> (Class (field [a Number] [b String])) String) Void)
+                                     '(-> (-> (Class (field [a String] [b Number])) String) Void)
+                                     type:class-field-swap))
+                 'pos))
+  (test-begin
+    #:name adapt-all-referencing-provides
+    (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
                      (struct foobar ([a : Real]
@@ -396,7 +708,7 @@
                        [c Y])
                      (define-type Z2 (-> String (-> Number Number))))
                  'Foo
-                 (make-base-type-adapter 'Integer 'Real))
+                 (mutated-interface-type 'Integer 'Real type:base-type-substitution))
                 (list-no-order
                  (cons 'b (app (compose1 syntax->datum ->stx)
                                '(delegating->
@@ -407,7 +719,7 @@
                                             (cons 0 #;(make-base-type-adapter 'Integer 'Real)
                                                   (sealing-adapter)))
                                            (list)))))))))
-    (test-match (adapt-all-negative-referencing-provides
+    (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
                      (struct foobar ([a : Real]
@@ -420,7 +732,7 @@
                        [c Y])
                      (define-type Z2 (-> String (-> Number Number))))
                  'Foo
-                 (make-base-type-adapter 'Integer 'Real))
+                 (mutated-interface-type 'Integer 'Real type:base-type-substitution))
                 (list-no-order
                  (cons 'b
                        (app (compose1 syntax->datum ->stx)
@@ -432,24 +744,101 @@
                                          (cons 0 #;(make-base-type-adapter 'Integer 'Real)
                                                (sealing-adapter)))
                                         (list)))))))))
-    (test-exn (λ (e) (string-contains? (exn-message e)
-                                       "not implemented"))
-              (adapt-all-negative-referencing-provides
-               #'(module A racket
-                   (define-type Z Real)
-                   (struct foobar ([a : Real]
-                                   [b : Number])
-                     #:prefab)
-                   (provide (struct-out foobar))
-                   (require/typed/provide "x.rkt"
-                     [a (-> Number Foo)]
-                     [b (-> String (-> Foo Number))]
-                     [c Y])
-                   (define-type Z2 (-> Foo (-> Number Number))))
-               'Foo
-               any/c))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (define-type Z Real)
+                     (struct foobar ([a : Real]
+                                     [b : Number])
+                       #:prefab)
+                     (provide (struct-out foobar))
+                     (require/typed/provide "x.rkt"
+                       [a (-> Z2 Foo)]
+                       [b (-> String (-> Foo Number))]
+                       [c Y])
+                     (define-type Z2 (-> Foo (-> Number Number))))
+                 'Foo
+                 (mutated-interface-type 'Integer 'Real type:base-type-substitution))
+                (list-no-order
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list)
+                              (list
+                               (cons 0 (delegating->
+                                        (list
+                                         (cons 0 #;(make-base-type-adapter 'Integer 'Real)
+                                               (sealing-adapter)))
+                                        (list)))))))
+                 ;; Nope! That's a positive reference to Foo via Z2.
+                 #;(cons 'a
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list (cons 0
+                                          (delegating->
+                                           (list (cons 0 (sealing-adapter)))
+                                           (list))))
+                              (list))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (define-type Z Real)
+                     (struct foobar ([a : Real]
+                                     [b : Number])
+                       #:prefab)
+                     (provide (struct-out foobar))
+                     (require/typed/provide "x.rkt"
+                       [a (-> Z2 Foo)]
+                       [b (-> Z (-> Foo Number))]
+                       [c Y])
+                     (define-type Z2 (-> Z (-> Number Number))))
+                 'Z
+                 (mutated-interface-type 'Integer 'Real type:base-type-substitution))
+                (list-no-order
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (sealing-adapter)))
+                              (list))))
+                 ;; Nope! That's a positive reverse to Z via Z2
+                 #;(cons 'a
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list (cons 0
+                                          (delegating->
+                                           (list (cons 0 (sealing-adapter)))
+                                           (list))))
+                              (list))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (define-type Z Real)
+                     (struct foobar ([a : Real]
+                                     [b : Number])
+                       #:prefab)
+                     (provide (struct-out foobar))
+                     (require/typed/provide "x.rkt"
+                       [a (-> Foo Z2)]
+                       [b (-> Z (-> Foo Number))]
+                       [c Y])
+                     (define-type Z2 (-> Z (-> Number Number))))
+                 'Z
+                 (mutated-interface-type 'Integer 'Real type:base-type-substitution))
+                (list-no-order
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (sealing-adapter)))
+                              (list))))
+                 (cons 'a
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list)
+                              (list (cons 0
+                                          (delegating->
+                                           (list (cons 0 (sealing-adapter)))
+                                           (list)))))))))
 
-    (test-match (adapt-all-negative-referencing-provides
+    (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
                      (struct foobar ([a : Real]
@@ -461,7 +850,7 @@
                        [c Y])
                      (define-type Z2 (-> String (-> Number Number))))
                  'stream
-                 (make-base-type-adapter 'Integer 'Index))
+                 (mutated-interface-type 'Integer 'Real type:base-type-substitution))
                 (list-no-order
                  (cons 'something
                        (app (compose1 syntax->datum ->stx)
@@ -472,7 +861,7 @@
                                         (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
                                                     (sealing-adapter))))))
                               (list))))))
-    (test-match (adapt-all-negative-referencing-provides
+    (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (struct YMD ([y : Natural]
                                   [m : Month]
@@ -491,16 +880,26 @@
                        [b (-> String (-> DateTime Number))]
                        [c Y]))
                  'YMD
-                 (delegating-struct 3 (list (cons 0 (sealing-adapter)))))
+                 (mutated-interface-type '(struct YMD ([y : Natural]
+                                                       [m : Month]
+                                                       [d : Natural])
+                                            #:prefab)
+                                         '(struct YMD ([y : Any]
+                                                       [m : Month]
+                                                       [d : Natural])
+                                            #:prefab)
+                                         type:base-type-substitution))
                 (list-no-order
                  (cons 'a
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
                               (list
                                (cons 0 (delegating-struct ; Date
+                                        #f
                                         2
                                         (list
                                          (cons 0 (delegating-struct ; YMD
+                                                  #f
                                                   3
                                                   (list
                                                    (cons 0 (sealing-adapter)))))))))
@@ -514,17 +913,20 @@
                                      (delegating->
                                       (list
                                        (cons 0 (delegating-struct ; DateTime
+                                                #f
                                                 1
                                                 (list
                                                  (cons 0 (delegating-struct ; Date
+                                                          #f
                                                           2
                                                           (list
                                                            (cons 0 (delegating-struct ; YMD
+                                                                    #f
                                                                     3
                                                                     (list
                                                                      (cons 0 (sealing-adapter))))))))))))
                                       (list)))))))))
-    (test-match (adapt-all-negative-referencing-provides
+    (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (struct YMD ([y : Natural]
                                   [m : Month]
@@ -559,7 +961,11 @@
                          Moment)]
                        [c Y]))
                  'Moment
-                 (delegating-struct 1 (list (cons 0 (sealing-adapter)))))
+                 (mutated-interface-type '(struct Moment ([dt : DateTime])
+                                            #:prefab)
+                                         '(struct Moment ([dt : Any])
+                                            #:prefab)
+                                         type:complex-type->Any))
                 (list
                  (cons 'moment
                        (app (compose1 syntax->datum ->stx)
@@ -571,10 +977,11 @@
                                      (delegating->
                                       (list)
                                       (list (cons 0 (delegating-struct
+                                                     #f
                                                      1
                                                      (list
                                                       (cons 0 (sealing-adapter))))))))))))))
-    (test-match (adapt-all-negative-referencing-provides
+    (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (struct exp () #:prefab)
                      (struct app exp ([fun : exp]
@@ -587,13 +994,20 @@
                        [b (-> annotated-app Number)]
                        [c Y]))
                  'app
-                 (delegating-struct 2 (list (cons 1 (sealing-adapter)))))
+                 (mutated-interface-type '(struct app exp ([fun : exp]
+                                                           [arg : Integer])
+                                            #:prefab)
+                                         '(struct app exp ([fun : exp]
+                                                           [arg : Any])
+                                            #:prefab)
+                                         type:base-type-substitution))
                 (list-no-order
                  (cons 'a
                        (app (compose1 syntax->datum ->stx)
                             '(delegating->
                               (list
                                (cons 0 (delegating-struct
+                                        #f
                                         2
                                         (list
                                          (cons 1 (sealing-adapter))))))
@@ -603,10 +1017,103 @@
                             '(delegating->
                               (list
                                (cons 0 (delegating-struct
-                                        3
+                                        (delegating-struct
+                                         #f
+                                         3
+                                         (list
+                                          (cons 1 (sealing-adapter))))
+                                        1
+                                        (list))))
+                              (list))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (struct exp ([a : Integer]) #:prefab)
+                     (struct app exp ([fun : exp]
+                                      [arg : Integer])
+                       #:prefab)
+                     (struct annotated-app app ([ann : Integer])
+                       #:prefab)
+                     (require/typed/provide "x.rkt"
+
+                       [a (-> app Number)]
+                       [b (-> annotated-app Number)]
+                       [c Y]))
+                 'exp
+                 (mutated-interface-type '(struct exp ([a : Integer])
+                                            #:prefab)
+                                         '(struct exp ([a : Any])
+                                            #:prefab)
+                                         type:base-type-substitution))
+                (list-no-order
+                 (cons 'a
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (delegating-struct
+                                        (delegating-struct
+                                         #f
+                                         3
+                                         (list
+                                          (cons 0 (sealing-adapter))))
+                                        2
                                         (list
-                                         (cons 1 (sealing-adapter))))))
-                              (list))))))))
+                                         (cons 0
+                                               (delegating-struct
+                                                #f
+                                                1
+                                                (list
+                                                 (cons 0 (sealing-adapter)))))))))
+                              (list))))
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list
+                               (cons 0 (delegating-struct
+                                        (delegating-struct
+                                         (delegating-struct
+                                          #f
+                                          4
+                                          (list
+                                           (cons 0 (sealing-adapter))))
+                                         3
+                                         (list
+                                          (cons 0
+                                                (delegating-struct
+                                                 #f
+                                                 1
+                                                 (list
+                                                  (cons 0 (sealing-adapter)))))))
+                                        1
+                                        (list))))
+                              (list))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (struct mystruct ([f : (-> Integer String)])
+                       #:prefab)
+                     (require/typed/provide "x.rkt"
+                       [a (-> mystruct Number)]
+                       [b (-> String mystruct)]
+                       [c Y]))
+                 'mystruct
+                 (mutated-interface-type '(struct mystruct ([f : (-> Integer String)])
+                                            #:prefab)
+                                         '(struct mystruct ([f : (-> Any String)])
+                                            #:prefab)
+                                         type:base-type-substitution))
+                (list
+                 (cons 'b
+                       (app (compose1 syntax->datum ->stx)
+                            '(delegating->
+                              (list)
+                              (list
+                               (cons 0 (delegating-struct
+                                        #f
+                                        1
+                                        (list
+                                         (cons 0
+                                               (delegating->
+                                                (list (cons 0 (sealing-adapter)))
+                                                (list))))))))))))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
@@ -629,15 +1136,22 @@
     (for/list ([form (in-list interface-r/t/c/p-forms)])
       ;; munge the bindings so that they line up with the import of r/t/c/p below
       (munge-location+bindings (r/t/c/p-redirect #''contracted form))))
-  (define interface-typedefs
+  (define top-level-n+ts
     (for*/list ([form (in-list interface-top-level-forms)]
-                [n+t (in-list (top-level-form->types form))]
-                #:when (typedef? n+t))
+                [n+t (in-list (top-level-form->types form))])
+      n+t))
+  (define interface-typedefs
+    (for/list ([n+t (in-list top-level-n+ts)]
+               #:when (typedef? n+t))
+      (datum->syntax interface-mod-stx `(define-type ,(name+type-name n+t)
+                                          ,(name+type-type n+t)))))
+  (define interface-typedef-names
+    (for/list ([n+t (in-list top-level-n+ts)]
+               #:when (typedef? n+t))
       (datum->syntax interface-mod-stx (name+type-name n+t))))
   (define interface-structs
-    (for*/list ([form (in-list interface-top-level-forms)]
-                [n+t (in-list (top-level-form->types form))]
-                #:when (struct-type? n+t))
+    (for/list ([n+t (in-list top-level-n+ts)]
+               #:when (struct-type? n+t))
       (datum->syntax interface-mod-stx (name+type-type n+t))))
   (munge-location+bindings
    #`(module mutation-adapter typed/racket
@@ -651,8 +1165,8 @@
                          #`[#,id #,(->stx adapter)]))))
         (require "../../../utilities/require-typed-check-provide.rkt")
         #,@interface-req/prov-forms
-        (require (only-in 'contracted #,@interface-typedefs))
-        (provide #,@interface-typedefs)
+        #,@interface-typedefs
+        (provide #,@interface-typedef-names)
         #,@interface-structs
         #,@redirected-interface-r/t/c/p-forms))))
 
@@ -677,7 +1191,6 @@
                       (provide (except-out (all-from-out "interface.rkt")))
                       (provide (contract-out)))
                     (require "../../../utilities/require-typed-check-provide.rkt")
-                    (require (only-in 'contracted))
                     (provide))))
    (test-equal?
     (syntax->datum
@@ -713,7 +1226,7 @@
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../base/base-types.rkt")
         (reprovide "../base/more-types.rkt")
-        (require (only-in 'contracted FOOBAR))
+        (define-type FOOBAR Natural)
         (provide FOOBAR)
         (struct YMD ([y : Integer]) #:prefab)
         (require/typed/check/provide

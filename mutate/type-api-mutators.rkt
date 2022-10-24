@@ -6,6 +6,7 @@
          type:function-result-swap
          type:struct-field-swap
          type:class-field-swap
+         active-mutation-types ;; add a new type to this list when providing it!
 
          base-type->Any
          complex-type->Any
@@ -188,6 +189,16 @@
   field-type #:-> new-field-type
   (field [field-id new-field-type]
          ...))
+
+
+(define active-mutation-types
+  (list type:base-type-substitution
+        type:complex-type->Any
+        type:function-arg-swap
+        type:function-result-swap
+        type:struct-field-swap
+        type:class-field-swap))
+
 
 (module+ test
   (test-begin

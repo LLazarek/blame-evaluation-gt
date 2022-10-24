@@ -2,8 +2,9 @@
 
 (provide generate-adapter-ctc
          ->stx
-         generate-negative-delegating-adapter-ctc
          expand-field-count-for-child-fields
+         mutation-type->td-leaf-predicate-hash
+         type-diff->adapter/delegate
 
          (struct-out mutated-interface-type)
 
@@ -23,14 +24,34 @@
          delegating-class/c
          delegating-parameter/c
 
-         sexp-diff)
+         sexp-diff
+         sexp->type-diff)
+
+(module+ tds
+  (provide
+   (struct-out td)
+   (struct-out td:->)
+   (struct-out td:->*)
+   (struct-out td:base)
+   (struct-out td:parametric)
+   (struct-out td:vector)
+   (struct-out td:struct)
+   (struct-out td:listof)
+   (struct-out td:vectorof)
+   (struct-out td:boxof)
+   (struct-out td:parameterof)
+   (struct-out td:setof)
+   (struct-out td:option)
+   (struct-out td:pairof)
+   (struct-out td:class)))
 
 (require "../mutate/type-api-mutators.rkt"
          "sexp-diff.rkt"
          "util.rkt"
          syntax/parse/define
          (for-syntax syntax/parse
-                     racket/syntax)
+                     racket/syntax
+                     racket/list)
          racket/struct
          racket/syntax
          syntax/location)
@@ -56,7 +77,7 @@
 (struct td:base td (original new) #:transparent)
 (struct td:parametric td (vars sub-td) #:transparent)
 (struct td:vector td (index-map) #:transparent)
-(struct td:struct td (field-count index-map) #:transparent)
+(struct td:struct td (maybe-parent field-count index-map) #:transparent)
 (struct td:listof td (sub-td) #:transparent)
 (struct td:vectorof td (sub-td) #:transparent)
 (struct td:boxof td (sub-td) #:transparent)
@@ -72,7 +93,7 @@
 ;; Really all that matters for handling swaps tho is knowing that there is a diff between
 ;; two arg positions, so wrap it up in this td to notice that later.
 ;; If the mutation is really of a new type requiring more support, the error will still show up
-;; later in `type-diff->contract`.
+;; later in `type-diff->adapter/delegate`.
 (struct td:unknown-type td (sub-tds) #:transparent)
 
 (define (sexp->type-diff a-sexp-diff)
@@ -87,14 +108,13 @@
   (define td
     (let recur ([sexp-diff-part a-sexp-diff])
       (match (normalize->-types sexp-diff-part)
-        [(list* '-> (app (mapping recur)
-                         (list arg-tds ...
-                               (or (list* 'values result-tds)
-                                   result-tds))))
+        [(list '->
+               (app recur arg-tds)
+               ...
+               (or (list (or 'values 'Values) (app recur result-tds) ...)
+                   (app (compose1 list recur) result-tds)))
          (define arg-map (list->td-index-map arg-tds))
-         (define result-map (list->td-index-map (if (list? result-tds)
-                                                    result-tds
-                                                    (list result-tds))))
+         (define result-map (list->td-index-map result-tds))
          (and (or (not (empty? arg-map)) (not (empty? result-map)))
               (td:-> arg-map result-map))]
         [(list '->*
@@ -104,9 +124,8 @@
                     (list (app (mapping recur)
                                (list optional-arg-tds ...))
                           kws))
-               (or (and (? list?)
-                        (app (mapping recur) (list* 'values result-tds)))
-                   (app recur result-tds)))
+               (or (list (or 'values 'Values) (app recur result-tds) ...)
+                   (app (compose1 list recur) result-tds)))
          (define mandatory-arg-map (list->td-index-map mandatory-arg-tds))
          (define optional-arg-map (list->td-index-map optional-arg-tds))
          (define optional-kw-map
@@ -114,9 +133,7 @@
                        [td (in-value (recur diff))]
                        #:when td)
              (cons kw td)))
-         (define result-map (list->td-index-map (if (list? result-tds)
-                                                    result-tds
-                                                    (list result-tds))))
+         (define result-map (list->td-index-map result-tds))
          (cond [(not (and (empty? optional-arg-map)
                           (empty? optional-kw-map)))
                 ;; Relying on the assumption of a single mutation here.
@@ -161,10 +178,18 @@
          (and sub-td (td:parameterof sub-td))]
         [(list* (or 'struct 'struct:)
                 (? symbol? name)
-                (or          (list* (? symbol? parent) (list [list fields ': (app recur sub-tds)] ...) _)
-                    (binding (list*                    (list [list fields ': (app recur sub-tds)] ...) _)
-                             #:with [parent #f])))
-         (td:struct (length fields) (list->td-index-map sub-tds))]
+                parent ...
+                (list [list fields ': (app recur sub-tds)] ...)
+                (or '()
+                    (list* (? keyword?) _)))
+         (define field-map (list->td-index-map sub-tds))
+         (define maybe-parent-td
+           (match (map recur parent)
+             [(list (? td? p)) p]
+             [else #f]))
+         (and (or maybe-parent-td
+                  (not (empty? field-map)))
+              (td:struct maybe-parent-td (length fields) field-map))]
         [(list* 'Class
                 (app parse-class-parts
                      (list (list (list init-field-names (app recur init-field-sub-tds))
@@ -188,15 +213,14 @@
                       [sub-td (in-list method-sub-tds)]
                       #:when (td? sub-td))
              (cons name sub-td)))
-         (td:class init-field-dict
-                   field-dict
-                   method-dict)]
+         (and (not (and (empty? init-field-dict)
+                        (empty? field-dict)
+                        (empty? method-dict)))
+              (td:class init-field-dict
+                        field-dict
+                        method-dict))]
         [(difference original new)
          (td:base original new)]
-        [(list* 'values (app (mapping recur)
-                             result-tds))
-         (and (ormap td? result-tds)
-              (cons 'values result-tds))]
         [(or (? symbol?) #t #f) #f]
         [(list* 'U
                 (app (mapping recur)
@@ -374,7 +398,18 @@
                                                stream
                                                 ((first : Index) (rest : (-> stream)))
                                                 #:prefab)))
-                 (td:struct 2 `((0 . ,(td:base 'Natural 'Index)))))
+                 (td:struct #f 2 `((0 . ,(td:base 'Natural 'Index)))))
+    (test-equal? (sexp->type-diff (sexp-diff '(struct
+                                               stream
+                                                stream-parent
+                                                ((first : Natural) (rest : (-> stream)))
+                                                #:prefab)
+                                             '(struct
+                                               stream
+                                                stream-parent522788
+                                                ((first : Natural) (rest : (-> stream)))
+                                                #:prefab)))
+                 (td:struct (td:base 'stream-parent 'stream-parent522788) 2 '()))
     (test-equal? (sexp->type-diff (sexp-diff '(struct
                                                stream
                                                 parent
@@ -385,7 +420,7 @@
                                                 parent
                                                 ((first : Index) (rest : (-> stream)))
                                                 #:prefab)))
-                 (td:struct 2 `((0 . ,(td:base 'Natural 'Index)))))
+                 (td:struct #f 2 `((0 . ,(td:base 'Natural 'Index)))))
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
                  (td:listof (td:base 'A 'B)))
@@ -557,152 +592,101 @@
   full-combinator)
 
 (struct recur () #:transparent)
-;; td? (td? -> (or/c contract? recur?)) -> contract?
-;; Converts `td` into a contract from the bottom up using `instantiator`,
-;; which decides where the "bottom" of the tree is by producing the base contract,
-;; or asks to continue unpacking the tree by producing `(recur)`.
-;; All layers above the base contract will simply delegate down to the base.
-(define (type-diff->contract td instantiator)
-  (let loop ([inner-td td])
-    (define (loop-over-dict-values d)
+;; td?
+;; (td? position? -> boolean?)
+;; (td? position? -> contract?)
+;; ->
+;; contract?
+;;
+;; Converts `td` into a contract from the bottom up using `is-leaf?` and
+;; `leaf->adapter`. `is-leaf?` decides where the "bottom" of the tree is, and
+;; `leaf->adapter` converts the bottom into a base contract. All layers above
+;; the base contract are converted into adapters that delegate down to the base.
+(define (type-diff->adapter/delegate td is-leaf? leaf->adapter)
+  (let loop ([inner-td td]
+             [current-position 'pos])
+    (define (loop-over-dict-values d pos)
       (for/list ([{k td} (in-dict d)])
-        (cons k (loop td))))
+        (cons k (loop td pos))))
 
-    (match* {(instantiator inner-td) inner-td}
-      [{(and (not (recur)) result) _} result]
-      [{(recur) (? td:base? base)}
-       (error 'type-diff->contract
-              @~a{given instantiator @~e[instantiator] asked to recur into td:base @~e[base]})]
-      [{(recur) (td:-> arg-index-map result-index-map)}
-       (delegating-> (loop-over-dict-values arg-index-map)
-                     (loop-over-dict-values result-index-map))]
-      [{(recur) (td:parametric vars sub-td)}
+    (match* {(is-leaf? inner-td current-position) inner-td}
+      [{#t _} (leaf->adapter inner-td current-position)]
+      [{#f (? td:base? base)}
+       (error 'type-diff->adapter/delegate
+              @~a{given leaf predicate @~e[is-leaf?] asked to recur into td:base @~e[base]})]
+      [{#f (td:-> arg-index-map result-index-map)}
+       (delegating-> (loop-over-dict-values arg-index-map (flip current-position))
+                     (loop-over-dict-values result-index-map current-position))]
+      [{#f (td:->* n optional-arg-index-map optional-kw-arg-map)}
+       (delegating->* n
+                      (loop-over-dict-values optional-arg-index-map (flip current-position))
+                      (loop-over-dict-values optional-kw-arg-map (flip current-position)))]
+      [{#f (td:parametric vars sub-td)}
        ;; We won't mutate a type variable (unless of course it's spelled the
        ;; same as a base type... let's hope not) so we can just treat it as a
        ;; non-parametric type for the adapter's purposes.
        ;; i.e. just ignore it the parametric part!
-       (loop sub-td)]
-      [{(recur) (td:struct field-count index-map)}
-       (delegating-struct field-count (loop-over-dict-values index-map))]
-      [{(recur) (td:listof sub-td)}
-       (delegating-listof (loop sub-td))]
-      [{(recur) (td:vectorof sub-td)}
-       (delegating-vectorof (loop sub-td))]
-      [{(recur) (td:boxof sub-td)}
-       (delegating-boxof (loop sub-td))]
-      [{(recur) (td:setof sub-td)}
-       (delegating-setof (loop sub-td))]
-      [{(recur) (td:pairof left right)}
-       (delegating-pairof (if left (loop left) (any/c-adapter))
-                          (if right (loop right) (any/c-adapter)))]
-      [{(recur) (td:parameterof sub-td)}
-       (delegating-parameter/c (loop sub-td))]
-      [{(recur) (td:->* n optional-arg-index-map optional-kw-arg-map)}
-       (delegating->* n
-                      (loop-over-dict-values optional-arg-index-map)
-                      (loop-over-dict-values optional-kw-arg-map))]
-      [{(recur) (td:class init-field-td-map field-td-map method-td-map)}
-       (delegating-class/c (loop-over-dict-values init-field-td-map)
-                           (loop-over-dict-values field-td-map)
-                           (loop-over-dict-values method-td-map))]
+       (loop sub-td current-position)]
+      [{#f (td:struct maybe-parent field-count index-map)}
+       (define parent-adapter (and maybe-parent
+                                   (loop maybe-parent current-position)))
+       (delegating-struct (and parent-adapter
+                               (expand-field-count-for-child-fields parent-adapter
+                                                                    field-count))
+                          field-count
+                          (loop-over-dict-values index-map current-position))]
+      [{#f (td:listof sub-td)}
+       (delegating-listof (loop sub-td current-position))]
+      [{#f (td:vectorof sub-td)}
+       (delegating-vectorof (loop sub-td current-position))]
+      [{#f (td:boxof sub-td)}
+       (delegating-boxof (loop sub-td current-position))]
+      [{#f (td:setof sub-td)}
+       (delegating-setof (loop sub-td current-position))]
+      [{#f (td:pairof left right)}
+       (delegating-pairof (if left (loop left current-position) (any/c-adapter))
+                          (if right (loop right current-position) (any/c-adapter)))]
+      [{#f (td:parameterof sub-td)}
+       (delegating-parameter/c (loop sub-td current-position))]
+      [{#f (td:class init-field-td-map field-td-map method-td-map)}
+       (delegating-class/c (loop-over-dict-values init-field-td-map current-position)
+                           (loop-over-dict-values field-td-map current-position)
+                           (loop-over-dict-values method-td-map current-position))]
       [{_ _}
-       (error 'type-diff->contract
+       (error 'type-diff->adapter/delegate
               @~a{
-                  Unexpected instantiator request to recur from @instantiator
+                  Unexpected leaf-predicate request to recur from @is-leaf?
                   on @~s[inner-td]
                   which is part of @~s[td]
                   })])))
 
-(define (type-sexp-not-containing-struct-subexps? s)
-  (let loop ([s s]
-             [top #t])
-    (match s
-      [(list* (or 'struct 'struct:) _ more)
-       (and top
-            (loop more #f))]
-      [(? list? l)
-       (andmap (λ (e) (loop e #f)) l)]
-      [datum #t])))
-
-(define/contract (replace-name-in-negative-types type name replacement)
-  (type-sexp-not-containing-struct-subexps? ;; `struct` handling below assumes
-                                            ;; that `struct` decls must be at
-                                            ;; the top level of a type
-   symbol?
-   any/c
-   . -> .
-   any/c)
-
-  (let loop ([subtype type]
-             [negative? #f])
-    (match subtype
-      [(list '-> arg-ts ... res-t)
-       (append (list '->)
-               (map (λ (t) (loop t (not negative?))) arg-ts)
-               (list (loop res-t negative?)))]
-      [(list '->* mandatory-arg-ts optional-arg-ts res-t)
-       (append (list '->*)
-               (list (map (λ (t) (loop t (not negative?))) mandatory-arg-ts)
-                     (map (λ (t) (loop t (not negative?))) optional-arg-ts))
-               (list (loop res-t negative?)))]
-      [(list* (and struct (or 'struct 'struct:)) name field-types)
-       ;; Literal #t for `negative?` here bc this can only appear at the top level!
-       `(,struct ,name . ,(map (λ (t) (loop t #t)) field-types))]
-      [(? list? sub-exps) (map (λ (t) (loop t negative?)) sub-exps)]
-      [(== name)
-       #:when negative?
-       replacement]
-      [other other])))
-
 (module+ test
   (test-begin
-    #:name type-sexp-not-containing-struct-subexps?
-    (type-sexp-not-containing-struct-subexps? '())
-    (type-sexp-not-containing-struct-subexps? 'A)
-    (type-sexp-not-containing-struct-subexps? '(-> A B C))
-    (type-sexp-not-containing-struct-subexps? '(struct s ([x : Nat] [y : Int])))
-    (not (type-sexp-not-containing-struct-subexps? '(-> (struct s ([x : Nat] [y : Int]))))))
-  (test-begin
-    #:name replace-name-in-negative-types
-    (test-equal? (replace-name-in-negative-types '(A B C (D E (B) G) (H I J))
-                                                 'B
-                                                 'X)
-                 '(A B C (D E (B) G) (H I J)))
-    (test-equal? (replace-name-in-negative-types '(-> A B C (D E (B) G) (H I J))
-                                                 'B
-                                                 'X)
-                 '(-> A X C (D E (X) G) (H I J)))
-    (test-equal? (replace-name-in-negative-types '(A B C (-> D E (-> B) G) (H I J))
-                                                 'B
-                                                 'X)
-                 '(A B C (-> D E (-> X) G) (H I J)))
-    (test-equal? (replace-name-in-negative-types '(-> A B C (-> D E (-> B R) G) (H I J))
-                                                 'B
-                                                 'X)
-                 '(-> A X C (-> D E (-> X R) G) (H I J)))
-    (test-equal? (replace-name-in-negative-types '(-> A B C (-> D E (-> B B) G) (H I J))
-                                                 'B
-                                                 'X)
-                 '(-> A X C (-> D E (-> X B) G) (H I J)))
-    (test-equal? (replace-name-in-negative-types '(struct Date ((ymd : YMD) (jdn : Integer)) #:prefab)
-                                                 'YMD
-                                                 '???)
-                 '(struct Date ((ymd : ???) (jdn : Integer)) #:prefab))))
+    #:name type-diff->adapter/delegate
+    (test-equal? (let/ec return
+                   (type-diff->adapter/delegate
+                    (sexp->type-diff
+                     (sexp-diff '(-> Number String)
+                                '(-> Any String)))
+                    is-td-leaf?:base-type-substitution
+                    (match-lambda** [{_ pos} (return pos)])))
+                 'neg)))
 
-;; sexp? symbol? contract? -> contract?
-;; Generate a contract that delegates on `name` in *negative positions only* to `ctc`.
-(define (generate-negative-delegating-adapter-ctc type name ctc)
-  (define td (sexp->type-diff (sexp-diff type (replace-name-in-negative-types type name (gensym name)))))
-  (type-diff->contract td
-                       (match-lambda [(? td:base?) ctc]
-                                     [else (recur)])))
+(define-simple-macro (simple-leaf-pattern pat)
+  (match-lambda** [{pat _} #t]
+                  [{_ _} #f]))
+
+(define is-td-leaf?:base-type-substitution
+  (simple-leaf-pattern (or (? td:base?)
+                           (td:option (? td:base?)))))
 
 (define (base-type-substitution-adapter type-diff)
-  (type-diff->contract type-diff
-                       (match-lambda [(or (td:base original new)
-                                          (td:option (td:base original new)))
-                                      (make-base-type-adapter original new)]
-                                     [else (recur)])))
+  (type-diff->adapter/delegate type-diff
+                               is-td-leaf?:base-type-substitution
+                               (match-lambda** [{(or (td:base original new)
+                                                     (td:option (td:base original new)))
+                                                 _}
+                                                (make-base-type-adapter original new)])))
 
 (define largest-possible-vector-size (expt 2 64))
 (define round->exact (compose1 inexact->exact round))
@@ -733,64 +717,82 @@
   ;;              new-type)
   (sealing-adapter))
 
+(define is-td-leaf?:function-arg/result-swap
+  ;; It would be nice to check some relationship betw the two sub-tds (the
+  ;; wildcards in this pattern) to make sure that this really does look like a
+  ;; swap, but that's not possible unfortunately, because the td algo often does
+  ;; things like this:
+  ;; (-> (Listof A) (Listof B) R)
+  ;; ~>
+  ;; (-> (Listof B) (Listof A) R)
+  ;; becomes the td:
+  ;; (td:-> ((0 . (td:listof (td:base A B)))
+  ;;         (1 . (td:listof (td:base B A)))))
+  ;; or, for some mutations, even worse:
+  ;; (td:-> ((0 . (td:unknown-type (list (td:base A B) ...)))
+  ;;         (1 . (td:unknown-type (list (td:base B A) ...)))))
+  ;;
+  ;; So it's not clear how to check this in general.
+  (simple-leaf-pattern (or (td:-> `(,_ ,_) '())
+                           (td:-> '()      `(,_ ,_)))))
 (define (function-arg/result-swap-adapter type-diff)
-  (type-diff->contract
+  (type-diff->adapter/delegate
    type-diff
-   ;; It would be nice to check some relationship betw `td1` and `td2`, to make
-   ;; sure that this really does look like a swap, but that's not possible
-   ;; unfortunately, because the td algo often does things like this:
-   ;; (-> (Listof A) (Listof B) R)
-   ;; ~>
-   ;; (-> (Listof B) (Listof A) R)
-   ;; becomes the td:
-   ;; (td:-> ((0 . (td:listof (td:base A B)))
-   ;;         (1 . (td:listof (td:base B A)))))
-   ;; or, for some mutations, even worse:
-   ;; (td:-> ((0 . (td:unknown-type (list (td:base A B) ...)))
-   ;;         (1 . (td:unknown-type (list (td:base B A) ...)))))
-   ;;
-   ;; So it's not clear how to check this in general.
-   (match-lambda [(or (binding (td:-> `((,i1 . ,td1)
-                                        (,i2 . ,td2))
-                                      '())
-                               #:with [arg? #t])
-                      (binding (td:-> '()
-                                      `((,i1 . ,td1)
-                                        (,i2 . ,td2)))
-                               #:with [arg? #f]))
-                  (swap-> arg? i1 i2)]
-                 [(td:base original new)
-                  (error 'function-arg-swap-adapter
-                         @~a{
-                             Should be impossible: got a base type diff? From recurring into: @;
-                             @~s[type-diff]
-                             })]
-                 [else (recur)])))
+   is-td-leaf?:function-arg/result-swap
+   (match-lambda** [{(or (binding (td:-> `((,i1 . ,td1)
+                                           (,i2 . ,td2))
+                                         '())
+                                  #:with [arg? #t])
+                         (binding (td:-> '()
+                                         `((,i1 . ,td1)
+                                           (,i2 . ,td2)))
+                                  #:with [arg? #f]))
+                     _}
+                    (swap-> arg? i1 i2)])))
+
+(define is-td-leaf?:struct-field-swap
+  ;; See note above about function arg/result swap sub-tds
+  (simple-leaf-pattern (td:struct _ _ `(,_ ,_))))
 
 (define (struct-field-swap-adapter type-diff)
-  (match type-diff
-    [(td:struct field-count
-                `((,i1 . ,td1)
-                  (,i2 . ,td2))) ;; See note above about function arg/result swap sub-tds
-     (swap-struct-field field-count i1 i2)]
-    [other
-     (error 'struct-field-swap-adapter
-            @~a{Should be impossible: got a td that isn't td:struct?: @~e[other]})]))
+  ;; Really, `type-diff->adapter/delegate` shouldn't be necessary here -- struct
+  ;; tds should only ever happen at the root of a td tree, because struct types
+  ;; only appear at the top level.
+  ;; But it's easier to parse when its consistent with the others - no harm anyway.
+  (type-diff->adapter/delegate
+   type-diff
+   is-td-leaf?:struct-field-swap
+   (match-lambda** [{(td:struct _
+                                field-count
+                                `((,i1 . ,td1)
+                                  (,i2 . ,td2)))
+                     _}
+                    (swap-struct-field field-count i1 i2)])))
+
+(define is-td-leaf?:class-field-swap
+  ;; See note above about function arg/result swap sub-tds
+  (simple-leaf-pattern (or (td:class `(,_ ,_)
+                                     '()
+                                     _)
+                           (td:class '()
+                                     `(,_ ,_)
+                                     _))))
 
 (define (class-field-swap-adapter type-diff)
-  (match type-diff
-    [(or (td:class `((,i1 . ,td1)
-                     (,i2 . ,td2)) ;; See note above about function arg/result swap sub-tds
-                   '()
-                   _)
-         (td:class '() ;; See note above about function arg/result swap sub-tds
-                   `((,i1 . ,td1)
-                     (,i2 . ,td2))
-                   _))
-     (swap-class-field i1 i2)]
-    [other
-     (error 'class-field-swap-adapter
-            @~a{Should be impossible: got a td that isn't td:class?: @~e[other]})]))
+  (type-diff->adapter/delegate
+   type-diff
+   is-td-leaf?:class-field-swap
+   (match-lambda**
+    [{(or (td:class `((,i1 . ,td1)
+                      (,i2 . ,td2))
+                    '()
+                    _)
+          (td:class '()
+                    `((,i1 . ,td1)
+                      (,i2 . ,td2))
+                    _))
+      _}
+     (swap-class-field i1 i2)])))
 
 
 #;(define (vector-swap-adapter type-diff)
@@ -807,6 +809,15 @@
     [(td:base original new)
      (error 'vector-swap-adapter
             "Should be impossible: got a base type diff?")]))
+
+(define/contract mutation-type->td-leaf-predicate-hash
+  (λ (h) (set=? (hash-keys h) active-mutation-types))
+  (hash type:base-type-substitution  is-td-leaf?:base-type-substitution
+        type:complex-type->Any       is-td-leaf?:base-type-substitution
+        type:function-arg-swap       is-td-leaf?:function-arg/result-swap
+        type:function-result-swap    is-td-leaf?:function-arg/result-swap
+        type:struct-field-swap       is-td-leaf?:struct-field-swap
+        type:class-field-swap        is-td-leaf?:class-field-swap))
 
 (require racket/generic)
 (define-generics adapted
@@ -1102,14 +1113,17 @@
          (append parents-fields
                  (transform this-structs-own-fields))))
 
-(define-adapter delegating-struct (field-count index-ctc-pairs)
+(define-adapter delegating-struct (maybe-parent-ctc field-count index-ctc-pairs)
   #:name (list 'delegating-struct
+               (and maybe-parent-ctc (contract-name maybe-parent-ctc))
                field-count
                (index-ctc-pairs->names index-ctc-pairs))
   #:->stx (λ (->stx)
-            #`(delegating-struct #,field-count #,(index-ctc-pairs->stx index-ctc-pairs ->stx)))
+            #`(delegating-struct #,(and maybe-parent-ctc (->stx maybe-parent-ctc))
+                                 #,field-count
+                                 #,(index-ctc-pairs->stx index-ctc-pairs ->stx)))
   (λ (v)
-    (transform-struct-fields v
+    (transform-struct-fields (apply-contract (or maybe-parent-ctc any/c) v)
                              field-count
                              (λ (fields)
                                (apply-contracts-in-list fields
@@ -1117,8 +1131,14 @@
 
 (define (expand-field-count-for-child-fields a-ds offset)
   (match a-ds
-    [(delegating-struct field-count index-ctc-pairs)
-     (delegating-struct (+ field-count offset) index-ctc-pairs)]
+    [(delegating-struct maybe-parent-adapter field-count index-ctc-pairs)
+     (define expanded-parent-adapter
+       (and maybe-parent-adapter
+            (expand-field-count-for-child-fields maybe-parent-adapter
+                                                 offset)))
+     (delegating-struct expanded-parent-adapter
+                        (+ field-count offset)
+                        index-ctc-pairs)]
     [(swap-struct-field field-count i1 i2)
      (swap-struct-field (+ field-count offset) i1 i2)]))
 
@@ -1143,7 +1163,7 @@
   (λ (v) (apply-contract (cons/c car-ctc cdr-ctc) v)))
 
 (define-adapter swap-struct-field (field-count i1 i2)
-  #:name (list 'delegating-struct i1 i2)
+  #:name (list 'swap-struct-field field-count i1 i2)
   #:->stx (λ _ #`(swap-struct-field #,field-count #,i1 #,i2))
   (λ (v)
     (transform-struct-fields v field-count (λ (fields) (swap-in-list fields i1 i2)))))
@@ -1426,6 +1446,18 @@
      (let-values ([{v1 v2} (f "" (λ _ 5.2))])
        (sealed? v2)))
     (test-adapter-contract
+     [f (λ (s g) (values 2 (g 0)))
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(-> String
+                                                      (-> Integer Real)
+                                                      (Values Integer Real))
+                                                 '(-> String
+                                                      (-> Integer Integer)
+                                                      (Values Integer Real))
+                                                 type:base-type-substitution))]
+     (let-values ([{v1 v2} (f "" (λ _ 5.2))])
+       (sealed? v2)))
+    (test-adapter-contract
      [f (λ (s g) (values 2 g))
         #:with-contract (generate-adapter-ctc
                          (mutated-interface-type '(-> String
@@ -1569,12 +1601,14 @@
    ;; Child struct adaptation for a parent's field
    (test-adapter-contract
     [t (temp-child 5.5 "hello" 2.3 'a 'b 'c)
-       #:with-contract (expand-field-count-for-child-fields
-                        (generate-adapter-ctc
-                         (mutated-interface-type '(struct temp ([x : Real] [y : String] [z : Real]))
-                                                 '(struct temp ([x : Real] [y : Integer] [z : Real]))
-                                                 type:base-type-substitution))
-                        3)]
+       #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(struct temp-child
+                                                    (struct temp ([x : Real] [y : String] [z : Real]))
+                                                    ([a : Integer] [b : Integer] [c : Integer] ))
+                                                 '(struct temp-child
+                                                    (struct temp ([x : Real] [y : Integer] [z : Real]))
+                                                    ([a : Integer] [b : Integer] [c : Integer] ))
+                                                 type:base-type-substitution))]
     (and/test/message [(temp-child? t) "not a temp-child"]
                       [(test-equal? (temp-x t) 5.5) "other field sealed: x"]
                       [(sealed? (temp-y t)) "field y not sealed"]
@@ -1584,19 +1618,51 @@
                       [(test-equal? (temp-child-c t) 'c) "other field sealed: c"]))
    (test-adapter-contract
     [t (temp-child 5.5 "hello" 2.3 'a 'b 'c)
-       #:with-contract (expand-field-count-for-child-fields
-                        (generate-adapter-ctc
-                         (mutated-interface-type '(struct temp ([x : Real] [y : String] [z : Real]))
-                                                 '(struct temp ([x : Real] [y : Real] [z : String]))
-                                                 type:struct-field-swap))
-                        3)]
+       #:with-contract (generate-adapter-ctc
+                        (mutated-interface-type '(struct temp-child
+                                                   (struct temp ([x : Real] [y : String] [z : Real]))
+                                                   ([a : Integer] [b : Integer] [c : Integer] ))
+                                                '(struct temp-child
+                                                   (struct temp ([x : Real] [y : Real] [z : String]))
+                                                   ([a : Integer] [b : Integer] [c : Integer] ))
+                                                type:struct-field-swap))]
     (and/test/message [(temp-child? t) "not a temp-child"]
                       [(test-equal? (temp-x t) 5.5) "other field wrong: x"]
                       [(test-equal? (temp-y t) 2.3) "field y not swapped"]
                       [(test-equal? (temp-z t) "hello") "field z not swapped"]
                       [(test-equal? (temp-child-a t) 'a) "other field wrong: a"]
                       [(test-equal? (temp-child-b t) 'b) "other field wrong: b"]
-                      [(test-equal? (temp-child-c t) 'c) "other field wrong: c"])))
+                      [(test-equal? (temp-child-c t) 'c) "other field wrong: c"]))
+   (ignore (struct exp (a) #:prefab)
+           (struct app exp (fun arg)
+             #:prefab)
+           (struct annotated-app app (ann)
+             #:prefab))
+   (test-adapter-contract
+    [aa (annotated-app 1 (exp 2) 3 4)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(struct annotated-app
+                                                    (struct app
+                                                      (struct exp ([a : Integer]) #:prefab)
+                                                      ([fun : (struct exp ([a : Integer]) #:prefab)]
+                                                       [arg : Integer])
+                                                      #:prefab)
+                                                    ([ann : Integer])
+                                                    #:prefab)
+                                                 '(struct annotated-app
+                                                    (struct app
+                                                      (struct exp ([a : Any]) #:prefab)
+                                                      ([fun : (struct exp ([a : Any]) #:prefab)]
+                                                       [arg : Integer])
+                                                      #:prefab)
+                                                    ([ann : Integer])
+                                                    #:prefab)
+                                                 type:base-type-substitution))]
+    (and/test/message [(annotated-app? aa) "not an annotated-app"]
+                      [(test-equal? (annotated-app-ann aa) 4) "field wrong: ann"]
+                      [(exp? (app-fun aa)) "field wrong: fun, not an exp"]
+                      [(sealed? (exp-a (app-fun aa))) "field wrong: exp-a of fun field, not sealed"]
+                      [(sealed? (exp-a aa)) "field wrong: exp-a not sealed"])))
   (test-begin
    #:name swap-struct-fields
    (ignore (struct temp (x y z) #:prefab))
@@ -1842,5 +1908,39 @@
              (field [a String]
                     [b Number]
                     [c Number])
-             (m (-> Number String String))))))
+             (m (-> Number String String)))))
+  (test-begin
+    #:name swap-ho-class-field
+    (ignore (define ns (make-base-namespace))
+            (define (eval* e) (eval e ns))
+            (eval* #'(require "mutation-adapter.rkt" rackunit racket racket/class))
+            (eval* #'(require/expose "mutation-adapter.rkt" [apply-contract]))
+            (eval* #`(define f (apply-contract #,(->stx (generate-adapter-ctc
+                                                        (mutated-interface-type
+                                                         '(-> (Class (init-field [a Number]
+                                                                                 [b String]
+                                                                                 [c Number])
+                                                                     (m (-> Number String String)))
+                                                              Number)
+                                                         '(-> (Class (init-field [a String]
+                                                                                 [b Number]
+                                                                                 [c Number])
+                                                                     (m (-> Number String String)))
+                                                              Number)
+                                                         type:class-field-swap)))
+                                              (λ (c)
+                                                (define o (new c [a 5] [b "hello"] [c 42]))
+                                                (send o get-field:a))))))
+
+    (test-equal? (eval* #'(f (class object%
+                               (super-new)
+                               (init-field a b c)
+                               (define/public (m n s) s)
+                               (define/public (get-field:a) a)
+                               (define/public (get-field:b) b)
+                               (define/public (get-field:c) c)
+                               (define/public (set-field:a v) (set! a v))
+                               (define/public (set-field:b v) (set! b v))
+                               (define/public (set-field:c v) (set! c v)))))
+                 "hello")))
 

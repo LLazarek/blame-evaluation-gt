@@ -1,7 +1,10 @@
 #lang at-exp racket
 
 (provide assert
-         binding)
+         binding
+         position?
+         position-match?
+         flip)
 
 (require syntax/parse/define)
 
@@ -18,3 +21,12 @@
      #'(and pat
             (app (const val) name)
             ...)]))
+
+(define position? (or/c 'pos 'neg 'any))
+(define (position-match? a b)
+  (or (equal? b 'any) ;; common case, I hypothesize
+      (equal? a b)
+      (equal? a 'any)))
+(define flip (match-lambda ['neg 'pos]
+                           ['pos 'neg]))
+
