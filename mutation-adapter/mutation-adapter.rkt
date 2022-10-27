@@ -69,7 +69,7 @@
 (td-struct td:option (sub-td))
 (td-struct td:pairof (left right))
 (td-struct td:hash (key val))
-(td-struct td:list (index-map))
+(td-struct td:list* (len index-map tail-sub-td))
 (td-struct td:class (init-field-td-map field-td-map method-td-map))
 
 ;; used to support diffs that we may not otherwise support, produced by arg swapping.
@@ -151,7 +151,16 @@
         [(list 'List (app recur sub-tds) ...)
          (define index-map (list->td-index-map sub-tds))
          (and (not (empty? index-map))
-              (td:list index-map))]
+              (td:list* (length sub-tds)
+                        index-map
+                        #f))]
+        [(list 'List* (app recur sub-tds) ... (app recur tail-sub-td))
+         (define index-map (list->td-index-map sub-tds))
+         (and (or (not (empty? index-map))
+                  tail-sub-td)
+              (td:list* (length sub-tds)
+                        index-map
+                        tail-sub-td))]
         [(list 'Vectorof (app recur sub-td))
          (and sub-td (td:vectorof sub-td))]
         [(list 'Boxof (app recur sub-td))
@@ -449,7 +458,14 @@
                  (td:listof (td:base 'A 'B)))
     (test-equal? (sexp->type-diff (sexp-diff '(List A B C D)
                                              '(List A B Z D)))
-                 (td:list `((2 . ,(td:base 'C 'Z)))))
+                 (td:list* 4
+                           `((2 . ,(td:base 'C 'Z)))
+                           #f))
+    (test-equal? (sexp->type-diff (sexp-diff '(List* A B C DD)
+                                             '(List* A B Z ZZ)))
+                 (td:list* 3
+                           `((2 . ,(td:base 'C 'Z)))
+                           (td:base 'DD 'ZZ)))
     (test-equal? (sexp->type-diff (sexp-diff '(Setof A)
                                              '(Setof B)))
                  (td:setof (td:base 'A 'B)))
@@ -660,8 +676,12 @@
                           (loop-over-dict-values index-map current-position))]
       [{#f (td:listof sub-td)}
        (delegating-listof (loop sub-td current-position))]
-      [{#f (td:list index-map)}
-       (delegating-list (loop-over-dict-values index-map current-position))]
+      [{#f (td:list* len index-map maybe-tail-sub-td)}
+       (delegating-list* len
+                         (loop-over-dict-values index-map current-position)
+                         (if maybe-tail-sub-td
+                             (loop maybe-tail-sub-td current-position)
+                             (any/c-adapter)))]
       [{#f (td:vectorof sub-td)}
        (delegating-vectorof (loop sub-td current-position))]
       [{#f (td:boxof sub-td)}
@@ -1174,8 +1194,20 @@
 
 (define-simple-delegating-adapter delegating-listof [sub-ctc]
   (λ (v) (apply-contract (listof sub-ctc) v)))
-(define-simple-delegating-adapter delegating-list [index-ctc-pairs]
-  (λ (v) (apply-contracts-in-list v index-ctc-pairs)))
+(define-adapter delegating-list* (len index-ctc-pairs tail-ctc)
+  #:name (list 'delegating-list*
+               len
+               (index-ctc-pairs->names index-ctc-pairs)
+               (contract-name tail-ctc))
+  #:->stx (λ (->stx)
+            #`(delegating-list*
+               #,len
+               #,(index-ctc-pairs->stx index-ctc-pairs)
+               #,(->stx tail-ctc)))
+  (λ (v)
+    (define-values {parts tail} (split-at v len))
+    (append (apply-contracts-in-list parts index-ctc-pairs)
+            (apply-contract tail-ctc tail))))
 
 (define-simple-delegating-adapter delegating-parameter/c [sub-ctc]
   (λ (p)
