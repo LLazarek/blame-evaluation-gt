@@ -6,8 +6,11 @@
 
 (define (install!)
   (configure! mutation                 type-interface-mistakes)
+  (configure! module-selection-for-mutation interface-module-only)
   (configure! benchmark-runner         run-it)
-  (configure! bt-root-sampling         random-with-replacement)
   (configure! configurations           module-types)
+
   (configure! module-instrumentation   none)
-  (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module))
+  (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module)
+
+  (configure! bt-root-sampling         random-with-replacement))

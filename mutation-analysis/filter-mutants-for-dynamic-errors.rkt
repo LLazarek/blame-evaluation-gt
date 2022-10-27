@@ -20,7 +20,7 @@
          racket/random)
 
 (define-runtime-paths
-  [erasure-config-path "../configurables/configs/mutation-analysis.rkt"]
+  [erasure-config-path "../configurables/configs/dynamic-error-analysis-erasure.rkt"]
   [natural-config-path "../configurables/configs/dynamic-error-analysis-natural.rkt"])
 
 (define working-dir (make-parameter "find-mutant-dynamic-errors-scratch"))
