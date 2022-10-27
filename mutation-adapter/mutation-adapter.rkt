@@ -47,13 +47,6 @@
 (define (mapping f)
   (λ (l) (map f l)))
 
-(define-match-expander binding
-  (syntax-parser
-    [(_ pat {~seq #:with [name:id val:expr]} ...)
-     #'(and pat
-            (app (const val) name)
-            ...)]))
-
 ;; type-diff
 (struct td () #:transparent)
 
@@ -191,7 +184,9 @@
               (td:struct maybe-parent-td (length fields) field-map))]
         [(list* 'Class
                 (app parse-class-parts
-                     (list (list (list init-field-names (app recur init-field-sub-tds))
+                     (list (app recur implements-clause-sub-td)
+                           (app recur implements/inits-clause-sub-td)
+                           (list (list init-field-names (app recur init-field-sub-tds))
                                  ...)
                            (list (list field-names (app recur field-sub-tds))
                                  ...)
@@ -212,12 +207,22 @@
                       [sub-td (in-list method-sub-tds)]
                       #:when (td? sub-td))
              (cons name sub-td)))
-         (and (not (and (empty? init-field-dict)
-                        (empty? field-dict)
-                        (empty? method-dict)))
-              (td:class init-field-dict
-                        field-dict
-                        method-dict))]
+         (define immediate-td
+           (and (not (and (false? implements-clause-sub-td)
+                          (false? implements/inits-clause-sub-td)
+                          (empty? init-field-dict)
+                          (empty? field-dict)
+                          (empty? method-dict)))
+                (td:class init-field-dict
+                          field-dict
+                          method-dict)))
+         (if (or implements-clause-sub-td
+                 implements/inits-clause-sub-td)
+             (union-td:classes immediate-td
+                               (or implements-clause-sub-td
+                                   implements/inits-clause-sub-td)
+                               #:with-inits? (and implements/inits-clause-sub-td #t))
+             immediate-td)]
         [(list 'Instance (app recur sub-td))
          (and sub-td (td:instanceof sub-td))]
         [(difference original new)
@@ -264,39 +269,56 @@
      (list only-positional-args
            empty)]))
 
+(define-simple-macro (multi-match e
+                                  [pat result #:otherwise default]
+                                  ...)
+  (list (match e [pat result] [else default]) ...))
+;; sexp? -> (list/c (or/c sexp? #f) ; implements
+;;                  (or/c sexp? #f) ; implements/inits
+;;                  (listof sexp)   ; init-fields
+;;                  (listof sexp)   ; fields
+;;                  (listof sexp)   ; methods
+;;                  )
 ;; Assumption: all fields/init-fields are grouped together under a single
 ;; field/init-field block, and those blocks (if any) appear before all methods.
 (define (parse-class-parts class-type-body)
-  (match class-type-body
-    [(or (list (not (? list?)) ... ;; e.g. #:implements FooBar
-               (list 'init-field init-fields ...)
-               (list 'field fields ...)
-               (and methods (list (? symbol?) _)) ...)
-         (list (not (? list?)) ...
-               (list 'field fields ...)
-               (list 'init-field init-fields ...)
-               (and methods (list (? symbol?) _)) ...)
-         (binding (list (not (? list?)) ...
-                        (list 'init-field init-fields ...)
-                        (and methods (list (? symbol?) _)) ...)
-                  #:with [fields empty])
-         (binding (list (not (? list?)) ...
-                        (list 'field fields ...)
-                        (and methods (list (? symbol?) _)) ...)
-                  #:with [init-fields empty])
-         (binding (list (not (? list?)) ...
-                        (and methods (list (? symbol?) _)) ...)
-                  #:with [init-fields empty]
-                  #:with [fields empty]))
-     (list init-fields
-           fields
-           methods)]
-    [else
-     (error 'parse-class-parts
-            @~a{
-                one or more assumptions about the shape of class types have been violated in:
-                @~s[(cons 'Class class-type-body)]
-                })]))
+  (multi-match
+   class-type-body
+
+   [(somewhere '#:implements implements-other-class-type)
+    implements-other-class-type
+    #:otherwise #f]
+   [(somewhere '#:implements/inits implements-other-class-type)
+    implements-other-class-type
+    #:otherwise #f]
+   [(somewhere (list 'init-field init-fields ...))
+    init-fields
+    #:otherwise empty]
+   [(somewhere (list 'field init-fields ...))
+    init-fields
+    #:otherwise empty]
+   [(list (not (list (and (? symbol?)
+                          (not (or 'init
+                                   'init-field
+                                   'init-rest
+                                   'field
+                                   'augment)))
+                     _)) ...
+          (and methods (list (and (? symbol?)
+                                  (not (or 'init
+                                           'init-field
+                                           'init-rest
+                                           'field
+                                           'augment)))
+                             _))
+          ...)
+    methods
+    #:otherwise (error 'parse-class-parts
+                       @~a{
+                           one or more assumptions about the shape of class types @;
+                           have been violated in:
+                           @~s[(cons 'Class class-type-body)]
+                           })]))
 
 (define (normalize->-types t)
   (match t
@@ -560,6 +582,18 @@
                                              '(-> A Any C)))
                  (td:-> `((1 . ,(td:base '(-> Z Z Z) 'Any)))
                         '()))))
+
+(define (union-td:classes td1 td2 #:with-inits? with-inits?)
+  (match* {td1 td2}
+    [{#f td2} td2]
+    [{td1 #f} td1]
+    [{(td:class init-map1 field-map1 method-map1)
+      (td:class init-map2 field-map2 method-map2)}
+     (td:class (if with-inits?
+                   (append init-map1 init-map2)
+                   td1)
+               (append field-map1 field-map2)
+               (append method-map1 method-map2))]))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)

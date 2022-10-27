@@ -2,6 +2,7 @@
 
 (provide assert
          binding
+         somewhere
          position?
          position-match?
          flip)
@@ -21,6 +22,9 @@
      #'(and pat
             (app (const val) name)
             ...)]))
+(define-match-expander somewhere
+  (syntax-parser
+    [(_ pats ...) #'(list _ ___ pats ... _ ___)]))
 
 (define position? (or/c 'pos 'neg 'any))
 (define (position-match? a b)

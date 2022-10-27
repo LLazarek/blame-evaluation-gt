@@ -777,7 +777,17 @@
                                                       (typedef 'Z2 '(-> String (-> Number Number)))))
                  (list (name+type 'a 'X)
                        (name+type 'b '(-> String (-> Foo Number)))
-                       (name+type 'c 'Y)))))
+                       (name+type 'c 'Y)))
+    (test-equal? (substitute-type-defs+structs*
+                  (list (typedef 'Z 'Real)
+                        (typedef 'PlayerS%
+                                 '(Class (move (-> State Move))))
+                        (typedef 'DefaultPlayer%
+                                 '(Class #:implements PlayerS%))
+                        (name+type 'f
+                                   '(-> String (-> DefaultPlayer% Number)))))
+                 (list (name+type 'f
+                                  '(-> String (-> (Class #:implements (Class (move (-> State Move)))) Number)))))))
 
 ;; sexp? (listof symbol?) -> (set/c symbol?)
 (define (references-in/of type names [position 'any] [overall-type-position 'pos])
@@ -1458,7 +1468,50 @@
                          (list (cons 0 (delegating->
                                         (list (cons 0 (adapter-reference 'Player%)))
                                         (list))))
-                         (list))))))))
+                         (list))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (struct Turn ([number : Natural]) #:prefab)
+                     (define-type Player%
+                       (Class
+                        (init-field [name String])
+                        (take-turn (-> Turn State))))
+                     (define-type DefaultPlayer%
+                       (Class
+                        #:implements/inits Player%
+                        (set-strategy (-> (-> Turn) Void))))
+                     (require/typed/provide "x.rkt"
+                       [default-player DefaultPlayer%]))
+                 'Turn
+                 (mutated-interface-type
+                  '(struct Turn ([number : Natural]) #:prefab)
+                  '(struct Turn ([number : Any]) #:prefab)
+                  type:base-type-substitution))
+                (list
+                 '()
+                 (list-no-order
+                  (cons 'default-player
+                        (delegating-class/c
+                         (list)
+                         (list)
+                         (list-no-order
+                          (cons 'take-turn
+                                (delegating->
+                                 (list (cons 0 (delegating-struct
+                                                #f
+                                                1
+                                                (list (cons 0 (sealing-adapter))))))
+                                 (list)))
+                          (cons 'set-strategy
+                                (delegating->
+                                 (list (cons 0
+                                             (delegating->
+                                              (list)
+                                              (list (cons 0 (delegating-struct
+                                                             #f
+                                                             1
+                                                             (list (cons 0 (sealing-adapter)))))))))
+                                 (list)))))))))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")
