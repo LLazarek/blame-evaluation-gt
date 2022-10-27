@@ -13,7 +13,7 @@
   (configure! configurations           module-types)
 
   (configure! module-instrumentation   none)
-  (configure! program-instrumentation  instrument-modules-and-insert-interface-adapter-module)
+  (configure! program-instrumentation  instrument-modules-and-insert-empty-interface-middle-module)
 
   ;;;; These don't matter for mutation analysis
   ;; (configure! mutant-sampling          none)

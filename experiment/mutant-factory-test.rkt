@@ -773,7 +773,9 @@
                       (match the-mutant
                         ;; Make sure this config is in the set of sampled bt-roots
                         ;; See test below that expects it
-                        [(mutant _ "main.rkt" 5)
+                        [(mutant _
+                                 (== mutant-with-config-blaming-main.rkt:mod)
+                                 (== mutant-with-config-blaming-main.rkt:index))
                          (define roots-1
                            ((original-sampler bench-info the-mutant) (sub1 n)))
                          (cons mutant-with-config-blaming-main.rkt:config

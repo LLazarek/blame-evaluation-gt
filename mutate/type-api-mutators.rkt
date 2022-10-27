@@ -101,12 +101,19 @@
   [Boolean #:-> Any]
   )
 
-;; This will create a whole lotta garbage (syntax errors), but that's ok since
-;; we weed those out easily and quickly in the first step of mutation analysis.
+(define known-special-form?
+  (syntax-parser
+    [({~or {~datum struct} {~datum struct:}} _ ...) #t]
+    [([field:id {~datum :} type ...] ...) #t]
+    [({~or {~datum field} {~datum init-field}} _ ...) #t]
+    [[field-name:id {~datum :} type ...] #t]
+    [[method-name:id ({~or {~datum ->} {~datum ->*}} _ ...)] #t]
+    [else #f]))
 (define type:complex-type->Any "complex-type->Any")
 (define-simple-mutator (complex-type->Any stx)
   #:type type:complex-type->Any
   #:pattern (_ ...)
+  #:when (not (known-special-form? stx))
   #'Any)
 
 (define (in-swaps l)
@@ -298,4 +305,9 @@
                          #'(Listof String)))
     (test-mutator* complex-type->Any
                    #'Natural
-                   (list #'Natural))))
+                   (list #'Natural))
+    (test-mutator* complex-type->Any
+                   #'(struct stream ([head : Number]
+                                     [tail : stream]))
+                   (list #'(struct stream ([head : Number]
+                                           [tail : stream]))))))

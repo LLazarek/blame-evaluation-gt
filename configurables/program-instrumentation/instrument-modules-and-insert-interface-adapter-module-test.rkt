@@ -137,8 +137,7 @@
                        (sealing-adapter)])))
         (require "../../../utilities/require-typed-check-provide.rkt") ;; inserted unconditionally
         (require "../../../utilities/require-typed-check-provide.rkt") ;; copied over from original
-        (require (only-in 'contracted)) ;; original has no typedefs, so nothing in
-        (provide)                       ;; these two
+        (provide)                       ;; original has no typedefs, so nothing here
         (require/typed/check/provide 'contracted
                                      [x Integer])})))
 
@@ -173,7 +172,6 @@
                         (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
-        (require (only-in 'contracted))
         (provide)
         (require/typed/check/provide 'contracted
                                      [f (-> Integer String Integer)])})))
@@ -209,8 +207,65 @@
                     [f (swap-> #t 0 1)])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
-        (require (only-in 'contracted))
         (provide)
         (require/typed/check/provide 'contracted
                                      [f (-> Integer String Integer)]
+                                     [g (-> Any Any)])})))
+
+  (test-interface-mutation-adapter
+   #:program-location "/"
+   (list "client.rkt"
+         #'{(require "type-interface.rkt")
+            (f 2 "hello")})
+   (list "library.rkt"
+         #'{(provide f g)
+            (define (f a s) (+ a (string-length s)))
+            (define (g x) x)})
+   #:original-interface-body #'{(define-type Foo Real)
+                                (struct stream ([head : Natural]
+                                                [rest : (-> stream)]))
+                                (provide Foo
+                                         (struct-out stream))
+                                (require/typed/check/provide "library.rkt"
+                                                             [f (-> Integer stream Integer)]
+                                                             [g (-> Any Any)])}
+   #:mutated-interface-body #'{(define-type Foo Real)
+                               (struct stream ([head : Any]
+                                               [rest : (-> stream)]))
+                               (provide Foo
+                                         (struct-out stream))
+                               (require/typed/check/provide "library.rkt"
+                                                            [f (-> Integer stream Integer)]
+                                                            [g (-> Any Any)])}
+   #:type type:base-type-substitution
+   #:logged (list #'Natural #'Any)
+
+   #:check-adapter-mod-body
+   (λ (body-stx)
+     (test-match
+      (syntax->datum body-stx)
+      `{(module contracted racket
+          (require (file ,_))
+          (require "original-type-interface.rkt")
+          (define stream
+            (recursive-contract
+             (delegating-struct #f
+                                2
+                                (list (cons 0 (sealing-adapter))
+                                      (cons 1 (delegating->
+                                               (list)
+                                               (list (cons 0 stream))))))))
+          (provide (except-out (all-from-out "original-type-interface.rkt")
+                               f))
+          (provide (contract-out
+                    [f (delegating-> (list (cons 1 stream)) (list))])))
+        (require "../../../utilities/require-typed-check-provide.rkt")
+        (require "../../../utilities/require-typed-check-provide.rkt")
+        (provide Foo (struct-out stream))
+        (define-type Foo Real)
+        (provide Foo)
+        (struct stream ([head : Natural]
+                        [rest : (-> stream)]))
+        (require/typed/check/provide 'contracted
+                                     [f (-> Integer stream Integer)]
                                      [g (-> Any Any)])}))))

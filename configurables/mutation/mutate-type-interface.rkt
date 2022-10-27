@@ -116,8 +116,8 @@
     (test-mutator* mutate-type-expr
                    #'(struct stream ([first : Natural] [rest : (-> stream)]) #:prefab)
                    (list #'(struct stream ([first : (-> stream)] [rest : Natural]) #:prefab)
-                         #'(struct stream ([first : Integer] [rest : (-> stream)]) #:prefab)
-                         #'(struct stream ([first : Index] [rest : (-> stream)]) #:prefab)
+                         #'(struct stream ([first : Any] [rest : (-> stream)]) #:prefab)
+                         #'(struct stream ([first : Natural] [rest : Any]) #:prefab)
                          #'(struct stream ([first : Natural] [rest : (-> stream)]) #:prefab))))
 
   (test-begin
@@ -158,9 +158,16 @@
               ]]
        [1 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
-              (struct stream ([first : Integer]
-                              [rest : (-> stream)])
-                #:prefab)
+              (struct stream ([first : Any] [rest : (-> stream)]) #:prefab)
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)]
+                                           [stream-unfold (-> stream (values Natural stream))]
+                                           [stream-get (-> stream Natural Natural)]
+                                           [stream-take (-> stream Natural (Listof Natural))])
+              ]]
+       [2 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (struct stream ([first : Natural] [rest : Any]) #:prefab)
               (require/typed/check/provide "streams.rkt"
                                            [make-stream (-> Natural (-> stream) stream)]
                                            [stream-unfold (-> stream (values Natural stream))]
@@ -173,7 +180,7 @@
                               [rest : (-> stream)])
                 #:prefab)
               (require/typed/check/provide "streams.rkt"
-                                           [make-stream (-> (-> stream) Natural stream)]
+                                           [make-stream Any]
                                            [stream-unfold (-> stream (values Natural stream))]
                                            [stream-get (-> stream Natural Natural)]
                                            [stream-take (-> stream Natural (Listof Natural))])
@@ -184,7 +191,18 @@
                               [rest : (-> stream)])
                 #:prefab)
               (require/typed/check/provide "streams.rkt"
-                                           [make-stream (-> Integer (-> stream) stream)]
+                                           [make-stream (-> (-> stream) Natural stream)]
+                                           [stream-unfold (-> stream (values Natural stream))]
+                                           [stream-get (-> stream Natural Natural)]
+                                           [stream-take (-> stream Natural (Listof Natural))])
+              ]]
+       [5 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (struct stream ([first : Natural]
+                              [rest : (-> stream)])
+                #:prefab)
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Any (-> stream) stream)]
                                            [stream-unfold (-> stream (values Natural stream))]
                                            [stream-get (-> stream Natural Natural)]
                                            [stream-take (-> stream Natural (Listof Natural))])
@@ -195,8 +213,8 @@
                               [rest : (-> stream)])
                 #:prefab)
               (require/typed/check/provide "streams.rkt"
-                                           [make-stream (-> Natural (-> stream) stream)]
-                                           [stream-unfold (-> stream (values stream Natural))]
+                                           [make-stream (-> Natural Any stream)]
+                                           [stream-unfold (-> stream (values Natural stream))]
                                            [stream-get (-> stream Natural Natural)]
                                            [stream-take (-> stream Natural (Listof Natural))])
               ]]
@@ -207,7 +225,18 @@
                 #:prefab)
               (require/typed/check/provide "streams.rkt"
                                            [make-stream (-> Natural (-> stream) stream)]
-                                           [stream-unfold (-> stream (values Integer stream))]
+                                           [stream-unfold Any]
+                                           [stream-get (-> stream Natural Natural)]
+                                           [stream-take (-> stream Natural (Listof Natural))])
+              ]]
+       [8 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (struct stream ([first : Natural]
+                              [rest : (-> stream)])
+                #:prefab)
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)]
+                                           [stream-unfold (-> stream (values stream Natural))]
                                            [stream-get (-> stream Natural Natural)]
                                            [stream-take (-> stream Natural (Listof Natural))])
               ]]
@@ -218,22 +247,44 @@
                 #:prefab)
               (require/typed/check/provide "streams.rkt"
                                            [make-stream (-> Natural (-> stream) stream)]
-                                           [stream-unfold (-> stream (values Natural stream))]
-                                           [stream-get (-> Natural stream Natural)]
+                                           [stream-unfold (-> stream Any)]
+                                           [stream-get (-> stream Natural Natural)]
                                            [stream-take (-> stream Natural (Listof Natural))])
               ]]
        [10 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
-               (struct stream ([first : Natural]
-                               [rest : (-> stream)])
-                 #:prefab)
+              (struct stream ([first : Natural]
+                              [rest : (-> stream)])
+                #:prefab)
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)]
+                                           [stream-unfold (-> stream (values Any stream))]
+                                           [stream-get (-> stream Natural Natural)]
+                                           [stream-take (-> stream Natural (Listof Natural))])
+              ]]
+       [11 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (struct stream ([first : Natural]
+                              [rest : (-> stream)])
+                #:prefab)
               (require/typed/check/provide "streams.rkt"
                                            [make-stream (-> Natural (-> stream) stream)]
                                            [stream-unfold (-> stream (values Natural stream))]
-                                           [stream-get (-> stream Integer Natural)]
+                                           [stream-get Any]
                                            [stream-take (-> stream Natural (Listof Natural))])
               ]]
        [12 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (struct stream ([first : Natural]
+                              [rest : (-> stream)])
+                #:prefab)
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)]
+                                           [stream-unfold (-> stream (values Natural stream))]
+                                           [stream-get (-> Natural stream Natural)]
+                                           [stream-take (-> stream Natural (Listof Natural))])
+              ]]
+       [13 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
                (struct stream ([first : Natural]
                                [rest : (-> stream)])
@@ -241,7 +292,7 @@
               (require/typed/check/provide "streams.rkt"
                                            [make-stream (-> Natural (-> stream) stream)]
                                            [stream-unfold (-> stream (values Natural stream))]
-                                           [stream-get (-> stream Natural Integer)]
+                                           [stream-get (-> stream Any Natural)]
                                            [stream-take (-> stream Natural (Listof Natural))])
               ]]
        [14 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
@@ -252,20 +303,31 @@
               (require/typed/check/provide "streams.rkt"
                                            [make-stream (-> Natural (-> stream) stream)]
                                            [stream-unfold (-> stream (values Natural stream))]
-                                           [stream-get (-> stream Natural Natural)]
-                                           [stream-take (-> Natural stream (Listof Natural))])
+                                           [stream-get (-> stream Natural Any)]
+                                           [stream-take (-> stream Natural (Listof Natural))])
               ]]
        [15 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
                (struct stream ([first : Natural]
                                [rest : (-> stream)])
                  #:prefab)
-               (require/typed/check/provide "streams.rkt"
-                                            [make-stream (-> Natural (-> stream) stream)]
-                                            [stream-unfold (-> stream (values Natural stream))]
-                                            [stream-get (-> stream Natural Natural)]
-                                            [stream-take (-> stream Integer (Listof Natural))])
-               ]]
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)]
+                                           [stream-unfold (-> stream (values Natural stream))]
+                                           [stream-get (-> stream Natural Natural)]
+                                           [stream-take Any])
+              ]]
+       [16 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+               (struct stream ([first : Natural]
+                               [rest : (-> stream)])
+                 #:prefab)
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)]
+                                           [stream-unfold (-> stream (values Natural stream))]
+                                           [stream-get (-> stream Natural Natural)]
+                                           [stream-take (-> Natural stream (Listof Natural))])
+              ]]
        [17 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
                (struct stream ([first : Natural]
@@ -275,7 +337,29 @@
                                             [make-stream (-> Natural (-> stream) stream)]
                                             [stream-unfold (-> stream (values Natural stream))]
                                             [stream-get (-> stream Natural Natural)]
-                                            [stream-take (-> stream Natural (Listof Integer))])
+                                            [stream-take (-> stream Any (Listof Natural))])
+               ]]
+       [18 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+               (struct stream ([first : Natural]
+                               [rest : (-> stream)])
+                 #:prefab)
+               (require/typed/check/provide "streams.rkt"
+                                            [make-stream (-> Natural (-> stream) stream)]
+                                            [stream-unfold (-> stream (values Natural stream))]
+                                            [stream-get (-> stream Natural Natural)]
+                                            [stream-take (-> stream Natural Any)])
+               ]]
+       [19 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+               (struct stream ([first : Natural]
+                               [rest : (-> stream)])
+                 #:prefab)
+               (require/typed/check/provide "streams.rkt"
+                                            [make-stream (-> Natural (-> stream) stream)]
+                                            [stream-unfold (-> stream (values Natural stream))]
+                                            [stream-get (-> stream Natural Natural)]
+                                            [stream-take (-> stream Natural (Listof Any))])
                ]]))
 
     (test-mutation/sequence
@@ -288,13 +372,38 @@
         ]
      `(#;[0 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
-              (define-type BoxQuad (List* 'box QuadAttrs QuadList))
-              (define-type RunQuad (List* 'run QuadAttrs QuadList))
-              ]]
+                (define-type BoxQuad (List* 'box QuadAttrs QuadList))
+                (define-type RunQuad (List* 'run QuadAttrs QuadList))
+                (require/typed/check/provide "streams.rkt"
+                                             [make-stream (-> Natural (-> stream) stream)])]]
        [0 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (define-type BoxQuad Any)
+              (define-type RunQuad (List* 'run QuadAttrs QuadList))
+              (require/typed/check/provide "streams.rkt"
+                                           [make-stream (-> Natural (-> stream) stream)])]]
+       [1 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+                (define-type BoxQuad (List* Any QuadAttrs QuadList))
+                (define-type RunQuad (List* 'run QuadAttrs QuadList))
+                (require/typed/check/provide "streams.rkt"
+                                             [make-stream (-> Natural (-> stream) stream)])]]
+       [2 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+                (define-type BoxQuad (List* 'box QuadAttrs QuadList))
+                (define-type RunQuad Any)
+                (require/typed/check/provide "streams.rkt"
+                                             [make-stream (-> Natural (-> stream) stream)])]]
+       [3 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+                (define-type BoxQuad (List* 'box QuadAttrs QuadList))
+                (define-type RunQuad (List* Any QuadAttrs QuadList))
+                (require/typed/check/provide "streams.rkt"
+                                             [make-stream (-> Natural (-> stream) stream)])]]
+       [4 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
 
               (define-type BoxQuad (List* 'box QuadAttrs QuadList))
               (define-type RunQuad (List* 'run QuadAttrs QuadList))
               (require/typed/check/provide "streams.rkt"
-                                            [make-stream (-> (-> stream) Natural stream)])
+                                            [make-stream Any])
               ]]))))

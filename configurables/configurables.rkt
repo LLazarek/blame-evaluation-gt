@@ -69,7 +69,10 @@
     #:module "program-instrumentation/just-instrument-modules.rkt")
 
   (define-implementation instrument-modules-and-insert-interface-adapter-module
-    #:module "program-instrumentation/instrument-modules-and-insert-interface-adapter-module.rkt"))
+    #:module "program-instrumentation/instrument-modules-and-insert-interface-adapter-module.rkt")
+
+  (define-implementation instrument-modules-and-insert-empty-interface-middle-module
+    #:module "program-instrumentation/instrument-modules-and-insert-empty-interface-middle-module.rkt"))
 
 (define-configurable benchmark-runner
   #:provides [make-benchmark-runner]

@@ -3,10 +3,12 @@
 (provide generate-adapter-ctc
          ->stx
          expand-field-count-for-child-fields
-         mutation-type->td-leaf-predicate-hash
+         lookup-td->adapter-generation-info
          type-diff->adapter/delegate
 
          (struct-out mutated-interface-type)
+
+         adapter-reference
 
          make-base-type-adapter
          swap->
@@ -21,29 +23,12 @@
          delegating-vectorof
          delegating-boxof
          delegating-pairof
+         delegating-instanceof
          delegating-class/c
          delegating-parameter/c
 
          sexp-diff
          sexp->type-diff)
-
-(module+ tds
-  (provide
-   (struct-out td)
-   (struct-out td:->)
-   (struct-out td:->*)
-   (struct-out td:base)
-   (struct-out td:parametric)
-   (struct-out td:vector)
-   (struct-out td:struct)
-   (struct-out td:listof)
-   (struct-out td:vectorof)
-   (struct-out td:boxof)
-   (struct-out td:parameterof)
-   (struct-out td:setof)
-   (struct-out td:option)
-   (struct-out td:pairof)
-   (struct-out td:class)))
 
 (require "../mutate/type-api-mutators.rkt"
          "sexp-diff.rkt"
@@ -71,21 +56,28 @@
 
 ;; type-diff
 (struct td () #:transparent)
-(struct td:-> td (argument-index-map result-index-map) #:transparent)
-(struct td:->* td (mandatory-arg-count optional-argument-index-map optional-kw-argument-map)
-  #:transparent)
-(struct td:base td (original new) #:transparent)
-(struct td:parametric td (vars sub-td) #:transparent)
-(struct td:vector td (index-map) #:transparent)
-(struct td:struct td (maybe-parent field-count index-map) #:transparent)
-(struct td:listof td (sub-td) #:transparent)
-(struct td:vectorof td (sub-td) #:transparent)
-(struct td:boxof td (sub-td) #:transparent)
-(struct td:parameterof td (sub-td) #:transparent)
-(struct td:setof td (sub-td) #:transparent)
-(struct td:option td (sub-td) #:transparent)
-(struct td:pairof td (left right) #:transparent)
-(struct td:class td (init-field-td-map field-td-map method-td-map) #:transparent)
+
+(define-simple-macro (td-struct name fields)
+  (begin (struct name td fields #:transparent)
+         (module+ tds (provide (struct-out name)))))
+
+(td-struct td:-> (argument-index-map result-index-map))
+(td-struct td:->* (mandatory-arg-count optional-argument-index-map optional-kw-argument-map))
+(td-struct td:base (original new))
+(td-struct td:parametric (vars sub-td))
+(td-struct td:vector (index-map))
+(td-struct td:struct (maybe-parent field-count index-map))
+(td-struct td:listof (sub-td))
+(td-struct td:vectorof (sub-td))
+(td-struct td:boxof (sub-td))
+(td-struct td:parameterof (sub-td))
+(td-struct td:setof (sub-td))
+(td-struct td:instanceof (sub-td))
+(td-struct td:option (sub-td))
+(td-struct td:pairof (left right))
+(td-struct td:hash (key val))
+(td-struct td:list (index-map))
+(td-struct td:class (init-field-td-map field-td-map method-td-map))
 
 ;; used to support diffs that we may not otherwise support, produced by arg swapping.
 ;; e.g. Swapping `(Listof A) (Setof A)` produces a diff
@@ -163,6 +155,10 @@
          (td:vector (list->td-index-map sub-tds))]
         [(list 'Listof (app recur sub-td))
          (and sub-td (td:listof sub-td))]
+        [(list 'List (app recur sub-tds) ...)
+         (define index-map (list->td-index-map sub-tds))
+         (and (not (empty? index-map))
+              (td:list index-map))]
         [(list 'Vectorof (app recur sub-td))
          (and sub-td (td:vectorof sub-td))]
         [(list 'Boxof (app recur sub-td))
@@ -174,6 +170,9 @@
         [(list 'Pairof (app recur car) (app recur cdr))
          (and (or car cdr)
               (td:pairof car cdr))]
+        [(list 'HashTable (app recur key) (app recur val))
+         (and (or key val)
+              (td:hash key val))]
         [(list 'Parameterof (app recur sub-td))
          (and sub-td (td:parameterof sub-td))]
         [(list* (or 'struct 'struct:)
@@ -219,9 +218,11 @@
               (td:class init-field-dict
                         field-dict
                         method-dict))]
+        [(list 'Instance (app recur sub-td))
+         (and sub-td (td:instanceof sub-td))]
         [(difference original new)
          (td:base original new)]
-        [(or (? symbol?) #t #f) #f]
+        [(or (? symbol?) #t #f (? number?) (? keyword?)) #f]
         [(list* 'U
                 (app (mapping recur)
                      (list _ ... (? td?) _ ...)))
@@ -424,6 +425,9 @@
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
                  (td:listof (td:base 'A 'B)))
+    (test-equal? (sexp->type-diff (sexp-diff '(List A B C D)
+                                             '(List A B Z D)))
+                 (td:list `((2 . ,(td:base 'C 'Z)))))
     (test-equal? (sexp->type-diff (sexp-diff '(Setof A)
                                              '(Setof B)))
                  (td:setof (td:base 'A 'B)))
@@ -436,6 +440,9 @@
     (test-equal? (sexp->type-diff (sexp-diff '(Pairof A B)
                                              '(Pairof C B)))
                  (td:pairof (td:base 'A 'C) #f))
+    (test-equal? (sexp->type-diff (sexp-diff '(HashTable A B)
+                                             '(HashTable C B)))
+                 (td:hash (td:base 'A 'C) #f))
 
     (test-equal? (sexp->type-diff (sexp-diff '(->* (A) (C) R)
                                              '(->* (B) (C) R)))
@@ -513,6 +520,17 @@
                            '()
                            `((run . ,(td:-> `((0 . ,(td:base 'Natural 'Integer)))
                                             '())))))
+    (test-equal? (sexp->type-diff
+                  (sexp-diff '(Class (init-field (next-tile (-> (Listof Tile) Tile)))
+                                     (sign-up (-> String (Instance Player%) String))
+                                     (show-players (-> (Listof String))))
+                             '(Class (init-field (next-tile (-> (Listof Tile) Tile)))
+                                     (sign-up (-> String (Instance Any) String))
+                                     (show-players (-> (Listof String))))))
+                 (td:class '()
+                           '()
+                           `((sign-up . ,(td:-> `((1 . ,(td:instanceof (td:base 'Player% 'Any))))
+                                                '())))))
 
     (test-equal? (sexp->type-diff (sexp-diff '(case-> (-> A C)
                                                       (->* (A) (B) C))
@@ -558,38 +576,9 @@
               @~s[mutated]
               })
   (define type-diff (sexp->type-diff (sexp-diff original mutated)))
-  (define full-combinator
-    (match mutation-type
-      [(or (== type:base-type-substitution)
-           (== type:complex-type->Any))
-       (base-type-substitution-adapter type-diff)]
-      [(== type:function-arg-swap)
-       (function-arg/result-swap-adapter type-diff)]
-      [(== type:function-result-swap)
-       (function-arg/result-swap-adapter type-diff)]
-      [(== type:struct-field-swap)
-       (struct-field-swap-adapter type-diff)]
-      [(== type:class-field-swap)
-       (class-field-swap-adapter type-diff)]
-      ;; [(== type:vector-arg-swap)
-      ;;  (vector-swap-adapter type-diff)]
-      ;; [type:function-arg-drop
-      ;;  (function-arg-drop-adapter annotated-diff)]
-      ;; [type:function-result-drop
-      ;;  (function-result-drop-adapter annotated-diff)]
-      ;; [type:union-branch-drop
-      ;;  (union-branch-drop-adapter annotated-diff)]
-      [other-type
-       (error
-        'mutation-adapter:generate-adapter-ctc
-        @~a{
-            Received unknown or unimplemented mutation type: @other-type
-            For mutation:
-            @~s[original]
-            -->
-            @~s[mutated]
-            })]))
-  full-combinator)
+  (apply type-diff->adapter/delegate
+         type-diff
+         (lookup-td->adapter-generation-info mutation-type)))
 
 (struct recur () #:transparent)
 ;; td?
@@ -637,6 +626,8 @@
                           (loop-over-dict-values index-map current-position))]
       [{#f (td:listof sub-td)}
        (delegating-listof (loop sub-td current-position))]
+      [{#f (td:list index-map)}
+       (delegating-list (loop-over-dict-values index-map current-position))]
       [{#f (td:vectorof sub-td)}
        (delegating-vectorof (loop sub-td current-position))]
       [{#f (td:boxof sub-td)}
@@ -646,12 +637,17 @@
       [{#f (td:pairof left right)}
        (delegating-pairof (if left (loop left current-position) (any/c-adapter))
                           (if right (loop right current-position) (any/c-adapter)))]
+      [{#f (td:hash left right)}
+       (delegating-hash/c (if left (loop left current-position) (any/c-adapter))
+                          (if right (loop right current-position) (any/c-adapter)))]
       [{#f (td:parameterof sub-td)}
        (delegating-parameter/c (loop sub-td current-position))]
       [{#f (td:class init-field-td-map field-td-map method-td-map)}
        (delegating-class/c (loop-over-dict-values init-field-td-map current-position)
                            (loop-over-dict-values field-td-map current-position)
                            (loop-over-dict-values method-td-map current-position))]
+      [{#f (td:instanceof sub-td)}
+       (delegating-instanceof (loop sub-td current-position))]
       [{_ _}
        (error 'type-diff->adapter/delegate
               @~a{
@@ -679,14 +675,11 @@
 (define is-td-leaf?:base-type-substitution
   (simple-leaf-pattern (or (? td:base?)
                            (td:option (? td:base?)))))
-
-(define (base-type-substitution-adapter type-diff)
-  (type-diff->adapter/delegate type-diff
-                               is-td-leaf?:base-type-substitution
-                               (match-lambda** [{(or (td:base original new)
-                                                     (td:option (td:base original new)))
-                                                 _}
-                                                (make-base-type-adapter original new)])))
+(define leaf->adapter:base-type-substitution
+  (match-lambda** [{(or (td:base original new)
+                        (td:option (td:base original new)))
+                    _}
+                   (make-base-type-adapter original new)]))
 
 (define largest-possible-vector-size (expt 2 64))
 (define round->exact (compose1 inexact->exact round))
@@ -735,39 +728,29 @@
   ;; So it's not clear how to check this in general.
   (simple-leaf-pattern (or (td:-> `(,_ ,_) '())
                            (td:-> '()      `(,_ ,_)))))
-(define (function-arg/result-swap-adapter type-diff)
-  (type-diff->adapter/delegate
-   type-diff
-   is-td-leaf?:function-arg/result-swap
-   (match-lambda** [{(or (binding (td:-> `((,i1 . ,td1)
-                                           (,i2 . ,td2))
-                                         '())
-                                  #:with [arg? #t])
-                         (binding (td:-> '()
-                                         `((,i1 . ,td1)
-                                           (,i2 . ,td2)))
-                                  #:with [arg? #f]))
-                     _}
-                    (swap-> arg? i1 i2)])))
+(define leaf->adapter:function-arg/result-swap
+  (match-lambda** [{(or (binding (td:-> `((,i1 . ,td1)
+                                          (,i2 . ,td2))
+                                        '())
+                                 #:with [arg? #t])
+                        (binding (td:-> '()
+                                        `((,i1 . ,td1)
+                                          (,i2 . ,td2)))
+                                 #:with [arg? #f]))
+                    _}
+                   (swap-> arg? i1 i2)]))
 
 (define is-td-leaf?:struct-field-swap
   ;; See note above about function arg/result swap sub-tds
   (simple-leaf-pattern (td:struct _ _ `(,_ ,_))))
 
-(define (struct-field-swap-adapter type-diff)
-  ;; Really, `type-diff->adapter/delegate` shouldn't be necessary here -- struct
-  ;; tds should only ever happen at the root of a td tree, because struct types
-  ;; only appear at the top level.
-  ;; But it's easier to parse when its consistent with the others - no harm anyway.
-  (type-diff->adapter/delegate
-   type-diff
-   is-td-leaf?:struct-field-swap
-   (match-lambda** [{(td:struct _
-                                field-count
-                                `((,i1 . ,td1)
-                                  (,i2 . ,td2)))
-                     _}
-                    (swap-struct-field field-count i1 i2)])))
+(define leaf->adapter:struct-field-swap
+  (match-lambda** [{(td:struct _
+                               field-count
+                               `((,i1 . ,td1)
+                                 (,i2 . ,td2)))
+                    _}
+                   (swap-struct-field field-count i1 i2)]))
 
 (define is-td-leaf?:class-field-swap
   ;; See note above about function arg/result swap sub-tds
@@ -777,22 +760,18 @@
                            (td:class '()
                                      `(,_ ,_)
                                      _))))
-
-(define (class-field-swap-adapter type-diff)
-  (type-diff->adapter/delegate
-   type-diff
-   is-td-leaf?:class-field-swap
-   (match-lambda**
-    [{(or (td:class `((,i1 . ,td1)
-                      (,i2 . ,td2))
-                    '()
-                    _)
-          (td:class '()
-                    `((,i1 . ,td1)
-                      (,i2 . ,td2))
-                    _))
-      _}
-     (swap-class-field i1 i2)])))
+(define leaf->adapter:class-field-swap
+  (match-lambda**
+   [{(or (td:class `((,i1 . ,td1)
+                     (,i2 . ,td2))
+                   '()
+                   _)
+         (td:class '()
+                   `((,i1 . ,td1)
+                     (,i2 . ,td2))
+                   _))
+     _}
+    (swap-class-field i1 i2)]))
 
 
 #;(define (vector-swap-adapter type-diff)
@@ -810,14 +789,28 @@
      (error 'vector-swap-adapter
             "Should be impossible: got a base type diff?")]))
 
-(define/contract mutation-type->td-leaf-predicate-hash
-  (λ (h) (set=? (hash-keys h) active-mutation-types))
-  (hash type:base-type-substitution  is-td-leaf?:base-type-substitution
-        type:complex-type->Any       is-td-leaf?:base-type-substitution
-        type:function-arg-swap       is-td-leaf?:function-arg/result-swap
-        type:function-result-swap    is-td-leaf?:function-arg/result-swap
-        type:struct-field-swap       is-td-leaf?:struct-field-swap
-        type:class-field-swap        is-td-leaf?:class-field-swap))
+(define lookup-td->adapter-generation-info
+  (match-lambda
+    [(or (== type:base-type-substitution)
+         (== type:complex-type->Any))
+     (list is-td-leaf?:base-type-substitution
+           leaf->adapter:base-type-substitution)]
+    [(or (== type:function-arg-swap)
+         (== type:function-result-swap))
+     (list is-td-leaf?:function-arg/result-swap
+           leaf->adapter:function-arg/result-swap)]
+    [(== type:struct-field-swap)
+     (list is-td-leaf?:struct-field-swap
+           leaf->adapter:struct-field-swap)]
+    [(== type:class-field-swap)
+     (list is-td-leaf?:class-field-swap
+           leaf->adapter:class-field-swap)]
+    [other-type
+     (error
+      'mutation-adapter:generate-adapter-ctc
+      @~a{
+          Received lookup request for unknown mutation type: @other-type
+          })]))
 
 (require racket/generic)
 (define-generics adapted
@@ -1024,17 +1017,17 @@
 (require (only-in rackunit require/expose))
 (require/expose racket/private/class-c-old (build-class/c
                                             build-internal-class/c))
-(define-adapter delegating-class/c (init-field-index-ctc-pairs
-                                    field-index-ctc-pairs
-                                    method-index-ctc-pairs)
+(define-adapter delegating-class/c (init-field-name-ctc-pairs
+                                    field-name-ctc-pairs
+                                    method-name-ctc-pairs)
   #:name (list 'delegating-class/c
-               (index-ctc-pairs->names init-field-index-ctc-pairs)
-               (index-ctc-pairs->names field-index-ctc-pairs)
-               (index-ctc-pairs->names method-index-ctc-pairs))
+               (index-ctc-pairs->names init-field-name-ctc-pairs)
+               (index-ctc-pairs->names field-name-ctc-pairs)
+               (index-ctc-pairs->names method-name-ctc-pairs))
   #:->stx (λ (->stx)
-            #`(delegating-class/c #,(index-ctc-pairs->stx init-field-index-ctc-pairs ->stx #t)
-                                  #,(index-ctc-pairs->stx field-index-ctc-pairs ->stx #t)
-                                  #,(index-ctc-pairs->stx method-index-ctc-pairs ->stx #t)))
+            #`(delegating-class/c #,(index-ctc-pairs->stx init-field-name-ctc-pairs ->stx #t)
+                                  #,(index-ctc-pairs->stx field-name-ctc-pairs ->stx #t)
+                                  #,(index-ctc-pairs->stx method-name-ctc-pairs ->stx #t)))
   (λ (c)
     (define (shift-index-map-indices map [Δ 1])
       (for/list ([{i c} (in-dict map)])
@@ -1050,13 +1043,13 @@
 
     ;; This magic derived from looking at
     ;; (syntax->datum (expand-once (expand-once #'(class/c (init-field [a number?]) (field [f string?]) [get-a (-> number?)]))))
-    (define methods (map car method-index-ctc-pairs))
+    (define methods (map car method-name-ctc-pairs))
     (define method-ctcs (map (compose1 fixup->-arg-adapter-indices-for-this-argument cdr)
-                             method-index-ctc-pairs))
-    (define init-fields (map car init-field-index-ctc-pairs))
-    (define init-field-ctcs (map cdr init-field-index-ctc-pairs))
-    (define fields (map car field-index-ctc-pairs))
-    (define field-ctcs (map cdr field-index-ctc-pairs))
+                             method-name-ctc-pairs))
+    (define init-fields (map car init-field-name-ctc-pairs))
+    (define init-field-ctcs (map cdr init-field-name-ctc-pairs))
+    (define fields (map car field-name-ctc-pairs))
+    (define field-ctcs (map cdr field-name-ctc-pairs))
     (apply-contract (build-class/c methods
                              method-ctcs
                              (append init-fields fields)
@@ -1069,6 +1062,9 @@
                              #f
                              #f)
                     c)))
+
+(define-simple-delegating-adapter delegating-instanceof [sub-ctc]
+  (λ (o) (apply-contract (instanceof/c sub-ctc) o)))
 
 (define/contract (transform-struct-fields v           ;; an instance of a struct...
                                           field-count ;; ... which has this many fields of its own
@@ -1144,6 +1140,8 @@
 
 (define-simple-delegating-adapter delegating-listof [sub-ctc]
   (λ (v) (apply-contract (listof sub-ctc) v)))
+(define-simple-delegating-adapter delegating-list [index-ctc-pairs]
+  (λ (v) (apply-contracts-in-list v index-ctc-pairs)))
 
 (define-simple-delegating-adapter delegating-parameter/c [sub-ctc]
   (λ (p)
@@ -1161,6 +1159,12 @@
       (apply-contract sub-ctc v))))
 (define-simple-delegating-adapter delegating-pairof [car-ctc cdr-ctc]
   (λ (v) (apply-contract (cons/c car-ctc cdr-ctc) v)))
+(define-simple-delegating-adapter delegating-hash/c [key-ctc val-ctc]
+  (λ (v)
+    ;; hash/c doesn't like impersonator ctcs on keys, so let's just copy the hash
+    (for/hash ([{key val} (in-hash v)])
+      (values (apply-contract key-ctc key)
+              (apply-contract val-ctc val)))))
 
 (define-adapter swap-struct-field (field-count i1 i2)
   #:name (list 'swap-struct-field field-count i1 i2)
@@ -1268,6 +1272,14 @@
                             this
                             v)))
     (error 'swap-class-field
+           "should never be called!")))
+
+(define-adapter adapter-reference (name)
+  #:name (list 'adapter-reference name)
+  #:->stx (λ _
+            (datum->syntax #f name))
+  (λ (v)
+    (error 'adapter-reference
            "should never be called!")))
 
 ;; Returns `vs`, but with the elements at each index in `index-ctc-pairs`
@@ -1728,6 +1740,17 @@
      (and/test (pair? v)
                (sealed? (car v))
                (equal? (cdr v) 2))))
+  (test-begin
+    #:name delegating-hash
+    (test-adapter-contract
+     [v (hash 1 2)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(HashTable A B)
+                                                 '(HashTable C B)
+                                                 type:base-type-substitution))]
+     (and/test (hash? v)
+               (sealed? (first (hash-keys v)))
+               (equal? (first (hash-values v)) 2))))
   (test-begin
     #:name delegating-parameter/c
     (let ([outer-p (make-parameter 5)])

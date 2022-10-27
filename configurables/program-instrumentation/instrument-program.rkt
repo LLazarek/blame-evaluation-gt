@@ -1,6 +1,7 @@
 #lang racket/base
 
-(provide instrument-program/c)
+(provide instrument-program/c
+         instrumented-program/c)
 
 (require racket/contract/base
          "../../runner/instrumented-runner.rkt"

@@ -1,6 +1,14 @@
 #lang at-exp racket
 
-(provide (contract-out [instrument-program instrument-program/c])
+(provide (contract-out
+          [instrument-program instrument-program/c]
+
+          [instrument-program/adapter-generator
+           (program/c
+            (mod/c . -> . resolved-module?)
+            (syntax? syntax? string? string? . -> . syntax?)
+            . -> .
+            instrumented-program/c)])
          type-interface-file-name
          type-interface-file-rename)
 
@@ -18,6 +26,13 @@
 (define type-interface-adapter-temporary-name "type-interface-adapter.rkt")
 
 (define (instrument-program a-program make-instrumented-module)
+  (instrument-program/adapter-generator a-program
+                                        make-instrumented-module
+                                        generate-adapter-module-for-mutation))
+
+(define (instrument-program/adapter-generator a-program
+                                              make-instrumented-module
+                                              generate-adapter-module-for-mutation)
   (define interface-mod (program->interface-mod a-program))
   (unless interface-mod
     (error 'instrument-modules-and-insert-interface-adapter-module:instrument-program
@@ -187,14 +202,37 @@
                            (stream-unfold (-> stream (values Natural stream)))
                            (stream-get (-> stream Natural Natural))
                            (stream-take (-> stream Natural (Listof Natural)))))))))))
-    (for/and/test ([expected-mutation-type (list type:struct-field-swap
-                                                 type:base-type-substitution
-                                                 type:base-type-substitution
-                                                 type:function-arg-swap
-                                                 type:base-type-substitution
-                                                 type:base-type-substitution
-                                                 type:function-result-swap
-                                                 type:base-type-substitution)]
+    (for/and/test ([expected-mutation-type (list
+                                            ;; Refer to test `mutate-benchmark` in `mutate-type-interface.rkt`
+                                            ;; the struct
+                                            type:struct-field-swap
+                                            type:base-type-substitution
+                                            type:complex-type->Any
+
+                                            ;; make-stream
+                                            type:complex-type->Any
+                                            type:function-arg-swap
+                                            type:base-type-substitution
+                                            type:complex-type->Any
+
+                                            ;; stream-unfold
+                                            type:complex-type->Any
+                                            type:function-result-swap
+                                            type:complex-type->Any
+                                            type:base-type-substitution
+
+                                            ;; stream-get
+                                            type:complex-type->Any
+                                            type:function-arg-swap
+                                            type:base-type-substitution
+                                            type:base-type-substitution
+
+                                            ;; stream-take
+                                            type:complex-type->Any
+                                            type:function-arg-swap
+                                            type:base-type-substitution
+                                            type:complex-type->Any
+                                            type:base-type-substitution)]
                    [i (in-naturals)])
       (define-values {instrumented-program type}
         (instrument-program/get-mutation-type
@@ -255,7 +293,6 @@
                                 (provide (contract-out
                                           [f (swap-> #t 0 1)])))
                               (require "../../../utilities/require-typed-check-provide.rkt")
-                              (require (only-in 'contracted))
                               (provide)
                               (require/typed/check/provide 'contracted
                                                            [f (-> Number Real String)])))
