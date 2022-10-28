@@ -41,6 +41,7 @@
                   maybe-rest-arg-td
                   result-index-map))
 (td-struct td:->* (mandatory-arg-count optional-argument-index-map optional-kw-argument-map))
+(td-struct td:->-both (mandatory-part optional-part))
 (td-struct td:base (original new))
 (td-struct td:parametric (vars sub-td))
 (td-struct td:vector (index-map))
@@ -107,30 +108,26 @@
                        #:when td)
              (cons kw td)))
          (define result-map (list->td-index-map result-tds))
-         (cond [(not (and (empty? optional-arg-map)
+         (define optional-part-adapter
+           (and (not (and (empty? optional-arg-map)
                           (empty? optional-kw-map)))
-                ;; Relying on the assumption of a single mutation here.
-                ;; Abort if it doesn't hold.
-                (assert (and (empty? mandatory-arg-map)
-                             (empty? result-map)
-                             (not maybe-rest-arg-td))
-                        #:name 'sexp->type-diff
-                        @~a{
-                            ->* mutation support currently assumes a single mutation, @;
-                            but that doesn't seem to be true: @;
-                            found type diffs in both optional args and mandatory/results
-                            })
                 (td:->* (length mandatory-arg-tds)
                         optional-arg-map
-                        optional-kw-map)]
-               [(or (not (empty? mandatory-arg-map))
+                        optional-kw-map)))
+         (define mandatory-part-adapter
+           (and (or (not (empty? mandatory-arg-map))
                     (not (empty? result-map))
                     maybe-rest-arg-td)
                 (td:-> (length mandatory-arg-tds)
                        mandatory-arg-map
                        maybe-rest-arg-td
-                       result-map)]
-               [else #f])]
+                       result-map)))
+         (if (and mandatory-part-adapter
+                  optional-part-adapter)
+             (td:->-both mandatory-part-adapter
+                         optional-part-adapter)
+             (or mandatory-part-adapter
+                 optional-part-adapter))]
         [(list* 'case->
                 (app (mapping recur) case-tds))
          (findf values case-tds)]
@@ -706,12 +703,21 @@
                         `((0 . ,(td:unknown-type (list (td:base 'B 'Z)))))
                         #f
                         '()))
-    (test-equal? (sexp->type-diff (sexp-diff '(-> A (-> Z Z Z) C)
-                                             '(-> A Any C)))
-                 (td:-> 2
-                        `((1 . ,(td:base '(-> Z Z Z) 'Any)))
+    (test-equal? (sexp->type-diff (sexp-diff '(-> (A B C) R)
+                                             '(-> (A Z C) R)))
+                 (td:-> 1
+                        `((0 . ,(td:unknown-type (list (td:base 'B 'Z)))))
                         #f
-                        '()))))
+                        '()))
+    (test-equal? (sexp->type-diff (sexp-diff '(->* (A B) ((-> Z Z Z)) C)
+                                             '(->* (A Z) ((-> Z Z Q)) Z)))
+                 (td:->-both (td:-> 2
+                                    `((1 . ,(td:base 'B 'Z)))
+                                    #f
+                                    `((0 . ,(td:base 'C 'Z))))
+                             (td:->* 2
+                                     `((0 . ,(td:-> 2 '() #f `((0 . ,(td:base 'Z 'Q))))))
+                                     '())))))
 
 (define (union-td:classes td1 td2 #:with-inits? with-inits?)
   (match* {td1 td2}
@@ -778,6 +784,9 @@
        (delegating->* n
                       (loop-over-dict-values optional-arg-index-map (flip current-position))
                       (loop-over-dict-values optional-kw-arg-map (flip current-position)))]
+      [{#f (td:->-both mandatory-part optional-part)}
+       (delegating-and/c (loop mandatory-part current-position)
+                         (loop optional-part current-position))]
       [{#f (td:parametric vars sub-td)}
        ;; We won't mutate a type variable (unless of course it's spelled the
        ;; same as a base type... let's hope not) so we can just treat it as a
@@ -1332,6 +1341,8 @@
     [(swap-struct-field field-count i1 i2)
      (swap-struct-field (+ field-count offset) i1 i2)]))
 
+(define-simple-delegating-adapter delegating-and/c [left-ctc right-ctc]
+  (λ (v) (apply-contract left-ctc (apply-contract right-ctc v))))
 (define-simple-delegating-adapter delegating-listof [sub-ctc]
   (λ (v) (apply-contract (listof sub-ctc) v)))
 (define-adapter delegating-list* (len index-ctc-pairs tail-ctc)
@@ -2019,7 +2030,19 @@
                                                    type:base-type-substitution))]
        (and/test (procedure? f)
                  (list? (f 1 "a" 22))
-                 (sealed? (first (f 1 "a" 22)))))))
+                 (sealed? (first (f 1 "a" 22))))))
+    (let ([outer-f (λ (x y [z "hi"])
+                     (list y z))])
+      (test-adapter-contract
+       [f outer-f
+          #:with-contract (generate-adapter-ctc
+                           (mutated-interface-type '(->* (Number String) (String) String)
+                                                   '(->* (Number Any) (Any) String)
+                                                   type:base-type-substitution))]
+       (and/test (procedure? f)
+                 (list? (f 1 "a"))
+                 (sealed? (first (f 1 "a" "b")))
+                 (sealed? (second (f 1 "a" "b")))))))
 
   (test-begin
     #:name delegating-class/c

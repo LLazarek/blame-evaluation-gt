@@ -308,6 +308,13 @@
     (reference-between? (findf (matches (name+type (== name) _))
                                all-interface-types)
                         MR-typedefs))
+  (log-adapter-generation-info
+   @~a{
+       Adapting all provides referencing @name ...
+       Detected @(length MR-typedefs) MR typedefs.
+       @name is @(if name-is-a-MR-typedef? "" "not ") part of a group of MR typedefs
+       And there is @(if reference-between-name-and-MR-typedefs? "some" "no") reference(s) between it and the set of MR typedefs.
+       })
   (cond [(or name-is-a-MR-typedef?
              reference-between-name-and-MR-typedefs?)
          (match-define (list adapter-definitions adapter-definition-ref-n+ts)
