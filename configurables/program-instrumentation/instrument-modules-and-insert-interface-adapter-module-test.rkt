@@ -137,7 +137,6 @@
                        (sealing-adapter)])))
         (require "../../../utilities/require-typed-check-provide.rkt") ;; inserted unconditionally
         (require "../../../utilities/require-typed-check-provide.rkt") ;; copied over from original
-        (provide)                       ;; original has no typedefs, so nothing here
         (require/typed/check/provide 'contracted
                                      [x Integer])})))
 
@@ -174,7 +173,6 @@
                         (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
-        (provide)
         (require/typed/check/provide 'contracted
                                      [f (-> Integer String Integer)])})))
 
@@ -209,7 +207,6 @@
                     [f (swap-> #t 0 1)])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
-        (provide)
         (require/typed/check/provide 'contracted
                                      [f (-> Integer String Integer)]
                                      [g (-> Any Any)])})))
@@ -270,7 +267,6 @@
         (require "../../../utilities/require-typed-check-provide.rkt")
         (provide Foo (struct-out stream))
         (define-type Foo Real)
-        (provide Foo)
         (struct stream ([head : Natural]
                         [rest : (-> stream)]))
         (require/typed/check/provide 'contracted

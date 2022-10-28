@@ -293,7 +293,6 @@
                                 (provide (contract-out
                                           [f (swap-> #t 0 1)])))
                               (require "../../../utilities/require-typed-check-provide.rkt")
-                              (provide)
                               (require/typed/check/provide 'contracted
                                                            [f (-> Number Real String)])))
 

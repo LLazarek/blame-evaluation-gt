@@ -1641,7 +1641,7 @@
         (require "../../../utilities/require-typed-check-provide.rkt")
         #,@interface-req/prov-forms
         #,@interface-typedefs
-        (provide #,@interface-typedef-names)
+        #;(provide #,@interface-typedef-names)
         #,@interface-structs
         #,@redirected-interface-r/t/c/p-forms))))
 
@@ -1666,8 +1666,7 @@
                       (require "interface.rkt")
                       (provide (except-out (all-from-out "interface.rkt")))
                       (provide (contract-out)))
-                    (require "../../../utilities/require-typed-check-provide.rkt")
-                    (provide))))
+                    (require "../../../utilities/require-typed-check-provide.rkt"))))
    (test-equal?
     (syntax->datum
      (adapter-ctcs->module-stx
@@ -1716,6 +1715,10 @@
               (init-field [name String])
               (go (-> (Instance Administrator%) Void))))
            (struct YMD ([y : Integer]) #:prefab)
+           (provide FOOBAR
+                    Administrator%
+                    Player%
+                    (struct-out YMD))
            (require/typed/check/provide
             "server.rkt"
             [foo Integer]
@@ -1764,6 +1767,10 @@
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../base/base-types.rkt")
         (reprovide "../base/more-types.rkt")
+        (provide FOOBAR
+                 Administrator%
+                 Player%
+                 (struct-out YMD))
         (define-type FOOBAR Natural)
         (define-type Administrator%
           (Class (sign-up (-> String (Instance Player%) String))))
@@ -1771,7 +1778,6 @@
           (Class
            (init-field [name String])
            (go (-> (Instance Administrator%) Void))))
-        (provide FOOBAR Administrator% Player%)
         (struct YMD ([y : Integer]) #:prefab)
         (require/typed/check/provide
          'contracted
