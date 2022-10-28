@@ -167,8 +167,10 @@
                                f))
           (provide (contract-out
                     [f (delegating->
+                        2
                         (list (cons 0 #;(make-base-type-adapter 'Integer 'String)
                                     (sealing-adapter)))
+                        (any/c-adapter)
                         (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
@@ -253,12 +255,17 @@
                                 2
                                 (list (cons 0 (sealing-adapter))
                                       (cons 1 (delegating->
+                                               0
                                                (list)
+                                               (any/c-adapter)
                                                (list (cons 0 stream))))))))
           (provide (except-out (all-from-out "original-type-interface.rkt")
                                f))
           (provide (contract-out
-                    [f (delegating-> (list (cons 1 stream)) (list))])))
+                    [f (delegating-> 2
+                                     (list (cons 1 stream))
+                                     (any/c-adapter)
+                                     (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
         (provide Foo (struct-out stream))

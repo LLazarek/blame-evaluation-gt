@@ -885,12 +885,16 @@
                  (list-no-order
                   (cons 'b (app (compose1 syntax->datum ->stx)
                                 '(delegating->
+                                  1
                                   (list)
+                                  (any/c-adapter)
                                   (list
                                    (cons 0 (delegating->
+                                            1
                                             (list
                                              (cons 0 #;(make-base-type-adapter 'Integer 'Real)
                                                    (sealing-adapter)))
+                                            (any/c-adapter)
                                             (list))))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -913,12 +917,16 @@
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list)
+                               (any/c-adapter)
                                (list
                                 (cons 0 (delegating->
+                                         1
                                          (list
                                           (cons 0 #;(make-base-type-adapter 'Integer 'Real)
                                                 (sealing-adapter)))
+                                         (any/c-adapter)
                                          (list))))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -941,12 +949,16 @@
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list)
+                               (any/c-adapter)
                                (list
                                 (cons 0 (delegating->
+                                         1
                                          (list
                                           (cons 0 #;(make-base-type-adapter 'Integer 'Real)
                                                 (sealing-adapter)))
+                                         (any/c-adapter)
                                          (list)))))))
                   ;; Nope! That's a positive reference to Foo via Z2.
                   #;(cons 'a
@@ -977,8 +989,10 @@
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (sealing-adapter)))
+                               (any/c-adapter)
                                (list))))
                   ;; Nope! That's a positive reverse to Z via Z2
                   #;(cons 'a
@@ -1009,16 +1023,22 @@
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (sealing-adapter)))
+                               (any/c-adapter)
                                (list))))
                   (cons 'a
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list)
+                               (any/c-adapter)
                                (list (cons 0
                                            (delegating->
+                                            1
                                             (list (cons 0 (sealing-adapter)))
+                                            (any/c-adapter)
                                             (list))))))))))
 
     (test-match (adapt-all-referencing-provides
@@ -1041,11 +1061,15 @@
                   (cons 'something
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               2
                                (list
                                 (cons 1 (delegating->
+                                         0
                                          (list)
+                                         (any/c-adapter)
                                          (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
                                                      (sealing-adapter))))))
+                               (any/c-adapter)
                                (list)))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1081,6 +1105,7 @@
                   (cons 'a
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (delegating-struct ; Date
                                          #f
@@ -1091,14 +1116,18 @@
                                                    3
                                                    (list
                                                     (cons 0 (sealing-adapter)))))))))
+                               (any/c-adapter)
                                (list))))
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list)
+                               (any/c-adapter)
                                (list
                                 (cons 0
                                       (delegating->
+                                       1
                                        (list
                                         (cons 0 (delegating-struct ; DateTime
                                                  #f
@@ -1113,6 +1142,7 @@
                                                                      3
                                                                      (list
                                                                       (cons 0 (sealing-adapter))))))))))))
+                                       (any/c-adapter)
                                        (list))))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1165,7 +1195,9 @@
                                (list
                                 (cons '#:resolve-offset
                                       (delegating->
+                                       4
                                        (list)
+                                       (any/c-adapter)
                                        (list (cons 0 (delegating-struct
                                                       #f
                                                       1
@@ -1197,16 +1229,19 @@
                   (cons 'a
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (delegating-struct
                                          #f
                                          2
                                          (list
                                           (cons 1 (sealing-adapter))))))
+                               (any/c-adapter)
                                (list))))
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (delegating-struct
                                          (delegating-struct
@@ -1216,6 +1251,7 @@
                                            (cons 1 (sealing-adapter))))
                                          1
                                          (list))))
+                               (any/c-adapter)
                                (list)))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1242,6 +1278,7 @@
                   (cons 'a
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (delegating-struct
                                          (delegating-struct
@@ -1257,10 +1294,12 @@
                                                  1
                                                  (list
                                                   (cons 0 (sealing-adapter)))))))))
+                               (any/c-adapter)
                                (list))))
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list
                                 (cons 0 (delegating-struct
                                          (delegating-struct
@@ -1279,6 +1318,7 @@
                                                    (cons 0 (sealing-adapter)))))))
                                          1
                                          (list))))
+                               (any/c-adapter)
                                (list)))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1300,7 +1340,9 @@
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
+                               1
                                (list)
+                               (any/c-adapter)
                                (list
                                 (cons 0 (delegating-struct
                                          #f
@@ -1308,7 +1350,9 @@
                                          (list
                                           (cons 0
                                                 (delegating->
+                                                 1
                                                  (list (cons 0 (sealing-adapter)))
+                                                 (any/c-adapter)
                                                  (list)))))))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1378,9 +1422,11 @@
                     (list)
                     (list (cons 'go
                                 (delegating->
+                                 1
                                  (list (cons 0
                                              (delegating-instanceof
                                               (adapter-reference 'Administrator%))))
+                                 (any/c-adapter)
                                  (list))))))
                   (adapter-definition
                    'Administrator%
@@ -1389,8 +1435,10 @@
                     (list)
                     (list (cons 'sign-up
                                 (delegating->
+                                 2
                                  (list (cons 1 (delegating-instanceof
                                                 (adapter-reference 'Player%))))
+                                 (any/c-adapter)
                                  (list)))))))
                  (list
                   (cons 'administrator%
@@ -1418,9 +1466,13 @@
                  (list
                   (cons 'something-else
                         (delegating->
+                         1
                          (list (cons 0 (delegating->
+                                        1
                                         (list)
+                                        (any/c-adapter)
                                         (list (cons 0 (sealing-adapter))))))
+                         (any/c-adapter)
                          (list))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1458,16 +1510,22 @@
                     (list)
                     (list)
                     (list (cons 'go (delegating->
+                                     1
                                      (list (cons 0 (delegating-instanceof (adapter-reference 'Administrator%))))
+                                     (any/c-adapter)
                                      (list)))))))
                  (list-no-order
                   (cons 'administrator%
                         (adapter-reference 'Administrator%))
                   (cons 'something-else
                         (delegating->
+                         1
                          (list (cons 0 (delegating->
+                                        1
                                         (list (cons 0 (adapter-reference 'Player%)))
+                                        (any/c-adapter)
                                         (list))))
+                         (any/c-adapter)
                          (list))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1497,20 +1555,26 @@
                          (list-no-order
                           (cons 'take-turn
                                 (delegating->
+                                 1
                                  (list (cons 0 (delegating-struct
                                                 #f
                                                 1
                                                 (list (cons 0 (sealing-adapter))))))
+                                 (any/c-adapter)
                                  (list)))
                           (cons 'set-strategy
                                 (delegating->
+                                 1
                                  (list (cons 0
                                              (delegating->
+                                              0
                                               (list)
+                                              (any/c-adapter)
                                               (list (cons 0 (delegating-struct
                                                              #f
                                                              1
                                                              (list (cons 0 (sealing-adapter)))))))))
+                                 (any/c-adapter)
                                  (list)))))))))))
 
 
@@ -1608,8 +1672,10 @@
     (syntax->datum
      (adapter-ctcs->module-stx
       `((foo . ,(make-base-type-adapter 'Integer 'Real))
-        (bar . ,(delegating-> (list (cons 1 (make-base-type-adapter 'Integer 'Real))
+        (bar . ,(delegating-> 3
+                              (list (cons 1 (make-base-type-adapter 'Integer 'Real))
                                     (cons 2 (adapter-reference 'Player%)))
+                              (any/c-adapter)
                               empty)))
       (list
        (adapter-definition
@@ -1619,9 +1685,11 @@
          (list)
          (list (cons 'go
                      (delegating->
+                      1
                       (list (cons 0
                                   (delegating-instanceof
                                    (adapter-reference 'Administrator%))))
+                      (any/c-adapter)
                       (list))))))
        (adapter-definition
         'Administrator%
@@ -1630,8 +1698,10 @@
          (list)
          (list (cons 'sign-up
                      (delegating->
+                      2
                       (list (cons 1 (delegating-instanceof
                                      (adapter-reference 'Player%))))
+                      (any/c-adapter)
                       (list)))))))
       "interface.rkt"
       #'(module ifce tr
@@ -1663,8 +1733,10 @@
               (list)
               (list (cons 'go
                           (delegating->
+                           1
                            (list (cons 0
                                        (delegating-instanceof Administrator%)))
+                           (any/c-adapter)
                            (list)))))))
           (define Administrator%
             (recursive-contract
@@ -1673,7 +1745,9 @@
               (list)
               (list (cons 'sign-up
                           (delegating->
+                           2
                            (list (cons 1 (delegating-instanceof Player%)))
+                           (any/c-adapter)
                            (list)))))))
           (provide (except-out (all-from-out "interface.rkt")
                                foo
@@ -1682,8 +1756,10 @@
            (contract-out
             [foo #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter)]
             [bar (delegating->
+                  3
                   (list (cons 1 #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter))
                         (cons 2 Player%))
+                  (any/c-adapter)
                   (list))])))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../base/base-types.rkt")
