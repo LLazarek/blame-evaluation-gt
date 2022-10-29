@@ -41,7 +41,7 @@
                   maybe-rest-arg-td
                   result-index-map))
 (td-struct td:->* (mandatory-arg-count optional-argument-index-map optional-kw-argument-map))
-(td-struct td:->-both (mandatory-part optional-part))
+(td-struct td:and (left right))
 (td-struct td:base (original new))
 (td-struct td:parametric (vars sub-td))
 (td-struct td:vector (index-map))
@@ -57,6 +57,7 @@
 (td-struct td:hash (key val))
 (td-struct td:list* (len index-map tail-sub-td))
 (td-struct td:class (init-field-td-map field-td-map method-td-map))
+#;(td-struct td:without-inits (sub-td-class))
 
 ;; used to support diffs that we may not otherwise support, produced by arg swapping.
 ;; e.g. Swapping `(Listof A) (Setof A)` produces a diff
@@ -124,8 +125,8 @@
                        result-map)))
          (if (and mandatory-part-adapter
                   optional-part-adapter)
-             (td:->-both mandatory-part-adapter
-                         optional-part-adapter)
+             (td:and mandatory-part-adapter
+                     optional-part-adapter)
              (or mandatory-part-adapter
                  optional-part-adapter))]
         [(list* 'case->
@@ -185,7 +186,9 @@
                 (app parse-class-parts
                      (list (app recur implements-clause-sub-td)
                            (app recur implements/inits-clause-sub-td)
-                           (list (list init-field-names (app recur init-field-sub-tds))
+                           (list (list init-field-names
+                                       (app recur init-field-sub-tds)
+                                       '#:optional ...)
                                  ...)
                            (list (list field-names (app recur field-sub-tds))
                                  ...)
@@ -215,13 +218,14 @@
                 (td:class init-field-dict
                           field-dict
                           method-dict)))
-         (if (or implements-clause-sub-td
-                 implements/inits-clause-sub-td)
-             (union-td:classes immediate-td
-                               (or implements-clause-sub-td
-                                   implements/inits-clause-sub-td)
-                               #:with-inits? (and implements/inits-clause-sub-td #t))
-             immediate-td)]
+         (cond [implements/inits-clause-sub-td
+                (td:and immediate-td
+                        implements/inits-clause-sub-td)]
+               [implements-clause-sub-td
+                (td:and immediate-td
+                        (try-remove-inits implements-clause-sub-td))]
+               [else
+                immediate-td])]
         [(list 'Instance (app recur sub-td))
          (and sub-td (td:instanceof sub-td))]
         [(difference original new)
@@ -272,6 +276,13 @@
                                   [pat result #:otherwise default]
                                   ...)
   (list (match e [pat result] [else default]) ...))
+(define-simple-macro (remove-pats [part ...] ...)
+  (λ (l) (for/fold ([l l])
+                   ([f (list (match-lambda [(list before ___ part ... after ___)
+                                            (append before after)]
+                                           [l l])
+                             ...)])
+           (f l))))
 ;; sexp? -> (list/c (or/c sexp? #f) ; implements
 ;;                  (or/c sexp? #f) ; implements/inits
 ;;                  (listof sexp)   ; init-fields
@@ -296,21 +307,11 @@
    [(somewhere (list 'field init-fields ...))
     init-fields
     #:otherwise empty]
-   [(list (not (list (and (? symbol?)
-                          (not (or 'init
-                                   'init-field
-                                   'init-rest
-                                   'field
-                                   'augment)))
-                     _)) ...
-          (and methods (list (and (? symbol?)
-                                  (not (or 'init
-                                           'init-field
-                                           'init-rest
-                                           'field
-                                           'augment)))
-                             _))
-          ...)
+   [(app (remove-pats ['#:implements _]
+                      ['#:implements/inits _]
+                      [(list* 'init-field _)]
+                      [(list* 'field _)])
+         methods)
     methods
     #:otherwise (error 'parse-class-parts
                        @~a{
@@ -373,6 +374,14 @@
      (list mandatory-args
            #f
            results)]))
+
+(define (try-remove-inits td)
+  (match td
+    [(td:class _ fields mtds)
+     (td:class empty
+               fields
+               mtds)]
+    [other other]))
 
 (define (normalize->-types t)
   (match t
@@ -711,13 +720,13 @@
                         '()))
     (test-equal? (sexp->type-diff (sexp-diff '(->* (A B) ((-> Z Z Z)) C)
                                              '(->* (A Z) ((-> Z Z Q)) Z)))
-                 (td:->-both (td:-> 2
-                                    `((1 . ,(td:base 'B 'Z)))
-                                    #f
-                                    `((0 . ,(td:base 'C 'Z))))
-                             (td:->* 2
-                                     `((0 . ,(td:-> 2 '() #f `((0 . ,(td:base 'Z 'Q))))))
-                                     '())))
+                 (td:and (td:-> 2
+                                `((1 . ,(td:base 'B 'Z)))
+                                #f
+                                `((0 . ,(td:base 'C 'Z))))
+                         (td:->* 2
+                                 `((0 . ,(td:-> 2 '() #f `((0 . ,(td:base 'Z 'Q))))))
+                                 '())))
     (test-equal? (sexp->type-diff (sexp-diff
                                    '(struct
                                       Array
@@ -740,19 +749,36 @@
                             `((0 . ,(td:base '(Vectorof Integer)
                                              '(-> (Vectorof Integer) Float)))
                               (4 . ,(td:base '(-> (Vectorof Integer) Float)
-                                             '(Vectorof Integer))))))))
-
-(define (union-td:classes td1 td2 #:with-inits? with-inits?)
-  (match* {td1 td2}
-    [{#f td2} td2]
-    [{td1 #f} td1]
-    [{(td:class init-map1 field-map1 method-map1)
-      (td:class init-map2 field-map2 method-map2)}
-     (td:class (if with-inits?
-                   (append init-map1 init-map2)
-                   td1)
-               (append field-map1 field-map2)
-               (append method-map1 method-map2))]))
+                                             '(Vectorof Integer))))))
+    (test-equal?
+     (sexp->type-diff
+      (sexp-diff '(Class
+                   (init-field (n Name)
+                               (order (-> (Listof Card) (Listof Card)) #:optional)))
+                 '(Class
+                   (init-field (n Any)
+                               (order (-> (Listof Card) (Listof Card)) #:optional)))))
+     (td:class `((n . ,(td:base 'Name 'Any)))
+               '()
+               '()))
+    (test-equal?
+     (sexp->type-diff
+      (sexp-diff '(Class
+                   #:implements FooBar
+                   (init-field [a Number]
+                               [b String]
+                               [c Number])
+                   (m (-> Number String String)))
+                 '(Class
+                   #:implements FooBar87894
+                   (init-field [a Number]
+                               [b Any]
+                               [c Number])
+                   (m (-> Number String String)))))
+     (td:and (td:class `((b . ,(td:base 'String 'Any)))
+                       '()
+                       '())
+             (td:base 'FooBar 'FooBar87894)))))
 
 ;; mutated-interface-type? -> contract?
 (define (generate-adapter-ctc a-mutated-interface-type)
@@ -807,9 +833,9 @@
        (delegating->* n
                       (loop-over-dict-values optional-arg-index-map (flip current-position))
                       (loop-over-dict-values optional-kw-arg-map (flip current-position)))]
-      [{#f (td:->-both mandatory-part optional-part)}
-       (delegating-and/c (loop mandatory-part current-position)
-                         (loop optional-part current-position))]
+      [{#f (td:and left right)}
+       (delegating-and/c (loop left current-position)
+                         (loop right current-position))]
       [{#f (td:parametric vars sub-td)}
        ;; We won't mutate a type variable (unless of course it's spelled the
        ;; same as a base type... let's hope not) so we can just treat it as a
@@ -850,6 +876,8 @@
        (delegating-class/c (loop-over-dict-values init-field-td-map current-position)
                            (loop-over-dict-values field-td-map current-position)
                            (loop-over-dict-values method-td-map current-position))]
+      #;[{#f (td:without-inits sub-td)}
+       (delegating-class/c-without-inits (loop sub-td current-position))]
       [{#f (td:instanceof sub-td)}
        (delegating-instanceof (loop sub-td current-position))]
       [{_ _}
@@ -2185,6 +2213,21 @@
        (m (-> Number String String)))
      '(Class
        #:implements FooBar
+       (init-field [a String]
+                   [b Number]
+                   [c Number])
+       (m (-> Number String String))))
+    (test:eval-class-with-ctc/get/set-object-fields
+     '(Class
+       #:implements (Class (init-field [a Number]
+                                       [b String]))
+       (init-field [a Number]
+                   [b String]
+                   [c Number])
+       (m (-> Number String String)))
+     '(Class
+       #:implements (Class (init-field [a String]
+                                       [b Number]))
        (init-field [a String]
                    [b Number]
                    [c Number])
