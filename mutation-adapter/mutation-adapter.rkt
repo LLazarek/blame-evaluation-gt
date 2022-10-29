@@ -717,7 +717,30 @@
                                     `((0 . ,(td:base 'C 'Z))))
                              (td:->* 2
                                      `((0 . ,(td:-> 2 '() #f `((0 . ,(td:base 'Z 'Q))))))
-                                     '())))))
+                                     '())))
+    (test-equal? (sexp->type-diff (sexp-diff
+                                   '(struct
+                                      Array
+                                      ((shape : (Vectorof Integer))
+                                       (size : Integer)
+                                       (strict? : (Boxof Boolean))
+                                       (strict! : (-> Void))
+                                       (unsafe-proc : (-> (Vectorof Integer) Float)))
+                                      #:prefab)
+                                   '(struct
+                                      Array
+                                      ((shape : (-> (Vectorof Integer) Float))
+                                       (size : Integer)
+                                       (strict? : (Boxof Boolean))
+                                       (strict! : (-> Void))
+                                       (unsafe-proc : (Vectorof Integer)))
+                                      #:prefab)))
+                 (td:struct #f
+                            5
+                            `((0 . ,(td:base '(Vectorof Integer)
+                                             '(-> (Vectorof Integer) Float)))
+                              (4 . ,(td:base '(-> (Vectorof Integer) Float)
+                                             '(Vectorof Integer))))))))
 
 (define (union-td:classes td1 td2 #:with-inits? with-inits?)
   (match* {td1 td2}

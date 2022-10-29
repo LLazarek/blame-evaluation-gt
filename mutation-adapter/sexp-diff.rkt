@@ -48,13 +48,10 @@
                     tail-2)]
              [{(cons (? list? head-1) tail-1)
                (cons (? list? head-2) tail-2)}
-              ;; different length heads. Something was dropped.
-              (define-values {head-1* head-2*} (mark-drop head-1 head-2))
-              (assert (=length? head-1* head-2*) #:name 'sexp-diff
-                      "given two sub-sexps that have more than one difference in length")
-              (loop result
-                    (cons head-1* tail-1)
-                    (cons head-2* tail-2))]
+              (loop (cons (compare head-1 head-2)
+                          result)
+                    tail-1
+                    tail-2)]
              [{'() '()}
               (reverse result)]
              [{atom1 atom2}
@@ -140,7 +137,7 @@
                  `(1 2 (,(difference 3 4) ,(difference 4 3)) (5 (6))))
     (test-equal? (sexp-diff '((1 2 3))
                             '((1 3)))
-                 `((1 ,(difference 2 (nothing)) 3)))
+                 `(,(difference '(1 2 3) '(1 3))))
     (test-equal? (sexp-diff '(1 2 3)
                             '(1 3))
                  `(1 ,(difference 2 (nothing)) 3))
