@@ -190,7 +190,7 @@
   (define msg (exn-message e))
   (and (exn:fail:syntax? e)
        (regexp-match? "Type Checker:" msg)
-       (not (regexp-match? "Type Checker: parse error in type" msg))))
+       (not (regexp-match? "Type Checker:.*parse error in type" msg))))
 
 (define/contract (run-with-mutated-module a-program
                                           module-to-mutate
@@ -960,6 +960,33 @@
                                                       #'(module name tr
                                                           (#%mod-begin
                                                            (: f (-> * N N2))
+                                                           def
+                                                           app))])
+                                                   'f)))
+                (struct* run-status ([outcome 'syntax-error])))
+    (ignore
+     (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
+                        #'(module a typed/racket
+                            (#%module-begin
+                             (: f (All (A) (-> A A)))
+                             (define (f x) x)
+                             (f 1)))))
+     (define p (program a empty)))
+    (test-match (run-with-mutated-module p
+                                         a
+                                         0
+                                         (hash 'a 'types)
+                                         #:mutator
+                                         (λ (m i #:in p)
+                                           (values (syntax-parse (mod-stx m)
+                                                     [(module name tr
+                                                        (#%mod-begin
+                                                         ({~datum :} f (All (A) arrow-t))
+                                                         def
+                                                         app))
+                                                      #'(module name tr
+                                                          (#%mod-begin
+                                                           (: f (All Any arrow-t))
                                                            def
                                                            app))])
                                                    'f)))
