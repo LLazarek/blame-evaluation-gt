@@ -44,6 +44,7 @@
 (td-struct td:and (left right))
 (td-struct td:base (original new))
 (td-struct td:parametric (vars sub-td))
+(td-struct td:rec (name sub-td))
 (td-struct td:vector (index-map))
 (td-struct td:struct (maybe-parent field-count index-map))
 (td-struct td:listof (sub-td))
@@ -68,6 +69,8 @@
 ;; later in `type-diff->adapter/delegate`.
 (struct td:unknown-type td (sub-tds) #:transparent)
 
+(define-logger adapter-generation)
+
 (define (sexp->type-diff a-sexp-diff)
   (define (list->td-index-map a-list)
     (match a-list
@@ -77,6 +80,8 @@
                   [index    (in-naturals)]
                   #:when (td? maybe-td))
          (cons index maybe-td))]))
+  (log-adapter-generation-debug
+   @~a{sexp->type-diff: @~s[a-sexp-diff]})
   (define td
     (let recur ([sexp-diff-part a-sexp-diff])
       (match (normalize->-types sexp-diff-part)
@@ -134,6 +139,8 @@
          (findf values case-tds)]
         [(list 'All vars (app recur sub-td))
          (and sub-td (td:parametric vars sub-td))]
+        [(list 'Rec var (app recur sub-td))
+         (and sub-td (td:rec var sub-td))]
         [(list* 'Vector (and (list _ ... (? td?) _ ... #f)
                              sub-tds))
          (td:vector (list->td-index-map sub-tds))]
@@ -841,6 +848,12 @@
        ;; same as a base type... let's hope not) so we can just treat it as a
        ;; non-parametric type for the adapter's purposes.
        ;; i.e. just ignore it the parametric part!
+       (loop sub-td current-position)]
+      [{#f (td:rec var sub-td)}
+       ;; Turns out that the bencmarks have Rec types of this form only:
+       ;; (Rec X (U t ... X t ...))
+       ;; This, coupled with the fact that we turn all mutations of union
+       ;; types into a single sealing adapter, means we can just ignore this!
        (loop sub-td current-position)]
       [{#f (td:struct maybe-parent field-count index-map)}
        (define parent-adapter (and maybe-parent
