@@ -88,7 +88,7 @@
        (when (equal? (run-status-outcome rs) 'syntax-error)
          (eprintf @~a{
 
-                      Warning: @mod-name @"@" @index produces syntax-error
+                      Warning: @bench-name @mod-name @"@" @index produces syntax-error
 
                       }))
        (values (mutant #f mod-name index)
