@@ -304,21 +304,30 @@
   (define name-is-a-MR-typedef?
     (ormap (matches (name+type (== name) _))
            MR-typedefs))
-  (define reference-between-name-and-MR-typedefs?
-    (reference-between? (findf (matches (name+type (== name) _))
-                               all-interface-types)
-                        MR-typedefs))
+  (define names-n+t (findf (matches (name+type (== name) _))
+                           all-interface-types))
+  (define MR-typedefs-refer-to-name?
+    (references->? MR-typedefs (list names-n+t)))
   (log-adapter-generation-info
    @~a{
        Adapting all provides referencing @name ...
        Detected @(length MR-typedefs) MR typedefs.
-       @name is @(if name-is-a-MR-typedef? "" "not ") part of a group of MR typedefs
-       And there is @(if reference-between-name-and-MR-typedefs? "some" "no") reference(s) between it and the set of MR typedefs.
+       @name is @(if name-is-a-MR-typedef? " " "not ")part of a group of MR typedefs,
+       @(if MR-typedefs-refer-to-name? "but there are" "and there are no") @;
+       reference(s) to it by MR typedefs.
        })
   (cond [(or name-is-a-MR-typedef?
-             reference-between-name-and-MR-typedefs?)
+             MR-typedefs-refer-to-name?)
+         (define ctc
+           (cond [name-is-a-MR-typedef?
+                  (adapter-reference name)]
+                 [MR-typedefs-refer-to-name?
+                  (generate-adapter-ctc mit)]))
          (match-define (list adapter-definitions adapter-definition-ref-n+ts)
-           (define-mutually-recursive-adapters MR-typedefs name mit))
+           (define-mutually-recursive-adapters MR-typedefs
+             #:specially-handle name
+             #:generate-with (and name-is-a-MR-typedef? mit)
+             #:substitute-with (and MR-typedefs-refer-to-name? ctc)))
          (define (find-adapter-definition-for name)
            (findf (matches (name+type (== name) _))
                   adapter-definition-ref-n+ts))
@@ -327,12 +336,6 @@
                                (or (find-adapter-definition-for name)
                                    n+t)])
                 all-interface-types))
-         (define ctc
-           (cond [name-is-a-MR-typedef?
-                  (adapter-reference name)]
-                 [reference-between-name-and-MR-typedefs?
-                  (generate-adapter-ctc/with-adapter-references mit
-                                                                adapter-definition-ref-n+ts)]))
          (define adaptations
            (append (adapt-types-referencing name
                                             (flip mutation-position-in-mit)
@@ -350,8 +353,10 @@
                                                (filter-not (matches (name+type (== name) _))
                                                            interface-types/MR-def-refs)
                                                (adapter-reference name))))))
+         (define merged-adaptations
+           (merge-duplicate-adapters adaptations))
          (list adapter-definitions
-               adaptations)]
+               merged-adaptations)]
         [else
          ;; no need to worry about MR-typedefs, they don't matter for this
          ;; mutation
@@ -369,23 +374,34 @@
 
 (define (generate-adapter-ctc/with-adapter-references mit adapter-definition-ref-n+ts)
   (match-define (mutated-interface-type original-type new-type mutation-type) mit)
+  (match-define (list normal-leaf-predicate
+                      normal-leaf->adapter-generator)
+    (lookup-td->adapter-generation-info mutation-type))
+  (generate-adapter-ctc/with-adapter-references/leaf-info original-type
+                                                          new-type
+                                                          normal-leaf-predicate
+                                                          normal-leaf->adapter-generator
+                                                          adapter-definition-ref-n+ts))
+
+(define (generate-adapter-ctc/with-adapter-references/leaf-info original-type
+                                                                new-type
+                                                                leaf-predicate
+                                                                leaf->adapter-generator
+                                                                adapter-definition-ref-n+ts)
   (define new-type* (type-substitute adapter-definition-ref-n+ts
                                      new-type
                                      'any))
   (define td (sexp->type-diff (sexp-diff original-type new-type*)))
-  (match-define (list normal-leaf-predicate
-                      normal-leaf->adapter-generator)
-    (lookup-td->adapter-generation-info mutation-type))
   (type-diff->adapter/delegate
    td
    (match-lambda**
     [{(td:base _ (list '#%adapter-reference _)) _} #t]
-    [{a-td pos} (normal-leaf-predicate a-td pos)])
+    [{a-td pos} (leaf-predicate a-td pos)])
    (match-lambda**
     [{(td:base _ (list '#%adapter-reference adapter-name)) _}
      (adapter-reference adapter-name)]
     [{a-td pos}
-     (normal-leaf->adapter-generator a-td pos)])))
+     (leaf->adapter-generator a-td pos)])))
 
 ;; (listof definition?)
 ;; symbol?
@@ -393,9 +409,16 @@
 ;; ->
 ;; (list/c (listof adapter-definition?)
 ;;         (listof typedef?)) ;; #%adapter-references to the former
-;; If `name` is among `MR-typedefs`, then `mit` will be used to create its adapter definition
-;; (along with references to the other adapters).
-(define (define-mutually-recursive-adapters MR-typedefs name mit)
+(define (define-mutually-recursive-adapters MR-typedefs
+          #:specially-handle name
+          ;; specify how to handle `name` with one of the following:
+
+          ;; `name` is among `MR-typedefs`, so use `mit` to create its adapter definition
+          ;; (along with references to the other adapters)
+          #:generate-with [mit #f]
+
+          ;; `name` is referred to by `MR-typedefs`, so substitute in this ctc for those references
+          #:substitute-with [ctc #f])
   (define MR-ref-defs
     (map (match-lambda [(name+type def-name _)
                         (typedef def-name `(#%adapter-reference ,def-name))])
@@ -406,6 +429,22 @@
        (adapter-definition
         name
         (generate-adapter-ctc/with-adapter-references mit MR-ref-defs))]
+      [(name+type other-name other-t)
+       #:when ctc
+       (define g (gensym name))
+       (adapter-definition
+        other-name
+        (generate-adapter-ctc/with-adapter-references/leaf-info
+         other-t
+         (type-substitute (list (typedef name g))
+                          other-t
+                          'any)
+         (match-lambda** [{(td:base _ _) _} #t]
+                         [{_ _} #f])
+         (match-lambda** [{(td:base (== name) (== g)) _} ctc]
+                         ;; see note in `mutation-adapter.rkt` about union types
+                         [{(td:base '<U> _) _} (sealing-adapter)])
+         MR-ref-defs))]
       [(name+type other-name other-t)
        (adapter-definition
         other-name
@@ -418,14 +457,13 @@
   (list (map define-mutually-recursive-adapter MR-typedefs)
         MR-ref-defs))
 
-;; name+type? (listof definition?) -> boolean?
+;; (listof name+type?) (listof definition?) -> boolean?
 ;; Does `n+t` refer to any of `definitions`, or vice versa?
-(define (reference-between? n+t definitions)
-  (not (and (set-empty? (references-in/of (name+type-type n+t)
-                                          (map name+type-name definitions)))
-            (for/and ([def (in-list definitions)])
-              (set-empty? (references-in/of (name+type-type def)
-                                            (list (name+type-name n+t))))))))
+(define (references->? from definitions)
+  (define def-names (map name+type-name definitions))
+  (not (for/and ([n+t (in-list from)])
+         (set-empty? (references-in/of (name+type-type n+t)
+                                       def-names)))))
 
 ;; mutated-interface-type? -> position?
 (define (mutation-position mit)
@@ -1554,35 +1592,93 @@
                   type:base-type-substitution))
                 (list
                  '()
-                 (list-no-order
+                 (list
                   (cons 'default-player
-                        (delegating-class/c
-                         (list)
-                         (list)
-                         (list-no-order
-                          (cons 'take-turn
-                                (delegating->
-                                 1
-                                 (list (cons 0 (delegating-struct
-                                                #f
-                                                1
-                                                (list (cons 0 (sealing-adapter))))))
+                        (delegating-and/c
+                         (delegating-class/c
+                          (list)
+                          (list)
+                          (list
+                           (cons 'set-strategy
+                                 (delegating->
+                                  1
+                                  (list (cons 0
+                                              (delegating->
+                                               0
+                                               (list)
+                                               (any/c-adapter)
+                                               (list (cons 0 (delegating-struct
+                                                              #f
+                                                              1
+                                                              (list (cons 0 (sealing-adapter)))))))))
+                                  (any/c-adapter)
+                                  (list)))))
+                         (delegating-class/c
+                          (list)
+                          (list)
+                          (list
+                           (cons 'take-turn
+                                 (delegating->
+                                  1
+                                  (list (cons 0 (delegating-struct
+                                                 #f
+                                                 1
+                                                 (list (cons 0 (sealing-adapter))))))
+                                  (any/c-adapter)
+                                  (list))))))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (define-type A Natural)
+                     (define-type B (-> A (-> String C) Natural))
+                     (define-type C (-> A (-> String B) Natural))
+                     (require/typed/provide "x.rkt"
+                       [default-player (-> B C Natural)]))
+                 'A
+                 (mutated-interface-type
+                  'Natural
+                  'Any
+                  type:base-type-substitution))
+                (list
+                 (list-no-order
+                  (adapter-definition
+                   'B
+                   (delegating-> 2
+                                 `((0 . ,(sealing-adapter))
+                                   (1 . ,(delegating-> 1
+                                                       (list)
+                                                       (any/c-adapter)
+                                                       `((0 . ,(adapter-reference 'C))))))
                                  (any/c-adapter)
                                  (list)))
-                          (cons 'set-strategy
-                                (delegating->
-                                 1
-                                 (list (cons 0
-                                             (delegating->
-                                              0
-                                              (list)
-                                              (any/c-adapter)
-                                              (list (cons 0 (delegating-struct
-                                                             #f
-                                                             1
-                                                             (list (cons 0 (sealing-adapter)))))))))
+                  (adapter-definition
+                   'C
+                   (delegating-> 2
+                                 `((0 . ,(sealing-adapter))
+                                   (1 . ,(delegating-> 1
+                                                       (list)
+                                                       (any/c-adapter)
+                                                       `((0 . ,(adapter-reference 'B))))))
                                  (any/c-adapter)
-                                 (list)))))))))))
+                                 (list))))
+                 (list
+                  (cons 'default-player
+                        (delegating-and/c
+                         (delegating-> 2
+                                       (list (cons 1 (adapter-reference 'C)))
+                                       (any/c-adapter)
+                                       (list))
+                         (delegating-> 2
+                                       (list (cons 0 (adapter-reference 'B)))
+                                       (any/c-adapter)
+                                       (list)))))))))
+
+(define (merge-duplicate-adapters names+adapters)
+  (define names (remove-duplicates (map car names+adapters)))
+  (for/list ([name (in-list names)])
+    (define adapters (for/list ([{n a} (in-dict names+adapters)]
+                                #:when (equal? n name))
+                       a))
+    (cons name (merge-adapters adapters))))
 
 
 (define-runtime-path type-api-mutators.rkt "mutation-adapter.rkt")

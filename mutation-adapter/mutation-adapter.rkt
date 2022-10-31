@@ -5,6 +5,7 @@
          expand-field-count-for-child-fields
          lookup-td->adapter-generation-info
          type-diff->adapter/delegate
+         merge-adapters
 
          (struct-out mutated-interface-type)
          make-base-type-adapter
@@ -912,6 +913,15 @@
                     is-td-leaf?:base-type-substitution
                     (match-lambda** [{_ pos} (return pos)])))
                  'neg)))
+
+(define (merge-adapters adapters)
+  (foldl* delegating-and/c adapters))
+
+(define (foldl* f l)
+  (match l
+    [(cons h t)
+     (foldl f h t)]
+    [empty empty]))
 
 (define-simple-macro (simple-leaf-pattern pat)
   (match-lambda** [{pat _} #t]
