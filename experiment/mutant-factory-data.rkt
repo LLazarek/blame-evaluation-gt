@@ -5,6 +5,7 @@
          racket/set)
 
 (provide (struct-out blame-trail)
+         (struct-out revivals)
          (struct-out mutant-process)
          (struct-out dead-mutant-process)
          (struct-out bench-info)
@@ -21,6 +22,7 @@
          result/c
          blame-trail-id?
          blame-trail/c
+         revivals/c
          mutant-process/c
          dead-mutant-process/c
          bench-info/c
@@ -47,20 +49,23 @@
 ;;                         (hash (or symbol? path-string?) ctc-level?))
 ;; blame-trail-id? := (or natural? 'no-blame)
 
+(struct revivals (for-failure for-type-error)
+  #:transparent)
+
 ;; mutant:         mutant?
 ;; config:         config?
 ;; file:           path-string?
 ;; id:             natural?
 ;; blame-trail-id: blame-trail-id?
 ;; blame-trail:    blame-trail/c
-;; revival-count:  natural?
+;; revival-counts:  revivals/c
 ;; increased-limits?: boolean?
 (struct mutant-process (mutant
                         config
                         file
                         id
                         blame-trail
-                        revival-count
+                        revival-counts
                         increased-limits?)
   #:transparent)
 
@@ -116,6 +121,8 @@
   (struct/dc blame-trail
              [id     blame-trail-id?]
              [parts  (listof (recursive-contract dead-mutant-process/c #:chaperone))]))
+(define revivals/c
+  (struct/c revivals natural? natural?))
 (define mutant-process/c
   (struct/dc mutant-process
              [mutant             mutant/c]
@@ -123,7 +130,7 @@
              [file               path-string?]
              [id                 natural?]
              [blame-trail        blame-trail/c]
-             [revival-count      natural?]
+             [revival-counts     natural?]
              [increased-limits?  boolean?]))
 (define dead-mutant-process/c
   (struct/dc dead-mutant-process

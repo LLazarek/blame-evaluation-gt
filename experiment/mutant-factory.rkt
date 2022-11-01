@@ -33,6 +33,7 @@
 
 (module+ test
   (provide (struct-out mutant)
+           (struct-out revivals)
            (struct-out mutant-process)
            (struct-out dead-mutant-process)
            (struct-out bench-info)
@@ -45,7 +46,8 @@
            abort-on-failure?
            default-memory-limit/gb
            default-timeout/s
-           MAX-REVIVALS
+           MAX-FAILURE-REVIVALS
+           MAX-TYPE-ERROR-REVIVALS
            sample-size
            copy-factory
            mutant-error-log
@@ -78,7 +80,8 @@
 
 
 (define MAX-CONFIG 'types)
-(define MAX-REVIVALS 10)
+(define MAX-FAILURE-REVIVALS 10)
+(define MAX-TYPE-ERROR-REVIVALS 3)
 
 ;; Outcomes in a blame trail that aren't one of these will go straight to the no-blame-handler
 (define/contract normal-blame-trail-outcomes
@@ -644,7 +647,6 @@ Giving up.
   (mutant-will/c . -> . mutant-will/c)
 
   (λ (the-process-q dead-proc)
-    (record/check-configuration-outcome! dead-proc)
     (log-factory debug
                  @~a{
                      Pursuing blame trail @;
@@ -661,7 +663,7 @@ Giving up.
                                mutation-index
                                precision-config
                                mutant-will
-                               [revival-count 0]
+                               [revival-counts (revivals 0 0)]
                                #:timeout/s [timeout/s #f]
                                #:memory/gb [memory/gb #f]
                                #:following-trail [trail-being-followed #f]
@@ -671,7 +673,7 @@ Giving up.
         [mutation-index         natural?]
         [precision-config       config/c]
         [mutant-will            mutant-will/c])
-       ([revival-count natural?]
+       ([revival-counts revivals/c]
         #:following-trail [trail-being-followed  (or/c #f blame-trail/c)]
         #:test-mutant?    [test-mutant?          boolean?]
         #:timeout/s       [t/s                   (or/c #f number?)]
@@ -726,7 +728,7 @@ Giving up.
                       outfile
                       mutant-id
                       mutant-blame-trail
-                      revival-count
+                      revival-counts
                       ;; coerce to bool
                       (and (or timeout/s memory/gb) #t)))
     (log-factory
@@ -759,8 +761,7 @@ Giving up.
    this-mutant-priority))
 
 ;; There is some common housekeeping that must be performed in every mutant
-;; will, regardless of what kind of mutant or the details of its particular will
-;; details.
+;; will, regardless of what kind of mutant or the details of its particular will.
 ;; In particular:
 ;; - Respawning the mutant a limited number of times if the mutant fails
 ;; - Otherwise, converting the mutant-process into a dead-mutant-process
@@ -774,7 +775,7 @@ Giving up.
                                        config
                                        file
                                        id the-blame-trail
-                                       revival-count
+                                       revival-counts
                                        increased-limits?))
       (process-info-data the-process-info))
     ;; Read the result of the mutant before possible consolidation
@@ -789,17 +790,6 @@ Giving up.
     (match (cons status maybe-result)
       [(or (cons 'done-error _)
            (cons 'done-ok (? eof-object?)))
-       (maybe-revive-failed-mutant process-q
-                                   mutant-proc
-                                   status
-                                   maybe-result
-                                   mutant-will)]
-      [(cons 'done-ok (struct* run-status ([outcome 'type-error])))
-       ;; mod may not be a configurable module, e.g. if it's a type interface module
-       #:when (and (hash-has-key? config mod)
-                   (equal? (hash-ref config mod) 'none))
-       (log-factory warning
-                    @~a{Mutant has unexpected type error, attempting to revive:})
        (maybe-revive-failed-mutant process-q
                                    mutant-proc
                                    status
@@ -828,15 +818,23 @@ Giving up.
                             o]), @;
                         config: @~s[(serialize-config config)]
                         })
-       (define dead-mutant-proc
-         (dead-mutant-process (mutant #f mod index)
-                              config
-                              result
-                              id
-                              the-blame-trail
-                              increased-limits?))
-       (delete-file file)
-       (mutant-will process-q dead-mutant-proc)]))
+       (match (record/check-configuration-outcome! mutant-proc result)
+         [#t
+          (revive-type-error-mutant process-q
+                                    mutant-proc
+                                    status
+                                    maybe-result
+                                    mutant-will)]
+         [#f
+          (define dead-mutant-proc
+            (dead-mutant-process (mutant #f mod index)
+                                 config
+                                 result
+                                 id
+                                 the-blame-trail
+                                 increased-limits?))
+          (delete-file file)
+          (mutant-will process-q dead-mutant-proc)])]))
   outer-will)
 
 (define/contract (maybe-revive-failed-mutant process-q
@@ -859,15 +857,16 @@ Giving up.
                           [blame-trail    the-blame-trail]
                           [mutant         (mutant #f mod index)]
                           [config         config]
-                          [revival-count  revival-count]))
+                          [revival-counts (revivals for-failure
+                                                    for-type-error)]))
     a-mutant-process)
 
-  (cond [(>= revival-count MAX-REVIVALS)
+  (cond [(>= for-failure MAX-FAILURE-REVIVALS)
          (log-factory error
                       "Runner errored all ~a / ~a tries on mutant:
  [~a] ~a @ ~a with config
 ~v"
-                      revival-count MAX-REVIVALS
+                      for-failure MAX-FAILURE-REVIVALS
                       id mod index
                       (serialize-config config))
          (maybe-abort "Revival failed to resolve mutant errors"
@@ -884,18 +883,57 @@ Attempting revival ~a / ~a
                       id mod index
                       (serialize-config config)
                       status maybe-result
-                      (add1 revival-count) MAX-REVIVALS)
+                      (add1 for-failure) MAX-FAILURE-REVIVALS)
          (spawn-mutant process-q
                        mod
                        index
                        config
                        mutant-will
-                       (add1 revival-count)
+                       (revivals (add1 for-failure)
+                                 for-type-error)
                        #:following-trail (match the-blame-trail
                                            [(? blame-trail? bt) bt]
                                            [else                #f])
                        #:test-mutant? (equal? the-blame-trail
                                               test-mutant-flag))]))
+
+(define/contract (revive-type-error-mutant process-q
+                                           a-mutant-process
+                                           status
+                                           maybe-result
+                                           mutant-will)
+  (->i ([process-q         (process-Q/c factory/c)]
+        [a-mutant-process  mutant-process/c]
+        [status            'done-ok]
+        [maybe-result      (property/c run-status-outcome 'type-error)]
+        [mutant-will       mutant-will/c])
+       [result (process-Q/c factory/c)])
+
+  (match-define (struct* mutant-process
+                         ([id             id]
+                          [blame-trail    the-blame-trail]
+                          [mutant         (mutant #f mod index)]
+                          [config         config]
+                          [revival-counts (revivals for-failure
+                                                    for-type-error)]))
+    a-mutant-process)
+
+  (log-factory info
+               @~a{
+                   Retrying @mutant [@id] to verify it really has a type-error. @;
+                   Retry # @(add1 for-type-error) / @MAX-TYPE-ERROR-REVIVALS
+                   })
+  (spawn-mutant process-q
+                mod
+                index
+                config
+                mutant-will
+                (revivals for-failure (add1 for-type-error))
+                #:following-trail (match the-blame-trail
+                                    [(? blame-trail? bt) bt]
+                                    [else                #f])
+                #:test-mutant? (equal? the-blame-trail
+                                       test-mutant-flag)))
 
 (define (mutant-data-file-name mod-name mutation-index)
   @~a{
@@ -1073,30 +1111,69 @@ Mutant: [~a] ~a @ ~a with config:
   (path->string (find-relative-path (simple-form-path (current-directory))
                                     (simple-form-path p))))
 
-(define (record/check-configuration-outcome! dead-proc)
-  (match-define (struct* dead-mutant-process ([result result]
-                                              [mutant mutant]
-                                              [config config]))
-    dead-proc)
+;; mutant-process? run-status? -> boolean?
+;;
+;; Checks the outcome of the given configuration, possibly recording or
+;; reporting an error about it, and returns whether to retry the process or
+;; continue with executing its will.
+;;
+;; A config needs to be retried a few times if it produces a type-error in order
+;; to verify that it really produces a type-error, thanks to a hard-to-pin-down
+;; bug in TR that very occaisonally causes some programs to raise "duplicate
+;; annotation" type errors for no apparent reason whatsoever. We don't know what
+;; causes it or how to fix it, so we need to work around it by checking a few
+;; times that any type error really is a type-error.
+(define (record/check-configuration-outcome! mutant-proc result)
+  (match-define (struct* mutant-process ([mutant mutant]
+                                         [config config]
+                                         [revival-counts (revivals _ for-type-error)]))
+    mutant-proc)
   (define (get-outcome outcome-for)
     (outcome-for mutant config))
+  (define retry #t)
+  (define continue #f)
   (match* {result (record/check-configuration-outcomes?)}
+    [{(struct* run-status ([outcome 'type-error]))
+      `(record ,record!)}
+     #:when (< for-type-error MAX-TYPE-ERROR-REVIVALS)
+     retry]
     [{(struct* run-status ([outcome outcome]))
       `(record ,record!)}
-     (record! mutant config outcome)]
+     (record! mutant config outcome)
+     continue]
 
+    [{(struct* run-status ([outcome 'type-error]))
+      `(check ,(app get-outcome (not 'type-error)))}
+     #:when (< for-type-error MAX-TYPE-ERROR-REVIVALS)
+     retry]
     [{(struct* run-status ([outcome (and real-outcome (not (or 'timeout 'oom)))]))
-      `(check ,(app get-outcome (and expected-outcome (or 'type-error 'runtime-error))))}
-     #:when (not (equal? real-outcome expected-outcome))
+      `(check ,(app get-outcome recorded-outcome))}
+     #:when (not (outcome-compatible-with? recorded-outcome real-outcome))
      (maybe-abort
       @~a{
           Found that a configuration produces @real-outcome, but configuration outcomes db @;
-          says that it should produce @expected-outcome
+          says that it should produce something compatible with @recorded-outcome
           Mutant: @mutant @(serialize-config config)
           }
-      (void))]
+      continue)]
 
-    [{_ _} (void)]))
+    [{_ _}
+     (match (record/check-configuration-outcomes?)
+       [`(check ,checker)
+        (log-factory debug @~a{outcome check: @result looks ok! checker says it should be: @(get-outcome checker)})]
+       [else (void)])
+     continue]))
+
+(define (outcome-compatible-with? recorded actual)
+  (match (list recorded actual)
+    [(list-no-order 'syntax-error _)                #f]
+    [(list 'type-error 'type-error)                 #t]
+    [(list-no-order 'type-error (not 'type-error )) #f]
+    [else
+     ;; all other modes should be 'weaker' than TR's recorded result
+     (define ordering '(blamed runtime-error completed))
+     (>= (index-of ordering actual)
+         (index-of ordering recorded))]))
 
 (define progress-log (make-parameter #f))
 (define (make-cached-results-for progress-info-hash)

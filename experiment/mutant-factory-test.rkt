@@ -183,7 +183,7 @@
                         id
                         blame-trail
                         increased-limits?)])
-(define (make:mutant0-proc)
+(define (make:mutant0-proc [m-revivals (revivals 0 0)])
   (mutant-process mutant0
                   (hash mutant0-mod 'none
                         mutant1-mod 'none
@@ -192,8 +192,17 @@
                   mutant0-path
                   1205
                   (blame-trail 42 '())
-                  0
+                  m-revivals
                   #f))
+(define (make:mutant0-result outcome [blaming (list mutant1-mod)])
+  (run-status main.rkt
+              0
+              'baz
+              outcome
+              blaming
+              empty
+              empty
+              #f))
 (define (make:mutant0-dead-proc)
   (mp->dead (make:mutant0-proc)))
 (define (make:mutant0-proc/following-42)
@@ -564,12 +573,12 @@
                                _
                                _
                                (== the-trail)
-                               0
+                               (revivals 0 0)
                                #f))))
 
 (define-test (test-mutant-will #:process-file process-file
                                #:status status
-                               #:revival-count revival-count
+                               #:revival-counts revival-counts
 
                                #:test:should-respawn? should-respawn?
                                #:test:will-called? will-should-be-called?)
@@ -597,7 +606,7 @@
                                    process-file
                                    1505
                                    (blame-trail 95 '())
-                                   revival-count
+                                   revival-counts
                                    #f)
                    (const status)
                    process-will:housekeeping+do-nothing))
@@ -618,35 +627,48 @@
  #:name mutant->process-will
  (test-mutant-will #:process-file mutant0-path
                    #:status 'done-ok
-                   #:revival-count 0
+                   #:revival-counts (revivals 0 0)
 
                    #:test:should-respawn? #f
                    #:test:will-called? #t)
  (test-mutant-will #:process-file mutant0-path
                    #:status 'done-error
-                   #:revival-count 0
+                   #:revival-counts (revivals 0 0)
 
                    #:test:should-respawn? #t
                    #:test:will-called? #f)
  (test-mutant-will #:process-file mutant0-path
                    #:status 'done-error
-                   #:revival-count MAX-REVIVALS
+                   #:revival-counts (revivals MAX-FAILURE-REVIVALS 0)
 
                    #:test:should-respawn? #f
                    #:test:will-called? #f)
  (test-mutant-will #:process-file empty-file-path
                    #:status 'done-ok
-                   #:revival-count 1
+                   #:revival-counts (revivals 1 0)
 
                    #:test:should-respawn? #t
                    #:test:will-called? #f)
  (test-mutant-will #:process-file empty-file-path
                    #:status 'done-ok
-                   #:revival-count MAX-REVIVALS
+                   #:revival-counts (revivals MAX-FAILURE-REVIVALS 0)
 
                    #:test:should-respawn? #f
-                   #:test:will-called? #f))
+                   #:test:will-called? #f)
+ (parameterize ([record/check-configuration-outcomes? `(check ,(const 'blamed))])
+   (test-mutant-will #:process-file mutant1-path/2
+                     #:status 'done-ok
+                     #:revival-counts (revivals 0 0)
 
+                     #:test:should-respawn? #t
+                     #:test:will-called? #f))
+ (parameterize ([record/check-configuration-outcomes? `(check ,(const 'blamed))])
+  (test-mutant-will #:process-file mutant1-path/2
+                    #:status 'done-ok
+                    #:revival-counts (revivals 0 MAX-TYPE-ERROR-REVIVALS)
+
+                    #:test:should-respawn? #f
+                    #:test:will-called? #t)))
 
 (test-begin/with-env
  #:name cache-replay/resume
@@ -684,7 +706,8 @@
              (hash-table ['enq 1] [_ 0] ___)))
 
 
-(parameterize ([record/check-configuration-outcomes? #f])
+(parameterize ([record/check-configuration-outcomes? #f]
+               [abort-on-failure? #f])
   (test-begin/with-env
    #:name configuration-outcome-record/check
 
@@ -694,54 +717,112 @@
            (define (clear-log-contents!)
              (with-output-to-file config-outcomes-log #:exists 'replace
                (thunk (displayln ""))))
-           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
-             (let ([finalize! (setup-configuration-outcome-record/checking!)])
-               (record/check-configuration-outcome! dead-e-proc/crashed)
-               (finalize!))))
-   (match dead-e-proc/crashed
-     [(struct* dead-mutant-process
-               ([mutant mutant]
-                [config config]))
-      (test-match (current-log-contents)
-                  (hash-table [(== (list mutant config))
-                               'runtime-error]))])
-   (ignore (clear-log-contents!)
-           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
-             (let ([finalize! (setup-configuration-outcome-record/checking!)])
-               (record/check-configuration-outcome! dead-e-proc/blame-e)
-               (finalize!))))
-   (match dead-e-proc/blame-e
-     [(struct* dead-mutant-process
-               ([mutant mutant]
-                [config config]))
-      (test-match (current-log-contents)
-                  (hash-table [(== (list mutant config))
-                               'blamed]))])
+           (define-test (test-outcome-checking/recording mode
+                                                         do-record/check!-tests
+                                                         [test-log-contents void]
+                                                         #:clear-first? [clear-first? #t])
+             (when clear-first?
+               (clear-log-contents!)
+               (set-box! abort-suppressed? #f))
+             (and/test
+              (parameterize ([record/check-configuration-outcomes? `(,mode ,config-outcomes-log)])
+                (let ([finalize! (setup-configuration-outcome-record/checking!)])
+                  (begin0 (do-record/check!-tests)
+                    (finalize!))))
+              (test-log-contents (current-log-contents))))
+           (match-define (struct* mutant-process ([mutant mutant]
+                                                  [config config]))
+             (make:mutant0-proc)))
 
-   ;; check
-   (ignore (clear-log-contents!)
-           (set-box! abort-suppressed? #f)
-           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
-             (let ([finalize! (setup-configuration-outcome-record/checking!)])
-               (record/check-configuration-outcome! dead-e-proc/blame-e)
-               (finalize!)))
-           (parameterize ([record/check-configuration-outcomes? `(check ,config-outcomes-log)])
-             (let ([finalize! (setup-configuration-outcome-record/checking!)])
-               (parameterize ([abort-on-failure? #f])
-                 (record/check-configuration-outcome! dead-e-proc/blame-e))
-               (finalize!))))
+   (test-outcome-checking/recording
+    'record
+    (thunk
+     (test-equal? (record/check-configuration-outcome! (make:mutant0-proc)
+                                                       (make:mutant0-result 'runtime-error))
+                  #f))
+    (λ (contents)
+      (test-match contents
+                  (hash-table [(== (list mutant config))
+                               'runtime-error]))))
+
+   (test-outcome-checking/recording
+    'record
+    (thunk
+     (test-equal? (record/check-configuration-outcome! (make:mutant0-proc)
+                                                       (make:mutant0-result 'blamed))
+                  #f))
+    (λ (contents)
+      (test-match contents
+                  (hash-table [(== (list mutant config))
+                               'blamed]))))
+
+   ;; type errors need to be retried before being recorded
+   (ignore (clear-log-contents!))
+   (for/and/test ([i MAX-TYPE-ERROR-REVIVALS])
+     (test-outcome-checking/recording
+      #:clear-first? #f
+      'record
+      (thunk
+       (test-equal? (record/check-configuration-outcome! (make:mutant0-proc
+                                                          (revivals 0 i))
+                                                         (make:mutant0-result 'type-error))
+                    #t))
+      (λ (contents)
+        (not/test (hash-has-key? contents
+                                 (list mutant config))))))
+   (test-outcome-checking/recording
+    #:clear-first? #f
+    'record
+    (thunk
+     (test-equal? (record/check-configuration-outcome! (make:mutant0-proc
+                                                        (revivals 0 MAX-TYPE-ERROR-REVIVALS))
+                                                       (make:mutant0-result 'type-error))
+                  #f))
+    (λ (contents)
+      (test-match contents
+                  (hash-table [(== (list mutant config))
+                               'type-error]))))
+
+   ;; ----- check -----
+   (test-outcome-checking/recording
+    'record
+    (thunk
+     (test-equal? (record/check-configuration-outcome! (make:mutant0-proc)
+                                                       (make:mutant0-result 'blamed))
+                  #f)))
+   (test-outcome-checking/recording
+    #:clear-first? #f
+    'check
+    (thunk
+     (test-equal? (record/check-configuration-outcome! (make:mutant0-proc)
+                                                       (make:mutant0-result 'blamed))
+                  #f)))
    (not (unbox abort-suppressed?))
-   (ignore (clear-log-contents!)
-           (set-box! abort-suppressed? #f)
-           (parameterize ([record/check-configuration-outcomes? `(record ,config-outcomes-log)])
-             (let ([finalize! (setup-configuration-outcome-record/checking!)])
-               (record/check-configuration-outcome! dead-e-proc/crashed)
-               (finalize!)))
-           (parameterize ([record/check-configuration-outcomes? `(check ,config-outcomes-log)])
-             (let ([finalize! (setup-configuration-outcome-record/checking!)])
-               (parameterize ([abort-on-failure? #f])
-                 (record/check-configuration-outcome! dead-e-proc/type-error-in-d))
-               (finalize!))))
+
+
+   ;; type-errors need to be retried before being declared failures
+   (test-outcome-checking/recording
+    'record
+    (thunk (test-equal? (record/check-configuration-outcome! (make:mutant0-proc)
+                                                             (make:mutant0-result 'blamed))
+                        #f)))
+   (for/and/test ([i MAX-TYPE-ERROR-REVIVALS])
+     (and/test (test-outcome-checking/recording
+                #:clear-first? #f
+                'check
+                (thunk
+                 (test-equal? (record/check-configuration-outcome! (make:mutant0-proc
+                                                                    (revivals 0 i))
+                                                                   (make:mutant0-result 'type-error))
+                              #t)))
+               (not (unbox abort-suppressed?))))
+   (test-outcome-checking/recording
+    #:clear-first? #f
+    'check
+    (thunk (test-equal? (record/check-configuration-outcome! (make:mutant0-proc
+                                                              (revivals 0 MAX-TYPE-ERROR-REVIVALS))
+                                                             (make:mutant0-result 'type-error))
+                        #f)))
    (unbox abort-suppressed?)))
 
 

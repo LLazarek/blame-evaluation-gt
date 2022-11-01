@@ -97,8 +97,8 @@
                                                'foo
                                                'type-error
                                                '("m1.rkt")
-                                               empty
-                                               empty
+                                               #f
+                                               #f
                                                #f))]
            [mutant2-path "m2.rktd"
                          (format "~s\n"
@@ -107,8 +107,8 @@
                                              'foo
                                              'type-error
                                              '("m2.rkt")
-                                             empty
-                                             empty
+                                             #f
+                                             #f
                                              #f))]
            [empty-file-path "empty-file.rktd"
                             ""]
