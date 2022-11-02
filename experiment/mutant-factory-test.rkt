@@ -731,7 +731,7 @@
                     (finalize!))))
               (test-log-contents (current-log-contents))))
            (match-define (struct* mutant-process ([mutant mutant]
-                                                  [config config]))
+                                                  [config (app serialize-config config)]))
              (make:mutant0-proc)))
 
    (test-outcome-checking/recording
@@ -823,7 +823,16 @@
                                                               (revivals 0 MAX-TYPE-ERROR-REVIVALS))
                                                              (make:mutant0-result 'type-error))
                         #f)))
-   (unbox abort-suppressed?)))
+   (unbox abort-suppressed?)
+
+   ;; Checking an outcome that hasn't been recorded shouldn't cause any errors
+   (test-outcome-checking/recording
+    'check
+    (thunk
+     (test-equal? (record/check-configuration-outcome! (make:mutant0-proc)
+                                                       (make:mutant0-result 'blamed))
+                  #f)))
+   (not (unbox abort-suppressed?))))
 
 
 (require racket/os)

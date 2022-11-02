@@ -82,6 +82,7 @@
 (define MAX-CONFIG 'types)
 (define MAX-FAILURE-REVIVALS 10)
 (define MAX-TYPE-ERROR-REVIVALS 3)
+(struct no-recorded-outcome () #:transparent)
 
 ;; Outcomes in a blame trail that aren't one of these will go straight to the no-blame-handler
 (define/contract normal-blame-trail-outcomes
@@ -1166,12 +1167,17 @@ Mutant: [~a] ~a @ ~a with config:
 
 (define (outcome-compatible-with? recorded actual)
   (match (list recorded actual)
+    [(list (no-recorded-outcome) _)                 #t]
     [(list-no-order 'syntax-error _)                #f]
     [(list 'type-error 'type-error)                 #t]
     [(list-no-order 'type-error (not 'type-error )) #f]
     [else
      ;; all other modes should be 'weaker' than TR's recorded result
      (define ordering '(blamed runtime-error completed))
+     (unless (and (index-of ordering actual)
+                  (index-of ordering recorded))
+       (log-factory error
+                    @~a{Outcome checking: unrecognized outcome in @recorded or @actual ?}))
      (>= (index-of ordering actual)
          (index-of ordering recorded))]))
 
@@ -1207,13 +1213,21 @@ Mutant: [~a] ~a @ ~a with config:
        (initialize-progress-log! path
                                  #:exists 'append))
      (define (log-outcome! mutant config outcome)
-       (log-outcome!/raw (cons (list mutant config) outcome)))
+       (log-outcome!/raw (cons (list mutant (serialize-config config)) outcome)))
      (record/check-configuration-outcomes? `(record ,log-outcome!))
      finalize-log!]
     [`(check ,path)
      (define outcomes (make-immutable-hash (file->list path)))
      (define (outcome-for mutant config)
-       (hash-ref outcomes (list mutant config) '<unrecorded>))
+       (hash-ref outcomes
+                 (list mutant (serialize-config config))
+                 (thunk
+                  (log-factory info
+                               @~a{
+                                   Outcome checking: no outcome found in log for @;
+                                   @mutant @(serialize-config config)
+                                   })
+                  (no-recorded-outcome))))
      (record/check-configuration-outcomes? `(check ,outcome-for))
      void]
     [else void]))
