@@ -4,6 +4,7 @@
          read-blame-trails-by-mutator/across-all-benchmarks
          mutator-names
          read-mutants-by-mutator
+         blame-trail-summaries->blame-trails
 
          (struct-out mutant)
          (struct-out blame-trail)

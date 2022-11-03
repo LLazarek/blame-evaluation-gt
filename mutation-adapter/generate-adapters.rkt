@@ -2,7 +2,9 @@
 
 (provide generate-adapter-module-for-mutation
          (struct-out mutated-type)
-         adapter-ctcs->module-stx)
+         adapter-ctcs->module-stx
+
+         find-mutated-type)
 
 (require "mutation-adapter.rkt"
          (only-in (submod "mutation-adapter.rkt" tds) td:base td:base?)
