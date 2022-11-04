@@ -17,6 +17,9 @@
 
 (define-runtime-path benchmarks-dir "../../gtp-benchmarks/benchmarks")
 
+;; program/c mod-name? mutation-index?
+(struct mutant* (program mod index) #:transparent)
+
 (define (categorize mutants)
   (for/hash ([m (in-list mutants)])
     (match-define (mutant benchmark-name mod index) m)
@@ -42,9 +45,6 @@
   (define the-benchmark-configuration
     (configure-benchmark the-benchmark (make-max-bench-config the-benchmark)))
   ((configured:benchmark-configuration->program) the-benchmark-configuration))
-
-;; program/c mod-name? mutation-index?
-(struct mutant* (program mod index) #:transparent)
 
 ;; mutant*? -> (values syntax? syntax?)
 (define (mutant->module-syntaxes m)
@@ -142,49 +142,45 @@
       [(td:class '() '() (list (cons _ a)))
        (loop a (cons class-method path))])))
 
-;; (define (uniq l)
-;;   (if (empty? l)
-;;       l
-;;       (for/fold ([result (take l 1)]
-;;                  [last-v (first l)]
-;;                  #:result (reverse result))
-;;                 ([v (in-list (rest l))]
-;;                  #:unless (equal? v last-v))
-;;         (values (cons v result)
-;;                 v))))
+(main
+ #:arguments ([(hash-table ['config config-path]
+                           ['summaries-db db-path]
+                           ['outpath outpath])
+               _]
+              #:once-each
+              [("-c" "--config")
+               'config
+               ("Config for obtaining mutation info.")
+               #:collect ["path" take-latest #f]
+               #:mandatory]
+              [("-s" "--summaries-db")
+               'summaries-db
+               ("Path to the db of mutant summaries for which to plot categories.")
+               #:collect ["path" take-latest #f]
+               #:mandatory]
+              [("-o" "--out")
+               'outpath
+               ("Path at which to save the plot.")
+               #:collect ["path" take-latest #f]
+               #:mandatory])
 
-;; (module+ test
-;;   (require ruinit)
-;;   (test-begin
-;;     #:name uniq
-;;     (test-equal? (uniq '(1 2 1 1 1 3 1 2 2 2 2 4))
-;;                  '(1 2 1 3 1 2 4))
-;;     (test-equal? (uniq '())
-;;                  '())
-;;     (test-equal? (uniq '(1 2 3))
-;;                  '(1 2 3))))
+ (require data-frame
+          (prefix-in plot: plot)
+          complot)
 
+ (define db (db:get db-path))
+ (install-configuration! config-path)
+ (define cs (categorize (summaries-db->mutants db)))
+ (parameterize ([plot:plot-x-tick-label-anchor  'top-right]
+                [plot:plot-x-tick-label-angle   30])
+   (render (add-to (plot (for/data-frame {mutant category}
+                           ([{m c} (in-hash cs)])
+                           (values m c)))
+                   (histogram #:x "category"
+                              #:bar-ordering (λ (a b) (< (length a) (length b))))
+                   (x-axis)
+                   (y-axis #:label "count")
+                   (title "Interesting mutants per mutation type"))
+           outpath
+           #:width 1700)))
 
-(module+ test
-  (define db (db:get "../dbs/type-api-mutations/dyn-err-summaries.rktdb"))
-  (install-configuration! "../configurables/bltym-configs/TR.rkt")
-  (define cs (categorize (summaries-db->mutants db)))
-  (require data-frame
-           sawzall
-           graphite)
-  #;(render (add-to (plot (reorder (for/data-frame {mutant category}
-                                   ([{m c} (in-hash cs)])
-                                   (values m c))
-                                 (cons "category" (λ (a b) (> (length a) (length b))))))
-                  (histogram #:x "category")
-                  (x-axis)
-                  (y-axis #:label "count"))
-            #:width 3400)
-  (plot (add-to (plot (reorder (for/data-frame {mutant category}
-                                   ([{m c} (in-hash cs)])
-                                   (values m c))
-                                 (cons "category" (λ (a b) (> (length a) (length b))))))
-                  (histogram #:x "category")
-                  (x-axis)
-                  (y-axis #:label "count"))
-          #:width 3400))
