@@ -57,6 +57,7 @@
              mutated-stx)]))
 
 (define base-type 'base)
+(define complex-type 'complex)
 (define function-swap 'f-swap)
 (define struct-field-swap 'struct-swap)
 (define class-field-swap 'class-swap)
@@ -65,6 +66,8 @@
 (define struct-field 'struct)
 (define class-field 'class-f)
 (define class-method 'class-m)
+
+(define typedef 'typedef)
 
 (define (category? l)
   (match l
@@ -77,6 +80,7 @@
            (or (== function-swap)
                (== struct-field-swap)
                (== class-field-swap)
+               (== complex-type)
                (== base-type)))
      #t]
     [else #f]))
@@ -84,10 +88,13 @@
 ;; mutant*? -> category?
 (define (categorize-mutant a-mutant*)
   (define-values {original-mod-stx mutated-mod-stx} (mutant->module-syntaxes a-mutant*))
-  (match-define (mutated-type name original-type new-type _ _)
+  (match-define (mutated-type name original-type new-type mutated-struct? mutated-definition?)
     (find-mutated-type original-mod-stx mutated-mod-stx))
   (define diff (sexp->type-diff (sexp-diff original-type new-type)))
-  (categorize-mutant-diff diff))
+  (define base-category (categorize-mutant-diff diff))
+  (if mutated-definition?
+      (cons typedef base-category)
+      base-category))
 
 
 (define/contract (categorize-mutant-diff a-td)
@@ -98,6 +105,8 @@
     (define (return v)
       (reverse (cons v path)))
     (match td
+      [(td:base (? list?) 'Any)
+       (return complex-type)]
       [(? td:base?)
        (return base-type)]
       [(or (td:-> _ (list (cons _ a) (cons _ b)) #f '())
@@ -180,7 +189,8 @@
                               #:bar-ordering (λ (a b) (< (length a) (length b))))
                    (x-axis)
                    (y-axis #:label "count")
-                   (title "Interesting mutants per mutation type"))
+                   (title "Interesting mutants per mutation location in type"))
            outpath
-           #:width 1700)))
+           #:width 1700
+           #:height 1000)))
 
