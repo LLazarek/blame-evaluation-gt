@@ -166,14 +166,26 @@
 
 
 (define type:function-arg-swap "function-arg-swap")
-(define-swapping-mutator function-arg-swap type:function-arg-swap
+(define-swapping-mutator ->-arg-swap type:function-arg-swap
   ({~and {~datum ->} head} e ... range)
   e #:-> new-e
   (head new-e ... range))
+(define-swapping-mutator ->*-mandatory-arg-swap type:function-arg-swap
+  ({~and {~datum ->*} head} (e ...) . rest)
+  e #:-> new-e
+  (head (new-e ...) . rest))
+(define-swapping-mutator ->*-optional-arg-swap type:function-arg-swap
+  ({~and {~datum ->*} head} mandatory (e ...) . rest)
+  e #:-> new-e
+  (head mandatory (new-e ...) . rest))
+(define function-arg-swap (compose-mutators ->-arg-swap
+                                            ->*-mandatory-arg-swap
+                                            ->*-optional-arg-swap))
+
 
 (define type:function-result-swap "function-result-swap")
 (define-swapping-mutator function-result-swap type:function-result-swap
-  ({~and {~datum ->} head} arg ... ({~and {~datum values} values} e ...))
+  ({~and head {~or {~datum ->} {~datum ->*}}} arg ... ({~and {~datum values} values} e ...))
   e #:-> new-e
   (head arg ... (values new-e ...)))
 
@@ -246,6 +258,31 @@
                          #'(-> A C B D)
 
                          #'(-> A B C D)
+                         ))
+    (test-mutator* function-arg-swap
+                   #'(->* (A B C) D)
+                   (list #'(->* (B A C) D)
+                         #'(->* (C B A) D)
+                         #'(->* (A C B) D)
+
+                         #'(->* (A B C) D)
+                         ))
+    (test-mutator* function-arg-swap
+                   #'(->* () (A B C) D)
+                   (list #'(->* () (B A C) D)
+                         #'(->* () (C B A) D)
+                         #'(->* () (A C B) D)
+
+                         #'(->* () (A B C) D)
+                         ))
+    (test-mutator* function-arg-swap
+                   #'(->* (A B) (A B C) D)
+                   (list #'(->* (B A) (A B C) D)
+                         #'(->* (A B) (B A C) D)
+                         #'(->* (A B) (C B A) D)
+                         #'(->* (A B) (A C B) D)
+
+                         #'(->* (A B) (A B C) D)
                          )))
   (test-begin
     #:name function-result-swap
