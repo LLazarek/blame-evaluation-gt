@@ -96,11 +96,18 @@
      (filter-map r/t/p-entry->name+type entries)]
     [(list 'define-type name t)
      (list (typedef name t))]
-    [(and struct (list (or 'struct: 'struct)
-                       (? symbol? name)
-                       (or (? symbol? parent)
-                           (binding (? list?) #:with [parent #f]))
-                       _ ...))
+    [(and struct (or (list (or 'struct: 'struct)
+                           (? symbol?)
+                           (or (? symbol? parent)
+                               (binding (? list?) #:with [parent #f]))
+                           _ ...
+                           '#:type-name name
+                           _ ...)
+                     (list (or 'struct: 'struct)
+                           (? symbol? name)
+                           (or (? symbol? parent)
+                               (binding (? list?) #:with [parent #f]))
+                           _ ...)))
      (list (struct-type name struct parent))]
     [other empty]))
 ;; syntax? -> (listof name+type?)
@@ -128,7 +135,9 @@
     (test-equal? (top-level-form->types '(struct s blah ([f : F])))
                  (list (struct-type 's '(struct s blah ([f : F])) 'blah)))
     (test-equal? (top-level-form->types '(struct s ([f : F])))
-                 (list (struct-type 's '(struct s ([f : F])) #f)))))
+                 (list (struct-type 's '(struct s ([f : F])) #f)))
+    (test-equal? (top-level-form->types '(struct s ([f : F]) #:prefab #:type-name S))
+                 (list (struct-type 'S '(struct s ([f : F]) #:prefab #:type-name S) #f)))))
 
 ;; syntax? syntax? -> mutated-type?
 (define (find-mutated-type original-mod-stx new-mod-stx)
@@ -1145,6 +1154,84 @@
                                                        [m : Month]
                                                        [d : Natural])
                                             #:prefab)
+                                         type:base-type-substitution))
+                (list
+                 '()
+                 (list-no-order
+                  (cons 'a
+                        (app (compose1 syntax->datum ->stx)
+                             '(delegating->
+                               1
+                               (list
+                                (cons 0 (delegating-struct ; Date
+                                         #f
+                                         2
+                                         (list
+                                          (cons 0 (delegating-struct ; YMD
+                                                   #f
+                                                   3
+                                                   (list
+                                                    (cons 0 (sealing-adapter)))))))))
+                               (any/c-adapter)
+                               (list))))
+                  (cons 'b
+                        (app (compose1 syntax->datum ->stx)
+                             '(delegating->
+                               1
+                               (list)
+                               (any/c-adapter)
+                               (list
+                                (cons 0
+                                      (delegating->
+                                       1
+                                       (list
+                                        (cons 0 (delegating-struct ; DateTime
+                                                 #f
+                                                 1
+                                                 (list
+                                                  (cons 0 (delegating-struct ; Date
+                                                           #f
+                                                           2
+                                                           (list
+                                                            (cons 0 (delegating-struct ; YMD
+                                                                     #f
+                                                                     3
+                                                                     (list
+                                                                      (cons 0 (sealing-adapter))))))))))))
+                                       (any/c-adapter)
+                                       (list))))))))))
+    (test-match (adapt-all-referencing-provides
+                 #'(module A racket
+                     (struct YMD ([y : Natural]
+                                  [m : Month]
+                                  [d : Natural])
+                       #:prefab
+                       #:type-name YMD-T)
+                     (struct Date ([ymd : YMD-T]
+                                   [jdn : Integer])
+                       #:prefab
+                       #:type-name Date-T)
+                     (struct DateTime ([date : Date-T])
+                       #:prefab
+                       #:type-name DateTime-T)
+                     (provide (struct-out YMD))
+                     (provide (struct-out Date))
+                     (provide (struct-out DateTime))
+                     (require/typed/provide "x.rkt"
+                       [a (-> Date-T Number)]
+                       [b (-> String (-> DateTime-T Number))]
+                       [c Y]))
+                 'YMD-T
+                 (mutated-interface-type '(struct YMD ([y : Natural]
+                                                       [m : Month]
+                                                       [d : Natural])
+                                            #:prefab
+                                            #:type-name YMD-T)
+                                         '(struct YMD ([y : Any]
+                                                       [m : Month]
+                                                       [d : Natural])
+                                            #:prefab
+                                            #:type-name YMD-T)
                                          type:base-type-substitution))
                 (list
                  '()
