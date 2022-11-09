@@ -109,20 +109,8 @@
        dump-dir-path-or-name*]))
 
   (when diff-mutant?
-    (define diff (diff-mutation the-module-to-mutate index the-program))
-    (if stop-diff-early?
-        (for/fold ([after-ctx #f])
-                  ([line (in-list (string-split diff "\n"))]
-                   #:break (and after-ctx
-                                (> after-ctx 3)))
-          (displayln line)
-          (match* {after-ctx line}
-            [{#f (regexp "^[<>]")}
-             0]
-            [{(? integer? n) _}
-             (add1 n)]
-            [{_ _} #f]))
-        (displayln diff)))
+    (displayln (diff-mutation the-module-to-mutate index the-program
+                              #:full? (not stop-diff-early?))))
   (when (or run?
             run-via-process?
             run-via-process-async?)

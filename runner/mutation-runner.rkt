@@ -998,8 +998,11 @@
   (provide diff-mutation)
 
   (require "../util/read-module.rkt"
-           ruinit/diff/diff)
-  (define (diff-mutation module-to-mutate mutation-index the-program)
+           rscript/util)
+  (define (diff-mutation module-to-mutate
+                         mutation-index
+                         the-program
+                         #:full? [full? #f])
     (define the-mod
       (match module-to-mutate
         [(mod _ stx) module-to-mutate]
@@ -1010,6 +1013,12 @@
     (define-values (mutated-program-stx mutated-id)
       (mutate-module the-mod mutation-index #:in the-program))
     (printf "--------------------\nMutated: ~a\n" mutated-id)
-    (dumb-diff-lines/string
-     (pretty-format (syntax->datum (mod-stx the-mod)))
-     (pretty-format (syntax->datum mutated-program-stx)))))
+    (call-with-temp-directory
+     (λ (dir)
+       (define original (build-path dir "original"))
+       (define mutated (build-path dir "mutated"))
+       (with-output-to-file original
+         (thunk (pretty-write (syntax->datum (mod-stx the-mod)))))
+       (with-output-to-file mutated
+         (thunk (pretty-write (syntax->datum mutated-program-stx))))
+       (system/string @~a{diff -d -U @(if full? 10000 10) @original @mutated})))))
