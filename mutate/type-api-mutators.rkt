@@ -108,6 +108,7 @@
     [({~or {~datum field} {~datum init-field}} _ ...) #t]
     [[field-name:id {~datum :} type ...] #t]
     [[method-name:id ({~or {~datum ->} {~datum ->*}} _ ...)] #t]
+    [({~or {~datum values} {~datum Values}} _ ...) #t]
     [else #f]))
 (define type:complex-type->Any "complex-type->Any")
 (define-simple-mutator (complex-type->Any stx)
