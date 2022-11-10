@@ -238,7 +238,7 @@
          (and sub-td (td:instanceof sub-td))]
         [(difference original new)
          (td:base original new)]
-        [(or (? symbol?) #t #f (? number?) (? keyword?)) #f]
+        [(or (? symbol?) #t #f (? number?) (? keyword?) (? string?)) #f]
         [(list* 'U
                 (app (mapping recur)
                      (list _ ... (? td?) _ ...)))
@@ -886,6 +886,8 @@
                           (if right (loop right current-position) (any/c-adapter)))]
       [{#f (td:parameterof sub-td)}
        (delegating-parameter/c (loop sub-td current-position))]
+      [{#f (td:option sub-td)}
+       (delegating-option (loop sub-td current-position))]
       [{#f (td:class init-field-td-map field-td-map method-td-map)}
        (delegating-class/c (loop-over-dict-values init-field-td-map current-position)
                            (loop-over-dict-values field-td-map current-position)
@@ -984,7 +986,8 @@
   (simple-leaf-pattern (or (td:-> _ `(,_ ,_) #f '())
                            (td:-> _ '()      #f `(,_ ,_))
                            (td:->* _ `(,_ ,_) '())
-                           (td:->* _ '() `(,_ ,_)))))
+                           (td:->* _ '() `(,_ ,_))
+                           (td:->* _ `(,_) `(,_)))))
 (define leaf->adapter:function-arg/result-swap
   (match-lambda** [{(or (binding (td:-> _
                                         `((,i1 . ,td1)
@@ -1003,15 +1006,16 @@
                   [{(or (binding (td:->* n
                                         `((,i1 . ,td1)
                                           (,i2 . ,td2))
-                                        '())
-                                 #:with [kw? #f])
+                                        '()))
                         (binding (td:->* n
                                         '()
                                         `((,i1 . ,td1)
-                                          (,i2 . ,td2)))
-                                 #:with [kw? #t]))
+                                          (,i2 . ,td2))))
+                        (binding (td:->* n
+                                        `((,i1 . ,td1))
+                                        `((,i2 . ,td2)))))
                     _}
-                   (swap->* n kw? i1 i2)]))
+                   (swap->* n i1 i2)]))
 
 (define is-td-leaf?:struct-field-swap
   ;; See note above about function arg/result swap sub-tds
@@ -1268,40 +1272,40 @@
          (values swapper #f)
          (values #f swapper)))))
 
-(define-adapter swap->* (mandatory-arg-count kw? i1 i2)
+(define-adapter swap->* (mandatory-arg-count i1 i2)
   #:name (λ (this)
-            (list (if (swap->*-kw? this)
-                      'swap->*-kw
-                      'swap->*-positional)
+            (list 'swap->*
                   (swap->*-mandatory-arg-count this)
                   (swap->*-i1 this)
                   (swap->*-i2 this)))
-  #:->stx (λ (->stx) #`(swap->* #,mandatory-arg-count #,kw? '#,i1 '#,i2))
+  #:->stx (λ (->stx) #`(swap->* #,mandatory-arg-count '#,i1 '#,i2))
   #:full-projection
   (simple->adapter-projection
    (λ (this)
-     (define kw? (swap->*-kw? this))
      (define mandatory-arg-count (swap->*-mandatory-arg-count this))
      (define i1 (swap->*-i1 this))
      (define i2 (swap->*-i2 this))
      (values (λ (args kws kw-args)
                (define-values {mandatory optional} (split-at args mandatory-arg-count))
                (define args-to-swap-supplied?
-                 (if kw?
-                     (subset? (list i1 i2) kws)
-                     (> (length optional)
-                        (max i1 i2))))
+                 (for/and ([i (list i1 i2)])
+                   (if (keyword? i)
+                       (member i kws)
+                       (> (length optional) i))))
                (cond [(not args-to-swap-supplied?)
                       (values args kw-args)]
-                     [kw?
-                      (values args
-                              (swap-in-list kw-args
-                                            (index-of kws i1)
-                                            (index-of kws i2)))]
                      [else
-                      (values (append mandatory
-                                      (swap-in-list optional i1 i2))
-                           kw-args)]))
+                      (define args+kw-args (append optional kw-args))
+                      (define positions+kws (append (build-list (length optional) values)
+                                                    kws))
+                      (define swapped-args+kw-args
+                        (swap-in-list args+kw-args
+                                      (index-of positions+kws i1)
+                                      (index-of positions+kws i2)))
+                      (define-values {new-optional new-kws}
+                        (split-at swapped-args+kw-args (length optional)))
+                      (values (append mandatory new-optional)
+                              new-kws)]))
              #f))))
 
 ;; This ->* support relies heavily on the 'only one mutation' assumption to
@@ -1497,7 +1501,7 @@
 (define-simple-delegating-adapter delegating-setof [sub-ctc]
   (λ (v)
     (for/set ([el (in-set v)])
-      (apply-contract sub-ctc v))))
+      (apply-contract sub-ctc el))))
 (define-simple-delegating-adapter delegating-pairof [car-ctc cdr-ctc]
   (λ (v) (apply-contract (cons/c car-ctc cdr-ctc) v)))
 (define-simple-delegating-adapter delegating-hash/c [key-ctc val-ctc]
@@ -1506,6 +1510,11 @@
     (for/hash ([{key val} (in-hash v)])
       (values (apply-contract key-ctc key)
               (apply-contract val-ctc val)))))
+(define-simple-delegating-adapter delegating-option [sub-ctc]
+  (λ (v)
+    (if (false? v)
+        v
+        (apply-contract sub-ctc v))))
 
 (define-adapter swap-struct-field (field-count i1 i2)
   #:name (list 'swap-struct-field field-count i1 i2)
@@ -1960,6 +1969,26 @@
                (let ([v (f 1 #:b 3 #:c 'hello)])
                  (test-equal? v "m"))
                (let ([v (f 1 #:m "two" #:c 'hello)])
+                 (test-equal? v "two"))))
+    (test-adapter-contract
+     [f (λ (a [m "m"] #:b [b 42] #:c [c 'c]) m)
+        #:with-contract (generate-adapter-ctc
+                         (mutated-interface-type '(->* {Natural}
+                                                       {Month
+                                                        #:b Natural
+                                                        #:c Symbol}
+                                                       Natural)
+                                                 '(->* {Natural}
+                                                       {Natural
+                                                        #:b Month
+                                                        #:c Symbol}
+                                                       Natural)
+                                                 type:function-arg-swap))]
+     (and/test (let ([v (f 1 "two" #:b 3 #:c 'hello)])
+                 (test-equal? v 3))
+               (let ([v (f 1 #:b 3 #:c 'hello)])
+                 (test-equal? v "m"))
+               (let ([v (f 1 "two" #:c 'hello)])
                  (test-equal? v "two")))))
 
   (test-begin
