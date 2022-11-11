@@ -117,11 +117,13 @@
   #:when (not (known-special-form? stx))
   #'Any)
 
-(define (in-swaps l)
+(define (in-swaps l [swap-ok? (const #t)])
   (for*/stream ([i (in-range (length l))]
-                [k (in-range (add1 i) (length l))])
-    (define I (list-ref l i))
-    (define K (list-ref l k))
+                [k (in-range (add1 i) (length l))]
+
+                [I (in-value (list-ref l i))]
+                [K (in-value (list-ref l k))]
+                #:when (swap-ok? I K))
     (list-set (list-set l i K)
               k
               I)))
@@ -147,18 +149,27 @@
                    (4 2 3 1)
                    (1 3 2 4)
                    (1 4 3 2)
+                   (1 2 4 3)])
+    (test-equal? (stream->list (in-swaps '(1 2 3 4)
+                                         (λ (a b)
+                                           (not (or (= a 2)
+                                                    (= b 2))))))
+                 '[(3 2 1 4)
+                   (4 2 3 1)
                    (1 2 4 3)])))
 
 (define-simple-macro (define-swapping-mutator name type
                        pattern
                        attribute-to-swap #:-> swapped-attribute-name
+                       {~optional {~seq #:guard guard-f}}
                        re-pattern)
   (define name
     (make-stream-mutator
      #:type type
      (syntax-parser
        [pattern
-        (for/stream ([rearranged-stxs (in-swaps (attribute attribute-to-swap))])
+        (for/stream ([rearranged-stxs (in-swaps (attribute attribute-to-swap)
+                                                {~? guard-f})])
           (syntax-parse rearranged-stxs
             [[swapped-attribute-name (... ...)]
              (quasisyntax/loc this-syntax
@@ -178,6 +189,8 @@
 (define-swapping-mutator ->*-optional-arg-swap type:function-arg-swap
   ({~and {~datum ->*} head} mandatory (e ...) . rest)
   e #:-> new-e
+  #:guard (λ left+right
+            (not (ormap (compose1 keyword? syntax->datum) left+right)))
   (head mandatory (new-e ...) . rest))
 (define function-arg-swap (compose-mutators ->-arg-swap
                                             ->*-mandatory-arg-swap
@@ -284,6 +297,15 @@
                          #'(->* (A B) (A C B) D)
 
                          #'(->* (A B) (A B C) D)
+                         ))
+    (test-mutator* function-arg-swap
+                   #'(->* (A B) (A B #:c C) D)
+                   (list #'(->* (B A) {A B #:c C} D)
+                         #'(->* (A B) (B A #:c C) D)
+                         #'(->* (A B) (C B #:c A) D)
+                         #'(->* (A B) (A C #:c B) D)
+
+                         #'(->* (A B) (A B #:c C) D)
                          )))
   (test-begin
     #:name function-result-swap
