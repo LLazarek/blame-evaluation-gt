@@ -218,7 +218,6 @@
                                             ;; stream-unfold
                                             type:complex-type->Any
                                             type:function-result-swap
-                                            type:complex-type->Any
                                             type:base-type-substitution
 
                                             ;; stream-get
