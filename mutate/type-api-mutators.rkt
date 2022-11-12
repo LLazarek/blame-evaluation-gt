@@ -192,9 +192,10 @@
   #:guard (λ left+right
             (not (ormap (compose1 keyword? syntax->datum) left+right)))
   (head mandatory (new-e ...) . rest))
-(define function-arg-swap (compose-mutators ->-arg-swap
-                                            ->*-mandatory-arg-swap
-                                            ->*-optional-arg-swap))
+(define function-arg-swap (mutator (compose-mutators ->-arg-swap
+                                                     ->*-mandatory-arg-swap
+                                                     ->*-optional-arg-swap)
+                                   type:function-arg-swap))
 
 
 (define type:function-result-swap "function-result-swap")
