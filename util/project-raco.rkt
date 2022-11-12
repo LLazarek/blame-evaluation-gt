@@ -18,6 +18,7 @@
   [blame-evaluation-gt "../"])
 (define glob-patterns-to-ignore
   '("mutation-analysis/plot-*mutation-analyses.rkt"
+    "mutation-analysis/categorize-mutants.rkt"
     "util/places-suck-demonstration.rkt"
     "util/mutation-index-cache-performance-check.rkt"
     "data-analysis/*"
