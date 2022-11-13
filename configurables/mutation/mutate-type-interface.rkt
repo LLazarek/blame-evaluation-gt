@@ -23,7 +23,18 @@
                               class-field-swap))
 (define active-mutator-names (map mutator-type active-mutators))
 
-(define mutate-type-expr (make-expr-mutator (apply compose-mutators active-mutators)))
+(define select-anything-but-field-get/setters
+  (syntax-parser
+    [[get/setter-method t]
+     #:when (regexp-match? #rx"^(g|s)et-field:" (~a (syntax->datum #'get/setter-method)))
+     #f]
+    [else
+     (list this-syntax
+           values
+           empty)]))
+
+(define mutate-type-expr (make-expr-mutator (apply compose-mutators active-mutators)
+                                            #:select select-anything-but-field-get/setters))
 
 (struct t+r (type reconstructor))
 (define (parse-name+types name+type-pairs)
