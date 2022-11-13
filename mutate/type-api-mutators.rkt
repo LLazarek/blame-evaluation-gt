@@ -15,7 +15,8 @@
          struct-field-swap
          class-field-swap
          ;; ll: write tests for the others before providing/using them!
-         )
+
+         select-anything-but-specially-handle-get/setters-for-field-swaps)
 
 (require "logger.rkt"
          "mutate-util.rkt"
@@ -221,8 +222,33 @@
    [field-id:id field-type:expr]
    ...)
   field-type #:-> new-field-type
+  #:guard (const (swapping-enabled-for-this-class?))
   (field [field-id new-field-type]
          ...))
+
+(define-syntax-class get/setter-method
+  #:commit
+  (pattern name:id
+           #:when (regexp-match? #rx"^(g|s)et-field:" (~a (syntax->datum #'name)))))
+(define swapping-enabled-for-this-class? (make-parameter #t))
+(define select-anything-but-specially-handle-get/setters-for-field-swaps
+  (syntax-parser
+    [[get/setter-method t]
+     #:when (regexp-match? #rx"^(g|s)et-field:" (~a (syntax->datum #'get/setter-method)))
+     #f]
+    [({~datum Class} {~alt [g/s:get/setter-method _]
+                           _}
+                     ...)
+     (define swapping-ok?
+       (and (attribute g/s)
+            (ormap values (attribute g/s))))
+     (list this-syntax
+           values
+           `((,swapping-enabled-for-this-class? . ,swapping-ok?)))]
+    [else
+     (list this-syntax
+           values
+           empty)]))
 
 
 (define active-mutation-types

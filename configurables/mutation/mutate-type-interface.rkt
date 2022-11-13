@@ -23,18 +23,8 @@
                               class-field-swap))
 (define active-mutator-names (map mutator-type active-mutators))
 
-(define select-anything-but-field-get/setters
-  (syntax-parser
-    [[get/setter-method t]
-     #:when (regexp-match? #rx"^(g|s)et-field:" (~a (syntax->datum #'get/setter-method)))
-     #f]
-    [else
-     (list this-syntax
-           values
-           empty)]))
-
 (define mutate-type-expr (make-expr-mutator (apply compose-mutators active-mutators)
-                                            #:select select-anything-but-field-get/setters))
+                                            #:select select-anything-but-specially-handle-get/setters-for-field-swaps))
 
 (struct t+r (type reconstructor))
 (define (parse-name+types name+type-pairs)
@@ -406,4 +396,68 @@
               (define-type RunQuad (List* 'run QuadAttrs QuadList))
               (require/typed/check/provide "streams.rkt"
                                             [make-stream Any])
-              ]]))))
+              ]]))
+
+    (test-mutation/sequence
+     #'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+        (require/typed/check/provide "streams.rkt"
+                                     [a (Class (field [x Integer]
+                                                      [y String]))])
+        ]
+     `([0 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (require/typed/check/provide "streams.rkt"
+                                           [a Any])
+              ]]
+       [1 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (require/typed/check/provide "streams.rkt"
+                                           [a (Class (field Any
+                                                            [y String]))])
+              ]]
+       [2 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (require/typed/check/provide "streams.rkt"
+                                           [a (Class (field [x Any]
+                                                            [y String]))])
+              ]]
+       [3 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (require/typed/check/provide "streams.rkt"
+                                           [a (Class (field [x Integer]
+                                                            Any))])
+              ]]
+       [4 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+              (require/typed/check/provide "streams.rkt"
+                                           [a (Class (field [x Integer]
+                                                            [y Any]))])
+              ]]))
+    (test-mutation/sequence
+     #'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+        (require/typed/check/provide "streams.rkt"
+                                     [a (Class (field [x Integer]
+                                                      [y String])
+                                               [get-field:x G]
+                                               [get-field:y G]
+                                               [set-field:x S]
+                                               [set-field:y S])])
+        ]
+     `([0 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+        (require/typed/check/provide "streams.rkt"
+                                     [a Any])
+        ]]
+       ;; Now swap is enabled since there are get/setters
+       [1 ,#'[(require "../../../utilities/require-typed-check-provide.rkt")
+
+        (require/typed/check/provide "streams.rkt"
+                                     [a (Class (field [x String]
+                                                      [y Integer])
+                                               [get-field:x G]
+                                               [get-field:y G]
+                                               [set-field:x S]
+                                               [set-field:y S])])
+        ]]))))
