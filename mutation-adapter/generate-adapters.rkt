@@ -349,7 +349,12 @@
                 all-interface-types))
          (define adaptations
            (append (adapt-types-referencing name
-                                            (flip mutation-position-in-mit)
+                                            ;; (flip mutation-position-in-mit)
+                                            ; all mutations should be adapted,
+                                            ; since even positive adaptations
+                                            ; simulate that the client misuses
+                                            ; the result.
+                                            'any
 
                                             (filter-not (matches (name+type (== name) _))
                                                         interface-types/MR-def-refs)
@@ -378,7 +383,9 @@
          (define ctc (generate-adapter-ctc mit))
          (list empty
                (adapt-types-referencing name
-                                        (flip mutation-position-in-mit)
+                                        ;; (flip mutation-position-in-mit)
+                                        ;; see note above
+                                        'any
 
                                         interface-types/except-name-and-MR-typedefs
                                         ctc))]))
