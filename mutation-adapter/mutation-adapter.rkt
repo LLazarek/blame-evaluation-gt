@@ -1490,9 +1490,23 @@
 
 (define-simple-delegating-adapter delegating-parameter/c [sub-ctc]
   (λ (p)
-    (make-derived-parameter p
+    ;; This seems like the right thing, but apparently TR contracts can
+    ;; impersonate parameters, and it's undocumented but
+    ;; `make-derived-parameter` can't be used on an impersonator.
+    #;(make-derived-parameter p
                             (λ (new-v) (apply-contract sub-ctc new-v))
-                            (λ (inner-v) (apply-contract sub-ctc inner-v)))))
+                            (λ (inner-v) (apply-contract sub-ctc inner-v)))
+    ;; The result still satisfies `parameter?` and can be used in `parameterize`
+    (impersonate-procedure p
+                           (λ args
+                             (define new-args
+                               (match args
+                                 ['() args]
+                                 [(list new-v) (list (apply-contract sub-ctc new-v))]))
+                             (apply values
+                                    (match-lambda [(? void? v) v]
+                                                  [inner-v (apply-contract sub-ctc inner-v)])
+                                    new-args)))))
 
 (define-simple-delegating-adapter delegating-vectorof [sub-ctc]
   (λ (v) (apply-contract (vectorof sub-ctc) v)))
