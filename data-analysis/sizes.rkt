@@ -1,18 +1,25 @@
-#lang at-exp rscript
+#lang at-exp racket
+
+(provide possible-interesting-scenario-counts/by-benchmark)
 
 (require racket/hash
+         (only-in rscript define-runtime-paths)
          (prefix-in db: "../db/db.rkt")
          "../configurations/configure-benchmark.rkt"
          "../mutation-analysis/mutation-analysis-summaries.rkt"
          "../util/for.rkt"
+         "../configurables/configurables.rkt"
          "plot-common.rkt")
 
 (define-runtime-paths
-  [dyn-err-summaries-db-path "../dbs/code-mutations/dyn-err-summaries.rktdb"]
-  [benchmarks-dir "../../gtp-benchmarks/benchmarks"])
+  [dyn-err-summaries-db-path "../dbs/type-api-mutations/dyn-err-summaries.rktdb"]
+  [benchmarks-dir "../../gtp-benchmarks/benchmarks"]
+  [TR-config "../configurables/configs/TR.rkt"])
 
 (define (benchmark-name->max-config name)
-  (make-max-bench-config (read-benchmark (build-path benchmarks-dir name))))
+  (call-with-configuration
+   TR-config
+   (λ _ (make-max-bench-config (read-benchmark (build-path benchmarks-dir name))))))
 
 (define dyn-err-summaries-db (db:get dyn-err-summaries-db-path))
 (define all-benchmarks (db:keys dyn-err-summaries-db))
@@ -43,8 +50,7 @@
 (define possible-interesting-scenario-counts/by-benchmark
   (for/hash ([benchmark (in-list all-benchmarks)])
     (define max-config (benchmark-name->max-config benchmark))
-    ;; sub1 because the mutated mod must always be untyped
-    (define typeable-mod-count (sub1 (hash-count max-config)))
+    (define typeable-mod-count (hash-count max-config))
     (values benchmark
             (expt 2 typeable-mod-count))))
 

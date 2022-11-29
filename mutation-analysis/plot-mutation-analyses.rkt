@@ -278,7 +278,7 @@
                 "  population : plot the breakdown of entire mutant population by mutators"
                 "  success-ratios : plot the ratio of successful mutants produced by each mutator"
                 "  success-counts : plot the count of successful mutants produced by each mutator"
-                "  successful-population-count : plot the number of successful mutants produced by each mutator, aggregating over benchmarks; this opens an interactive window rather than producing a plot image"
+                "  successful-population-count : plot the number of successful mutants produced by each mutator, aggregating over benchmarks"
                 "  successful-population-heatmap : plot a heatmap-like stacked bar chart color-coding the number of successful mutants produced by each mutator, aggregating over benchmarks")
                #:collect {"type" take-latest "population"}]
               [("-s" "--save")
@@ -408,28 +408,32 @@
        (255 255 0)
        (255 80 5)))
     (stacked-histogram-line-colors (stacked-histogram-colors))
-    (plot/labels-angled
-     (grouped-category-stacked-histogram all-data
-                                         #:label-groups? #f
-                                         #:common-legend? #t)
-     #:legend-anchor 'top-left
-     #:title @~a{Ill-typed mutant population breakdown by mutator}
-     #:y-label (match plot-type
-                 ['successful-population-count
-                  "count"]
-                 ['successful-population-ratios
-                  "ratio"])
-     #:x-label "Mutator"
-     #:y-max (match plot-type
-               ['successful-population-count
-                #f]
-               ['successful-population-ratios
-                1])
-     #:y-min (match plot-type
-               ['successful-population-count
-                #f]
-               ['successful-population-ratios
-                0]))]
+    (pict->png!
+     (plot-pict
+      (grouped-category-stacked-histogram all-data
+                                          #:label-groups? #f
+                                          #:common-legend? #t)
+      #:legend-anchor 'top-right
+      #:title @~a{Ill-typed mutant population breakdown by mutator}
+      #:y-label (match plot-type
+                  ['successful-population-count
+                   "count"]
+                  ['successful-population-ratios
+                   "ratio"])
+      #:x-label "Mutator"
+      #:y-max (match plot-type
+                ['successful-population-count
+                 #f]
+                ['successful-population-ratios
+                 1])
+      #:y-min (match plot-type
+                ['successful-population-count
+                 #f]
+                ['successful-population-ratios
+                 0])
+      #:width 1700
+      #:height 1000)
+     (hash-ref flags 'outfile))]
    ['successful-population-heatmap
     (define bucket-colors
       '((1 "gray")

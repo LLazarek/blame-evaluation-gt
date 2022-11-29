@@ -64,8 +64,9 @@
                                           config}
                                          (set-empty? (set-intersect blamed
                                                                     ;; lltodo: this is kind of a hack. Really the right thing to do is to get ahold of the benchmark modules with benchmark->mutatable-modules
-                                                                    (cons type-interface-file-name
-                                                                          (hash-keys config))))]
+                                                                    (list* type-interface-file-name
+                                                                           type-interface-file-rename
+                                                                           (hash-keys config))))]
                                         [{_ _} #f])
                         all-bts))
   (define stat:resource-limits (summarize-resource-limit-occurrences all-bts))
@@ -217,6 +218,13 @@
                        (struct* run-status ([outcome (and outcome (or 'type-error 'completed))]))
                        _)
        @~a{immediate @outcome}]
+      [(mutant-summary _
+                       (struct* run-status ([outcome 'blamed]
+                                            [blamed blamed]))
+                       _)
+       #:when (not (set-empty? (set-intersect blamed (list type-interface-file-name
+                                                           type-interface-file-rename))))
+       @~a{immediate blame on interface}]
       [else "other?"]))
 
   (define (0-length? bt) (= (length (blame-trail-mutant-summaries bt)) 1))

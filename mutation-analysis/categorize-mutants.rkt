@@ -111,7 +111,9 @@
        (return base-type)]
       [(or (td:-> _ (list (cons _ a) (cons _ b)) #f '())
            (td:-> _ '() #f (list (cons _ a) (cons _ b)))
-           (td:->* _ (list (cons _ a) (cons _ b)) '()))
+           (td:->* _ (list (cons _ a) (cons _ b)) '())
+           (td:->* _ (list (cons _ a)) (list (cons _ b)))
+           (td:->* _ (list) (list (cons _ a) (cons _ b))))
        (return function-swap)]
       [(or (td:-> _ (list (cons _ a)) #f '())
            (td:-> _ '() a '())

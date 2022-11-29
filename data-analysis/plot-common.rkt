@@ -37,6 +37,7 @@
             (hash/c (or/c "always" "sometimes" "never")
                     (listof listof-blame-trails-for-same-mutant?)))]
           [satisfies-BT-hypothesis? (blame-trail? . -> . boolean?)]
+          [immediate-type-err-bt? (blame-trail? . -> . boolean?)]
           [add-missing-active-mutators
            ((hash/c mutator-name? (listof blame-trail?))
             . -> .
@@ -180,7 +181,7 @@
        [{"transient-oldest.rkt" (list _ ... (? type-interface-mod?))}
         #t]
        [{_ other-blamed-list}
-        (when (member type-interface-file-name other-blamed-list)
+        (when (ormap type-interface-mod? other-blamed-list)
           (log-bt-hypoth-options-info
            @~a{mode @mode, blamed contains interface somewhere in middle}))
         #f])]
@@ -316,3 +317,15 @@
                (struct-copy pre-tick tick
                             [value (abs (pre-tick-value tick))])))
            ((ticks-format original-ticks) min max absolute-value-ticks))))
+
+(define immediate-type-err-bt?
+  (match-lambda
+    [(struct* blame-trail
+              ([mutant-summaries
+                (list
+                 (mutant-summary
+                  _
+                  (struct* run-status ([outcome 'type-error]))
+                  _))]))
+     #t]
+    [else #f]))

@@ -45,18 +45,10 @@
         'sample-size sample-size
         'population-size population-size))
 
+(require "sizes.rkt")
 (define max-bt-population-sizes-by-benchmark
   ;; computed in sizes.rkt: possible-interesting-scenario-counts/by-benchmark
-  #hash(("acquire" . 256)
-        ("gregor" . 4096)
-        ("kcfa" . 64)
-        ("quadT" . 8192)
-        ("quadU" . 8192)
-        ("snake" . 128)
-        ("suffixtree" . 32)
-        ("synth" . 512)
-        ("take5" . 128)
-        ("tetris" . 256)))
+  possible-interesting-scenario-counts/by-benchmark)
 
 ;; (A . -> . boolean?) ; where A is typically blame-trail?
 ;; (benchmark? mutator . -> . (hash/c mutant? A))

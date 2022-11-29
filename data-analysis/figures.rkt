@@ -24,7 +24,7 @@
 
                   "erasure-stack-first" "Erasure"
 
-                  "null" "Random")
+                  "TR-null" "Random")
             mode-name
             mode-name))
 (define rename-benchmark values)
@@ -67,8 +67,8 @@
          "bt-ids.rkt")
 
 (define-runtime-paths
-  [data-dirs "../../experiment-data/results/code-mutations-erasure-biased-2"]
-  [mutant-summaries-db-path "../dbs/code-mutations/type-err-summaries.rktdb"]
+  [data-dirs "../../experiment-data/results/type-api-mutations-erasure-any"]
+  [mutant-summaries-db-path "../dbs/type-api-mutations/type-err-summaries.rktdb"]
   [TR-config "../configurables/configs/TR.rkt"]
   [outdir "./figures"]
   [data-cache "./data-cache"]
@@ -170,10 +170,15 @@
                (cb-superimpose label-pict uniform-label-filler)
                pict)))
 
+(define (round-up-to-next-multiple n of)
+  (define x (/ n of))
+  (if (integer? x)
+      (+ n of)
+      (* (inexact->exact (ceiling x)) of)))
 
 (define (generate-figure:bt-lengths-table modes/ordered)
   (define mode->max-trail-length
-    (match-lambda ["null" 13]
+    (match-lambda ["TR-null" 13]
                   [else 7]))
   (define bt-length-distribution-for-mode
     (simple-memoize
@@ -221,10 +226,10 @@
                  #:x-label #f
                  #:y-label "% of trails"
                  #:title #f
-                 #:width (if (equal? mode-name "null")
+                 #:width (if (equal? mode-name "TR-null")
                              (* 2 (plot-width))
                              (plot-width))
-                 #:x-max (if (equal? mode-name "null") #f 8))))
+                 #:x-max (if (equal? mode-name "TR-null") #f 8))))
 
   (define plots/ordered
     (for/list ([mode (in-list modes/ordered)])
@@ -292,8 +297,20 @@
          (list Δ
                (estimate-Δ-proportion Δ))))))
 
-  (define (direct-bt-length-comparison top-mode other-mode)
-    (define Δ-distribution (direct-bt-length-comparison-distribution top-mode other-mode #f))
+  (define Δ-distributions
+    (for/list ([comparison (in-list mode-comparisons)])
+      (match-define (list top-mode other-mode) comparison)
+      (direct-bt-length-comparison-distribution top-mode other-mode #f)))
+
+  (define biggest-% (argmax values
+                            (for*/list ([Δ-distribution (in-list Δ-distributions)]
+                                        [% (in-dict-values Δ-distribution)])
+                              (first %))))
+  (define y-max% (/ (round-up-to-next-multiple (* 100 biggest-%) 5) 100))
+
+  (define (direct-bt-length-comparison Δ-distribution)
+    (define compression-zone-bottom 0.55)
+    (define compression-zone-top 0.8)
     ;; lltodo: there seems to be another bug with discrete-histogram here
     ;; this doesn't work at all:
     #;(plot (list (discrete-histogram '((1 2) (2 10))
@@ -304,13 +321,18 @@
                                       #:color "green")))
     ;; Actually, there just need to be placeholders for every x-value that I want
     ;; to show up in the final plot, in every group (see below)
-    (parameterize ([plot-y-transform (axis-transform-compose
+    (parameterize (#;[plot-y-transform (axis-transform-compose
                                       (axis-transform-compose
-                                       (collapse-transform (~% 0.15) (~% 0.6))
-                                       (stretch-transform (~% 0) (~% 0.15) 2))
-                                      (stretch-transform (~% 0.6) (~% 1) 1/4))]
+                                       (collapse-transform (~% compression-zone-bottom)
+                                                           (~% compression-zone-top))
+                                       (stretch-transform (~% 0)
+                                                          (~% compression-zone-bottom)
+                                                          2))
+                                      (stretch-transform (~% compression-zone-top)
+                                                         (~% 1)
+                                                         1/3))]
                    [plot-y-ticks (ticks-add (plot-y-ticks)
-                                            (map ~% '(0.025 0.05 0.075 0.1 0.125 0.15 0.7 0.8 0.9)))])
+                                            (map ~% (append (range 0 y-max% 0.05) (list y-max%))))])
       (plot-pict (list
                   (for/list ([filter (in-list (list (</c 0) (=/c 0) (>/c 0)))]
                              [color (in-list (list success-color
@@ -328,20 +350,21 @@
                                                (if (filter Δ) (~% (first %l)) 0))))
                     (discrete-histogram group-data
                                         #:color color))
-                  (x-axis (~% 0.15) #:ticks? #f #:alpha 0.7))
+                  #;(x-axis (~% compression-zone-bottom) #:ticks? #f #:alpha 0.7))
                  #:title #f
                  #:y-label "% of mutually-successful scenarios"
                  #:x-label @~a{trail length difference}
                  #:y-min (~% 0)
-                 #:y-max (~% 1)
+                 #:y-max (~% y-max%)
                  #:x-min 0
                  #:x-max (length Δ-distribution))))
 
   (define-values {plots labels/lines}
     (for/lists {plots labels/lines}
-               ([comparison (in-list mode-comparisons)])
+               ([comparison (in-list mode-comparisons)]
+                [Δ-distribution (in-list Δ-distributions)])
       (match-define (list top-mode other-mode) comparison)
-      (values (direct-bt-length-comparison top-mode other-mode)
+      (values (direct-bt-length-comparison Δ-distribution)
               (list (rename-mode top-mode) "vs" (rename-mode other-mode)))))
   (define (text* str)
     (text str
@@ -393,7 +416,7 @@
                       #:row-spacing 50))
 
 (define (generate-figure:avo-bars modes/ordered bottom-modes)
-  (define y-max/min-% 0.14)
+  ;; (define y-max/min-% 0.4)
   (define direct-avo-%
     (simple-memoize
      #:on-disk (and (use-disk-data-cache?)
@@ -420,6 +443,20 @@
         (match-define (list top/other top/other-error-margin) (direct-avo-% top-mode other-mode #f))
         (match-define (list other/top other/top-error-margin) (direct-avo-% other-mode top-mode #f))
         (list (rename-mode other-mode) (~% top/other) (~% other/top))))
+    comparison-data)
+
+  (define direct-avo-comparisons-data
+    (for/list ([top (in-list modes/ordered)])
+      (cons top (direct-avo-comparisons top bottom-modes))))
+
+  (define biggest-%
+    (argmax abs
+            (for*/list ([comparisons (in-dict-values direct-avo-comparisons-data)]
+                        [comparison (in-list comparisons)])
+              (second comparison))))
+  (define y-max/min-% (/ (round-up-to-next-multiple (abs biggest-%) 5) 100))
+
+  (define (direct-avo-comparisons-plot top-mode comparison-data)
     (parameterize ([plot-x-tick-label-angle 40]
                    [plot-x-tick-label-anchor 'top-right]
                    [plot-y-ticks (absolute-value-format (linear-ticks #:number 15))]
@@ -436,8 +473,8 @@
                  #:width (* 1.3 (plot-width)))))
 
   (define plots
-    (for*/list ([top (in-list modes/ordered)])
-      (direct-avo-comparisons top bottom-modes)))
+    (for/list ([{top comparison-data} (in-dict direct-avo-comparisons-data)])
+      (direct-avo-comparisons-plot top comparison-data)))
 
   #;(apply vc-append
            20
@@ -481,7 +518,7 @@
   (when (member 'bt-lengths-table to-generate)
     (define bt-lengths-table
       (let ()
-        (define modes/ordered '("null"
+        (define modes/ordered '("TR-null"
                                 "TR" "transient-newest" "transient-oldest"
                                 "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:bt-lengths-table modes/ordered)))
@@ -513,7 +550,7 @@
         (define modes/ordered '("TR" "transient-newest" "transient-oldest"
                                      "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:avo-bars modes/ordered
-                                  (remove "null" modes))))
+                                  (remove "TR-null" modes))))
     (pict->figure-png! avo-bars "avo-bars")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for avo-bars: @(unbox max-error-margin)})
@@ -529,7 +566,7 @@
                                 "transient-oldest"
                                 "transient-stack-first"
                                 "erasure-stack-first"
-                                #;"null" ; decided to remove it from this plot
+                                #;"TR-null" ; decided to remove it from this plot
                                 ))
         (generate-figure:success-bars modes/ordered)))
     (pict->figure-png! success-bars "success-bars")

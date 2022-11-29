@@ -36,6 +36,11 @@
          [else
           (displayln "Try again.")
           (loop)]))]
+    [(? (conjoin hash?
+                 (λ (h) (andmap number? (hash-values h))))
+        bt-count-hash)
+     (displayln "Raw count hash:")
+     (pretty-write bt-count-hash)]
     [(? hash? bt-hash)
      (let loop ()
        (displayln @~a{
