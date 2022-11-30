@@ -9,11 +9,13 @@
 ;; 1. produces an error, and
 ;; 2. the error context stack contains at least three distinct modules from the program
 
-(require (prefix-in db: "../db/db.rkt")
+(require racket/hash
+         (prefix-in db: "../db/db.rkt")
          "mutation-analysis-summaries.rkt"
          "debugging-scenarios.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
+         "../configurables/configurables.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
          "../process-q/interface.rkt"
@@ -30,51 +32,42 @@
 
 ;; (listof mutant?)
 ;; path-to-existant-directory?
+;; process-queue?
 ;; ->
-;; (listof scenario?)
-(define (mutants-interesting-scenarios mutants-with-type-errors
-                                       benchmark-path
-                                       #:log-progress log-progress!
-                                       #:logged-progress logged-progress
-                                       #:process-limit process-limit)
+;; process-queue?
+(define (enq-mutants-interesting-scenarios-finders mutants-with-type-errors
+                                                   benchmark-path
+                                                   pq
+                                                   #:log-progress log-progress!
+                                                   #:logged-progress logged-progress)
   (define benchmark (read-benchmark benchmark-path))
   (define benchmark-name (benchmark->name benchmark))
   (log-find-scenarios-info @~a{Starting @benchmark-name analysis})
-  (define q
-    (for/fold ([q (make-process-Q process-limit
-                                  ; (listof mutant?)
-                                  empty
-                                  #:kill-older-than (* 5 60))])
-              ([mutant (in-list mutants-with-type-errors)])
-      (find-interesting-scenarios-for-mutant mutant
-                                             benchmark
-                                             q
-                                             #:log-progress log-progress!
-                                             #:logged-progress logged-progress)))
-  (define interesting-scenarios
-    (process-Q-get-data (process-Q-wait q)))
-  (log-find-scenarios-info
-   @~a{
-       @benchmark-name analysis complete: @;
-       found @;
-       @(length interesting-scenarios) interesting scenarios @;
-       across all @(length mutants-with-type-errors) mutants.
-       })
-  interesting-scenarios)
+  (for/fold ([q pq])
+            ([mutant (in-list mutants-with-type-errors)])
+    (find-interesting-scenarios-for-mutant mutant
+                                           benchmark
+                                           q
+                                           #:log-progress log-progress!
+                                           #:logged-progress logged-progress)))
 
 ;; benchmark? -> (streamof config/c)
-(define (benchmark-scenarios benchmark)
-  (define (scenario-stream-with-mods mods)
-    (match mods
-      [(list* mod remaining)
-       (define remaining-stream (scenario-stream-with-mods remaining))
-       (stream-append (stream-map (λ (c) (hash-set c mod 'types))
-                                  remaining-stream)
-                      (stream-map (λ (c) (hash-set c mod 'none))
-                                  remaining-stream))]
-      ['() (stream (hash))]))
+(define (benchmark-scenario-configs benchmark)
   (define max-config (make-max-bench-config benchmark))
-  (scenario-stream-with-mods (hash-keys max-config)))
+  (define min-config (for/hash ([mod (in-hash-keys max-config)])
+                       (values mod 'none)))
+  (for/stream ([mod (in-hash-keys min-config)])
+    (hash-set min-config mod 'types)))
+
+(define (all-possible-configs-with mods)
+  (match mods
+    [(list* mod remaining)
+     (define remaining-stream (all-possible-configs-with remaining))
+     (stream-append (stream-map (λ (c) (hash-set c mod 'types))
+                                remaining-stream)
+                    (stream-map (λ (c) (hash-set c mod 'none))
+                                remaining-stream))]
+    ['() (stream (hash))]))
 
 ;; mutant?
 ;; benchmark?
@@ -86,10 +79,7 @@
                                                #:logged-progress logged-progress)
   (define benchmark-name (benchmark->name benchmark))
   (for/fold ([q q])
-            ([config (in-stream
-                      (stream-filter (λ (config) (equal? (hash-ref config (mutant-module mutant))
-                                                         'none))
-                                     (benchmark-scenarios benchmark)))])
+            ([config (in-stream (benchmark-scenario-configs benchmark))])
     (define the-scenario (scenario mutant config))
     (match (logged-progress benchmark-name the-scenario)
       ['? (process-Q-enq q
@@ -97,7 +87,7 @@
                                                        the-scenario
                                                        #:log-progress log-progress!)
                          2)]
-      [#t (process-Q-update-data q (add-to-list the-scenario))]
+      [#t (process-Q-update-data q (add-to-list (list benchmark-name the-scenario)))]
       [#f q])))
 
 (define ((config->interesting-run-status? config) rs)
@@ -105,47 +95,51 @@
     [(struct* run-status ([outcome 'blamed])) #t]
     [(struct* run-status ([outcome 'runtime-error]
                           [context-stack context]))
-     (define context-mods-in-program
-       (filter (λ (blamed) (hash-has-key? config blamed)) context))
-     (define 3-unique-mods-on-stack?
-       (>= (length (remove-duplicates context-mods-in-program)) 3))
-     (log-find-scenarios-debug
-      @~a{
-          ⇓ @(serialize-config config) interesting?, ctx: @context : @3-unique-mods-on-stack?
-          })
-     3-unique-mods-on-stack?]
+     ;; (define context-mods-in-program
+     ;;   (filter (λ (blamed) (hash-has-key? config blamed)) context))
+     ;; (define 3-unique-mods-on-stack?
+     ;;   (>= (length (remove-duplicates context-mods-in-program)) 3))
+     ;; (log-find-scenarios-debug
+     ;;  @~a{
+     ;;      ⇓ @(serialize-config config) interesting?, ctx: @context : @3-unique-mods-on-stack?
+     ;;      })
+     ;; 3-unique-mods-on-stack?
+     #t]
     [else #f]))
+
+(define (get-run-status outfile mutant config)
+  (with-handlers ([exn:fail? (λ _
+                              (log-find-scenarios-error
+                               @~a{
+                                   Unable to read result from mutant @mutant config @config
+                                   Output file contents:
+                                   "@(file->string outfile)"
+                                   })
+                              #f)])
+    (file->value outfile)))
 
 (struct interesting-error ())
 (struct other-outcome ())
-(define (extract-outcome outfile mutant config)
-  (define result (with-handlers ([exn:fail? (const #f)])
-                   (file->value outfile)))
+(define (extract-outcome result benchmark mutant config)
   (match result
     [(? (config->interesting-run-status? config))
      (log-find-scenarios-info @~a{
-                                  @mutant @(serialize-config config) @;
+                                  @benchmark @mutant @(serialize-config config) @;
                                   => @(run-status-outcome result) @;
                                   : accepted
                                   })
      (interesting-error)]
     [(? run-status?)
      (log-find-scenarios-info @~a{
-                                  @mutant @(serialize-config config) @;
+                                  @benchmark @mutant @(serialize-config config) @;
                                   => @(run-status-outcome result) @;
                                   : filtered
                                   })
      (other-outcome)]
     [else
-     (log-find-scenarios-error
-      @~a{
-          Unable to read result from mutant @mutant config @config
-          Output file contents:
-          "@(file->string outfile)"
-          })
      (void)]))
 
-(define max-retries 10)
+(define max-retries 3)
 (define (interesting-scenario-checker benchmark a-scenario
                                       #:log-progress log-progress!
                                       #:retry-count [retry-count 0])
@@ -169,10 +163,31 @@
     (process-info outfile ctl will))
 
   (define (will:record-outcome! q info)
-    (match (extract-outcome (process-info-data info) mutant run-configuration)
+    (define (retry)
+      (process-Q-enq q
+                     (interesting-scenario-checker benchmark
+                                                   a-scenario
+                                                   #:log-progress log-progress!
+                                                   #:retry-count (add1 retry-count))
+                     1))
+
+    (define result (get-run-status (process-info-data info) mutant run-configuration))
+    (match (extract-outcome result benchmark-name mutant run-configuration)
       [(? interesting-error?)
        (log-progress! benchmark-name a-scenario #t)
-       (process-Q-update-data q (add-to-list a-scenario))]
+       (process-Q-update-data q (add-to-list (list benchmark-name a-scenario)))]
+      [(? other-outcome?)
+       #:when (match result
+                [(struct* run-status ([outcome 'type-error]))
+                 (< retry-count max-retries)]
+                [else #f])
+       (log-find-scenarios-info
+        @~a{
+            Retrying @benchmark-name @mutant @(serialize-config run-configuration) @;
+            to confirm type error result @;
+            (retry # @(add1 retry-count))
+            })
+       (retry)]
       [(? other-outcome?)
        (log-progress! benchmark-name a-scenario #f)
        q]
@@ -181,14 +196,10 @@
        (log-find-scenarios-info
         @~a{
             Retrying @benchmark-name @mutant @(serialize-config run-configuration) @;
+            in response to failure @;
             (retry # @(add1 retry-count))
             })
-       (process-Q-enq q
-                      (interesting-scenario-checker benchmark
-                                                    a-scenario
-                                                    #:log-progress log-progress!
-                                                    #:retry-count (add1 retry-count))
-                      2)]
+       (retry)]
       [else
        (log-find-scenarios-error
         @~a{
@@ -294,6 +305,8 @@
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
 
+ (install-configuration! (current-parameterizing-config))
+
  (define progress
    (match progress-log-path
      [(? file-exists? path)
@@ -322,27 +335,70 @@
    (delete-directory/files (working-dir)))
  (make-directory* (working-dir))
 
- (unless (db:path-to-db? interesting-scenarios-db-path)
-   (log-find-scenarios-info @~a{Creating db at @interesting-scenarios-db-path})
-   (db:new! interesting-scenarios-db-path))
- (define interesting-scenarios-db (db:get interesting-scenarios-db-path))
-
- (define interesting-scenarios-by-benchmark
-   (for/hash ([benchmark-name (in-list (db:keys summaries-db))])
+ (define q
+   (for/fold ([q (make-process-Q process-limit
+                                 ; (listof (list/c benchmark-name? scenario?))
+                                 empty
+                                 #:kill-older-than (* 5 60))])
+             ([benchmark-name (in-list (db:keys summaries-db))])
      (define benchmark-path (build-path benchmarks-dir benchmark-name))
 
      (define base-summaries (db:read summaries-db benchmark-name))
      (define benchmark-mutants (summaries->mutants base-summaries))
-     (values benchmark-name
-             (mutants-interesting-scenarios benchmark-mutants
-                                            benchmark-path
-                                            #:log-progress log-progress!
-                                            #:logged-progress logged-progress
-                                            #:process-limit process-limit))))
+     (enq-mutants-interesting-scenarios-finders benchmark-mutants
+                                                benchmark-path
+                                                q
+                                                #:log-progress log-progress!
+                                                #:logged-progress logged-progress)))
+
+ (define interesting-base-scenarios
+   (process-Q-get-data (process-Q-wait q)))
 
  (finalize-log!)
 
+ (define interesting-base-scenarios-grouped-by-benchmark
+   (group-by first interesting-base-scenarios))
+
+ (define interesting-scenarios-by-benchmark
+   (for*/hash ([group (in-list interesting-base-scenarios-grouped-by-benchmark)]
+               [benchmark-name (in-value (first (first group)))])
+     (define benchmark-path (build-path benchmarks-dir benchmark-name))
+     (define benchmark (read-benchmark benchmark-path))
+     (define max-config (make-max-bench-config benchmark))
+     (define all-typable-modules (hash-keys max-config))
+
+     (define scenarios-grouped-by-mutant
+       (group-by scenario-mutant (map second group)))
+     (define modules-that-are-safe-to-type
+       (for*/list ([scenarios (in-list scenarios-grouped-by-mutant)]
+                   [mutant (in-value (scenario-mutant (first scenarios)))]
+                   [scenario (in-list scenarios)])
+         (match (scenario-config scenario)
+           [(hash-table [typed-mod 'types] [_ 'none] ...)
+            typed-mod]
+           [else (error 'bad-scenario
+                        (~s scenario))])))
+     (define modules-that-are-not-safe-to-type (set-subtract all-typable-modules
+                                                             modules-that-are-safe-to-type))
+     (define interesting-sub-lattice-configs
+       (all-possible-configs-with modules-that-are-safe-to-type))
+
+     (define unsafe-sub-config
+       (for/hash ([m (in-list modules-that-are-not-safe-to-type)])
+         (values m 'none)))
+
+     (define interesting-sub-lattice-configs/with-missing-modules
+       (map (λ (c) (hash-union c unsafe-sub-config))
+            interesting-sub-lattice-configs))
+
+     (values benchmark-name
+             interesting-sub-lattice-configs/with-missing-modules)))
+
+ (unless (db:path-to-db? interesting-scenarios-db-path)
+   (log-find-scenarios-info @~a{Creating db at @interesting-scenarios-db-path})
+   (db:new! interesting-scenarios-db-path))
  (log-find-scenarios-info @~a{Writing database})
+ (define interesting-scenarios-db (db:get interesting-scenarios-db-path))
  (void (db:write! interesting-scenarios-db interesting-scenarios-by-benchmark))
 
  (log-find-scenarios-info @~a{Cleaning up working dir})
