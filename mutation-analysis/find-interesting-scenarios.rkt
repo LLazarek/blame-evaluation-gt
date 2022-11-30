@@ -392,7 +392,8 @@
             interesting-sub-lattice-configs))
 
      (values benchmark-name
-             interesting-sub-lattice-configs/with-missing-modules)))
+             (map serialize-config
+                  interesting-sub-lattice-configs/with-missing-modules))))
 
  (unless (db:path-to-db? interesting-scenarios-db-path)
    (log-find-scenarios-info @~a{Creating db at @interesting-scenarios-db-path})
