@@ -4,10 +4,14 @@
 
 ;; Output: a DB containing scenarios (belonging to a subset of the mutants in the input DB)
 ;; which are /interesting/ according to the configuration `parameterizing-config`.
-;; Specifically, /interesting/ means that running the scenario with
-;; `parameterizing-config`
-;; 1. produces an error, and
-;; 2. the error context stack contains at least three distinct modules from the program
+;; In the current implementation, interesting means:
+;; 1. An ancestor (config lower in the lattice reachable from this one) causes a runtime error
+;;    when run under `parameterizing-config`, and
+;; 2. it's unlikely that it causes a type error (specifically, it doesn't type a module that
+;;    typing in the lowest possible config causes a type error).
+
+;; Output DB format:
+;; (benchmark-name? => (hash/c mutant? (listof serialized-config?)))
 
 (require racket/hash
          (prefix-in db: "../db/db.rkt")
@@ -359,9 +363,13 @@
  (define interesting-base-scenarios-grouped-by-benchmark
    (group-by first interesting-base-scenarios))
 
- (define interesting-scenarios-by-benchmark
-   (for*/hash ([group (in-list interesting-base-scenarios-grouped-by-benchmark)]
-               [benchmark-name (in-value (first (first group)))])
+ (log-find-scenarios-info
+  "Collected interesting base scenarios; computing full interesting sub-lattices...")
+
+ (define interesting-scenarios-by-mutant-per-benchmark
+   (for/hash ([group (in-list interesting-base-scenarios-grouped-by-benchmark)])
+     (define benchmark-name (first (first group)))
+     (log-find-scenarios-info @~a{ ... @benchmark-name})
      (define benchmark-path (build-path benchmarks-dir benchmark-name))
      (define benchmark (read-benchmark benchmark-path))
      (define max-config (make-max-bench-config benchmark))
@@ -369,38 +377,46 @@
 
      (define scenarios-grouped-by-mutant
        (group-by scenario-mutant (map second group)))
-     (define modules-that-are-safe-to-type
-       (for*/list ([scenarios (in-list scenarios-grouped-by-mutant)]
-                   [mutant (in-value (scenario-mutant (first scenarios)))]
-                   [scenario (in-list scenarios)])
-         (match (scenario-config scenario)
-           [(hash-table [typed-mod 'types] [_ 'none] ...)
-            typed-mod]
-           [else (error 'bad-scenario
-                        (~s scenario))])))
-     (define modules-that-are-not-safe-to-type (set-subtract all-typable-modules
-                                                             modules-that-are-safe-to-type))
-     (define interesting-sub-lattice-configs
-       (all-possible-configs-with modules-that-are-safe-to-type))
+     (define interesting-scenarios-by-mutant
+       (for/hash ([scenarios (in-list scenarios-grouped-by-mutant)])
+         (define mutant (scenario-mutant (first scenarios)))
+         (define modules-that-are-safe-to-type
+           (set->list
+            (for/set ([scenario (in-list scenarios)])
+              (match (scenario-config scenario)
+                [(hash-table [typed-mod 'types] [_ 'none] ...)
+                 typed-mod]
+                [else (error 'bad-scenario
+                             (~s scenario))]))))
+         (log-find-scenarios-info
+          @~a{  sublattice has @(length modules-that-are-safe-to-type) modules, making its size: @(expt 2 (length modules-that-are-safe-to-type))})
 
-     (define unsafe-sub-config
-       (for/hash ([m (in-list modules-that-are-not-safe-to-type)])
-         (values m 'none)))
+         (define modules-that-are-not-safe-to-type (set-subtract all-typable-modules
+                                                                 modules-that-are-safe-to-type))
+         (define interesting-sub-lattice-configs
+           (all-possible-configs-with modules-that-are-safe-to-type))
 
-     (define interesting-sub-lattice-configs/with-missing-modules
-       (map (λ (c) (hash-union c unsafe-sub-config))
-            interesting-sub-lattice-configs))
+         (define unsafe-sub-config
+           (for/hash ([m (in-list modules-that-are-not-safe-to-type)])
+             (values m 'none)))
 
+         (define interesting-sub-lattice-configs/with-missing-modules
+           (stream-map (λ (c) (hash-union c unsafe-sub-config))
+                       interesting-sub-lattice-configs))
+
+         (values mutant
+                 (stream->list
+                  (stream-map serialize-config
+                              interesting-sub-lattice-configs/with-missing-modules)))))
      (values benchmark-name
-             (map serialize-config
-                  interesting-sub-lattice-configs/with-missing-modules))))
+             interesting-scenarios-by-mutant)))
 
  (unless (db:path-to-db? interesting-scenarios-db-path)
    (log-find-scenarios-info @~a{Creating db at @interesting-scenarios-db-path})
    (db:new! interesting-scenarios-db-path))
  (log-find-scenarios-info @~a{Writing database})
  (define interesting-scenarios-db (db:get interesting-scenarios-db-path))
- (void (db:write! interesting-scenarios-db interesting-scenarios-by-benchmark))
+ (void (db:write! interesting-scenarios-db interesting-scenarios-by-mutant-per-benchmark))
 
  (log-find-scenarios-info @~a{Cleaning up working dir})
  (delete-directory/files (working-dir))

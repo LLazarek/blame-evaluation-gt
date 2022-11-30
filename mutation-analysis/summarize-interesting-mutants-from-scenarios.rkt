@@ -25,24 +25,25 @@
 
 (define mutator-name? string?)
 (define/contract (group-by-mutator interesting-scenarios
-                                   benchmark-name
                                    mutant-mutators)
-  ((listof scenario?)
-   string?
+  ((listof mutant?)
    (hash/c mutant? mutator-name?)
    . -> .
    (hash/c mutator-name?
            (listof mutant?)))
 
-  (define (scenario->mutator a-scenario)
-    (match-define (scenario (mutant #f mod index) _) a-scenario)
-    (hash-ref mutant-mutators
-              (mutant benchmark-name mod index)))
+  (define (mutant->mutator m)
+    (hash-ref mutant-mutators m))
   (define grouped-by-mutator
-    (group-by scenario->mutator interesting-scenarios))
+    (group-by mutant->mutator interesting-scenarios))
   (for/hash ([mutator-group (in-list grouped-by-mutator)])
-    (values (scenario->mutator (first mutator-group))
-            (remove-duplicates (map scenario-mutant mutator-group)))))
+    (values (mutant->mutator (first mutator-group))
+            mutator-group)))
+
+(define ((add-mutant-benchmark bench) m)
+  (match m
+    [(mutant #f mod index)
+     (mutant bench mod index)]))
 
 (main
  #:arguments ([(hash-table ['interesting-scenarios-log interesting-scenarios-log]
@@ -54,7 +55,7 @@
               [("-l" "--log")
                'interesting-scenarios-log
                ("Path to the log of `find-interesting-scenarios.rkt` with which to populate"
-                "the interesting-scenarios-db provided with -d.")
+                "the interesting-scenarios-db provided with -i.")
                #:collect {"path" take-latest #f}]
               [("-i" "--interesting-scenarios-db")
                'interesting-scenarios-db
@@ -86,11 +87,12 @@
  (define mutant-mutators (read-mutants-by-mutator mutant-summaries-db))
  (define data
    (for/hash ([bench (in-list (db:keys interesting-scenarios-db))])
-     (define interesting-scenarios (db:read interesting-scenarios-db bench))
+     (define interesting-scenario-configs-by-mutant (db:read interesting-scenarios-db bench))
+     (define interesting-mutants (map (add-mutant-benchmark bench)
+                                      (hash-keys interesting-scenario-configs-by-mutant)))
      (values bench
              (benchmark-summary
-              (group-by-mutator interesting-scenarios
-                                bench
+              (group-by-mutator interesting-mutants
                                 mutant-mutators)))))
  (unless (file-exists? outdb-path)
    (db:new! outdb-path))

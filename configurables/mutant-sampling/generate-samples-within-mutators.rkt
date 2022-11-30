@@ -319,7 +319,7 @@
                 (hash-table ["constant-swap" (app length 2)]))))
 
 
-(define default-sample-size-multiplier 5)
+(define default-sample-size-multiplier 10)
 (main
  #:arguments {[(hash-table ['config-path config-path]
                            ['summaries-db summaries-db-path]

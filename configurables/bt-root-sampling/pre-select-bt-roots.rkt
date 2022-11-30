@@ -17,24 +17,17 @@
 ;; benchmark/c
 ;; (hash/c mod-name? (listof mutation-index?))
 ;; natural?
-;; (or/c #f (listof scenario?))
+;; [(or/c #f (hash/c mutant/c (listof config/c)))]
 ;; ->
 ;; (hash/c mutant/c (listof config/c))
 (define (select-roots-by-mutant bench
                                 mutant-samples-by-module
                                 root-sample-size
-                                [interesting-scenarios #f])
+                                [interesting-configs-by-mutant #f])
   (define ((add-to-list v) l)
     (cons v l))
   (define bench-max-config (make-max-bench-config bench))
-  (cond [interesting-scenarios
-         (define interesting-configs-by-mutant
-           (for/hash/fold ([scenario (in-list interesting-scenarios)])
-             #:combine cons
-             #:default empty
-             (values (scenario-mutant scenario)
-                     (deserialize-config (scenario-config scenario)
-                                         #:reference bench-max-config))))
+  (cond [interesting-configs-by-mutant
          (for*/hash ([{mod-name indices} (in-hash mutant-samples-by-module)]
                      [index (in-list indices)])
            (define this-mutant (mutant #f mod-name index))
@@ -129,11 +122,19 @@
                                     (db:read interesting-scenarios-db bench-name))))
      (values bench-name selected-roots-by-mutant)))
 
+ (define (maybe-serialize-config c)
+   (if (serialized-config? c)
+       c
+       (serialize-config c)))
+
  (define serialized-roots-by-benchmark
    (for/hash ([{bench-name roots-by-mutant} (in-hash roots-by-benchmark)])
      (values bench-name
              (for/hash ([{mutant roots} (in-hash roots-by-mutant)])
-               (values mutant (map serialize-config roots))))))
+               (values mutant
+                       ;; maybe bc the configs that come fomr the
+                       ;; interesting-scenarios-db are already serialized
+                       (map maybe-serialize-config roots))))))
 
  (db:new! outdb-path)
  (define outdb (db:get outdb-path))
