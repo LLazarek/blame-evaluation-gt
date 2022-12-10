@@ -14,7 +14,8 @@
          (except-in racket/contract/base contract-out)
          openssl/md5
          "../util/optional-contracts.rkt"
-         "../util/path-utils.rkt")
+         "../util/path-utils.rkt"
+         "../util/experiment-exns.rkt")
 
 (provide (contract-out
           [path-to-db? (path-string? . -> . boolean?)]
@@ -116,15 +117,18 @@
 
 (define (get path)
   (unless (path-to-db? path)
-    (error 'get @~a{@(simple-form-path path) doesn't exist or it doesn't look like a db}))
+    (raise-internal-experiment-argument-error 'get
+                                              "a path-to-db?"
+                                              path))
   (read-serialized-db! path))
 
 (define (read a-db
               key
               [fail-result
                (λ _
-                 (error 'read
-                        @~a{key not found in db: @~e[key]}))]
+                 (raise-internal-experiment-argument-error 'read
+                                                           "a key in the db"
+                                                           key))]
               #:reader [read-from-file file->value])
   (define file-name (hash-ref (db-map a-db) key #f))
   (cond [file-name
@@ -179,8 +183,8 @@
       (define new-db (struct-copy db a-db [map (hash-set (db-map a-db) key file-name)]))
       (write-serialized-db! new-db)))
    (thunk
-    (error 'db:set!
-           @~a{Timeout waiting on lock to write db: @(db-path a-db)}))
+    (raise-internal-experiment-error 'db:set!
+                                     @~a{Timeout waiting on lock to write db: @(db-path a-db)}))
    #:max-delay 1))
 
 (define (keys a-db)
