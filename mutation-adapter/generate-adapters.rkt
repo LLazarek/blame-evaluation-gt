@@ -977,6 +977,15 @@
                 (list
                  '()
                  (list-no-order
+                  (cons 'a
+                        (app (compose1 syntax->datum ->stx)
+                             '(delegating->
+                                         1
+                                         (list)
+                                         (any/c-adapter)
+                                         (list
+                                          (cons 0 #;(make-base-type-adapter 'Integer 'Real)
+                                                (sealing-adapter))))))
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
@@ -1023,15 +1032,19 @@
                                                 (sealing-adapter)))
                                          (any/c-adapter)
                                          (list)))))))
-                  ;; Nope! That's a positive reference to Foo via Z2.
-                  #;(cons 'a
+                  ;; That's a positive reference to Foo via Z2.
+                  (cons 'a
                           (app (compose1 syntax->datum ->stx)
                                '(delegating->
+                                 1
                                  (list (cons 0
                                              (delegating->
+                                              1
                                               (list (cons 0 (sealing-adapter)))
+                                              (any/c-adapter)
                                               (list))))
-                                 (list)))))))
+                                 (any/c-adapter)
+                                 (list (cons 0 (sealing-adapter)))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (define-type Z Real)
@@ -1057,14 +1070,18 @@
                                 (cons 0 (sealing-adapter)))
                                (any/c-adapter)
                                (list))))
-                  ;; Nope! That's a positive reverse to Z via Z2
-                  #;(cons 'a
+                  ;; That's a positive reference to Z via Z2
+                  (cons 'a
                           (app (compose1 syntax->datum ->stx)
                                '(delegating->
+                                 1
                                  (list (cons 0
                                              (delegating->
+                                              1
                                               (list (cons 0 (sealing-adapter)))
+                                              (any/c-adapter)
                                               (list))))
+                                 (any/c-adapter)
                                  (list)))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
@@ -1133,7 +1150,7 @@
                                          (list (cons 0 #;(make-base-type-adapter 'Integer 'Index)
                                                      (sealing-adapter))))))
                                (any/c-adapter)
-                               (list)))))))
+                               (list (cons 0 (sealing-adapter)))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (struct YMD ([y : Natural]
@@ -1170,12 +1187,14 @@
                              '(delegating->
                                1
                                (list
-                                (cons 0 (delegating-struct ; Date
+                                (cons 0 (delegating-struct
                                          #f
+                                         'Date
                                          2
                                          (list
-                                          (cons 0 (delegating-struct ; YMD
+                                          (cons 0 (delegating-struct
                                                    #f
+                                                   'YMD
                                                    3
                                                    (list
                                                     (cons 0 (sealing-adapter)))))))))
@@ -1192,16 +1211,19 @@
                                       (delegating->
                                        1
                                        (list
-                                        (cons 0 (delegating-struct ; DateTime
+                                        (cons 0 (delegating-struct
                                                  #f
+                                                 'DateTime
                                                  1
                                                  (list
-                                                  (cons 0 (delegating-struct ; Date
+                                                  (cons 0 (delegating-struct
                                                            #f
+                                                           'Date
                                                            2
                                                            (list
-                                                            (cons 0 (delegating-struct ; YMD
+                                                            (cons 0 (delegating-struct
                                                                      #f
+                                                                     'YMD
                                                                      3
                                                                      (list
                                                                       (cons 0 (sealing-adapter))))))))))))
@@ -1248,12 +1270,14 @@
                              '(delegating->
                                1
                                (list
-                                (cons 0 (delegating-struct ; Date
+                                (cons 0 (delegating-struct
                                          #f
+                                         'Date
                                          2
                                          (list
-                                          (cons 0 (delegating-struct ; YMD
+                                          (cons 0 (delegating-struct
                                                    #f
+                                                   'YMD
                                                    3
                                                    (list
                                                     (cons 0 (sealing-adapter)))))))))
@@ -1270,16 +1294,19 @@
                                       (delegating->
                                        1
                                        (list
-                                        (cons 0 (delegating-struct ; DateTime
+                                        (cons 0 (delegating-struct
                                                  #f
+                                                 'DateTime
                                                  1
                                                  (list
-                                                  (cons 0 (delegating-struct ; Date
+                                                  (cons 0 (delegating-struct
                                                            #f
+                                                           'Date
                                                            2
                                                            (list
-                                                            (cons 0 (delegating-struct ; YMD
+                                                            (cons 0 (delegating-struct
                                                                      #f
+                                                                     'YMD
                                                                      3
                                                                      (list
                                                                       (cons 0 (sealing-adapter))))))))))))
@@ -1327,23 +1354,51 @@
                                          type:complex-type->Any))
                 (list
                  '()
-                 (list
+                 (list-no-order
                   (cons 'moment
                         (app (compose1 syntax->datum ->stx)
-                             '(delegating->*
-                               1
-                               (list)
-                               (list
-                                (cons '#:resolve-offset
-                                      (delegating->
-                                       4
-                                       (list)
-                                       (any/c-adapter)
-                                       (list (cons 0 (delegating-struct
-                                                      #f
-                                                      1
-                                                      (list
-                                                       (cons 0 (sealing-adapter)))))))))))))))
+                             '(delegating-and/c
+                               (delegating->
+                                1
+                                (list)
+                                (any/c-adapter)
+                                (list (cons 0 (delegating-struct
+                                               #f
+                                               'Moment
+                                               1
+                                               (list
+                                                (cons 0 (sealing-adapter)))))))
+                               (delegating->*
+                                1
+                                (list)
+                                (list
+                                 (cons '#:resolve-offset
+                                       (delegating->
+                                        4
+                                        (list (cons 3 (delegating-struct
+                                                       #f
+                                                       'Moment
+                                                       1
+                                                       (list
+                                                        (cons 0 (sealing-adapter))))))
+                                        (any/c-adapter)
+                                        (list (cons 0 (delegating-struct
+                                                       #f
+                                                       'Moment
+                                                       1
+                                                       (list
+                                                        (cons 0 (sealing-adapter)))))))))))))
+                  (cons 'a (app (compose1 syntax->datum ->stx)
+                                '(delegating->
+                                  1
+                                  (list)
+                                  (any/c-adapter)
+                                  (list (cons 0 (delegating-struct
+                                                 #f
+                                                 'Moment
+                                                 1
+                                                 (list
+                                                  (cons 0 (sealing-adapter))))))))))))
     (test-match (adapt-all-referencing-provides
                  #'(module A racket
                      (struct exp () #:prefab)
@@ -1374,6 +1429,7 @@
                                (list
                                 (cons 0 (delegating-struct
                                          #f
+                                         'app
                                          2
                                          (list
                                           (cons 1 (sealing-adapter))))))
@@ -1387,9 +1443,11 @@
                                 (cons 0 (delegating-struct
                                          (delegating-struct
                                           #f
-                                          3
+                                         'app
+                                          2
                                           (list
                                            (cons 1 (sealing-adapter))))
+                                         'annotated-app
                                          1
                                          (list))))
                                (any/c-adapter)
@@ -1424,14 +1482,17 @@
                                 (cons 0 (delegating-struct
                                          (delegating-struct
                                           #f
-                                          3
+                                          'exp
+                                          1
                                           (list
                                            (cons 0 (sealing-adapter))))
+                                         'app
                                          2
                                          (list
                                           (cons 0
                                                 (delegating-struct
                                                  #f
+                                                 'exp
                                                  1
                                                  (list
                                                   (cons 0 (sealing-adapter)))))))))
@@ -1446,17 +1507,21 @@
                                          (delegating-struct
                                           (delegating-struct
                                            #f
-                                           4
+                                           'exp
+                                           1
                                            (list
                                             (cons 0 (sealing-adapter))))
-                                          3
+                                          'app
+                                          2
                                           (list
                                            (cons 0
                                                  (delegating-struct
                                                   #f
+                                                  'exp
                                                   1
                                                   (list
                                                    (cons 0 (sealing-adapter)))))))
+                                         'annotated-app
                                          1
                                          (list))))
                                (any/c-adapter)
@@ -1478,6 +1543,24 @@
                 (list
                  '()
                  (list
+                  (cons 'a
+                        (app (compose1 syntax->datum ->stx)
+                             '(delegating->
+                               1
+                               (list
+                                (cons 0 (delegating-struct
+                                         #f
+                                         'mystruct
+                                         1
+                                         (list
+                                          (cons 0
+                                                (delegating->
+                                                 1
+                                                 (list (cons 0 (sealing-adapter)))
+                                                 (any/c-adapter)
+                                                 (list)))))))
+                               (any/c-adapter)
+                               (list))))
                   (cons 'b
                         (app (compose1 syntax->datum ->stx)
                              '(delegating->
@@ -1487,6 +1570,7 @@
                                (list
                                 (cons 0 (delegating-struct
                                          #f
+                                         'mystruct
                                          1
                                          (list
                                           (cons 0
@@ -1705,6 +1789,7 @@
                                                (any/c-adapter)
                                                (list (cons 0 (delegating-struct
                                                               #f
+                                                              'Turn
                                                               1
                                                               (list (cons 0 (sealing-adapter)))))))))
                                   (any/c-adapter)
@@ -1718,6 +1803,7 @@
                                   1
                                   (list (cons 0 (delegating-struct
                                                  #f
+                                                 'Turn
                                                  1
                                                  (list (cons 0 (sealing-adapter))))))
                                   (any/c-adapter)

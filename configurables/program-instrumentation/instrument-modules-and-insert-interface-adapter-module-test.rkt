@@ -249,6 +249,7 @@
           (define stream
             (recursive-contract
              (delegating-struct #f
+                                'stream
                                 2
                                 (list (cons 0 (sealing-adapter))
                                       (cons 1 (delegating->

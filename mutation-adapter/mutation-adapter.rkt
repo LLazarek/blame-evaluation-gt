@@ -14,6 +14,7 @@
          sexp->type-diff)
 
 (require "../mutate/type-api-mutators.rkt"
+         "../util/experiment-exns.rkt"
          "sexp-diff.rkt"
          "util.rkt"
          syntax/parse/define
@@ -47,7 +48,7 @@
 (td-struct td:parametric (vars sub-td))
 (td-struct td:rec (name sub-td))
 (td-struct td:vector (index-map))
-(td-struct td:struct (maybe-parent field-count index-map))
+(td-struct td:struct (maybe-parent name field-count index-map))
 (td-struct td:listof (sub-td))
 (td-struct td:vectorof (sub-td))
 (td-struct td:boxof (sub-td))
@@ -189,7 +190,7 @@
              [else #f]))
          (and (or maybe-parent-td
                   (not (empty? field-map)))
-              (td:struct maybe-parent-td (length fields) field-map))]
+              (td:struct maybe-parent-td name (length fields) field-map))]
         [(list* 'Class
                 (app parse-class-parts
                      (list (app recur implements-clause-sub-td)
@@ -532,7 +533,7 @@
                                                stream
                                                 ((first : Index) (rest : (-> stream)))
                                                 #:prefab)))
-                 (td:struct #f 2 `((0 . ,(td:base 'Natural 'Index)))))
+                 (td:struct #f 'stream 2 `((0 . ,(td:base 'Natural 'Index)))))
     (test-equal? (sexp->type-diff (sexp-diff '(struct
                                                stream
                                                 stream-parent
@@ -543,7 +544,7 @@
                                                 stream-parent522788
                                                 ((first : Natural) (rest : (-> stream)))
                                                 #:prefab)))
-                 (td:struct (td:base 'stream-parent 'stream-parent522788) 2 '()))
+                 (td:struct (td:base 'stream-parent 'stream-parent522788) 'stream 2 '()))
     (test-equal? (sexp->type-diff (sexp-diff '(struct
                                                stream
                                                 parent
@@ -554,7 +555,7 @@
                                                 parent
                                                 ((first : Index) (rest : (-> stream)))
                                                 #:prefab)))
-                 (td:struct #f 2 `((0 . ,(td:base 'Natural 'Index)))))
+                 (td:struct #f 'stream 2 `((0 . ,(td:base 'Natural 'Index)))))
     (test-equal? (sexp->type-diff (sexp-diff '(Listof A)
                                              '(Listof B)))
                  (td:listof (td:base 'A 'B)))
@@ -753,6 +754,7 @@
                                        (unsafe-proc : (Vectorof Integer)))
                                       #:prefab)))
                  (td:struct #f
+                            'Array
                             5
                             `((0 . ,(td:base '(Vectorof Integer)
                                              '(-> (Vectorof Integer) Float)))
@@ -856,12 +858,13 @@
        ;; This, coupled with the fact that we turn all mutations of union
        ;; types into a single sealing adapter, means we can just ignore this!
        (loop sub-td current-position)]
-      [{#f (td:struct maybe-parent field-count index-map)}
+      [{#f (td:struct maybe-parent name field-count index-map)}
        (define parent-adapter (and maybe-parent
                                    (loop maybe-parent current-position)))
        (delegating-struct (and parent-adapter
                                (expand-field-count-for-child-fields parent-adapter
                                                                     field-count))
+                          name
                           field-count
                           (loop-over-dict-values index-map current-position))]
       [{#f (td:listof sub-td)}
@@ -1019,15 +1022,16 @@
 
 (define is-td-leaf?:struct-field-swap
   ;; See note above about function arg/result swap sub-tds
-  (simple-leaf-pattern (td:struct _ _ `(,_ ,_))))
+  (simple-leaf-pattern (td:struct _ _ _ `(,_ ,_))))
 
 (define leaf->adapter:struct-field-swap
   (match-lambda** [{(td:struct _
+                               name
                                field-count
                                `((,i1 . ,td1)
                                  (,i2 . ,td2)))
                     _}
-                   (swap-struct-field field-count i1 i2)]))
+                   (swap-struct-field name field-count i1 i2)]))
 
 (define is-td-leaf?:class-field-swap
   ;; See note above about function arg/result swap sub-tds
@@ -1308,8 +1312,9 @@
                               new-kws)]))
              #f))))
 
-;; This ->* support relies heavily on the 'only one mutation' assumption to
-;; avoid duplicating the work of delegating->
+;; This ->* support relies heavily on `delegating-and/c` to avoid duplicating
+;; the work of delegating->, since they can be used together if the union of
+;; both functionalities are needed.
 (define-adapter delegating->* (mandatory-arg-count optional-arg-index-ctc-pairs optional-arg-kw-ctc-pairs)
   #:name (list 'delegating->*
                mandatory-arg-count
@@ -1336,7 +1341,12 @@
              #f))))
 
 (define (apply-contract ctc v)
-  (contract ctc v #f #f))
+  (with-handlers ([exn:fail:contract?
+                   (λ (e)
+                     (raise-internal-experiment-error
+                      'mutation-adapter
+                      @~a{adapter raised a contract violation: @exn-message[e]}))])
+    (contract ctc v #f #f)))
 
 (define (apply-kw-contracts kws kw-args kw-ctc-pairs)
   (for/list ([kw (in-list kws)]
@@ -1397,12 +1407,14 @@
 (define-simple-delegating-adapter delegating-instanceof [sub-ctc]
   (λ (o) (apply-contract (instanceof/c sub-ctc) o)))
 
-(define/contract (transform-struct-fields v           ;; an instance of a struct...
+(define/contract (transform-struct-fields v           ;; an instance of the prefab struct...
+                                          name        ;; ... with this name, and...
                                           field-count ;; ... which has this many fields of its own
                                                       ;;     (i.e. not from parents)
                                           transform   ;; a function to transform those fields
                                           )
   (->i ([v struct?]
+        [name symbol?]
         [field-count natural?]
         [transform {field-count}
                    ((and/c list? (property/c length (=/c field-count)))
@@ -1419,18 +1431,32 @@
 
   ;; fields are in order of inheritance chain (root, child, child's child, ...)
   ;; so the fields of the most-specific struct this is an instance of are last
-  (define all-fields-including-parents (struct->list v))
-  (assert (>= (length all-fields-including-parents) field-count)
+  (define all-fields-including-parents-and-children (struct->list v))
+  (define key (prefab-struct-key v))
+  (define parents-field-count
+    (match key
+      [(? symbol?) 0]
+      [(or (cons (== name)
+                 parent-fields+counts)
+           (list* _ ..1
+                  (== name)
+                  (== field-count)
+                  parent-fields+counts))
+       (apply + (filter integer? parent-fields+counts))]))
+  (assert (>= (length all-fields-including-parents-and-children) (+ field-count
+                                                                    parents-field-count))
           @~a{
               internal adapter error:
-              expected at least @field-count fields for struct @~s[v], @;
-              but struct->list only reports @(length all-fields-including-parents)
+              expected at least @(+ field-count parents-field-count) fields for struct @~s[v], @;
+              but struct->list only reports @(length all-fields-including-parents-and-children)
               })
-  (define-values {parents-fields this-structs-own-fields}
-    (split-at all-fields-including-parents
-              (- (length all-fields-including-parents) field-count)))
-  (define key (prefab-struct-key v))
-  (define struct-type (prefab-key->struct-type key (length all-fields-including-parents)))
+  (define-values {parents-fields this+childrens-fields}
+    (split-at all-fields-including-parents-and-children
+              parents-field-count))
+  (define-values {this-structs-own-fields childrens-fields}
+    (split-at this+childrens-fields
+              field-count))
+  (define struct-type (prefab-key->struct-type key (length all-fields-including-parents-and-children)))
   ;; (define-values {name init-field-cnt auto-field-cnt accessor-proc mutator-proc immutable-k-list super-type skipped?}
     ;; (struct-type-info struct-type))
   ;; so all we can do is make a new copy of the struct.
@@ -1438,36 +1464,43 @@
   ;; At least the simple ones don't.
   (apply (struct-type-make-constructor struct-type)
          (append parents-fields
-                 (transform this-structs-own-fields))))
+                 (transform this-structs-own-fields)
+                 childrens-fields)))
 
-(define-adapter delegating-struct (maybe-parent-ctc field-count index-ctc-pairs)
+(define-adapter delegating-struct (maybe-parent-ctc name field-count index-ctc-pairs)
   #:name (list 'delegating-struct
                (and maybe-parent-ctc (contract-name maybe-parent-ctc))
+               name
                field-count
                (index-ctc-pairs->names index-ctc-pairs))
   #:->stx (λ (->stx)
             #`(delegating-struct #,(and maybe-parent-ctc (->stx maybe-parent-ctc))
+                                 '#,name
                                  #,field-count
                                  #,(index-ctc-pairs->stx index-ctc-pairs ->stx)))
   (λ (v)
     (transform-struct-fields (apply-contract (or maybe-parent-ctc any/c) v)
+                             name
                              field-count
                              (λ (fields)
                                (apply-contracts-in-list fields
                                                         index-ctc-pairs)))))
 
+;; lltodo: this may no longer be necessary if we use the prefab key info
 (define (expand-field-count-for-child-fields a-ds offset)
-  (match a-ds
-    [(delegating-struct maybe-parent-adapter field-count index-ctc-pairs)
+  a-ds
+  #;(match a-ds
+    [(delegating-struct maybe-parent-adapter name field-count index-ctc-pairs)
      (define expanded-parent-adapter
        (and maybe-parent-adapter
             (expand-field-count-for-child-fields maybe-parent-adapter
                                                  offset)))
      (delegating-struct expanded-parent-adapter
+                        name
                         (+ field-count offset)
                         index-ctc-pairs)]
-    [(swap-struct-field field-count i1 i2)
-     (swap-struct-field (+ field-count offset) i1 i2)]))
+    [(swap-struct-field name field-count i1 i2)
+     (swap-struct-field name (+ field-count offset) i1 i2)]))
 
 (define-simple-delegating-adapter delegating-and/c [left-ctc right-ctc]
   (λ (v) (apply-contract left-ctc (apply-contract right-ctc v))))
@@ -1511,7 +1544,9 @@
 (define-simple-delegating-adapter delegating-vectorof [sub-ctc]
   (λ (v) (apply-contract (vectorof sub-ctc) v)))
 (define-simple-delegating-adapter delegating-boxof [sub-ctc]
-  (λ (v) (apply-contract (box/c sub-ctc) v)))
+  (λ (v)
+    (assert (box? v) @~a{delegating box got a value that isn't a box: @~e[v]})
+    (apply-contract (box/c sub-ctc) v)))
 (define-simple-delegating-adapter delegating-setof [sub-ctc]
   (λ (v)
     (for/set ([el (in-set v)])
@@ -1530,11 +1565,11 @@
         v
         (apply-contract sub-ctc v))))
 
-(define-adapter swap-struct-field (field-count i1 i2)
-  #:name (list 'swap-struct-field field-count i1 i2)
-  #:->stx (λ _ #`(swap-struct-field #,field-count #,i1 #,i2))
+(define-adapter swap-struct-field (name field-count i1 i2)
+  #:name (list 'swap-struct-field name field-count i1 i2)
+  #:->stx (λ _ #`(swap-struct-field '#,name #,field-count #,i1 #,i2))
   (λ (v)
-    (transform-struct-fields v field-count (λ (fields) (swap-in-list fields i1 i2)))))
+    (transform-struct-fields v name field-count (λ (fields) (swap-in-list fields i1 i2)))))
 
 #;(struct swap-vector adapter/c (i1 i2)
   #:property prop:contract
@@ -2108,7 +2143,74 @@
                       [(test-equal? (annotated-app-ann aa) 4) "field wrong: ann"]
                       [(exp? (app-fun aa)) "field wrong: fun, not an exp"]
                       [(sealed? (exp-a (app-fun aa))) "field wrong: exp-a of fun field, not sealed"]
-                      [(sealed? (exp-a aa)) "field wrong: exp-a not sealed"])))
+                      [(sealed? (exp-a aa)) "field wrong: exp-a not sealed"]))
+
+   (ignore (struct Array (shape
+                          size
+                          strict?
+                          strict!
+                          unsafe-proc)
+             #:prefab)
+           (struct Settable-Array Array (set-proc) #:prefab)
+           (struct Mutable-Array Settable-Array (data) #:prefab))
+   (test-adapter-contract
+    [m-a (Mutable-Array (vector 0) 0 (box #f) void void void (vector 0))
+         #:with-contract (generate-adapter-ctc
+                          (mutated-interface-type
+                           '(struct Mutable-Array
+                              (struct Settable-Array
+                                (struct Array
+                                  ((shape : (Vectorof Integer))
+                                   (size : Integer)
+                                   (strict? : (Boxof Boolean))
+                                   (strict! : (-> Void))
+                                   (unsafe-proc : (-> (Vectorof Integer) Float)))
+                                  #:prefab)
+                                ((set-proc : (-> (Vectorof Integer) Float Void)))
+                                #:prefab)
+                              ((data : (Vectorof Float)))
+                              #:prefab)
+                           '(struct Mutable-Array
+                              (struct Settable-Array
+                                (struct Array
+                                  ((shape : (Vectorof Integer))
+                                   (size : Integer)
+                                   (strict? : (Boxof Any))
+                                   (strict! : (-> Void))
+                                   (unsafe-proc : (-> (Vectorof Integer) Float)))
+                                  #:prefab)
+                                ((set-proc : (-> (Vectorof Integer) Float Void)))
+                                #:prefab)
+                              ((data : (Vectorof Float)))
+                              #:prefab)
+                           type:base-type-substitution))]
+    (and/test/message [(Mutable-Array? m-a) "not a mutable array"]
+                      [(box? (Array-strict? m-a)) "field wrong: Array-strict? not a box"]
+                      [(sealed? (unbox (Array-strict? m-a))) "field wrong: Array-strict? contents not sealed"]))
+   (test-adapter-contract
+    [m-a (Mutable-Array (vector 0) 0 (box #f) void void void (vector 0))
+         #:with-contract (generate-adapter-ctc
+                          (mutated-interface-type
+                           '(struct Array
+                                  ((shape : (Vectorof Integer))
+                                   (size : Integer)
+                                   (strict? : (Boxof Boolean))
+                                   (strict! : (-> Void))
+                                   (unsafe-proc : (-> (Vectorof Integer) Float)))
+                                  #:prefab)
+                           '(struct Array
+                                  ((shape : (Vectorof Integer))
+                                   (size : Integer)
+                                   (strict? : (Boxof Any))
+                                   (strict! : (-> Void))
+                                   (unsafe-proc : (-> (Vectorof Integer) Float)))
+                                  #:prefab)
+                           type:base-type-substitution))]
+    (and/test/message [(Mutable-Array? m-a) "not a mutable array"]
+                      [(box? (Array-strict? m-a)) "field wrong: Array-strict? not a box"]
+                      [(sealed? (unbox (Array-strict? m-a))) "field wrong: Array-strict? contents not sealed"]
+                      [(procedure? (Settable-Array-set-proc m-a)) "field wrong: Settable-Array-set-proc"]
+                      [(vector? (Mutable-Array-data m-a)) "field wrong: Mutable-Array-data"])))
   (test-begin
    #:name swap-struct-fields
    (ignore (struct temp (x y z) #:prefab))
