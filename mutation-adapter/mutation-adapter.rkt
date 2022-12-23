@@ -1114,18 +1114,36 @@
                (define field-name (field-accessor this)) ...
                name-e)
       #:late-neg-projection
-      {~? full-proj-e
+      {~? (wrap-projection-to-inform-transient-about-adaptation! full-proj-e)
           (λ (this)
             (define field-name (field-accessor this)) ...
             (λ (blame)
               (λ (value-name neg-party)
-                proj-body ...)))})
+                (define adapted-value (let () proj-body ...))
+                (inform-transient-about-adaptation! value-name adapted-value)
+                adapted-value)))})
      #:methods gen:adapted
      [(define/generic generic->stx ->stx)
       (define (->stx this)
         (define field-name (field-accessor this)) ...
         (make-stx-fn generic->stx))])
     (provide name)))
+
+(define (inform-transient-about-adaptation! v adapted-v)
+  (when (transient-register-adapted-value?)
+    (define transient-assert
+      (dynamic-require 'typed-racket/utils/shallow-contract 'shallow-shape-check))
+    (transient-assert adapted-v values '??? (quote-source-file) (cons v 'noop))))
+
+(define (wrap-projection-to-inform-transient-about-adaptation! proj)
+  (λ (this)
+    (define inner1 (proj this))
+    (λ (blame)
+      (define inner2 (inner1 blame))
+      (λ (v neg-party)
+        (define adapted-v (inner2 v neg-party))
+        (inform-transient-about-adaptation! v adapted-v)
+        adapted-v))))
 
 (define-simple-macro (define-simple-delegating-adapter name [sub-ctc-name ...]
                        ({~literal λ} (value-name:id) proj-body ...))
@@ -1144,15 +1162,7 @@
 (define-adapter sealing-adapter ()
   #:name 'sealing-adapter
   #:->stx (λ _ #`(sealing-adapter))
-  (λ (v)
-    (define sealed-v (sealed v))
-    ;; an alternative option for cooperating with transient blame tracking;
-    ;; deferred for now in favor of using a prefab `sealed` struct
-    (when (transient-register-adapted-value?)
-      (define transient-assert
-        (dynamic-require 'typed-racket/utils/shallow-contract 'shallow-shape-check))
-      (transient-assert sealed-v values '??? (quote-source-file) (cons v 'noop)))
-    sealed-v))
+  (λ (v) (sealed v)))
 (define-adapter no-adapter ()
   #:name 'no-adapter
   #:->stx (λ _ #`any/c)
