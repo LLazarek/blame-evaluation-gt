@@ -132,9 +132,12 @@
           (require "original-type-interface.rkt")
           (provide (except-out (all-from-out "original-type-interface.rkt")
                                x))
-          (provide (contract-out
-                    [x #;(make-base-type-adapter 'Integer 'String)
-                       (sealing-adapter)])))
+          (begin
+            (define ,x-gensym (contract #;(make-base-type-adapter 'Integer 'String) (sealing-adapter)
+                                        x
+                                        #f
+                                        #f))
+            (provide (rename-out [,x-gensym x]))))
         (require "../../../utilities/require-typed-check-provide.rkt") ;; inserted unconditionally
         (require "../../../utilities/require-typed-check-provide.rkt") ;; copied over from original
         (require/typed/check/provide 'contracted
@@ -164,13 +167,17 @@
           (require "original-type-interface.rkt")
           (provide (except-out (all-from-out "original-type-interface.rkt")
                                f))
-          (provide (contract-out
-                    [f (delegating->
-                        2
-                        (list (cons 0 #;(make-base-type-adapter 'Integer 'String)
-                                    (sealing-adapter)))
-                        (any/c-adapter)
-                        (list))])))
+          (begin
+            (define ,f-gensym (contract (delegating->
+                                         2
+                                         (list (cons 0 #;(make-base-type-adapter 'Integer 'String)
+                                                     (sealing-adapter)))
+                                         (any/c-adapter)
+                                         (list))
+                                        f
+                                        #f
+                                        #f))
+            (provide (rename-out [,f-gensym f]))))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require/typed/check/provide 'contracted
@@ -203,8 +210,12 @@
           (require "original-type-interface.rkt")
           (provide (except-out (all-from-out "original-type-interface.rkt")
                                f))
-          (provide (contract-out
-                    [f (swap-> #t 0 1)])))
+          (begin
+            (define ,f-gensym (contract (swap-> #t 0 1)
+                                        f
+                                        #f
+                                        #f))
+            (provide (rename-out [,f-gensym f]))))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require/typed/check/provide 'contracted
@@ -259,11 +270,15 @@
                                                (list (cons 0 stream))))))))
           (provide (except-out (all-from-out "original-type-interface.rkt")
                                f))
-          (provide (contract-out
-                    [f (delegating-> 2
-                                     (list (cons 1 stream))
-                                     (any/c-adapter)
-                                     (list))])))
+          (begin
+            (define ,f-gensym (contract (delegating-> 2
+                                                      (list (cons 1 stream))
+                                                      (any/c-adapter)
+                                                      (list))
+                                        f
+                                        #f
+                                        #f))
+            (provide (rename-out [,f-gensym f]))))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../../../utilities/require-typed-check-provide.rkt")
         (provide Foo (struct-out stream))

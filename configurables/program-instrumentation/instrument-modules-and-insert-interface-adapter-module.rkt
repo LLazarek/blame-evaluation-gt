@@ -278,29 +278,33 @@
                     (resolved-module->datum (make-test-resolved-mod main.rkt-path main.rkt-stx)))
 
        ;; Interface module is moved and adapter injected
-       (test-equal? (make-immutable-hash (map rm->name+code others))
-                    (hash (path->string (simple-form-path type-interface-file-name))
-                          `(module mutation-adapter typed/racket
-                             (#%module-begin
-                              (module contracted racket
-                                (require (file ,(path->string
-                                                 (simple-form-path
-                                                  type-api-mutators.rkt))))
-                                (require ,type-interface-file-rename)
-                                (provide (except-out (all-from-out ,type-interface-file-rename)
-                                                     f))
-                                (provide (contract-out
-                                          [f (swap-> #t 0 1)])))
-                              (require "../../../utilities/require-typed-check-provide.rkt")
-                              (require/typed/check/provide 'contracted
-                                                           [f (-> Number Real String)])))
+       (test-match (make-immutable-hash (map rm->name+code others))
+                   (hash-table [(== (path->string (simple-form-path type-interface-file-name)))
+                                `(module mutation-adapter typed/racket
+                                   (#%module-begin
+                                    (module contracted racket
+                                      (require (file ,(== (path->string
+                                                           (simple-form-path
+                                                            type-api-mutators.rkt)))))
+                                      (require ,type-interface-file-rename)
+                                      (provide (except-out (all-from-out ,type-interface-file-rename)
+                                                           f))
+                                      (begin
+                                        (define ,f-gensym (contract (swap-> #t 0 1)
+                                                                    f
+                                                                    #f
+                                                                    #f))
+                                        (provide (rename-out [,f-gensym f]))))
+                                    (require "../../../utilities/require-typed-check-provide.rkt")
+                                    (require/typed/check/provide 'contracted
+                                                                 [f (-> Number Real String)])))]
 
-                          (path->string (simple-form-path type-interface-file-rename))
-                          '(module interface racket
-                             (#%module-begin
-                              (require/typed/check/provide
-                               "something"
-                               [f (-> Real Number String)])))))))
+                               [(== (path->string (simple-form-path type-interface-file-rename)))
+                                '(module interface racket
+                                   (#%module-begin
+                                    (require/typed/check/provide
+                                     "something"
+                                     [f (-> Real Number String)])))]))))
 
     (test-exn exn:fail?
               (instrument-program

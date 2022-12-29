@@ -1911,9 +1911,14 @@
       #`(define #,(datum->syntax #f (adapter-definition-name a-def))
           (recursive-contract
            #,(->stx (adapter-definition-body a-def))))))
-  (define adapter-provide-pair-stxs
+  (define adapter-provide-stxs
     (for/list ([{id adapter} (in-dict adapter-ctcs)])
-      #`[#,id #,(->stx adapter)]))
+      ;; We can't use `contract-out` because it does funny stuff with rename
+      ;; transformers that Transient doesn't handle well.
+      (define renamed (gensym id))
+      #`(begin
+          (define #,renamed (contract #,(->stx adapter) #,id #f #f))
+          (provide (rename-out [#,renamed #,id])))))
   (munge-location+bindings
    #`(module mutation-adapter typed/racket
        (#%module-begin
@@ -1922,7 +1927,7 @@
           (require #,interface-mod-name)
           #,@adapter-definition-stxs
           (provide (except-out (all-from-out #,interface-mod-name) #,@(dict-keys adapter-ctcs)))
-          (provide (contract-out #,@adapter-provide-pair-stxs)))
+          #,@adapter-provide-stxs)
         (require "../../../utilities/require-typed-check-provide.rkt")
         #,@interface-req/prov-forms
         #,@interface-typedefs
@@ -1950,9 +1955,9 @@
                       (require (file ,(path->string type-api-mutators.rkt)))
                       (require "interface.rkt")
                       (provide (except-out (all-from-out "interface.rkt")))
-                      (provide (contract-out)))
+                      )
                     (require "../../../utilities/require-typed-check-provide.rkt"))))
-   (test-equal?
+   (test-match
     (syntax->datum
      (adapter-ctcs->module-stx
       `((foo . ,(make-base-type-adapter 'Integer 'Real))
@@ -2012,7 +2017,7 @@
     `(module mutation-adapter typed/racket
        (#%module-begin
         (module contracted racket
-          (require (file ,(path->string type-api-mutators.rkt)))
+          (require (file ,(== (path->string type-api-mutators.rkt))))
           (require "interface.rkt")
           (define Player%
             (recursive-contract
@@ -2040,15 +2045,23 @@
           (provide (except-out (all-from-out "interface.rkt")
                                foo
                                bar))
-          (provide
-           (contract-out
-            [foo #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter)]
-            [bar (delegating->
-                  3
-                  (list (cons 1 #;(make-base-type-adapter 'Integer 'Real) (sealing-adapter))
-                        (cons 2 Player%))
-                  (any/c-adapter)
-                  (list))])))
+          (begin
+            (define ,foo-gensym (contract (sealing-adapter)
+                                          foo
+                                          #f
+                                          #f))
+            (provide (rename-out [,foo-gensym foo])))
+          (begin
+            (define ,bar-gensym (contract (delegating->
+                                           3
+                                           (list (cons 1 (sealing-adapter))
+                                                 (cons 2 Player%))
+                                           (any/c-adapter)
+                                           (list))
+                                          bar
+                                          #f
+                                          #f))
+            (provide (rename-out [,bar-gensym bar]))))
         (require "../../../utilities/require-typed-check-provide.rkt")
         (require "../base/base-types.rkt")
         (reprovide "../base/more-types.rkt")
