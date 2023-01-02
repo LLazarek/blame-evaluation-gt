@@ -1,5 +1,9 @@
 #lang at-exp rscript
 
+(provide (contract-out
+          [categorize (-> (listof mutant?) (hash/c mutant? category?))]
+          [current-benchmarks-dir (parameter/c path-to-existant-directory?)]))
+
 (require "../util/read-module.rkt"
          "../util/program.rkt"
          "../util/mutant-util.rkt"
@@ -16,6 +20,7 @@
          racket/runtime-path)
 
 (define-runtime-path benchmarks-dir "../../gtp-benchmarks/benchmarks")
+(define current-benchmarks-dir (make-parameter benchmarks-dir))
 
 ;; program/c mod-name? mutation-index?
 (struct mutant* (program mod index) #:transparent)
@@ -40,7 +45,7 @@
     (mutant benchmark-name mod index)))
 
 (define (benchmark-name->program name)
-  (define path (build-path benchmarks-dir name))
+  (define path (build-path (current-benchmarks-dir) name))
   (define the-benchmark (read-benchmark path))
   (define the-benchmark-configuration
     (configure-benchmark the-benchmark (make-max-bench-config the-benchmark)))
@@ -140,9 +145,9 @@
            (td:hash a #f)
            (td:hash #f a))
        (loop a (cons container path))]
-      [(td:struct #f _ (list (cons _ _) ..2))
+      [(td:struct #f _ _ (list (cons _ _) ..2))
        (return struct-field-swap)]
-      [(td:struct #f _ (list (cons _ a)))
+      [(td:struct #f _ _ (list (cons _ a)))
        (loop a (cons struct-field path))]
       [(or (td:class (list (cons _ _) ..2) '() '())
            (td:class '() (list (cons _ _) ..2) '()))

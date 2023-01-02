@@ -7,6 +7,7 @@
          "../configurables.rkt"
          "mutant-selector.rkt"
          "use-pre-selected-samples.rkt"
+         "sampling-common.rkt"
          racket/random)
 
 (define-runtime-paths
@@ -80,113 +81,20 @@
                                    sample-size
                                    #:exclude [excluded-indices empty]
                                    #:replacement? [replacement? #f])
-  (define valid-indices-by-mutator
+  (define all-indices-by-mutator
     (for/hash ([mutator (in-list (current-active-mutator-names))])
-      (define all-indices-for-mutator
-        (summarized-indices-for-mutator mutator benchmark-summary))
       (values mutator
-              (set-subtract all-indices-for-mutator
-                            excluded-indices))))
-  (define max-sample-size-by-mutator
-    (for/hash ([{mutator indices} (in-hash valid-indices-by-mutator)])
-      (values mutator (length indices))))
-  (define samples-by-mutator
-    (distribute-sample-size-to-mutators sample-size
-                                        max-sample-size-by-mutator))
-  (define sampled-indices-by-mutator
-    (for/hash ([{mutator samples} (in-hash samples-by-mutator)])
-      (define indices-for-mutator
-        (hash-ref valid-indices-by-mutator mutator))
-      (define sampled-indices (random-sample indices-for-mutator samples
-                                             #:replacement? replacement?))
-      (values mutator sampled-indices)))
-  sampled-indices-by-mutator)
-
-(define (distribute-sample-size-to-mutators sample-size
-                                            max-sample-size-by-mutator)
-  (define mutators (hash-keys max-sample-size-by-mutator))
-  (let redistribute
-      ([distributed (for/hash ([mutator (in-list mutators)])
-                      (values mutator 0))]
-       [space-left max-sample-size-by-mutator]
-       [remaining-to-distribute sample-size])
-    (define remaining-mutators
-      (for/list ([{mutator left} (in-hash space-left)]
-                 #:when (> left 0))
-        mutator))
-    (cond [(or (<= remaining-to-distribute 0)
-               (empty? remaining-mutators))
-           distributed]
-          [(<= remaining-to-distribute (length remaining-mutators))
-           (for/fold ([distributed distributed])
-                     ([i (in-range remaining-to-distribute)]
-                      [mutator (in-list remaining-mutators)])
-             (hash-update distributed mutator add1))]
-          [else
-           (define distribution-per-mutator
-             (quotient remaining-to-distribute (length remaining-mutators)))
-           (define distributed-this-time
-             (for/hash ([mutator (in-list remaining-mutators)])
-               (define distributed-to-mutator
-                 (if (<= distribution-per-mutator (hash-ref space-left mutator))
-                     distribution-per-mutator
-                     (hash-ref space-left mutator)))
-               (values mutator
-                       distributed-to-mutator)))
-           (define new-distributed
-             (for/hash ([{mutator previously-distributed} (in-hash distributed)])
-               (values mutator
-                       (+ previously-distributed
-                          (hash-ref distributed-this-time mutator 0)))))
-           (define new-space-left
-             (for/hash ([{mutator previously-left} (in-hash space-left)])
-               (values mutator
-                       (- previously-left
-                          (hash-ref distributed-this-time mutator 0)))))
-           (define total-distributed-this-time
-             (apply + (hash-values distributed-this-time)))
-           (define new-remaining-to-distribute
-             (- remaining-to-distribute total-distributed-this-time))
-           (redistribute new-distributed
-                         new-space-left
-                         new-remaining-to-distribute)])))
+              (summarized-indices-for-mutator mutator benchmark-summary))))
+  (sample-indices-by-category all-indices-by-mutator
+                              sample-size
+                              #:exclude excluded-indices
+                              #:replacement? replacement?))
 
 (module+ test
   (require ruinit
            "../../util/path-utils.rkt")
 
   (install-configuration! "../configs/test.rkt")
-  (test-begin
-    #:name distribute-sample-size-to-mutators
-    (test-match (distribute-sample-size-to-mutators 100
-                                                    (make-immutable-hash
-                                                     (map (λ (name) (cons name 15))
-                                                          (build-list 10 values))))
-                (hash-table [(? (between/c 0 9)) 10] ___))
-    (test-match (distribute-sample-size-to-mutators 100
-                                                    (make-immutable-hash
-                                                     (map (λ (name) (cons name 5))
-                                                          (build-list 10 values))))
-                (hash-table [(? (between/c 0 9)) 5] ___))
-    (test-equal? (distribute-sample-size-to-mutators 100
-                                                    (hash 0 15
-                                                          1 50
-                                                          2 30
-                                                          3 20))
-                 (hash 0 15
-                       1 35
-                       2 30
-                       3 20))
-    (test-equal? (distribute-sample-size-to-mutators 2
-                                                    (hash 0 15
-                                                          1 50
-                                                          2 30
-                                                          3 20))
-                 (hash 0 1
-                       1 1
-                       2 0
-                       3 0)))
-
   (define m1-text
     @~a{
         #lang racket
