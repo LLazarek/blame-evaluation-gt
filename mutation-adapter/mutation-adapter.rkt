@@ -1093,6 +1093,8 @@
           Received lookup request for unknown mutation type: @other-type
           })]))
 
+(define-logger adaptation)
+
 (require racket/generic)
 (define-generics adapted
   (->stx adapted))
@@ -1114,14 +1116,15 @@
                (define field-name (field-accessor this)) ...
                name-e)
       #:late-neg-projection
-      {~? (wrap-projection-to-inform-transient-about-adaptation! full-proj-e)
-          (λ (this)
-            (define field-name (field-accessor this)) ...
-            (λ (blame)
-              (λ (value-name neg-party)
-                (define adapted-value (let () proj-body ...))
-                (inform-transient-about-adaptation! value-name adapted-value)
-                adapted-value)))})
+      (let ([p {~? full-proj-e
+                   (λ (this)
+                     (define field-name (field-accessor this)) ...
+                     (λ (blame)
+                       (λ (value-name neg-party)
+                         proj-body ...)))}])
+        (make-adapter-projection-unique
+         (wrap-projection-transformation p
+                                         inform-transient-about-adaptation!))))
      #:methods gen:adapted
      [(define/generic generic->stx ->stx)
       (define (->stx this)
@@ -1129,21 +1132,36 @@
         (make-stx-fn generic->stx))])
     (provide name)))
 
+(define (make-adapter-projection-unique p)
+  (define adapted (weak-set))
+  (wrap-projection-transformation p
+                                  (λ (v adapted-v)
+                                    (cond [(set-member? adapted v)
+                                           v]
+                                          [else
+                                           (set-add! adapted adapted-v)
+                                           (log-adaptation-info @~a{adapted @~e[v] to @~e[adapted-v]})
+                                           adapted-v]))))
+
 (define (inform-transient-about-adaptation! v adapted-v)
   (when (transient-register-adapted-value?)
     (define transient-assert
       (dynamic-require 'typed-racket/utils/shallow-contract 'shallow-shape-check))
-    (transient-assert adapted-v values '??? (quote-source-file) (cons v 'noop))))
+    (transient-assert adapted-v values '??? (quote-source-file) (cons v 'noop)))
+  adapted-v)
 
-(define (wrap-projection-to-inform-transient-about-adaptation! proj)
+;; late-neg-projection?
+;; (v1 v2 -> (or/c v1 v2))
+;; ->
+;; late-neg-projection?
+(define (wrap-projection-transformation proj f)
   (λ (this)
     (define inner1 (proj this))
     (λ (blame)
       (define inner2 (inner1 blame))
       (λ (v neg-party)
         (define adapted-v (inner2 v neg-party))
-        (inform-transient-about-adaptation! v adapted-v)
-        adapted-v))))
+        (f v adapted-v)))))
 
 (define-simple-macro (define-simple-delegating-adapter name [sub-ctc-name ...]
                        ({~literal λ} (value-name:id) proj-body ...))
