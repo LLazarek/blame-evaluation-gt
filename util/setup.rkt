@@ -357,10 +357,41 @@
        (eprintf "WARNING: couldn't get current branch for repo ~a~n"
                 repo-path)
        #f])))
+(define (git-remote-show-output-says-up-to-date? branch output)
+  (regexp-match? (pregexp @~a{(?m:@|branch|.*\(up to date)})
+                   output))
 (define (repo-branch-up-to-date-with-remote? repo-path branch [remote-name "origin"])
   (parameterize ([current-directory repo-path])
-    (regexp-match? @~a{@|branch|.*up to date}
-                   (system/string @~a{git fetch @remote-name && git remote show @remote-name}))))
+    (git-remote-show-output-says-up-to-date?
+     branch
+     (system/string @~a{git fetch @remote-name && git remote show @remote-name}))))
+
+(module+ test
+  (require ruinit)
+  (test-begin
+    #:name git-remote-show-output-says-up-to-date?
+    (not
+     (git-remote-show-output-says-up-to-date?
+      "dev"
+      @~a{
+          * remote origin
+            Fetch URL: https:
+            ...
+            Local refs configured for 'git push':
+              dev                      pushes to dev                      (local out of date)
+              seperate-blame-following pushes to seperate-blame-following (up to date)
+              }))
+    (git-remote-show-output-says-up-to-date?
+      "dev"
+      @~a{
+          * remote origin
+            Fetch URL: https:
+            ...
+            Local refs configured for 'git push':
+              dev                      pushes to dev                      (up to date)
+              seperate-blame-following pushes to seperate-blame-following (up to date)
+          })))
+
 (define (report-repo-status repo-dir active-branch expected-branch up-to-date?)
   (unless (equal? active-branch expected-branch)
     (displayln
@@ -524,4 +555,3 @@
                  "test"
                  repo-path))))
 
-(module test racket/base)
