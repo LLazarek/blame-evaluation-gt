@@ -87,7 +87,7 @@
                #:mandatory]
               [("-n" "--sample-size")
                'root-sample-size
-               ("How many roots to select?"
+               ("How many roots to select per mutant?"
                 @~a{Default: @(sample-size)})
                #:collect {"N" take-latest (~a (sample-size))}]
               [("-c" "--config")

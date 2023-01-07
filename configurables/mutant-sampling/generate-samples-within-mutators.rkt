@@ -340,13 +340,13 @@
 
               [("-s" "--summaries-db")
                'summaries-db
-               ("Database in which to find benchmark mutant summaries."
+               ("Database in which to find benchmark mutant summaries (like type/dyn-err-sumaries.rktdb)."
                 "Either this or -S must be supplied.")
                #:collect ["path" take-latest #f]
                #:mandatory-unless (λ (flags) (member 'benchmark-summaries-db flags))]
               [("-S" "--benchmark-summaries-db")
                'benchmark-summaries-db
-               ("Database in which to find benchmark summaries."
+               ("Database in which to find benchmark summaries (like interesting-mutant-summaries.rktdb)."
                 "Either this or -s must be supplied.")
                #:collect ["path" take-latest #f]
                #:mandatory-unless (λ (flags) (member 'summaries-db flags))]
@@ -363,7 +363,7 @@
               [("-n" "--sample-size")
                'sample-size
                ("Size of mutant samples to generate."
-                "This is the total number of mutants to sample."
+                "This is the total number of mutants to sample per benchmark."
                 @~a{Default: @default-sample-size-multiplier * <number of mutators>})
                #:collect ["N" take-latest #f]]
               [("-r" "--with-replacement")

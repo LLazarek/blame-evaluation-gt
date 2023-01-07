@@ -37,6 +37,10 @@
                                    #:logged-progress logged-progress
                                    #:process-limit process-limit)
   (define benchmark (read-benchmark benchmark-path))
+  (unless benchmark
+    (raise-argument-error 'filter-for-dynamic-errors
+                          "path to a benchmark"
+                          benchmark-path))
   (define benchmark-name (benchmark->name benchmark))
   (log-mutant-dynamic-errors-info
    @~a{Starting @benchmark-name analysis})
