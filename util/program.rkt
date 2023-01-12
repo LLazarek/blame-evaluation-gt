@@ -13,7 +13,9 @@
           [find-program-base-path
            (program/c . -> . path-string?)]
           [program->mods
-           (program/c . -> . (listof mod/c))]))
+           (program/c . -> . (listof mod/c))]
+          [program-mod-with-name
+           (string? program/c . -> . (or/c mod/c #f))]))
 
 (require "path-utils.rkt"
          "read-module.rkt")
@@ -81,6 +83,10 @@
              #:when (for/and ([f (in-list files)])
                       ((path-prefix?-of f) candidate)))
     candidate))
+
+(define (program-mod-with-name mod-name a-program)
+  (findf (compose1 (path-ends-with mod-name) mod-path)
+         (program->mods a-program)))
 
 (module+ test
   (require ruinit)

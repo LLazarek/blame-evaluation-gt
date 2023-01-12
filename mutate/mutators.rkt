@@ -845,10 +845,6 @@
       {~not _:require-form} ...}
      (syntax->datum #'[{~? spec.relative-require-mod-path} ... ...])]])
 
-(define (program-mod-with-name mod-name a-program)
-  (findf (compose1 (path-ends-with mod-name) mod-path)
-         (program->mods a-program)))
-
 (define-syntax-class provide-spec
   #:description "provide spec"
   #:commit
