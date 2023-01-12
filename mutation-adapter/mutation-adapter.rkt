@@ -1122,9 +1122,10 @@
                      (λ (blame)
                        (λ (value-name neg-party)
                          proj-body ...)))}])
-        (make-adapter-projection-unique
-         (wrap-projection-transformation p
-                                         inform-transient-about-adaptation!))))
+        (catch+transform-adapter-errors
+         (make-adapter-projection-unique
+          (wrap-projection-transformation p
+                                          inform-transient-about-adaptation!)))))
      #:methods gen:adapted
      [(define/generic generic->stx ->stx)
       (define (->stx this)
@@ -1133,7 +1134,7 @@
     (provide name)))
 
 (define (make-adapter-projection-unique p)
-  (define adapted (weak-set))
+  (define adapted (mutable-seteq))
   (wrap-projection-transformation p
                                   (λ (v adapted-v)
                                     (cond [(set-member? adapted v)
@@ -1142,6 +1143,21 @@
                                            (set-add! adapted adapted-v)
                                            (log-adaptation-info @~a{adapted @~e[v] to @~e[adapted-v]})
                                            adapted-v]))))
+
+(define (catch+transform-adapter-errors proj)
+  (define (exn->internal-error e)
+    (raise-internal-experiment-error
+     'mutation-adapter
+     @~a{adapter raised a contract violation: @exn-message[e]}))
+  (λ (this)
+    (define inner1 (with-handlers ([exn:fail? exn->internal-error])
+                     (proj this)))
+    (λ (blame)
+      (define inner2 (with-handlers ([exn:fail? exn->internal-error])
+                       (inner1 blame)))
+      (λ (v neg-party)
+        (with-handlers ([exn:fail? exn->internal-error])
+          (inner2 v neg-party))))))
 
 (define (inform-transient-about-adaptation! v adapted-v)
   (when (transient-register-adapted-value?)
@@ -1369,12 +1385,7 @@
              #f))))
 
 (define (apply-contract ctc v)
-  (with-handlers ([exn:fail:contract?
-                   (λ (e)
-                     (raise-internal-experiment-error
-                      'mutation-adapter
-                      @~a{adapter raised a contract violation: @exn-message[e]}))])
-    (contract ctc v #f #f)))
+  (contract ctc v #f #f))
 
 (define (apply-kw-contracts kws kw-args kw-ctc-pairs)
   (for/list ([kw (in-list kws)]
