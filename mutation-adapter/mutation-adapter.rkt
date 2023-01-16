@@ -1141,7 +1141,11 @@
                                            v]
                                           [else
                                            (set-add! adapted adapted-v)
-                                           (log-adaptation-info @~a{adapted @~e[v] to @~e[adapted-v]})
+                                           (log-adaptation-info
+                                            @~a{
+                                                adapted @~e[v] (@(eq-hash-code v)) @;
+                                                to @~e[adapted-v] (@(eq-hash-code adapted-v))
+                                                })
                                            adapted-v]))))
 
 (define (catch+transform-adapter-errors proj)
