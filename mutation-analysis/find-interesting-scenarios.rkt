@@ -96,8 +96,8 @@
 
 (define ((config->interesting-run-status? config) rs)
   (match rs
-    [(struct* run-status ([outcome 'blamed])) #t]
-    [(struct* run-status ([outcome 'runtime-error]
+    #;[(struct* run-status ([outcome 'blamed])) #t]
+    #;[(struct* run-status ([outcome 'runtime-error]
                           [context-stack context]))
      ;; (define context-mods-in-program
      ;;   (filter (λ (blamed) (hash-has-key? config blamed)) context))
@@ -109,6 +109,7 @@
      ;;      })
      ;; 3-unique-mods-on-stack?
      #t]
+    [(struct* run-status ([outcome (not 'type-error)])) #t]
     [else #f]))
 
 (define (get-run-status outfile mutant config)
