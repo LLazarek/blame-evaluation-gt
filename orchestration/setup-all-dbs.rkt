@@ -168,8 +168,8 @@
  (define progress-logs (analyze-mutation/all-benchmarks! outdir))
  (displayln "Summarizing mutation analysis...")
  (define type-err-summaries.rktdb (summarize-mutation-analyses! outdir progress-logs))
- ;; (displayln "Filtering mutants for dynamic errors...")
- ;; (define dyn-err-summaries.rktdb  (filter-mutants-for-dynamic-errors! outdir type-err-summaries.rktdb))
+ (displayln "Filtering mutants for dynamic errors...")
+ (define dyn-err-summaries.rktdb  (filter-mutants-for-dynamic-errors! outdir type-err-summaries.rktdb))
  (displayln "Plotting results...")
  (plot-mutation-analysis-results! outdir)
 
@@ -178,13 +178,11 @@
  ;; interesting)
  (displayln "Searching for interesting scenarios...")
  (define interesting-scenarios.rktdb (find-interesting-scenarios! outdir
-                                                                  #;dyn-err-summaries.rktdb
-                                                                  type-err-summaries.rktdb))
+                                                                  dyn-err-summaries.rktdb))
  (displayln "Summarizing interesting mutants from scenarios...")
  (define interesting-mutants.rktdb (summarize-interesting-mutants! outdir
                                                                    interesting-scenarios.rktdb
-                                                                   #;dyn-err-summaries.rktdb
-                                                                   type-err-summaries.rktdb))
+                                                                   dyn-err-summaries.rktdb))
  (displayln "Sampling interesting mutants...")
  (define mutant-samples.rktdb (sample-mutants! outdir interesting-mutants.rktdb))
  (displayln "Selecting BT roots for mutant samples...")
