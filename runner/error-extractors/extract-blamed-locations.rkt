@@ -53,7 +53,7 @@
   (define blamed
     (cond [(empty? blamed-list) empty]
           [else
-           (flatten
+           (append*
             (map (λ (boundary)
                    (list (boundary-pos boundary)
                          (boundary-neg boundary)))
