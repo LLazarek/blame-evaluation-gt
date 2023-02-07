@@ -160,7 +160,8 @@
 
 (define (bt-failures-blaming-typed-code bts)
   (filter-not false?
-              (for/list ([bt (in-list bts)])
+              (for/list ([bt (in-list bts)]
+                         #:unless (satisfies-BT-hypothesis? bt))
                 (match (first (blame-trail-mutant-summaries bt))
                   [(mutant-summary _
                                    (struct* run-status ([outcome 'blamed]
