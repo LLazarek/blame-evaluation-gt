@@ -173,7 +173,7 @@
                                           [blamed blamed]))
                      config)
      #:when (member mode '("TR.rkt" "transient-newest.rkt" "transient-oldest.rkt"))
-     (match* {mode (remove-duplicates blamed)}
+     (match* {mode blamed}
        [{_ (list (? type-interface-mod?))}
         #t]
        [{"transient-newest.rkt" (list* (? type-interface-mod?) _)}
@@ -232,7 +232,68 @@
                               #s(mutant-summary 26167 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("state.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
                               #s(mutant-summary 26093 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("basics.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
                               #s(mutant-summary 26003 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("tree.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . none)))
-                              #s(mutant-summary 6350 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("strategy.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . none) ("tree.rkt" . none))))))))))
+                              #s(mutant-summary 6350 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("strategy.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . none) ("tree.rkt" . none))))))))
+    (satisfies-BT-hypothesis? (blame-trail
+                               #s(mutant "quadU" "type-interface.rkt" 5)
+                               34
+                               "transient-oldest.rkt"
+                               '(#s(mutant-summary
+                                    4560
+                                    #s(run-status
+                                       "type-interface.rkt"
+                                       5
+                                       Quad
+                                       blamed
+                                       ("type-interface.rkt"
+                                        "type-interface.rkt"
+                                        "quick-sample.rkt"
+                                        "type-interface.rkt"
+                                        "type-interface.rkt")
+                                       ("main.rkt" "main.rkt" "main.rkt")
+                                       ("main.rkt" "main.rkt")
+                                       #f)
+                                    #hash(("hyphenate.rkt" . types)
+                                          ("main.rkt" . types)
+                                          ("measure.rkt" . types)
+                                          ("ocm-struct.rkt" . none)
+                                          ("ocm.rkt" . types)
+                                          ("penalty-struct.rkt" . none)
+                                          ("quad-main.rkt" . types)
+                                          ("quads.rkt" . none)
+                                          ("quick-sample.rkt" . types)
+                                          ("render.rkt" . none)
+                                          ("sugar-list.rkt" . none)
+                                          ("utils.rkt" . none)
+                                          ("world.rkt" . types)
+                                          ("wrap.rkt" . none)))
+                                 #s(mutant-summary
+                                    323
+                                    #s(run-status
+                                       "type-interface.rkt"
+                                       5
+                                       Quad
+                                       blamed
+                                       ("type-interface.rkt"
+                                        "type-interface.rkt"
+                                        "quick-sample.rkt"
+                                        "original-type-interface.rkt")
+                                       ("main.rkt" "main.rkt" "main.rkt")
+                                       ("main.rkt" "main.rkt")
+                                       #f)
+                                    #hash(("hyphenate.rkt" . types)
+                                          ("main.rkt" . types)
+                                          ("measure.rkt" . types)
+                                          ("ocm-struct.rkt" . none)
+                                          ("ocm.rkt" . types)
+                                          ("penalty-struct.rkt" . none)
+                                          ("quad-main.rkt" . types)
+                                          ("quads.rkt" . none)
+                                          ("quick-sample.rkt" . none)
+                                          ("render.rkt" . none)
+                                          ("sugar-list.rkt" . none)
+                                          ("utils.rkt" . none)
+                                          ("world.rkt" . types)
+                                          ("wrap.rkt" . none))))))))
 
 (define ((add-to-list v) l) (cons v l))
 

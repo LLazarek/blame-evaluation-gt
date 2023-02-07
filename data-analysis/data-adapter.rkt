@@ -39,7 +39,7 @@
                       mutated-id
                       outcome
                       blamed
-                      #f
-                      #f
+                      empty
+                      empty
                       result-value)]
     [(? current:run-status? rs) rs]))
