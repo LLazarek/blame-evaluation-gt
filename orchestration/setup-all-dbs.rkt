@@ -96,15 +96,22 @@
 (define (plot-mutation-analysis-results! outdir)
   (define full-outdir (simple-form-path outdir))
   (parameterize ([current-directory mutation-analysis-dir])
-    (plot-mutation-analysis-results!/assuming-right-dir full-outdir)))
+    (plot-mutant-attrition!/assuming-right-dir full-outdir))
+  (plot-mutant-population! outdir))
 
-(define/racket-runner (plot-mutation-analysis-results!/assuming-right-dir outdir)
+(define/racket-runner (plot-mutant-attrition!/assuming-right-dir outdir)
   ../mutation-analysis/plot-new-mutation-analyses.rkt
   -c (~a TR-config)
   --type attrition
   -d (build-path outdir "dyn-err-summaries.rktdb")
-  -o (build-path outdir "mutant-attrition.png")
+  -o (build-path outdir "mutant-attrition.pdf")
   (glob (~a (build-path outdir "mutation-analyses" "*-debug.log"))))
+
+(define/racket-runner (plot-mutant-population! outdir)
+  ../mutation-analysis/categorize-mutants.rkt
+  -c (~a TR-config)
+  -s (build-path outdir "dyn-err-summaries.rktdb")
+  -o (build-path outdir "mutant-population.pdf"))
 
 (define/racket-runner (find-interesting-scenarios! outdir dyn-err-summaries.rktdb)
   #:helper (define (outpath name)
