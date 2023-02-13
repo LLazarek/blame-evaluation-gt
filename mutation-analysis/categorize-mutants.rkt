@@ -57,15 +57,15 @@
              mutated-stx)]))
 
 (define base-type 'base)
-(define complex-type 'complex)
-(define function-swap 'f-swap)
+(define complex-type 'composite)
+(define function-swap 'fun-swap)
 (define struct-field-swap 'struct-swap)
 (define class-field-swap 'class-swap)
 (define ->path '->)
 (define container 'container)
 (define struct-field 'struct)
-(define class-field 'class-f)
-(define class-method 'class-m)
+(define class-field 'class-fld)
+(define class-method 'class-mtd)
 
 (define typedef 'typedef)
 
@@ -140,9 +140,9 @@
            (td:hash a #f)
            (td:hash #f a))
        (loop a (cons container path))]
-      [(td:struct #f _ (list (cons _ _) ..2))
+      [(td:struct #f _ _ (list (cons _ _) ..2))
        (return struct-field-swap)]
-      [(td:struct #f _ (list (cons _ a)))
+      [(td:struct #f _ _ (list (cons _ a)))
        (loop a (cons struct-field path))]
       [(or (td:class (list (cons _ _) ..2) '() '())
            (td:class '() (list (cons _ _) ..2) '()))
@@ -188,9 +188,11 @@
                            ([{m c} (in-hash cs)])
                            (values m c)))
                    (histogram #:x "category"
-                              #:bar-ordering (λ (a b) (< (length a) (length b))))
+                              #:bar-ordering (λ (a b) (< (length a) (length b)))
+                              #:color "black")
                    (x-axis)
-                   (y-axis #:label "count")
+                   (y-axis #:label "count"
+                           #:max 60)
                    (title "Interesting mutants per mutation location in type"))
            outpath
            #:width 1700
