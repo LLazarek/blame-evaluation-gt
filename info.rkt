@@ -8,4 +8,5 @@
                           "configurables/code-mutation-configs"
                           "configurables/errortrace-configs"))
 (define compile-omit-paths '("mutation-analysis/plot-mutation-analyses.rkt"
-                             "mutation-analysis/plot-new-mutation-analyses.rkt"))
+                             "mutation-analysis/plot-new-mutation-analyses.rkt"
+                             "data-analysis/spot-checking.rkt"))

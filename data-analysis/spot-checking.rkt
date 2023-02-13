@@ -75,3 +75,41 @@
                       (length filtered-bts))
                  #:replacement? #f))
 
+
+(module+ db
+  (require sawzall
+           threading
+           data-frame
+           "aggregate-data.rkt")
+  (sawzall-show-formatter (λ (v) (pretty-format v 60)))
+  (define data (read-blame-trail-db->df "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/experiment-data/results/type-api-mutations/data.sqlite"))
+  (define comparison-points
+    (~> data
+        (create [mutant (mutant) (pretty-format mutant)])
+        #;(where [success] (false? success))
+        #;(where [mode] (equal? mode "transient-newest"))
+        ((λ (data*)
+           (inner-join (~> data*
+                           (where [mode] (equal? mode "transient-newest"))
+                           (rename "success" "transient-newest-success"
+                                   "mutant-summaries" "transient-newest-summaries"))
+                       (~> data*
+                           (where [mode] (equal? mode "transient-oldest"))
+                           (rename "success" "transient-oldest-success"
+                                   "mutant-summaries" "transient-oldest-summaries"))
+                       "mutant"
+                       "id"))
+         _)
+        (where [transient-newest-success
+                transient-oldest-success]
+               (and transient-newest-success
+                    (not transient-oldest-success)))
+        #;(where transient-newest-summaries
+               (match* transient-newest-summaries
+                 [(list* (struct* mutant-summary ([run-status (struct* run-status ([outcome 'blamed]
+                                                                                   [blamed '()]))]))
+                         _)
+                  #t]
+                 [else #f]))))
+  (pretty-print-columns 80)
+  (show (reorder comparison-points (cons "id" (λ (a b) (random-ref '(#t #f))))) everything))
