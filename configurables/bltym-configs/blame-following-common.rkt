@@ -61,8 +61,7 @@
     [else
      (raise-internal-experiment-error
       'blame-following-common:select-blame-positive
-      "TR blame has unexpected shape (not (list pos neg)): ~a"
-      blamed)]))
+      (~a "TR blame has unexpected shape (not (list pos neg)): " blamed))]))
 
 ;; For transient blame, which always points to pairs of modules (the boundary).
 ;; Since there is no guarantee about which side is the untyped one, both sides
@@ -91,36 +90,38 @@
 
 
 (define (config->benchmark-id config)
-  (equal-hash-code (list->set (hash-keys config))))
+  (list->string
+   (for/list ([m (in-list (sort (hash-keys config) string<?))])
+     (string-ref m 0))))
 (define client-mods-by-benchmark-id
-  (hash #;"acquire" 548409849495921129
+  (hash #;"acquire" "aabbmpsst"
         '(main.rkt player.rkt strategy.rkt)
 
-        #;"gregor" 331490195211507796
+        #;"gregor" "ccdddghmmmoty"
         '(main.rkt)
 
-        #;"kcfa" 548407543311834055
+        #;"kcfa" "abdmstu"
         '(main.rkt ui.rkt)
 
-        #;"quadT" #;"quadU" 131120763051543598
+        #;"quadT" #;"quadU" "hmmoopqqqrsuww"
         '(main.rkt quad-main.rkt)
 
-        #;"snake" 553760278578814055
+        #;"snake" "cccdhmmm"
         '(main.rkt handlers.rkt)
 
-        #;"synth" 8104232757965284
+        #;"synth" "aaaaddmmss"
         '(main.rkt sequencer.rkt mixer.rkt synth.rkt drum.rkt)
 
-        #;"take5" 551790292889251081
+        #;"take5" "bbccddmps"
         '(main.rkt player.rkt)
 
-        #;"tetris" 551127599752439499
+        #;"tetris" "abbcdemtw"
         '(main.rkt world.rkt)
 
-        #;"suffixtree" 548402567047909558
+        #;"suffixtree" "dllmsu"
         '(main.rkt lcs.rkt)
 
-        #;"sieve" 548402560262049974
+        #;"sieve" "ms"
         '(main.rkt)))
 (define (config->library-side-predicate config)
   (define client-mods (hash-ref client-mods-by-benchmark-id
@@ -128,8 +129,8 @@
                                 (λ _
                                   (raise-internal-experiment-error
                                    'blame-following-common:client-side-filtering
-                                   "Found unkown config: ~a"
-                                   config))))
+                                   (~a "Found unkown config: " (~s config)
+                                       " which has id: " (config->benchmark-id config))))))
   (define library-mods (remove* client-mods
                                 (hash-keys config)))
   (λ (mod) (member mod library-mods)))
