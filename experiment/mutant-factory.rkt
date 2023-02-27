@@ -921,7 +921,7 @@ Attempting revival ~a / ~a
 
   (log-factory info
                @~a{
-                   Retrying @mutant [@id] to verify it really has a type-error. @;
+                   Retrying @mod @"@" @index [@id] to verify it really has a type-error. @;
                    Retry # @(add1 for-type-error) / @MAX-TYPE-ERROR-REVIVALS
                    })
   (spawn-mutant process-q
