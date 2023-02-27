@@ -99,6 +99,17 @@
                   selector:runtime-error
                   selector:blame]))
 
+;; How to handle blame that has this shape: (interface for <id>)
+;; TR produces blame like this when a value imported with require/typed doesn't live up to its type.
+(define-configurable interface-blame-translation
+  #:provides [translate-blame-from-interface-to-source?]
+
+  (define-implementation to-module-that-declared-the-type
+    #:module "interface-blame-translation/to-module-that-declared-the-type.rkt")
+
+  (define-implementation to-value-source
+    #:module "interface-blame-translation/to-value-source.rkt"))
+
 (define-configurable trail-completion
   #:provides [blame-trail-ended-normally?]
 

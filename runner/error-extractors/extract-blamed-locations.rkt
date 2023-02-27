@@ -7,7 +7,8 @@
            (blamed-location-extractor/c-for exn:fail:contract:blame?)]))
 
 (require typed-racket/utils/shallow-contract-struct
-         "../../util/path-utils.rkt")
+         "../../util/path-utils.rkt"
+         "../../configurables/configurables.rkt")
 
 (define (make-extract-blamed-locations the-program
                                        program-config
@@ -89,7 +90,13 @@
          `(interface for ,_ from (quote ,_)))
      (file-name-string-from-path blame-positive-source)]
     [`(interface for ,_ from ,mod-name)
-     mod-name]
+     (if (configured:translate-blame-from-interface-to-source?)
+         mod-name
+         (file-name-string-from-path blame-positive-source))]
+    [`(interface for ,_) ;; i.e. TR hasn't been modified to add the source info
+     ;; that's fine so long as the translation isn't configured to point to the source
+     #:when (not (configured:translate-blame-from-interface-to-source?))
+     (file-name-string-from-path blame-positive-source)]
     [(or (? path-string? path)
          ;; a submod
          (list (? path-string? path)

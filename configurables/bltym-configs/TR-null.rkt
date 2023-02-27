@@ -11,6 +11,8 @@
   (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
   (configure! module-selection-for-mutation interface-module-only)
   (configure! benchmark-runner         run-it)
+  (configure! interface-blame-translation
+              to-value-source)
   (configure! blame-following          null)
   (configure! bt-root-sampling         pre-selected
               "../dbs/type-api-mutations/pre-selected-bt-roots.rktdb")
