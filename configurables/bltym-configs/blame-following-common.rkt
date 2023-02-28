@@ -170,6 +170,6 @@
                                       errortrace
                                       (filter-out-library-side context config)))
 (define (select-last-blamed-pair/filter-library config blamed errortrace context)
-  (take-up-to-N (filter-out-library-side/boundary-pairs blamed) 2 #:right? #t))
+  (take-up-to-N (filter-out-library-side/boundary-pairs blamed config) 2 #:right? #t))
 (define (select-first-blamed-pair/filter-library config blamed errortrace context)
-  (take-up-to-N (filter-out-library-side/boundary-pairs blamed) 2 #:right? #f))
+  (take-up-to-N (filter-out-library-side/boundary-pairs blamed config) 2 #:right? #f))
