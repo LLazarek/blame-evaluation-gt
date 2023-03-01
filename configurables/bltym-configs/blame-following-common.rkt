@@ -131,7 +131,7 @@
                                    'blame-following-common:client-side-filtering
                                    (~a "Found unkown config: " (~s config)
                                        " which has id: " (config->benchmark-id config))))))
-  (define library-mods (remove* client-mods
+  (define library-mods (remove* (map ~a client-mods)
                                 (hash-keys config)))
   (λ (mod) (member mod library-mods)))
 (define (filter-out-library-side candidate-mods config)
@@ -173,3 +173,63 @@
   (take-up-to-N (filter-out-library-side/boundary-pairs blamed config) 2 #:right? #t))
 (define (select-first-blamed-pair/filter-library config blamed errortrace context)
   (take-up-to-N (filter-out-library-side/boundary-pairs blamed config) 2 #:right? #f))
+
+(module+ test
+  (require ruinit)
+  (test-begin
+    #:name library-side-filtering
+    (ignore (define quadT-test-config #hash(("hyphenate.rkt" . none)
+                                                ("main.rkt" . none)
+                                                ("measure.rkt" . types)
+                                                ("ocm-struct.rkt" . types)
+                                                ("ocm.rkt" . none)
+                                                ("penalty-struct.rkt" . types)
+                                                ("quad-main.rkt" . types)
+                                                ("quads.rkt" . none)
+                                                ("quick-sample.rkt" . none)
+                                                ("render.rkt" . types)
+                                                ("sugar-list.rkt" . none)
+                                                ("utils.rkt" . types)
+                                                ("world.rkt" . types)
+                                                ("wrap.rkt" . none))))
+    (test-equal? (filter-out-library-side (map ~a '(quads.rkt quad-main.rkt quad-main.rkt main.rkt main.rkt))
+                                          quadT-test-config)
+                 (map ~a '(quad-main.rkt quad-main.rkt main.rkt main.rkt)))
+    (test-equal? (select-all-blamed/filter-library
+                  quadT-test-config
+                  '("render.rkt")
+                  #f
+                  #f)
+                 '())
+    (test-equal? (select-all-blamed/filter-library
+                  quadT-test-config
+                  '("main.rkt")
+                  #f
+                  #f)
+                 '("main.rkt"))
+    (test-equal? (select-top-of-context/filter-typed+library
+                  quadT-test-config
+                  #f
+                  #f
+                  (map ~a '(quads.rkt quad-main.rkt quad-main.rkt main.rkt main.rkt)))
+                 '("main.rkt"))
+    (test-equal? (select-first-blamed-pair/filter-library
+                  quadT-test-config
+                  '(
+                    "main.rkt" "quad-main.rkt"
+                    "type-interface.rkt" "wrap.rkt"
+                    "ocm.rkt" "ocm-struct.rkt"
+                    )
+                  #f
+                  #f)
+                 '("main.rkt" "quad-main.rkt"))
+    (test-equal? (select-last-blamed-pair/filter-library
+                  quadT-test-config
+                  '(
+                    "main.rkt" "quad-main.rkt"
+                    "type-interface.rkt" "wrap.rkt"
+                    "ocm.rkt" "ocm-struct.rkt"
+                    )
+                  #f
+                  #f)
+                 '("type-interface.rkt" "type-interface.rkt"))))
