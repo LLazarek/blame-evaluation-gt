@@ -32,7 +32,7 @@
     "kcfa"
     "quadT"
     "quadU"
-    "sieve"
+    ;; "sieve"
     "snake"
     "suffixtree"
     "synth"
