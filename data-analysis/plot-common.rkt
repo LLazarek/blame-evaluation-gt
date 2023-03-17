@@ -176,9 +176,11 @@
      (match* {mode blamed}
        [{_ (list (? type-interface-mod?))}
         #t]
-       [{"transient-newest.rkt" (list* (? type-interface-mod?) _)}
+       [{"transient-newest.rkt" (or (list* (? type-interface-mod?) _)
+                                    (list* _ (? type-interface-mod?) _))}
         #t]
-       [{"transient-oldest.rkt" (list _ ... (? type-interface-mod?))}
+       [{"transient-oldest.rkt" (or (list _ ... (? type-interface-mod?))
+                                    (list _ ... (? type-interface-mod?) _))}
         #t]
        [{_ other-blamed-list}
         (when (ormap type-interface-mod? other-blamed-list)
