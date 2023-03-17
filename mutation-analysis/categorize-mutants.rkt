@@ -183,17 +183,18 @@
  (install-configuration! config-path)
  (define cs (categorize (summaries-db->mutants db)))
  (parameterize ([plot:plot-x-tick-label-anchor  'top-right]
-                [plot:plot-x-tick-label-angle   30])
+                [plot:plot-x-tick-label-angle   40]
+                [plot:plot-font-size            14])
    (render (add-to (plot (for/data-frame {mutant category}
                            ([{m c} (in-hash cs)])
                            (values m c)))
                    (histogram #:x "category"
                               #:bar-ordering (λ (a b) (< (length a) (length b)))
-                              #:color "black")
+                              #:color '(205 247 255))
                    (x-axis)
                    (y-axis #:label "count"
                            #:max 60)
-                   (title "Interesting mutants per mutation location in type"))
+                   #;(title "Interesting mutants per mutation location in type"))
            outpath
            #:width 1700
            #:height 1000)))
