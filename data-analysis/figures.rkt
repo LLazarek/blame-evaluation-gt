@@ -14,7 +14,7 @@
          collect-max-error-margin?)
 
 (define (rename-mode mode-name)
-  (hash-ref (hash "TR" "Natural"
+  (hash-ref (hash "TR" "Natural blame"
                   "TR-stack-first" "Natural exceptions"
 
                   "transient-newest" "Transient last blame"
@@ -29,8 +29,9 @@
             mode-name))
 (define rename-benchmark values)
 
-;; (bt-lengths-table bt-length-comparisons avo-bars blame-vs-exns-bars blame-vs-exns-venn success-bars)
-(define to-generate '(success-bars))
+;; (bt-lengths-table bt-length-comparisons avo-bars blame-vs-exns-venn success-bars detection-bars client-side-success-bars)
+(define to-generate '(bt-lengths-table #;bt-length-comparisons avo-bars #;blame-vs-exns-venn success-bars
+                      detection-bars client-side-success-bars))
 (plot-font-size 14)
 (define (plot-title-size) (inexact->exact (truncate (* 1.5 (plot-font-size)))))
 
@@ -41,7 +42,7 @@
 ;; are *not* pulling data from a cache on disk ...
 (define collect-max-error-margin? (make-parameter #t))
 ;; ... i.e. this is not #t
-(define use-disk-data-cache? (make-parameter #t))
+(define use-disk-data-cache? (make-parameter #f))
 
 
 (define max-error-margin (box 0))
@@ -67,10 +68,10 @@
          "bt-ids.rkt")
 
 (define-runtime-paths
-  [data-dirs "../../experiment-data/results/type-api-mutations-erasure-any"]
+  [data-dirs "../../experiment-data/results/type-api-mutations"]
   [mutant-summaries-db-path "../dbs/type-api-mutations/type-err-summaries.rktdb"]
   [TR-config "../configurables/configs/TR.rkt"]
-  [outdir "./figures"]
+  [outdir "../../experiment-data/results/type-api-mutations"]
   [data-cache "./data-cache"]
   [venn-template "venn-template.svg"])
 
@@ -178,8 +179,8 @@
 
 (define (generate-figure:bt-lengths-table modes/ordered)
   (define mode->max-trail-length
-    (match-lambda ["TR-null" 13]
-                  [else 7]))
+    (match-lambda ["TR-null" 10]
+                  [else 4]))
   (define bt-length-distribution-for-mode
     (simple-memoize
      #:on-disk (and (use-disk-data-cache?)
@@ -215,7 +216,8 @@
       (stacked-histogram (map (match-lambda [`(,len (,%1 ,%2))
                                              (list len (list (~% %1) (~% %2)))])
                               length-distribution)
-                         #:colors (list success-color failure-color)))
+                         #:colors (list success-color failure-color)
+                         #:line-colors (list "black" "black")))
     (parameterize ([plot-x-ticks (ticks (linear-ticks-layout #:number 1)
                                         (linear-ticks-format))]
                    [plot-y-far-ticks no-ticks])
@@ -224,12 +226,12 @@
                  #:y-max (~% 1)
 
                  #:x-label #f
-                 #:y-label "% of trails"
+                 #:y-label "% of trails with length"
                  #:title #f
                  #:width (if (equal? mode-name "TR-null")
                              (* 2 (plot-width))
                              (plot-width))
-                 #:x-max (if (equal? mode-name "TR-null") #f 8))))
+                 #:x-max (if (equal? mode-name "TR-null") #f (add1 (mode->max-trail-length "TR"))))))
 
   (define plots/ordered
     (for/list ([mode (in-list modes/ordered)])
@@ -465,7 +467,7 @@
                                       #:top-color success-color
                                       #:bot-color failure-color)
                  #:title (rename-mode top-mode)
-                 #:y-label @~a{% of scenarios} ; where @top-mode is more useful than mode X (above) | vice versa (below)
+                 #:y-label @~a{% of scenarios less useful    % of scenarios more useful}
                  #:x-label #f
                  #:y-min (~% (- y-max/min-%))
                  #:y-max (~% y-max/min-%)
@@ -499,21 +501,181 @@
 
   (parameterize ([plot-x-tick-label-angle 40]
                  [plot-x-tick-label-anchor 'top-right]
-                 [plot-y-ticks (linear-ticks #:number 10)])
+                 [plot-y-ticks (linear-ticks #:number 10)]
+                 [plot-y-far-ticks no-ticks])
     (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes/ordered)])
                                      (list (rename-mode mode-name) (~% (mode-success-% mode-name))))
                                    #:color success-color)
                #:y-max (~% 1)
                #:y-min (~% 0)
-               #:y-label "% of scenarios"
+               #:y-label "% of scenarios successful"
+               #:x-label #f
+               #:width (* 1.25 (plot-width))
+               #:height (* 1.25 (plot-height)))))
+
+(define (generate-figure:detection-bars modes/ordered)
+  (local-require "../experiment/blame-trail-data.rkt"
+                 "../runner/mutation-runner-data.rkt")
+  (define undetected?
+    (match-lambda
+      [(struct* blame-trail
+                ([mutant-summaries
+                  (cons (mutant-summary _
+                                        (struct* run-status ([outcome outcome]))
+                                        _)
+                        _)]))
+       (equal? outcome 'completed)]))
+  (define mode-detection-%
+    (simple-memoize
+     #:on-disk (and (use-disk-data-cache?)
+                    (build-path data-cache "detection-percents-prop-estimate.rktd"))
+     (λ (mode-name)
+       (define estimate (bt-wise-strata-proportion-estimate
+                         (list mode-name)
+                         (match-lambda [(list bt) (undetected? bt)])))
+       (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
+                                                        1.96))
+       (hash-ref estimate 'proportion-estimate))))
+
+  (parameterize ([plot-x-tick-label-angle 40]
+                 [plot-x-tick-label-anchor 'top-right]
+                 [plot-y-ticks (linear-ticks #:number 10)]
+                 [plot-y-far-ticks no-ticks])
+    (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes/ordered)])
+                                     (list (rename-mode mode-name)
+                                           (~% (- 1 (mode-detection-% mode-name)))))
+                                   #:color success-color)
+               #:y-max (~% 1)
+               #:y-min (~% 0)
+               #:y-label "% of scenarios producing error"
+               #:x-label #f
+               #:width (* 1.25 (plot-width))
+               #:height (* 1.25 (plot-height)))))
+#;(define (generate-figure:detection-bars modes/ordered)
+  (local-require complot
+                 data-frame
+                 sawzall
+                 threading
+                 racket/hash
+                 "aggregate-data.rkt"
+                 "../experiment/blame-trail-data.rkt"
+                 "../runner/mutation-runner-data.rkt")
+
+  (define undetected?
+    (match-lambda
+      [(cons (mutant-summary _
+                             (struct* run-status ([outcome outcome]))
+                             _)
+             _)
+       (equal? outcome 'completed)]))
+  (define ((order-like an-ordering) a b)
+    (< (or (index-of an-ordering a) +inf.0)
+       (or (index-of an-ordering b) +inf.0)))
+
+  (define data (read-blame-trail-db->df (build-path data-dirs "data.sqlite")))
+  (define detection-bars-data (~> data
+                                  (group-with "mode")
+                                  (aggregate [detection-rate
+                                              (mutant-summaries)
+                                              (for/fold ([missed 0]
+                                                         [total 0]
+                                                         #:result (~% (/ (- total missed) total)))
+                                                        ([trail-summaries (in-vector mutant-summaries)])
+                                                (values (if (undetected? trail-summaries)
+                                                            (add1 missed)
+                                                            missed)
+                                                        (add1 total)))])))
+  (render (add-to (plot detection-bars-data)
+                  (x-axis)
+                  (y-axis #:max (~% 1) #:min (~% 0) #:label "% of scenarios")
+                  (bars #:x "mode" #:y "detection-rate"
+                        #:color success-color
+                        #:bar-ordering (order-like modes/ordered)))
+          #:width (* 1.25 (plot-width))
+          #:height (* 1.25 (plot-height))))
+
+(define (generate-figure:client-side-success-bars modes/ordered)
+  (local-require "../experiment/blame-trail-data.rkt"
+                 "../runner/mutation-runner-data.rkt")
+  (define client-mods-by-benchmark
+    (hash "acquire" '(main.rkt player.rkt strategy.rkt)
+          "gregor" '(main.rkt)
+          "kcfa" '(main.rkt ui.rkt)
+          "quadT" '(main.rkt quad-main.rkt)
+          "quadU" '(main.rkt quad-main.rkt)
+          "snake" '(main.rkt handlers.rkt)
+          "synth" '(main.rkt sequencer.rkt mixer.rkt synth.rkt drum.rkt)
+          "take5" '(main.rkt player.rkt)
+          "tetris" '(main.rkt world.rkt)
+          "suffixtree" '(main.rkt lcs.rkt)
+          "sieve" '(main.rkt)))
+  (define ((server-side? mutant) mod-name)
+    (not (member mod-name
+                 (map ~a
+                      (hash-ref client-mods-by-benchmark
+                                (mutant-benchmark mutant))))))
+  (define (hash-diff-keys a b) ; assuming a and b have the same keys
+    (for/list ([{ka va} (in-hash a)]
+               #:unless (equal? (hash-ref b ka) va))
+      ka))
+  (define (configs->typed-module-sequence config-seq)
+    (match config-seq
+      [(list a b _ ...)
+       (for/list ([before-config (in-list config-seq)]
+                  [after-config  (in-list (rest config-seq))])
+         (first (hash-diff-keys before-config after-config)))]
+      [else empty]))
+  (define types-server-side?
+    (match-lambda
+      [(struct* blame-trail
+                ([mutant-summaries
+                  (list (mutant-summary _ _ configs)
+                        ...)]
+                 [mutant-id mutant]))
+       (unless (subset? (map ~a (hash-ref client-mods-by-benchmark (mutant-benchmark mutant)))
+                        (hash-keys (first configs)))
+         (error 'assert
+                @~a{
+                    bad client mod name(s) for @(mutant-benchmark mutant):
+                    @~s[(map ~a (hash-ref client-mods-by-benchmark (mutant-benchmark mutant)))]
+                    is not a subset of
+                    @~s[(hash-keys (first configs))]
+                    }))
+       (define modules-typed (configs->typed-module-sequence (reverse configs)))
+       (ormap (server-side? mutant)
+              modules-typed)]))
+  (define mode-success-%
+    (simple-memoize
+     #:on-disk (and (use-disk-data-cache?)
+                    (build-path data-cache "client-side-success-percents-prop-estimate.rktd"))
+     (λ (mode-name)
+       (define estimate (bt-wise-strata-proportion-estimate
+                         (list mode-name)
+                         (match-lambda [(list bt) (and (satisfies-BT-hypothesis? bt)
+                                                       (not (types-server-side? bt)))])))
+       (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
+                                                        1.96))
+       (hash-ref estimate 'proportion-estimate))))
+
+  (parameterize ([plot-x-tick-label-angle 40]
+                 [plot-x-tick-label-anchor 'top-right]
+                 [plot-y-ticks (linear-ticks #:number 10)]
+                 [plot-y-far-ticks no-ticks])
+    (plot-pict (discrete-histogram (for/list ([mode-name (in-list modes/ordered)])
+                                     (list (rename-mode mode-name)
+                                           (~% (mode-success-% mode-name))))
+                                   #:color success-color)
+               #:y-max (~% 1)
+               #:y-min (~% 0)
+               #:y-label "% of scenarios successful"
                #:x-label #f
                #:width (* 1.25 (plot-width))
                #:height (* 1.25 (plot-height)))))
 
 (module+ main
   (make-directory* outdir)
-  (define (pict->figure-png! pict name)
-    (pict->png! pict (build-path outdir (~a plot-name-prefix "-" name ".png"))))
+  (define (pict->figure-pdf! pict name)
+    (pict->pdf! pict (build-path outdir (~a plot-name-prefix "-" name ".pdf"))))
 
   (when (member 'bt-lengths-table to-generate)
     (define bt-lengths-table
@@ -522,7 +684,7 @@
                                 "TR" "transient-newest" "transient-oldest"
                                 "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:bt-lengths-table modes/ordered)))
-    (pict->figure-png! bt-lengths-table "bt-lengths-table")
+    (pict->figure-pdf! bt-lengths-table "bt-lengths-table")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for bt-lengths-table: @(unbox max-error-margin)})
       (set-box! max-error-margin 0)))
@@ -538,7 +700,7 @@
                                    ["transient-newest" "transient-stack-first"]
                                    ["transient-oldest" "transient-stack-first"]))
         (generate-figure:bt-length-comparisons mode-comparisons)))
-    (pict->figure-png! bt-length-comparisons "bt-length-comparisons")
+    (pict->figure-pdf! bt-length-comparisons "bt-length-comparisons")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for bt-lengths-comparisons: @(unbox max-error-margin)})
       (set-box! max-error-margin 0)))
@@ -551,7 +713,7 @@
                                      "TR-stack-first" "transient-stack-first" "erasure-stack-first"))
         (generate-figure:avo-bars modes/ordered
                                   (remove "TR-null" modes))))
-    (pict->figure-png! avo-bars "avo-bars")
+    (pict->figure-pdf! avo-bars "avo-bars")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for avo-bars: @(unbox max-error-margin)})
       (set-box! max-error-margin 0))
@@ -569,7 +731,7 @@
                                 #;"TR-null" ; decided to remove it from this plot
                                 ))
         (generate-figure:success-bars modes/ordered)))
-    (pict->figure-png! success-bars "success-bars")
+    (pict->figure-pdf! success-bars "success-bars")
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for success-bars: @(unbox max-error-margin)})
       (set-box! max-error-margin 0))
@@ -702,10 +864,46 @@
                                     bot-only-% bot-erasure-%
                                     erasure-only-%))])
         (template-fill! pattern %))
-      (system @~a{convert '@venn-outfile' '@(path-replace-extension venn-outfile ".png")'})
+      (system @~a{convert '@venn-outfile' '@(path-replace-extension venn-outfile ".pdf")'})
       (delete-file venn-outfile))
 
     (when (collect-max-error-margin?)
       (displayln @~a{Max error margin for venns: @(unbox max-error-margin)})
+      (set-box! max-error-margin 0))
+    (void))
+
+  (when (member 'detection-bars to-generate)
+    (define detection-bars
+      (let ()
+        (define modes/ordered '("TR"
+                                "TR-stack-first"
+                                "transient-newest"
+                                "transient-oldest"
+                                "transient-stack-first"
+                                "erasure-stack-first"
+                                #;"TR-null" ; decided to remove it from this plot
+                                ))
+        (generate-figure:detection-bars modes/ordered)))
+    (pict->figure-pdf! detection-bars "detection-bars")
+    (when (collect-max-error-margin?)
+      (displayln @~a{Max error margin for detection-bars: @(unbox max-error-margin)})
+      (set-box! max-error-margin 0))
+    (void))
+
+  (when (member 'client-side-success-bars to-generate)
+    (define success-bars
+      (let ()
+        (define modes/ordered '("TR"
+                                "TR-stack-first"
+                                "transient-newest"
+                                "transient-oldest"
+                                "transient-stack-first"
+                                "erasure-stack-first"
+                                #;"TR-null" ; decided to remove it from this plot
+                                ))
+        (generate-figure:client-side-success-bars modes/ordered)))
+    (pict->figure-pdf! success-bars "client-side-success-bars")
+    (when (collect-max-error-margin?)
+      (displayln @~a{Max error margin for client-side-success-bars: @(unbox max-error-margin)})
       (set-box! max-error-margin 0))
     (void)))
