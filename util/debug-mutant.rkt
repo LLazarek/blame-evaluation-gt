@@ -47,6 +47,20 @@
      (raise-user-error
       @~a{Unable to extract configuration from identifier: @~v[other]})]))
 
+(define (decode-config bench-name-or-path
+                       identifier
+                       #:config [config-name "TR"])
+  (define experiment-config (build-path config-dir (~a config-name ".rkt")))
+  (unless (file-exists? experiment-config)
+    (raise-user-error
+     'debug-mutant
+     @~a{Unable to find config named @|config-name|.rkt in @config-dir}))
+
+  (install-configuration! experiment-config)
+  (define bench-path (find-benchmark bench-name-or-path))
+  (define the-benchmark (read-benchmark bench-path))
+  (read-config identifier the-benchmark))
+
 (define (debug-mutant bench-name-or-path
                       mutated-module-name
                       index
