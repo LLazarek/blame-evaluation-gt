@@ -1,5 +1,35 @@
 #lang info
 
+(define collection "blame-evaluation")
+(define build-deps '("racket-doc"
+                     "scribble-lib"
+                     "at-exp-lib"))
+(define deps '("base"
+               "custom-load"
+               "errortrace-lib"
+               "rackunit-lib"
+               "require-typed-check"
+               "rscript"
+               "ruinit"
+               "sandbox-lib"
+               "typed-racket-lib"
+
+               ;; process-queue
+               "pfds"
+
+               ;; data analysis
+               "complot"
+               "data-frame"
+               "db-lib"
+               "pict-lib"
+               "pict-util"
+               "plot-gui-lib"
+               "plot-lib"
+               "plot-util"
+               "text-table"))
+
+(define scribblings '())
+
 (define test-omit-paths '("util/setup.rkt"
                           "mutation-analysis/plot-mutation-analyses.rkt"
                           "mutation-analysis/plot-new-mutation-analyses.rkt"
