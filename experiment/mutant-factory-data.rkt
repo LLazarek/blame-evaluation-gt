@@ -34,7 +34,7 @@
          "../runner/mutation-runner.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
-         "../process-q/interface.rkt"
+         process-queue/priority
          syntax/parse/define)
 
 ;; see last result of `process`
@@ -130,7 +130,7 @@
              [file               path-string?]
              [id                 natural?]
              [blame-trail        blame-trail/c]
-             [revival-counts     natural?]
+             [revival-counts     revivals/c]
              [increased-limits?  boolean?]))
 (define dead-mutant-process/c
   (struct/dc dead-mutant-process
@@ -152,7 +152,7 @@
              [total-mutants-spawned   natural?]))
 
 (define mutant-will/c
-  ((process-Q/c factory/c) dead-mutant-process/c . -> . (process-Q/c factory/c)))
+  ((process-queue/c factory/c) dead-mutant-process/c . -> . (process-queue/c factory/c)))
 
 (define sample-size (make-parameter 100))
 

@@ -12,84 +12,10 @@
          "../configurations/configure-benchmark.rkt"
          "../util/program.rkt"
          "../util/path-utils.rkt"
-         "../process-q/interface.rkt"
+         (rename-in process-queue/mock
+                    [make-process-queue           make-mock-Q]
+                    [make-recording-process-queue make-recording-mock-Q])
          "../configurables/configurables.rkt")
-
-
-(module mock racket
-  (provide make-mock-Q
-           make-recording-mock-Q)
-  (require "../process-q/interface.rkt"
-           (submod "../process-q/interface.rkt" internal))
-  (define (make-mock-Q [data-init #f]
-                       #:empty? [empty? (λ _ #f)]
-                       #:enq [enq (λ (q . _) q)]
-                       #:wait [wait (λ (q) q)]
-                       #:active-count [active-count (λ (q) 1)]
-                       #:waiting-count [waiting-count (λ (q) 1)]
-                       #:get-data [get-data process-Q-data]
-                       #:set-data [set-data (λ (q new)
-                                              (struct-copy process-Q q
-                                                           [data new]))])
-    (process-Q empty?
-               enq
-               wait
-               active-count
-               waiting-count
-               get-data
-               set-data
-
-               data-init))
-  (define (make-recording-mock-Q [data-init #f]
-                                 #:record-in h)
-    (for ([k (in-list '(empty? enq wait active-count waiting-count))])
-      (hash-set! h k 0))
-    (define (add-call! name)
-      (hash-update! h name add1 0))
-    (make-mock-Q data-init
-                 #:empty? (λ (q) (add-call! 'empty?) #f)
-                 #:enq (λ (q v . _) (add-call! 'enq) q)
-                 #:wait (λ (q) (add-call! 'wait) q)
-                 #:active-count (λ (q) (add-call! 'active-count) 1)
-                 #:waiting-count (λ (q) (add-call! 'waiting-count) 1)))
-  (require ruinit)
-  (test-begin
-    #:name mock-test
-    (ignore
-     (define call-hash (make-hash))
-     (define mock-q
-       (make-mock-Q
-        1
-        #:empty? (λ _
-                   (hash-set! call-hash 'empty? #t)
-                   #f)
-        #:enq (λ (q . _)
-                (hash-set! call-hash 'enq #t)
-                q)
-        #:wait (λ (q)
-                 (hash-set! call-hash 'wait #t)
-                 q)
-        #:active-count (λ _
-                         (hash-set! call-hash 'active-count #t)
-                         42)
-        #:waiting-count (λ _
-                          (hash-set! call-hash 'waiting-count #t)
-                          24))))
-    (begin (process-Q-empty? mock-q)
-           (hash-ref call-hash 'empty? #f))
-    (begin (process-Q-enq mock-q (thunk 42))
-           (hash-ref call-hash 'enq #f))
-    (begin (process-Q-wait mock-q)
-           (hash-ref call-hash 'wait #f))
-    (test-= (process-Q-active-count mock-q)
-            42)
-    (hash-ref call-hash 'active-count #f)
-    (test-= (process-Q-waiting-count mock-q)
-            24)
-    (hash-ref call-hash 'waiting-count #f)
-    (test-= (process-Q-get-data (process-Q-set-data mock-q 2))
-            2)))
-
 
 (define-runtime-path test-config "../configurables/configs/test.rkt")
 (install-configuration! (simple-form-path test-config))
@@ -296,14 +222,14 @@
                       (list expected-blame-trail-recording))))
 
 
-(require 'mock)
 (parameterize ([data-output-dir test-mutant-dir])
   (test-begin/with-env
    #:name follow-blame-from-dead-process
    (ignore
     (define enqueued (box #f))
     (define mock-q
-      (make-mock-Q (make:m0-factory)
+      (make-mock-Q 2
+                   (make:m0-factory)
                    #:enq (λ (q spawn-proc . _)
                            (define the-process-info (spawn-proc))
                            (set-box! enqueued (process-info-data the-process-info))
@@ -421,7 +347,8 @@
  (ignore
   (define enqueued (box #f))
   (define mock-q
-    (make-mock-Q (make:m0-factory)
+    (make-mock-Q 2
+                 (make:m0-factory)
                  #:enq (λ (q spawn-proc . _)
                          (define the-process-info (spawn-proc))
                          (set-box! enqueued (process-info-data the-process-info))
@@ -477,7 +404,7 @@
        (λ (q #:timeout/s t #:memory/gb m)
          (set-box! increased-limits?-box (or t m))
          q)))
-    (fallback/oom (make-mock-Q (make:m0-factory))
+    (fallback/oom (make-mock-Q 2 (make:m0-factory))
                   dead-e-proc/oom/no-increased-limits))
    (extend-test-message (unbox increased-limits?-box)
                         "oom process is not revived with increased limits")
@@ -487,7 +414,7 @@
     (define dead-e-proc/oom/increased-limits
       (struct-copy dead-mutant-process dead-e-proc/oom/no-increased-limits
                    [increased-limits? #t]))
-    (fallback/oom (make-mock-Q (make:m0-factory))
+    (fallback/oom (make-mock-Q 2 (make:m0-factory))
                   dead-e-proc/oom/increased-limits))
    (extend-test-message
     (not (unbox increased-limits?-box))
@@ -505,7 +432,7 @@
                                        #f
                                        #f
                                        #f)]))
-    (fallback/oom (make-mock-Q (make:m0-factory))
+    (fallback/oom (make-mock-Q 2 (make:m0-factory))
                   dead-e-proc/completed))
    (extend-test-message
     (not (unbox increased-limits?-box))
@@ -519,7 +446,7 @@
                     (struct-copy run-status
                                  (dead-mutant-process-result dead-e-proc/blame-e)
                                  [blamed '("../base/csp.rkt")])]))
-    (fallback/oom (make-mock-Q (make:m0-factory))
+    (fallback/oom (make-mock-Q 2 (make:m0-factory))
                   dead-e-proc/blamed-lib))
    (extend-test-message
     (not (unbox increased-limits?-box))
@@ -536,7 +463,7 @@
                                  [blamed '()])])))
    (extend-test-message
     (with-handlers ([exn:fail? (const #f)])
-      (fallback/oom (make-mock-Q (make:m0-factory))
+      (fallback/oom (make-mock-Q 2 (make:m0-factory))
                     dead-e-proc/runtime-error-no-blamed)
       #t)
     "runtime-error without inferred blame crashes factory")
@@ -550,7 +477,7 @@
    (ignore
     (define enqueued (box #f))
     (define mock-q
-      (make-mock-Q (make:m0-factory)
+      (make-mock-Q 2 (make:m0-factory)
                    #:enq (λ (q spawn-proc . _)
                            (define the-process-info (spawn-proc))
                            (set-box! enqueued (process-info-data the-process-info))
@@ -593,7 +520,7 @@
       (mutant->process-will will:do-nothing))
     (define respawned?-box (box #f))
     (define mock-Q
-      (make-mock-Q (make:m0-factory)
+      (make-mock-Q 2 (make:m0-factory)
                    #:enq (λ (q spawn-proc . _)
                            (set-box! respawned?-box #t)
                            q)))
@@ -674,7 +601,8 @@
  #:name cache-replay/resume
  (ignore
   (define calls (make-hash))
-  (define mock-q (make-recording-mock-Q (make:m0-factory)
+  (define mock-q (make-recording-mock-Q 2
+                                        (make:m0-factory)
                                         #:record-in calls))
   (parameterize ([current-result-cache
                   (λ _ mutant0-path)])

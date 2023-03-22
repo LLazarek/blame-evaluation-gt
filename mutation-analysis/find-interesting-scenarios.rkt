@@ -22,9 +22,8 @@
          "../configurables/configurables.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
-         "../process-q/interface.rkt"
-         "../process-q/priority.rkt"
-         "../runner/mutation-runner.rkt")
+         "../runner/mutation-runner.rkt"
+         process-queue/priority)
 
 (define-runtime-paths
   [default-parameterizing-config "../configurables/configs/TR.rkt"])
@@ -75,7 +74,7 @@
 
 ;; mutant?
 ;; benchmark?
-;; (process-Q/c (listof scenario?))
+;; (process-queue/c (listof scenario?))
 (define (find-interesting-scenarios-for-mutant mutant
                                                benchmark
                                                q
@@ -86,12 +85,13 @@
             ([config (in-stream (benchmark-scenario-configs benchmark))])
     (define the-scenario (scenario mutant config))
     (match (logged-progress benchmark-name the-scenario)
-      ['? (process-Q-enq q
-                         (interesting-scenario-checker benchmark
-                                                       the-scenario
-                                                       #:log-progress log-progress!)
-                         2)]
-      [#t (process-Q-update-data q (add-to-list (list benchmark-name the-scenario)))]
+      ['? (process-queue-enqueue
+           q
+           (interesting-scenario-checker benchmark
+                                         the-scenario
+                                         #:log-progress log-progress!)
+           2)]
+      [#t (process-queue-update-data q (add-to-list (list benchmark-name the-scenario)))]
       [#f q])))
 
 (define ((config->interesting-run-status? config) rs)
@@ -169,18 +169,19 @@
 
   (define (will:record-outcome! q info)
     (define (retry)
-      (process-Q-enq q
-                     (interesting-scenario-checker benchmark
-                                                   a-scenario
-                                                   #:log-progress log-progress!
-                                                   #:retry-count (add1 retry-count))
-                     1))
+      (process-queue-enqueue
+       q
+       (interesting-scenario-checker benchmark
+                                     a-scenario
+                                     #:log-progress log-progress!
+                                     #:retry-count (add1 retry-count))
+       1))
 
     (define result (get-run-status (process-info-data info) mutant run-configuration))
     (match (extract-outcome result benchmark-name mutant run-configuration)
       [(? interesting-error?)
        (log-progress! benchmark-name a-scenario #t)
-       (process-Q-update-data q (add-to-list (list benchmark-name a-scenario)))]
+       (process-queue-update-data q (add-to-list (list benchmark-name a-scenario)))]
       [(? other-outcome?)
        #:when (match result
                 [(struct* run-status ([outcome 'type-error]))
@@ -217,8 +218,8 @@
   (mutant-spawner run-configuration
                   will:record-outcome!))
 
-(define (process-Q-update-data q f)
-  (process-Q-set-data q (f (process-Q-get-data q))))
+(define (process-queue-update-data q f)
+  (process-queue-set-data q (f (process-queue-get-data q))))
 
 ;; (hash/c mod-name? summary?) -> (listof mutant?)
 (define (summaries->mutants summaries)
@@ -341,7 +342,7 @@
  (make-directory* (working-dir))
 
  (define q
-   (for/fold ([q (make-process-Q process-limit
+   (for/fold ([q (make-process-queue process-limit
                                  ; (listof (list/c benchmark-name? scenario?))
                                  empty
                                  #:kill-older-than (* 5 60))])
@@ -357,7 +358,7 @@
                                                 #:logged-progress logged-progress)))
 
  (define interesting-base-scenarios
-   (process-Q-get-data (process-Q-wait q)))
+   (process-queue-get-data (process-queue-wait q)))
 
  (finalize-log!)
 

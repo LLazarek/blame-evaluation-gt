@@ -6,8 +6,6 @@
 ;; 2. The right identifier (i.e. the mutated identifier)
 
 (require (prefix-in db: "../db/db.rkt")
-         "../process-q/interface.rkt"
-         "../process-q/functional.rkt"
          "../configurations/configure-benchmark.rkt"
          (only-in "../runner/mutation-runner.rkt"
                   mutate-module
@@ -17,6 +15,7 @@
          "../util/program.rkt"
          "../util/mutant-util.rkt"
          "../configurables/configurables.rkt"
+         process-queue/functional
          racket/logging)
 
 (define-runtime-paths
@@ -31,7 +30,7 @@
   (define configured-benchmark
     (configure-benchmark benchmark
                          (make-max-bench-config benchmark)))
-  (process-Q-enq
+  (process-queue-enqueue
    q
    (thunk
     (define (will current-q info)
@@ -52,8 +51,8 @@
              (log-type-error-verification-debug @~a{Is @mutant type error useful? @useful?})
              (delete-file outcome-file)
              (delete-file output-file)
-             (process-Q-set-data current-q
-                                 (hash-update (process-Q-get-data current-q)
+             (process-queue-set-data current-q
+                                 (hash-update (process-queue-get-data current-q)
                                               useful?
                                               (add-to-list mutant)
                                               empty))]))
@@ -130,8 +129,8 @@
 
  (define mutant-samples-db (db:get mutant-samples-db-path))
  (define q
-   (process-Q-wait
-    (for*/fold ([q (make-process-Q cpus (hash))])
+   (process-queue-wait
+    (for*/fold ([q (make-process-queue cpus (hash))])
                ([benchmark-name (in-list (db:keys mutant-samples-db))]
                 [benchmark (in-value (read-benchmark (build-path benchmarks-dir benchmark-name)))]
                 [{mod indices} (in-hash (db:read mutant-samples-db benchmark-name))]
@@ -143,7 +142,7 @@
   @~a{
       Verification complete.
       Mutant type error information breakdown:
-      @pretty-format[(process-Q-get-data q)]
+      @pretty-format[(process-queue-get-data q)]
       }))
 
 

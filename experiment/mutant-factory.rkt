@@ -11,12 +11,11 @@
          "../util/progress-log.rkt"
          "../configurations/config.rkt"
          "../configurations/configure-benchmark.rkt"
-         "../process-q/interface.rkt"
-         "../process-q/priority.rkt"
          "../configurables/configurables.rkt"
          "mutant-factory-data.rkt"
          "blame-trail-data.rkt"
          "integrity-metadata.rkt"
+         process-queue/priority
          racket/file
          racket/format
          racket/match
@@ -104,7 +103,7 @@
   (parameter/c (or/c #f
                      (list/c 'record (mutant/c config/c run-outcome/c . -> . any))
                      (list/c 'check  (mutant/c config/c . -> . (or/c run-outcome/c
-                                                                     '<uncrecorded>)))
+                                                                     no-recorded-outcome?)))
                      (list/c (or/c 'record 'check)
                              path-string?)))
   (make-parameter #f))
@@ -156,7 +155,7 @@
 
     (define select-mutants (configured:select-mutants))
     (define process-q
-      (for/fold ([process-q (make-process-Q
+      (for/fold ([process-q (make-process-queue
                              (process-limit)
                              (factory (bench-info bench max-config)
                                       (hash)
@@ -175,7 +174,7 @@
                                                              mutation-index))))
 
     (log-factory info "Finished enqueing all test mutants. Waiting...")
-    (define process-q-finished (process-Q-wait process-q))
+    (define process-q-finished (process-queue-wait process-q))
     (report-completion/sanity-checks bench
                                      select-mutants
                                      (load-result-cache))))
@@ -267,14 +266,14 @@
 ;; Note that sampling the precision lattice is done indirectly by
 ;; just generating random configs
 (define/contract (sample-blame-trails-if-max-config-result-ok process-q mutant-program)
-  ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
+  ((process-queue/c factory/c) mutant/c . -> . (process-queue/c factory/c))
 
   (match-define (mutant #f module-to-mutate-name mutation-index) mutant-program)
   (log-factory debug
                "  Trying to spawn test mutant for ~a @ ~a."
                module-to-mutate-name
                mutation-index)
-  (define bench (factory-bench (process-Q-get-data process-q)))
+  (define bench (factory-bench (process-queue-get-data process-q)))
   (define max-config (bench-info-max-config bench))
   (define should-sample-mutant-blame-trails? (configured:should-sample-mutant-blame-trails?))
   (define (will:sample-if-type-error current-process-q dead-proc)
@@ -342,9 +341,9 @@
                    #:test-mutant? #t)]))
 
 (define/contract (sample-blame-trail-roots process-q mutant-program)
-  ((process-Q/c factory/c) mutant/c . -> . (process-Q/c factory/c))
+  ((process-queue/c factory/c) mutant/c . -> . (process-queue/c factory/c))
 
-  (define the-factory (process-Q-get-data process-q))
+  (define the-factory (process-queue-get-data process-q))
   (define N-samples-please
     ((configured:make-bt-root-sampler) (factory-bench the-factory)
                                        mutant-program))
@@ -371,13 +370,13 @@
                                                 config
                                                 resample
                                                 sample-number)
-  ((process-Q/c factory/c)
+  ((process-queue/c factory/c)
    mutant/c
    config/c
    (factory/c . -> . config/c)
    natural?
    . -> .
-   (process-Q/c factory/c))
+   (process-queue/c factory/c))
 
   (match-define (mutant #f module-to-mutate-name mutation-index)
     mutant-program)
@@ -410,7 +409,7 @@
                         ['resample
                          ;; Try sampling another config
                          (define new-sample
-                           (resample (process-Q-get-data current-process-q)))
+                           (resample (process-queue-get-data current-process-q)))
                          (spawn-blame-trail-root-mutant current-process-q
                                                         mutant-program
                                                         new-sample
@@ -437,13 +436,13 @@
 (define/contract (follow-blame-from-dead-process the-process-q
                                                  dead-proc
                                                  handle-no-blame)
-  (->i ([the-process-q                (process-Q/c factory/c)]
+  (->i ([the-process-q                (process-queue/c factory/c)]
         [dead-proc                    dead-mutant-process/c]
-        [handle-no-blame              ((process-Q/c factory/c)
+        [handle-no-blame              ((process-queue/c factory/c)
                                        dead-mutant-process/c
                                        . -> .
-                                       (process-Q/c factory/c))])
-       [result (process-Q/c factory/c)])
+                                       (process-queue/c factory/c))])
+       [result (process-queue/c factory/c)])
 
   (match-define (dead-mutant-process (mutant #f mod index)
                                      config
@@ -487,9 +486,9 @@
 
      ;; Log the trail and stop following.
      (define new-factory
-       (record-blame-trail! (process-Q-get-data the-process-q)
+       (record-blame-trail! (process-queue-get-data the-process-q)
                             the-blame-trail+dead-proc))
-     (process-Q-set-data the-process-q
+     (process-queue-set-data the-process-q
                          new-factory)]
 
     [(list locations-selected-as-blamed ..1)
@@ -543,13 +542,13 @@
 (define/contract (make-blame-disappearing-fallback dead-proc
                                                    respawn-mutant)
   (dead-mutant-process/c
-   ((process-Q/c factory/c)
+   ((process-queue/c factory/c)
     #:timeout/s (or/c #f number?)
     #:memory/gb (or/c #f number?)
     . -> .
-    (process-Q/c factory/c))
+    (process-queue/c factory/c))
    . -> .
-   ((process-Q/c factory/c) dead-mutant-process/c . -> . (process-Q/c factory/c)))
+   ((process-queue/c factory/c) dead-mutant-process/c . -> . (process-queue/c factory/c)))
 
   (match-define (dead-mutant-process (mutant #f mod index)
                                      config
@@ -582,7 +581,7 @@ Previous mutant [~a] exceeded limits with: ~v
                     dead-succ-id outcome)
        (define-values {timeout* memory*}
          (increased-limits
-          (factory-bench (process-Q-get-data current-process-q))))
+          (factory-bench (process-queue-get-data current-process-q))))
        (respawn-mutant current-process-q
                        #:timeout/s timeout*
                        #:memory/gb memory*)]
@@ -669,7 +668,7 @@ Giving up.
                                #:memory/gb [memory/gb #f]
                                #:following-trail [trail-being-followed #f]
                                #:test-mutant? [test-mutant? #f])
-  (->i ([process-q              (process-Q/c factory/c)]
+  (->i ([process-q              (process-queue/c factory/c)]
         [module-to-mutate-name  module-name?]
         [mutation-index         natural?]
         [precision-config       config/c]
@@ -688,9 +687,9 @@ Giving up.
                and #:test-mutant? (@test-mutant?) @;
                must be specified.
                })
-       [result (process-Q/c factory/c)])
+       [result (process-queue/c factory/c)])
 
-  (define current-factory (process-Q-get-data process-q))
+  (define current-factory (process-queue-get-data process-q))
   (match-define (factory (bench-info the-benchmark _)
                          _
                          _
@@ -753,8 +752,8 @@ Giving up.
         1
         ; mutants progressing along a blame trail should be prioritized to finish the trail quickly
         (- (length (blame-trail-parts mutant-blame-trail)))))
-  (process-Q-enq
-   (process-Q-set-data process-q
+  (process-queue-enqueue
+   (process-queue-set-data process-q
                        (copy-factory current-factory
                                      [total-mutants-spawned
                                       (add1 mutants-spawned)]))
@@ -843,7 +842,7 @@ Giving up.
                                              status
                                              maybe-result
                                              mutant-will)
-  (->i ([process-q         (process-Q/c factory/c)]
+  (->i ([process-q         (process-queue/c factory/c)]
         [a-mutant-process  mutant-process/c]
         [status            (or/c 'done-ok 'done-error)]
         [maybe-result      {status}
@@ -851,7 +850,7 @@ Giving up.
                              ['done-ok eof-object?]
                              ['done-error any/c])]
         [mutant-will       mutant-will/c])
-       [result (process-Q/c factory/c)])
+       [result (process-queue/c factory/c)])
 
   (match-define (struct* mutant-process
                          ([id             id]
@@ -903,12 +902,12 @@ Attempting revival ~a / ~a
                                            status
                                            maybe-result
                                            mutant-will)
-  (->i ([process-q         (process-Q/c factory/c)]
+  (->i ([process-q         (process-queue/c factory/c)]
         [a-mutant-process  mutant-process/c]
         [status            'done-ok]
         [maybe-result      (property/c run-status-outcome 'type-error)]
         [mutant-will       mutant-will/c])
-       [result (process-Q/c factory/c)])
+       [result (process-queue/c factory/c)])
 
   (match-define (struct* mutant-process
                          ([id             id]
@@ -1009,19 +1008,19 @@ Attempting revival ~a / ~a
 (define/contract (terminate-and-record-blame-trail! the-process-q
                                                     the-blame-trail/without-dead-proc
                                                     dead-proc)
-  (->i ([the-process-q                      (process-Q/c factory/c)]
+  (->i ([the-process-q                      (process-queue/c factory/c)]
         [the-blame-trail/without-dead-proc  blame-trail/c]
         [dead-proc                          dead-mutant-process/c])
-       [result (process-Q/c factory/c)])
+       [result (process-queue/c factory/c)])
 
   (define the-blame-trail+dead-proc
     (extend-blame-trail the-blame-trail/without-dead-proc
                         dead-proc))
   (define new-factory
-    (record-blame-trail! (process-Q-get-data the-process-q)
+    (record-blame-trail! (process-queue-get-data the-process-q)
                          the-blame-trail+dead-proc))
-  (process-Q-set-data the-process-q
-                      new-factory))
+  (process-queue-set-data the-process-q
+                          new-factory))
 
 
 (define/contract (read-mutant-result mutant-proc)

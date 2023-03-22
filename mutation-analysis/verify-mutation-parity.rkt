@@ -8,10 +8,9 @@
          "../configurables/configurables.rkt"
          "../util/program.rkt"
          "../mutate/mutate-program.rkt"
-         "../process-q/priority.rkt"
-         "../process-q/interface.rkt"
          "../util/for.rkt"
          "../util/binary-search.rkt"
+         process-queue/priority
          racket/runtime-path)
 
 (module common rscript
@@ -280,7 +279,7 @@
   (define q2 (report-parity-results! (result 30 (exhausted))
                                      (make-exhaustive-process-info 3)
                                      (make-mock-Q (hash))))
-  (process-Q-get-data q2)
+  (process-queue-get-data q2)
   (log-parity-info "4")
   (define q3 (for/fold ([q (make-mock-Q (hash))])
                        ([rng (in-list index-ranges)]
@@ -288,7 +287,7 @@
                (report-parity-results! (result (first rng) (exhausted))
                                        (make-exhaustive-process-info i)
                                        q)))
-  (process-Q-get-data q3)
+  (process-queue-get-data q3)
   (log-parity-info "5")
   (define q4 (for/fold ([q (make-mock-Q (hash))])
                        ([rng (in-list index-ranges)]
@@ -303,7 +302,7 @@
                         (exhausted))
                 (make-exhaustive-process-info i)
                 q)))
-  (process-Q-get-data q4))
+  (process-queue-get-data q4))
 
 (define (report-parity-result! the-result prefix)
   (match the-result
@@ -319,7 +318,7 @@
 
                     })]))
 
-;; process-Q-data:
+;; process-queue-data:
 ;; (hash/c (list/c benchmark-name? mod-name?) (hash/c id? result?))
 (define (record-parity-result current-process-q
                               the-mod-checker
@@ -328,14 +327,14 @@
                              mod-to-mutate
                              id)
     the-mod-checker)
-  (define results-map (process-Q-get-data current-process-q))
+  (define results-map (process-queue-get-data current-process-q))
   (define new-results-map
     (hash-update results-map
                  (list benchmark-name mod-to-mutate)
                  (λ (mod-results)
                    (hash-set mod-results id result))
                  (hash)))
-  (process-Q-set-data current-process-q
+  (process-queue-set-data current-process-q
                       new-results-map))
 (define (maybe-report-exhaustive-parity-result! current-process-q
                                                 the-mod-checker
@@ -344,7 +343,7 @@
                              mod-to-mutate
                              id)
     the-mod-checker)
-  (define mod-results (hash-ref (process-Q-get-data current-process-q)
+  (define mod-results (hash-ref (process-queue-get-data current-process-q)
                                 (list benchmark-name mod-to-mutate)))
   (match mod-results
     [(hash-table [ids results] ...)
@@ -426,16 +425,16 @@
                      process-will:report-mutant-parity)))
     (match mode
       ['quick
-       (process-Q-enq current-process-q
-                      (make-process-checker-spawner -1 #f))]
+       (process-queue-enqueue current-process-q
+                              (make-process-checker-spawner -1 #f))]
       ['exhaustive
        (for/fold ([q current-process-q])
                  ([index-range (in-list index-ranges)]
                   [i (in-naturals)])
-         (process-Q-enq q
-                        (make-process-checker-spawner i index-range)))]
+         (process-queue-enqueue q
+                                (make-process-checker-spawner i index-range)))]
       ['simple-exhaustive
-       (process-Q-enq
+       (process-queue-enqueue
         current-process-q
         (make-process-checker-spawner -2 (list 0 INDEX-SEARCH-RANGE)))]))
 
@@ -501,10 +500,10 @@
  (define q
    (verify-mutation-parity-of-all-benchmarks-in
     benchmarks-dir
-    (make-process-Q n-processes
+    (make-process-queue n-processes
                     (hash))
     mode))
- (void (process-Q-wait q))
+ (void (process-queue-wait q))
  (define end-ms (current-inexact-milliseconds))
  (define total-minutes (/ (- end-ms start-ms) 1000 60))
  (log-parity-info @~a{Analysis complete in @total-minutes min}))

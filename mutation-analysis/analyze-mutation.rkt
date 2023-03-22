@@ -1,14 +1,13 @@
 #lang at-exp rscript
 
-(require "../process-q/interface.rkt"
-         "../process-q/functional.rkt"
-         "../configurations/configure-benchmark.rkt"
+(require "../configurations/configure-benchmark.rkt"
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
          "../util/read-module.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
          "../configurables/configurables.rkt"
+         process-queue/functional
          racket/runtime-path)
 
 (define process-limit (make-parameter 3))
@@ -41,9 +40,9 @@
     (make-directory (data-output-dir)))
 
   (define q
-    (for/fold ([q (make-process-Q proc-limit
-                                  ; (hash/c name? (hash/c 'type-error natural? 'total natural?))
-                                  (hash))])
+    (for/fold ([q (make-process-queue proc-limit
+                                      ; (hash/c name? (hash/c 'type-error natural? 'total natural?))
+                                      (hash))])
               ([module-to-mutate-name mutatable-module-names]
                [i-1 (in-naturals)]
                #:when #t
@@ -51,12 +50,13 @@
                                            bench)]
                [i-2 (in-naturals)])
       (match (cached-results-for module-to-mutate-name index)
-        [#f (process-Q-enq q
-                           (λ _ (mutation-info-for bench
-                                                   module-to-mutate-name
-                                                   index
-                                                   (~a i-1 '- i-2)
-                                                   #:progress-logger log-progress!)))]
+        [#f (process-queue-enqueue
+             q
+             (λ _ (mutation-info-for bench
+                                     module-to-mutate-name
+                                     index
+                                     (~a i-1 '- i-2)
+                                     #:progress-logger log-progress!)))]
         [(list type-error? mutation-type)
          (log-mutation-analysis-info
           @~a{
@@ -68,12 +68,12 @@
   (log-mutation-analysis-info
    @~a{
        Done enqueuing mutants. @;
-       Q has @(process-Q-active-count q) active and @(process-Q-waiting-count q) waiting. @;
+       Q has @(process-queue-active-count q) active and @(process-queue-waiting-count q) waiting. @;
        Waiting...})
 
-  (define q* (process-Q-wait q))
+  (define q* (process-queue-wait q))
   (log-mutation-analysis-info "Done waiting.")
-  (pretty-display (process-Q-get-data q*)))
+  (pretty-display (process-queue-get-data q*)))
 
 (define (mutation-info-for bench
                            module-to-mutate-name
@@ -103,8 +103,8 @@
      @~a{
          Executing will. Q size: @;
          { @;
-          active: @(process-Q-active-count q*), @;
-          waiting: @(process-Q-waiting-count q*) @;
+          active: @(process-queue-active-count q*), @;
+          waiting: @(process-queue-waiting-count q*) @;
           }
          })
     (define-values {type-error? mutation-type}
@@ -130,7 +130,7 @@
                  (if type-error? "success" "fail")
                  update-inner-hash
                  (hash)))
-  (process-Q-set-data q (update (process-Q-get-data q))))
+  (process-queue-set-data q (update (process-queue-get-data q))))
 
 (define multiple-blamed-mutants?
   (box #f))

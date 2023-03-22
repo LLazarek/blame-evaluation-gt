@@ -18,7 +18,7 @@
     "custom-load"
     "https://github.com/LLazarek/ruinit.git"
     "https://github.com/LLazarek/rscript.git"
-    "pfds"))
+    "https://github.com/LLazarek/process-queue.git"))
 
 (define racket-version "8.6") ;; minimum needed for TR bug fixes
 (define racket-download-url

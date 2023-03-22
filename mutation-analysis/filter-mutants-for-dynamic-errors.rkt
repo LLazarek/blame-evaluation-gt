@@ -13,9 +13,8 @@
          "../configurables/configurables.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
-         "../process-q/interface.rkt"
-         "../process-q/priority.rkt"
          "../runner/mutation-runner.rkt"
+         process-queue/priority
          racket/hash
          racket/random)
 
@@ -45,19 +44,19 @@
   (log-mutant-dynamic-errors-info
    @~a{Starting @benchmark-name analysis})
   (define q
-    (for/fold ([q (make-process-Q process-limit
-                                  ; (listof mutant?)
-                                  empty)])
+    (for/fold ([q (make-process-queue process-limit
+                                      ; (listof mutant?)
+                                      empty)])
               ([mutant (in-list mutants-with-type-errors)])
       (match (logged-progress benchmark-name mutant)
-        ['? (process-Q-enq q
-                           (dynamic-error-checker mutant benchmark
-                                                  #:log-progress log-progress!)
-                           2)]
-        [#t (process-Q-update-data q (add-to-list mutant))]
+        ['? (process-queue-enqueue q
+                                   (dynamic-error-checker mutant benchmark
+                                                          #:log-progress log-progress!)
+                                   2)]
+        [#t (process-queue-update-data q (add-to-list mutant))]
         [#f q])))
   (define mutants-with-dynamic-errors
-    (process-Q-get-data (process-Q-wait q)))
+    (process-queue-get-data (process-queue-wait q)))
   (log-mutant-dynamic-errors-info
    @~a{
        @benchmark-name analysis complete: @;
@@ -143,7 +142,7 @@
     (match (extract-outcome (process-info-data info) mutant run-configuration)
       [(? dynamic-error?)
        (log-progress! benchmark-name mutant #t)
-       (process-Q-update-data q (add-to-list mutant))]
+       (process-queue-update-data q (add-to-list mutant))]
       [(? other-outcome?)
        (log-progress! benchmark-name mutant #f)
        q]
@@ -152,8 +151,8 @@
   (mutant-spawner run-configuration
                   will:record-outcome!))
 
-(define (process-Q-update-data q f)
-  (process-Q-set-data q (f (process-Q-get-data q))))
+(define (process-queue-update-data q f)
+  (process-queue-set-data q (f (process-queue-get-data q))))
 
 ;; (hash/c mod-name? summary?) -> (listof mutant?)
 (define (summaries->mutants summaries)

@@ -9,13 +9,11 @@
                "errortrace-lib"
                "rackunit-lib"
                "require-typed-check"
-               "rscript"
-               "ruinit"
                "sandbox-lib"
                "typed-racket-lib"
-
-               ;; process-queue
-               "pfds"
+               "https://github.com/LLazarek/rscript.git"
+               "https://github.com/LLazarek/ruinit.git"
+               "https://github.com/LLazarek/process-queue.git"
 
                ;; data analysis
                "complot"

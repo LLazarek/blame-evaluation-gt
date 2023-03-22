@@ -5,9 +5,8 @@
          "../configurations/configure-benchmark.rkt"
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
-         "../process-q/interface.rkt"
-         "../process-q/priority.rkt"
          "../runner/mutation-runner.rkt"
+         process-queue/priority
          racket/random)
 
 (define MUTANT-SAMPLE-SIZE 500)
@@ -49,7 +48,7 @@
      @~a{
          @mutant [@id] enQing checker attempt @retry-count / @CONFIG-SAMPLE-MAX-RETRIES @;
          with modes-to-check @(map basename modes-to-check)
-         Queue state: [A: @(process-Q-active-count q), W: @(process-Q-waiting-count q)]
+         Queue state: [A: @(process-queue-active-count q), W: @(process-queue-waiting-count q)]
          })
     (cond [(> retry-count CONFIG-SAMPLE-MAX-RETRIES)
            (log-comparison-info @~a{Ran out of retries for @mutant, trying to resample...})
@@ -62,13 +61,13 @@
                                          #:resampled? #t)])]
           [else
            (define a-config (random-configuration))
-           (process-Q-enq q
-                          (make-mutant-spawner a-config
-                                               modes-to-check
-                                               results-so-far
-                                               retry-count)
-                          (- (length modes-to-check)
-                             retry-count))]))
+           (process-queue-enqueue q
+                                  (make-mutant-spawner a-config
+                                                       modes-to-check
+                                                       results-so-far
+                                                       retry-count)
+                                  (- (length modes-to-check)
+                                     retry-count))]))
   (define (make-mutant-spawner run-configuration
                                modes-to-check
                                results-so-far
@@ -298,8 +297,8 @@
               @~a{Attempt to resample @original-mutant success: chose @new-mutant})
              new-mutant]))))
 
- (process-Q-wait
-  (for/fold ([q (make-process-Q process-limit)])
+ (process-queue-wait
+  (for/fold ([q (make-process-queue process-limit)])
             ([mutant (in-list mutants-to-sample-from)]
              [mutant-id-number (in-naturals)]
              #:when #t
