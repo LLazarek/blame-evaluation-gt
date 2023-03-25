@@ -20,26 +20,26 @@
                          (config-for-benchmark/c bench)])
                 [result benchmark-configuration/c])]))
 
-(define/contract (config-for-benchmark/c b)
-  (benchmark/c . -> . (config/c . -> . boolean?))
-
-  (simple-flat-contract-with-explanation
-   (λ (config)
-     (equal? (sort-file-names (map file-name-string-from-path
-                                   (benchmark-typed b)))
-             (sort-file-names (hash-keys config))))
-   @~a{a config for @~v[b]}))
-
-(define (sort-file-names names)
-  (sort names string<?))
-
-
-
 (require "../../configurations/configure-benchmark.rkt"
+         "../../configurations/config.rkt"
          "../../util/path-utils.rkt"
          "../../util/experiment-exns.rkt"
          "../../util/program.rkt"
          "common.rkt")
+
+(define/contract (config-for-benchmark/c b)
+  (benchmark/c . -> . (any/c . -> . boolean?))
+
+  (simple-flat-contract-with-explanation
+   (and/c config/c
+          (λ (config)
+            (equal? (sort-file-names (map file-name-string-from-path
+                                          (benchmark-typed b)))
+                    (sort-file-names (hash-keys config)))))
+   @~a{a config for @~v[b]}))
+
+(define (sort-file-names names)
+  (sort names string<?))
 
 (define (config-at-max-precision-for? name config)
   (equal? (hash-ref config name) 'types))

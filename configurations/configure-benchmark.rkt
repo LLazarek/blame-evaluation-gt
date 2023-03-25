@@ -1,6 +1,7 @@
 #lang at-exp racket
 
 (require "../util/optional-contracts.rkt"
+         "../util/ctc-utils.rkt"
          "../util/experiment-exns.rkt")
 (provide (contract-out
           [read-benchmark

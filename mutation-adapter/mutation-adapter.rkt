@@ -13,7 +13,7 @@
          sexp-diff
          sexp->type-diff)
 
-(require "../mutate/type-api-mutators.rkt"
+(require "../configurables/mutation/type-api-mutators.rkt"
          "../util/experiment-exns.rkt"
          "sexp-diff.rkt"
          "util.rkt"
@@ -945,7 +945,7 @@
 (define round->exact (compose1 inexact->exact round))
 (define realize-delta 0.00001)
 (define (make-base-type-adapter original-type new-type)
-  ;; Commented out: See note in ../mutate/type-api-mutators.rkt at `base-type-gen/restr`.
+  ;; Commented out: See note in type-api-mutators.rkt at `base-type-gen/restr`.
   ;;
   ;; Must handle all of the ids that that mutator mutates.
   ;; (define transfomer

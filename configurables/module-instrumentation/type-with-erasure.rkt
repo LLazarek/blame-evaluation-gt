@@ -4,7 +4,8 @@
          syntax/parse/define
          (for-syntax syntax/parse)
          "../../util/program.rkt"
-         "../../util/optional-contracts.rkt")
+         "../../util/optional-contracts.rkt"
+         "instrument-module.rkt")
 
 (provide (contract-out
           [instrument-module module-instrumenter/c]))

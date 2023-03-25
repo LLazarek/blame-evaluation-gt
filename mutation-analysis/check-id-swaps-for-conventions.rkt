@@ -84,7 +84,7 @@
         [index               (in-list (hash-ref (summary-valid-indices summary)
                                                 id-swap-mutator
                                                 empty))])
-   (define mutation (second (extract-mutation mod index bench-program)))
+   (define mutation (third (extract-mutation mod index bench-program)))
    (define maybe-convention-swap (into/outof-which-convention-swap? mutation))
    (when maybe-convention-swap
      (displayln @~a{@bench-name @mod-name @index : @maybe-convention-swap @mutation}))))

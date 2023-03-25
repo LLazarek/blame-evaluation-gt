@@ -1,6 +1,6 @@
 #lang at-exp racket/base
 
-(require "../util/optional-contracts.rkt"
+(require "../../util/optional-contracts.rkt"
          (except-in racket/contract/base
                     contract-out))
 (provide (contract-out
@@ -36,13 +36,11 @@
          racket/string
          syntax/parse
          syntax/id-set
-         "logger.rkt"
-         "mutate-expr.rkt"
-         "mutate-util.rkt"
-         "mutated.rkt"
-         "mutator-lib.rkt"
-         "../util/program.rkt"
-         "../util/path-utils.rkt")
+         mutate/define
+         mutate/low-level
+         mutate/traversal
+         "../../util/program.rkt"
+         "../../util/path-utils.rkt")
 
 (define-id-mutator arithmetic-op-swap
   #:type "arithmetic-op-swap"
@@ -77,9 +75,8 @@
   #:type "nested-list-construction-swap"
   [append #:-> cons])
 
-(define-value-mutator replace-constants
+(define-constant-mutator (replace-constants value)
   #:type "constant-swap"
-  #:bind-value value
   ;; May mess with occurrence typing
   [(? boolean?)              #:-> (not value)]
 
@@ -102,7 +99,7 @@
 (module+ test
   (require ruinit
            racket
-           "mutate-test-common.rkt")
+           mutate/tests/testing-util)
   (define mutate-datum (compose-mutators arithmetic-op-swap
                                          boolean-op-swap
                                          class-method-publicity-swap
@@ -209,9 +206,9 @@
 
 
 (define-mutator (delete-begin-result-expr stx mutation-index counter)
-  #:type [the-type "begin-result-deletion"]
-  (define (delete-result-expr stx mutation-index counter)
-    (log-mutation-type the-type)
+  #:type "begin-result-deletion"
+  (define-mutator (delete-result-expr stx mutation-index counter)
+    #:type "begin-result-deletion"
     (syntax-parse stx
       [[e ...+ result]
        (maybe-mutate stx
@@ -226,27 +223,30 @@
             {~or* begin
                   {~seq {~or* λ lambda} formals}}}
       es ...+ e-result)
-     (mdo* (def mutated-es (delete-result-expr (syntax/loc stx [es ... e-result])
-                                               mutation-index
-                                               counter))
-           [return (quasisyntax/loc stx
-                     (head ... #,@mutated-es))])]
+     (mutated-do-single
+      [mutated-es (delete-result-expr (syntax/loc stx [es ... e-result])
+                                      mutation-index
+                                      counter)]
+      #:return (quasisyntax/loc stx
+                 (head ... #,@mutated-es)))]
     [(begin0 e-result es ...+)
-     (mdo* (def mutated-es (delete-result-expr (quasisyntax/loc stx
-                                                 [#,@(reverse (attribute es)) e-result])
-                                               mutation-index
-                                               counter))
-           [return (quasisyntax/loc stx
-                     (begin0 #,@(reverse (syntax->list mutated-es))))])]
+     (mutated-do-single
+      [mutated-es (delete-result-expr (quasisyntax/loc stx
+                                        [#,@(reverse (attribute es)) e-result])
+                                      mutation-index
+                                      counter)]
+      #:return (quasisyntax/loc stx
+                 (begin0 #,@(reverse (syntax->list mutated-es)))))]
     [(cond [test e ...] ...)
-     (mdo* (def mutated-case-bodies (mutate-in-seq (syntax->list #'[[e ...] ...])
-                                                   mutation-index
-                                                   counter
-                                                   delete-result-expr))
-           [return (syntax-parse mutated-case-bodies
-                     [[[mutated-e ...] ...]
-                      (syntax/loc stx
-                        (cond [test mutated-e ...] ...))])])]
+     (mutated-do-single
+      [mutated-case-bodies (mutate-in-sequence (syntax->list #'[[e ...] ...])
+                                               mutation-index
+                                               counter
+                                               delete-result-expr)]
+      #:return (syntax-parse mutated-case-bodies
+                 [[[mutated-e ...] ...]
+                  (syntax/loc stx
+                    (cond [test mutated-e ...] ...))]))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -276,30 +276,32 @@
 
 
 (define (make-conditional-test-mutator mutate-condition)
-  (define-mutator (m stx mutation-index counter) #:type [type (mutator-type mutate-condition)]
+  (define-mutator (m stx mutation-index counter) #:type (mutator-type mutate-condition)
     (syntax-parse stx
       #:datum-literals [cond if]
       [(cond [test . body] ...)
        (define test-stxs (attribute test))
-       (mdo* (def mutated-test-stxs (mutate-in-seq test-stxs
-                                                   mutation-index
-                                                   counter
-                                                   mutate-condition))
-             [return
-              (syntax-parse mutated-test-stxs
-                [[mutated-test ...]
-                 (syntax/loc stx
-                   (cond [mutated-test . body] ...))])])]
+       (mutated-do-single
+        [mutated-test-stxs (mutate-in-sequence test-stxs
+                                               mutation-index
+                                               counter
+                                               mutate-condition)]
+        #:return
+        (syntax-parse mutated-test-stxs
+          [[mutated-test ...]
+           (syntax/loc stx
+             (cond [mutated-test . body] ...))]))]
       [(if test then-e else-e)
        (define cond-form #'(cond [test then-e] [else else-e]))
-       (mdo* (def mutated-cond-form (m cond-form
-                                       mutation-index
-                                       counter))
-             [return
-              (syntax-parse mutated-cond-form
-                [(cond [mutated-test _] _)
-                 (syntax/loc stx
-                   (if mutated-test then-e else-e))])])]
+       (mutated-do-single
+        [mutated-cond-form (m cond-form
+                              mutation-index
+                              counter)]
+        #:return
+        (syntax-parse mutated-cond-form
+          [(cond [mutated-test _] _)
+           (syntax/loc stx
+             (if mutated-test then-e else-e))]))]
       [else
        (no-mutation stx mutation-index counter)]))
   m)
@@ -312,8 +314,7 @@
 
 (define (make-simple-condition-mutator condition-stx-transform
                                        type)
-  (define-mutator (m stx mutation-index counter) #:type [the-type type]
-    (log-mutation-type the-type)
+  (define-mutator (m stx mutation-index counter) #:type type
     (define new-stx
       (syntax-parse stx
         [{~datum else} stx]
@@ -432,25 +433,25 @@
                 "not guarded when it should be"
                 "guarded when it shouldn't be")}]))))
 
-(define-mutator (replace-class-parent stx mutation-index counter) #:type [type "class:parent-swap"]
-  (log-mutation-type type)
+(define-mutator (replace-class-parent stx mutation-index counter) #:type "class:parent-swap"
   (syntax-parse stx
     [(~or ({~and {~datum class}  class-form} superclass:expr . body)
           ({~and {~datum class*} class-form} superclass:expr
                                              interfaces:expr . body))
      (define superclass-stx (attribute superclass))
-     (mdo* (def mutated-superclass (maybe-mutate superclass-stx
-                                                 (datum->syntax superclass-stx
-                                                                'object%
-                                                                superclass-stx
-                                                                superclass-stx)
-                                                 mutation-index
-                                                 counter))
-           [return
-            (quasisyntax/loc stx
-              (class-form #,mutated-superclass
-                          {~? interfaces}
-                          . body))])]
+     (mutated-do-single
+      [mutated-superclass (maybe-mutate superclass-stx
+                                        (datum->syntax superclass-stx
+                                                       'object%
+                                                       superclass-stx
+                                                       superclass-stx)
+                                        mutation-index
+                                        counter)]
+      #:return
+      (quasisyntax/loc stx
+        (class-form #,mutated-superclass
+                    {~? interfaces}
+                    . body)))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -469,8 +470,7 @@
                              (define/public (foo x) x))))))
 
 (define-mutator (swap-class-initializers stx mutation-index counter)
-  #:type [type "class:initializer-swap"]
-  (log-mutation-type type)
+  #:type "class:initializer-swap"
   (syntax-parse stx
     [({~and {~or {~datum init-field}
                  {~datum field}}
@@ -481,33 +481,35 @@
       [field-id:id other-field-stuff ... initial-value:expr]
       ...)
      (define init-value-stxs (attribute initial-value))
-     (mdo* (def rearranged-init-value-stxs
-             (rearrange-in-seq init-value-stxs
-                               mutation-index
-                               counter))
-           [return
-            (syntax-parse rearranged-init-value-stxs
-              [[new-init-value ...]
-               (quasisyntax/loc stx
-                 (field-type no-init-field ...
-                             [field-id other-field-stuff ... new-init-value] ...))])])]
+     (mutated-do-single
+      [rearranged-init-value-stxs
+       (rearrange-in-sequence init-value-stxs
+                              mutation-index
+                              counter)]
+      #:return
+      (syntax-parse rearranged-init-value-stxs
+        [[new-init-value ...]
+         (quasisyntax/loc stx
+           (field-type no-init-field ...
+                       [field-id other-field-stuff ... new-init-value] ...))]))]
     [({~and {~or {~datum new} {~datum instantiate}} instantiator}
       class-e
       {~and positional-initializer {~not (_ ...)}} ...
       [field-id:id other-field-stuff ... initial-value:expr]
       ...)
      (define init-value-stxs (attribute initial-value))
-     (mdo* (def rearranged-init-value-stxs
-             (rearrange-in-seq init-value-stxs
-                               mutation-index
-                               counter))
-           [return
-            (syntax-parse rearranged-init-value-stxs
-              [[new-init-value ...]
-               (quasisyntax/loc stx
-                 (instantiator class-e
-                      positional-initializer ...
-                      [field-id other-field-stuff ... new-init-value] ...))])])]
+     (mutated-do-single
+      [rearranged-init-value-stxs
+       (rearrange-in-sequence init-value-stxs
+                              mutation-index
+                              counter)]
+      #:return
+      (syntax-parse rearranged-init-value-stxs
+        [[new-init-value ...]
+         (quasisyntax/loc stx
+           (instantiator class-e
+                         positional-initializer ...
+                         [field-id other-field-stuff ... new-init-value] ...))]))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -564,17 +566,17 @@
                    #'(new my-class 42 33 [a 5])
                    (list #'(new my-class 42 33 [a 5])))))
 
-(define-mutator (rearrange-positional-exprs stx mutation-index counter) #:type [type "position-swap"]
-  (log-mutation-type type)
+(define-mutator (rearrange-positional-exprs stx mutation-index counter) #:type "position-swap"
   (syntax-parse stx
     [({~and head {~not _:special-form}} e ...)
      (define e-stxs (attribute e))
-     (mdo* (def rearranged-e-stxs (rearrange-in-seq e-stxs
-                                                    mutation-index
-                                                    counter))
-           [return
-            (quasisyntax/loc stx
-              (head #,@rearranged-e-stxs))])]
+     (mutated-do-single
+      [rearranged-e-stxs (rearrange-in-sequence e-stxs
+                                                mutation-index
+                                                counter)]
+      #:return
+      (quasisyntax/loc stx
+        (head #,@rearranged-e-stxs)))]
     [else
      (no-mutation stx mutation-index counter)]))
 (define-syntax-class special-form
@@ -624,24 +626,24 @@
                    (list #'(a-function c b d)
                          #'(a-function b c d)))))
 
-(define-mutator (add-extra-class-method stx mutation-index counter) #:type [type "class:add-extra-method"]
-  (log-mutation-type type)
+(define-mutator (add-extra-class-method stx mutation-index counter) #:type "class:add-extra-method"
   (syntax-parse stx
     [(~or ({~and {~datum class}  class-form} superclass:expr . body)
           ({~and {~datum class*} class-form} superclass:expr
                                              interfaces:expr . body))
-     (mdo* (def extra-method-stx
-             (maybe-mutate (syntax/loc stx [])
-                           (syntax/loc stx
-                             [(define/public (a-nonexistant-method x) x)])
-                           mutation-index
-                           counter))
-           [return
-            (quasisyntax/loc stx
-              (class-form superclass
-                          {~? interfaces}
-                          #,@extra-method-stx
-                          . body))])]
+     (mutated-do-single
+      [extra-method-stx
+       (maybe-mutate (syntax/loc stx [])
+                     (syntax/loc stx
+                       [(define/public (a-nonexistant-method x) x)])
+                     mutation-index
+                     counter)]
+      #:return
+      (quasisyntax/loc stx
+        (class-form superclass
+                    {~? interfaces}
+                    #,@extra-method-stx
+                    . body)))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -661,8 +663,8 @@
 
 (define (id-list-swap-mutators ids name)
   (for/list ([top-level-id (in-list ids)])
-    (define (replace-with-top-level-id stx mutation-index counter)
-      (log-mutation-type name)
+    (define-mutator (replace-with-top-level-id stx mutation-index counter)
+      #:type name
       (syntax-parse stx
         [ref:id
          #:when (member #'ref ids free-identifier=?)
@@ -680,11 +682,12 @@
     ['()  no-mutation]
     [else (apply compose-mutators mutators)]))
 
+(define top-level-id-swap-type "top-level-id-swap")
 (define-dependent-mutator (make-top-level-id-swap-mutator mod-stx containing-program)
-  #:type [type "top-level-id-swap"]
+  #:type top-level-id-swap-type
   (define all-top-level-identifiers (top-level-definitions mod-stx))
-  (mutator (combined-id-list-swap-mutator all-top-level-identifiers type)
-           type))
+  (mutator (combined-id-list-swap-mutator all-top-level-identifiers top-level-id-swap-type)
+           top-level-id-swap-type))
 
 ;; Analagous to `function-header` but:
 ;; - matches for plain ids as well as function headers
@@ -782,7 +785,7 @@
 
 ; stx? program/c -> mutator/c
 (define-dependent-mutator (make-imported-id-swap-mutator mod-top-level-forms-stx containing-program)
-  #:type [type "imported-id-swap"]
+  #:type "imported-id-swap"
   (define program-mods (program->mods containing-program))
   (define try-unadapt
     (match-lambda
@@ -807,10 +810,9 @@
       (define mod-exported-ids+duplicates (syntactic-module->exported-ids the-mod))
       (define mod-exported-ids
         (normalize-name-list mod-exported-ids+duplicates))
-      (log-mutate-debug @~a{ids from @mod-name : @mod-exported-ids})
-      (combined-id-list-swap-mutator mod-exported-ids type)))
+      (combined-id-list-swap-mutator mod-exported-ids (current-mutator-type))))
   (mutator (apply compose-mutators imported-id-swap-mutators)
-           type))
+           (current-mutator-type)))
 
 (define-syntax-class require-spec
   #:description "require spec"
@@ -1069,10 +1071,10 @@
 
 
 (define-dependent-mutator (make-method-id-swap-mutator mod-stx containing-program)
-  #:type [type "method-id-swap"]
+  #:type "method-id-swap"
   (define all-methods (method-names-in mod-stx))
-  (mutator (combined-id-list-swap-mutator all-methods type)
-           type))
+  (mutator (combined-id-list-swap-mutator all-methods (current-mutator-type))
+           (current-mutator-type)))
 
 (define-syntax-class public-method-def
   #:attributes [name]
@@ -1205,11 +1207,12 @@
                    (list #'n
                          #'m))))
 
+(define field-id-swap-mutator-type "field-id-swap")
 (define-dependent-mutator (make-field-id-swap-mutator mod-stx containing-program)
-  #:type [type "field-id-swap"]
+  #:type field-id-swap-mutator-type
   (define all-fields (field-names-in mod-stx))
-  (mutator (combined-id-list-swap-mutator all-fields type)
-           type))
+  (mutator (combined-id-list-swap-mutator all-fields (current-mutator-type))
+           (current-mutator-type)))
 
 (define-syntax-class class-maybe-renamed
   #:attributes [name internal-name]
@@ -1359,5 +1362,10 @@
     (test-mutator* field-call-swap-mutator
                    #'n
                    (list #'m
-                         #'n))))
+                         #'n))
+    (ignore (local-require racket/logging
+                           mutate/logger))
+    (test-logged-mutation field-call-swap-mutator
+                          #'n
+                          field-id-swap-mutator-type)))
 

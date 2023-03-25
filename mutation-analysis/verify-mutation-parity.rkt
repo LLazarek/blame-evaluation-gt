@@ -7,7 +7,6 @@
          "../configurations/configure-benchmark.rkt"
          "../configurables/configurables.rkt"
          "../util/program.rkt"
-         "../mutate/mutate-program.rkt"
          "../util/for.rkt"
          "../util/binary-search.rkt"
          process-queue/priority
@@ -48,7 +47,6 @@
 
   (require "../configurations/configure-benchmark.rkt"
            "../configurables/configurables.rkt"
-           "../mutate/mutate-program.rkt"
            "../runner/mutation-runner.rkt"
            "../util/program.rkt"
            "../util/path-utils.rkt"
@@ -92,8 +90,8 @@
     (match mutateds
       [(list (no-more-mutants) (no-more-mutants))
        (no-more-mutants)]
-      [(list (list (? symbol? a) e-a)
-             (list (? symbol? b) e-b))
+      [(list (list (? symbol? a) (? string?) e-a)
+             (list (? symbol? b) (? string?) e-b))
        #:when (and (equal? a b)
                    (equal? e-a e-b))
        #t]

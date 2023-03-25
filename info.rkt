@@ -14,6 +14,7 @@
                "https://github.com/LLazarek/rscript.git"
                "https://github.com/LLazarek/ruinit.git"
                "https://github.com/LLazarek/process-queue.git"
+               "https://github.com/LLazarek/mutate.git"
 
                ;; data analysis
                "complot"

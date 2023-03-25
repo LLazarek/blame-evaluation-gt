@@ -40,6 +40,7 @@
 
 
 (require "../../configurations/configure-benchmark.rkt"
+         "../../configurations/config.rkt"
          "../../util/path-utils.rkt"
          "../../util/program.rkt"
          "common.rkt"

@@ -18,10 +18,8 @@
 
          select-anything-but-specially-handle-get/setters-for-field-swaps)
 
-(require "logger.rkt"
-         "mutate-util.rkt"
-         "mutated.rkt"
-         "mutator-lib.rkt"
+(require mutate/define
+         mutate/low-level
          syntax/parse
          syntax/parse/define)
 
@@ -130,7 +128,7 @@
               I)))
 (module+ test
   (require ruinit
-           "mutate-test-common.rkt")
+           mutate/tests/testing-util)
 
   (test-begin
     #:name in-swaps

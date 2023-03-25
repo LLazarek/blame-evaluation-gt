@@ -9,7 +9,7 @@
 (require "mutation-adapter.rkt"
          (only-in (submod "mutation-adapter.rkt" tds) td:base td:base?)
          "util.rkt"
-         "../mutate/type-api-mutators.rkt"
+         "../configurables/mutation/type-api-mutators.rkt"
          racket/runtime-path
          syntax/parse
          syntax/parse/define)

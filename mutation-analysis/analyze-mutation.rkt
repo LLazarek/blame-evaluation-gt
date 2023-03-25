@@ -141,10 +141,7 @@
   (define output-regexp
     (pregexp @~a{
                  (?m:@;
-                 mutate: type: (\S+)$
-                 mutate: Mutating.+$
-                 (.+
-                 )*@;
+                 ^mutate: Mutating with (.+) : .+ -> .+$
                  (#s\(run-status.+)$@;
                  )
            }))
@@ -154,7 +151,7 @@
                                  (file->string f))))
   (match trimmed-output
     [(regexp output-regexp
-             (list _ mutation-type _ rs-string))
+             (list _ mutation-type rs-string))
      (define the-run-status (with-input-from-string rs-string read))
      (define type-error? (equal? (run-status-outcome the-run-status)
                                  'type-error))

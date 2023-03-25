@@ -5,12 +5,10 @@
 
 (require racket/function
          syntax/parse
-         "../../mutate/mutate-expr.rkt"
-         "../../mutate/mutate-program.rkt"
-         "../../mutate/mutator-lib.rkt"
-         "../../mutate/mutators.rkt"
-         "../../mutate/top-level-selectors.rkt"
-         "../../mutate/expression-selectors.rkt")
+         mutate/define
+         mutate/low-level
+         mutate/traversal
+         "mutators.rkt")
 
 (define active-mutators
   (list arithmetic-op-swap
@@ -42,7 +40,8 @@
                           #:top-level-select
                           [top-level-selector select-define-body]
                           #:expression-select
-                          [expression-selector select-exprs-as-if-untyped])
+                          [expression-selector select-exprs-as-if-untyped]
+                          #:transformer [transform identity])
   (define instantiated-dependent-mutators
     (for/list ([make-mutator (in-list active-dependent-mutators)])
       (make-mutator module-body-stxs the-program)))
@@ -53,8 +52,9 @@
                     instantiated-dependent-mutators))
      #:select expression-selector))
   (define mutate-program
-    (make-program-mutator mutate-expr
-                          top-level-selector))
+    (transform
+     (make-program-mutator mutate-expr
+                           #:select top-level-selector)))
   (mutate-program module-body-stxs mutation-index))
 
 (module+ test
@@ -63,13 +63,7 @@
            ruinit
            syntax/parse
            syntax/parse/define
-           "../../mutate/mutate-expr.rkt"
-           "../../mutate/mutate-program.rkt"
-           "../../mutate/mutate-test-common.rkt"
-           "../../mutate/mutator-lib.rkt"
-           "../../mutate/mutators.rkt"
-           "../../mutate/top-level-selectors.rkt"
-           "../../mutate/expression-selectors.rkt"
+           mutate/tests/testing-util
            "../../util/program.rkt")
 
   (define (mutate-program module-body-stxs mutation-index
@@ -77,38 +71,39 @@
                                                            #'(module main racket (#%module-begin)))
                                                       empty)]
                           #:top-level-select [top-level-selector select-define-body]
-                          #:expression-select [select select-any-expr])
+                          #:expression-select [select select-any-expr]
+                          #:transformer [transform identity])
     (mutate-benchmark module-body-stxs mutation-index
                       #:top-level-select top-level-selector
                       #:expression-select select
-                      #:program program))
+                      #:program program
+                      #:transformer transform))
 
   (define mutate-syntax
-    (syntax-only mutate-program))
+    (curry mutate-program #:transformer syntax-only))
 
   (define mutate-program/no-counter
-    (without-counter mutate-program))
+    (curry mutate-program #:transformer without-counter))
 
-  (define (mutate-syntax/define/c stx
-                                  mutation-index)
-    (match-define (mutated-program mutated-stx mutated-id)
-      (mutate-program/define/c stx mutation-index))
-    mutated-stx)
+  (define mutate-syntax/define/c
+    (curry mutate-syntax
+           #:top-level-select select-define/contract-body))
 
-  (define (mutate-program/define/c stx mutation-index)
-    (mutate-program/no-counter stx mutation-index))
+  (define mutate-program/define/c
+    (curry mutate-program/no-counter
+           #:top-level-select select-define/contract-body))
 
 
   (define-test (test-mutation index orig-prog new-prog
-                              [mutate-syntax mutate-syntax/define/c])
-    (with-handlers ([mutation-index-exception?
-                     (λ _
-                       (fail "Mutation index exceeded"))])
-      (test-programs-equal?
-       (mutate-syntax orig-prog index)
-       new-prog)))
+                              [mutate-syntax mutate-syntax])
+    (define mutated (mutate-syntax orig-prog index))
+    (if (equal? mutated no-more-mutations-flag)
+        (fail "Mutation index exceeded")
+        (test-programs-equal?
+         mutated
+         new-prog)))
   (define-test (test-mutation/sequence orig-program expects
-                                       [mutate-syntax mutate-syntax/define/c])
+                                       [mutate-syntax mutate-syntax])
     (for/and/test ([expect (in-list expects)])
                   (match-define (list mutation-index expected) expect)
                   (define result (test-mutation mutation-index
@@ -151,11 +146,11 @@
      0
      #'{(define a 3.5)}
      #'{(define a -3.5)})
-    (test-exn
-     mutation-index-exception?
+    (test-equal?
      (mutate-syntax/define/c
       #'{(define a (λ (x) x))}
-      0))
+      0)
+     no-more-mutations-flag)
 
     (test-mutation/sequence
      #'{(define a 1)
@@ -437,14 +432,14 @@
 
   (test-begin
     #:name out-of-mutations
-    (test-exn
-     mutation-index-exception?
+    (test-equal?
      (mutate-program #'{(define (f x)
                           (or x #t))
                         (define b (begin 1 2))
                         (define (g x)
                           (if x 1 x))}
-                     25)))
+                     25)
+     no-more-mutations-flag))
 
 
   (test-begin
@@ -686,7 +681,7 @@
     #:name mutated-id-reporting
     (test-equal?
      (mutated-program-mutated-id
-      (mutate-program/define/c
+      (mutate-program/no-counter
        #'{(define (f x)
             (<= x 2))
           (define b 2)}
@@ -694,7 +689,7 @@
      'f)
     (test-equal?
      (mutated-program-mutated-id
-      (mutate-program/define/c
+      (mutate-program/no-counter
        #'{(define (f x)
             (<= x 2))
           (define b 2)}
@@ -702,7 +697,7 @@
      'b)
     (test-equal?
      (mutated-program-mutated-id
-      (mutate-program/define/c
+      (mutate-program/no-counter
        #'{(displayln "B")
           (define c 1)
           (define d
@@ -1062,7 +1057,7 @@
 
     (test-equal?
      (mutated-program-mutated-id
-      (mutate-program/define/c
+      (mutate-program/no-counter
        #'{(provide
            command%
            CMD*
@@ -1138,12 +1133,13 @@
                               #:reconstructor [test-reconstructor (λ _ #t)])
     (define selector/ctc (contract top-level-selector/c selector
                                    'the-selector 'the-test))
-    (call-with-values
-     (thunk (selector/ctc stx))
-     (λ (parts name reconstructor)
-       (and/test (test-parts parts)
-                 (test-name name)
-                 (test-reconstructor reconstructor)))))
+    (let expand-result ([res (selector/ctc stx)])
+      (match res
+          [(list parts name reconstructor)
+           (and/test (test-parts parts)
+                     (test-name name)
+                     (test-reconstructor reconstructor))]
+          [#f (expand-result (list #f #f #f))])))
   (define (make-name-test expected)
     (λ (name) (test-equal? name expected)))
   (define (make-parts-test expected)
@@ -1178,14 +1174,14 @@
      #:reconstructor (make-reconstructor-test (list #'42)
                                               #'42))
     (test-selector
-     select-define/contract
+     select-define/contract-body
      #'(define/contract (f x) ctc (+ y y))
      #:name (make-name-test 'f)
      #:parts (make-parts-test (list #'(begin (+ y y))))
      #:reconstructor (make-reconstructor-test (list #'(begin foo))
                                               #'(define/contract (f x) ctc foo)))
     (test-selector
-     select-define/contract
+     select-define/contract-body
      #'(define (f x) (+ y y))
      #:name false?
      #:parts false?
@@ -1203,11 +1199,11 @@
      (λ (stx mi)
        (mutate-syntax stx mi
                       #:top-level-select select-define-body)))
-    (test-exn mutation-index-exception?
-              (mutate-program #'{(foobar)
-                                 (define (f x)
-                                   (+ y y))}
-                              1)))
+    (test-equal? (mutate-program #'{(foobar)
+                                    (define (f x)
+                                      (+ y y))}
+                                 1)
+                 no-more-mutations-flag))
 
   (test-begin
     #:name expr-filtering

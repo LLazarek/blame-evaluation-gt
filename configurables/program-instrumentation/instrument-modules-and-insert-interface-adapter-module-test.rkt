@@ -2,9 +2,8 @@
 
 (require "instrument-modules-and-insert-interface-adapter-module.rkt"
          "../../util/program.rkt"
-         "../../util/logging.rkt"
          "../../util/path-utils.rkt"
-         "../../mutate/logger.rkt"
+         mutate/logger
          "../../mutation-adapter/generate-adapters.rkt"
          "../../runner/instrumented-runner.rkt"
          "instrument-program.rkt")
@@ -12,7 +11,7 @@
 (require ruinit
          racket/runtime-path
          syntax/parse
-         "../../mutate/type-api-mutators.rkt"
+         "../mutation/type-api-mutators.rkt"
          "../configurables.rkt")
 
 (test-begin
@@ -69,8 +68,7 @@
               (compose1 test:mod->resolved-module
                         (match-lambda
                           [(mod (== (~a mod-path-prefix type-interface-file-name)) _)
-                           (log-mutation-type mutation-type)
-                           (apply log-mutation logged-stxs)
+                           (log-mutation (first logged-stxs) (second logged-stxs) mutation-type)
                            (mod (~a mod-path-prefix type-interface-file-name)
                                 (make-interface-mod-body-stx interface-mutated-body))]
                           [other other])))

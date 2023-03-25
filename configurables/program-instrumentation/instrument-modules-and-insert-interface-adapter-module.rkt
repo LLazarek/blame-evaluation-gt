@@ -13,9 +13,9 @@
          type-interface-file-rename)
 
 (require "../../util/program.rkt"
-         "../../util/logging.rkt"
          "../../util/path-utils.rkt"
-         "../../mutate/logger.rkt"
+         "../../util/logging.rkt"
+         mutate/logger
          "../../mutation-adapter/generate-adapters.rkt"
          "../../runner/instrumented-runner.rkt"
          "instrument-program.rkt"
@@ -54,41 +54,22 @@
                       adapter-mod-stx
                       make-instrumented-module))
 
-(struct type (name) #:transparent)
-(struct mutating () #:transparent)
-
 (define (instrument-program/get-mutation-type a-program make-instrumented-module)
   (define-values {mutation-log-messages instrumented-program}
     (with-collected-log-messages mutate-logger 'info 'mutate
-      (match-lambda [(vector level
-                             (regexp @~a{^mutate: @log-prefix:mutation-type (.+)$}
-                                     (list _ type-name))
-                             msg
+      (match-lambda [(vector _
+                             _
+                             (list type before-stx after-stx)
                              _)
-                     (type type-name)]
-                    [(vector level
-                             (regexp @~a{^mutate: @log-prefix:mutating .*})
-                             msg
-                             _)
-                     (mutating)]
+                     (list type before-stx after-stx)]
                     [other #f])
       (thunk (instrument-all-the-modules a-program make-instrumented-module))))
-  (define mutation-type (find-mutation-type (filter-not false? mutation-log-messages)))
+  (define mutation-type (match (filter-not false? mutation-log-messages)
+                          [(list (list type _ _)) type]
+                          [else
+                           (error 'instrument-program/get-mutation-type
+                                  "instrumenting the program did not log a mutation")]))
   (values instrumented-program mutation-type))
-
-;; (listof (or/c type? mutating?)) -> string?
-;; Assumption: there's only one `mutating?` in `mutation-log-messages`, and
-;; there's at least one `type?` before it.
-(define (find-mutation-type mutation-log-messages)
-  (match mutation-log-messages
-    [(list _ ... (type type-name) (mutating) _ ...)
-     type-name]
-    [else
-     (error 'find-mutation-type
-            @~a{
-                expected a sequence of mutation type messages followed by mutating message @;
-                in mutation log messages, but didn't find it
-                })]))
 
 ;; program/c . -> . (or/c mod/c #f)
 (define (program->interface-mod a-program)
@@ -139,7 +120,7 @@
 (module+ test
   (require ruinit
            racket/runtime-path
-           "../../mutate/type-api-mutators.rkt"
+           "../mutation/type-api-mutators.rkt"
            "../configurables.rkt")
 
   (define-runtime-path type-api-mutators.rkt "../../mutation-adapter/mutation-adapter.rkt")
@@ -149,10 +130,7 @@
   (define ((make-test-mod-instrumentor mutation-type new-interface-stx) a-mod)
     (match a-mod
       [(mod (== type-interface-file-name) _)
-       (log-mutation-type (~a "not " mutation-type))
-       (log-mutation-type mutation-type)
-       (log-mutation 1 2)
-       (log-mutation-type (~a "not " mutation-type))
+       (log-mutation 1 2 mutation-type)
        (make-test-resolved-mod type-interface-file-name new-interface-stx)]
       [(mod path stx)
        (make-test-resolved-mod path stx)]))

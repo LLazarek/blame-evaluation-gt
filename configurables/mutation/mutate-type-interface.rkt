@@ -10,10 +10,10 @@
          racket/format
          racket/match
          racket/list
-         "../../mutate/type-api-mutators.rkt"
-         "../../mutate/mutate-expr.rkt"
-         "../../mutate/mutate-program.rkt"
-         "../../mutate/mutator-lib.rkt")
+         mutate/define
+         mutate/low-level
+         mutate/traversal
+         "type-api-mutators.rkt")
 
 (define active-mutators (list base-type->Any
                               complex-type->Any
@@ -54,31 +54,34 @@
       name+type ...)
      (match-define (list (t+r types name+type-reconstructors) ...)
        (parse-name+types (attribute name+type)))
-     (values types
-             (syntax->datum #'mod-path)
-             (λ (new-types)
-               (quasisyntax/loc this-syntax
-                 (r/t/c/p mod-path
-                          #,@(map (λ (f stx) (f stx))
-                                  name+type-reconstructors
-                                  new-types)))))]
+     (list types
+           (syntax->datum #'mod-path)
+           (λ (new-types)
+             (quasisyntax/loc this-syntax
+               (r/t/c/p mod-path
+                        #,@(map (λ (f stx) (f stx))
+                                name+type-reconstructors
+                                new-types)))))]
     [({~and {~datum define-type} d-t} name:id type)
-     (values (list (attribute type))
-             (syntax->datum #'name)
-             (λ (new-type)
-               (quasisyntax/loc this-syntax
-                 (d-t name #,@new-type))))]
+     (list (list (attribute type))
+           (syntax->datum #'name)
+           (λ (new-type)
+             (quasisyntax/loc this-syntax
+               (d-t name #,@new-type))))]
     [({~and {~or* {~datum struct} {~datum struct:}} struct} {~or name:id (name:id parent:id)} ([field-name:id {~datum :} field-type] ...)
                                                             #:prefab
                                                             {~optional {~seq #:type-name type-name:id}})
-     (values (list this-syntax)
-             (syntax->datum #'name)
-             first)]
-    [_ (values #f #f #f)]))
+     (list (list this-syntax)
+           (syntax->datum #'name)
+           first)]
+    [_ #f]))
 
-(define mutate-type-interface (make-program-mutator mutate-type-expr select-interface-types))
-(define (mutate-benchmark module-body-stxs mutation-index #:program [_ignored #f])
-  (mutate-type-interface module-body-stxs mutation-index))
+(define mutate-type-interface (make-program-mutator mutate-type-expr #:select select-interface-types))
+(define (mutate-benchmark module-body-stxs
+                          mutation-index
+                          #:program [_ignored #f]
+                          #:transform [transformer identity])
+  ((transformer mutate-type-interface) module-body-stxs mutation-index))
 
 
 (define (count-type-mutations a-type)
@@ -86,29 +89,27 @@
     (mutate-type-interface (datum->syntax #f (list a-type)) index))
 
   (let next ([i 0])
-    (with-handlers ([mutation-index-exception? (λ _ i)])
-      (mutate-type a-type i)
-      (next (add1 i)))))
+    (if (equal? (mutate-type a-type i) no-more-mutations-flag)
+        i
+        (next (add1 i)))))
 
 (module+ test
   (require ruinit
-           "../../mutate/mutate-test-common.rkt")
-  (define-test (test-mutation index orig-prog new-prog
-                              [mutate-syntax (syntax-only mutate-benchmark)])
-    (with-handlers ([mutation-index-exception?
-                     (λ _
-                       (fail "Mutation index exceeded"))])
-      (test-programs-equal?
-       (mutate-syntax orig-prog index)
-       new-prog)))
-  (define-test (test-mutation/sequence orig-program expects
-                                       [mutate-syntax (syntax-only mutate-benchmark)])
+           mutate/tests/testing-util)
+  (define mutate-syntax (curry mutate-benchmark #:transform syntax-only))
+  (define-test (test-mutation index orig-prog new-prog)
+    (define mutated (mutate-syntax orig-prog index))
+    (if (equal? mutated no-more-mutations-flag)
+        (fail "Mutation index exceeded")
+        (test-programs-equal?
+         mutated
+         new-prog)))
+  (define-test (test-mutation/sequence orig-program expects)
     (for/and/test ([expect (in-list expects)])
                   (match-define (list mutation-index expected) expect)
                   (define result (test-mutation mutation-index
                                                 orig-program
-                                                expected
-                                                mutate-syntax))
+                                                expected))
                   (extend-test-message result
                                        " (mutation index: ~v)"
                                        mutation-index)))

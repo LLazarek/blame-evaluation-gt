@@ -6,16 +6,11 @@
 (require racket/function
          syntax/parse
          racket/list
-         "../../mutate/mutated.rkt"
-         "../../mutate/mutate-expr.rkt"
-         "../../mutate/mutate-program.rkt"
-         "../../mutate/mutator-lib.rkt"
-         "../../mutate/mutate-util.rkt"
-         "../../mutate/mutators.rkt"
-         "../../mutate/logger.rkt"
-
-         "../../mutate/top-level-selectors.rkt"
-         "../../mutate/expression-selectors.rkt")
+         racket/stream
+         mutate/define
+         mutate/low-level
+         mutate/traversal
+         "mutators.rkt")
 
 (define-id-mutator known-type-generalization
   #:type "known-type-generalization"
@@ -38,7 +33,7 @@
 (module+ test
   (require ruinit
            racket
-           "../../mutate/mutate-test-common.rkt")
+           mutate/tests/testing-util)
 
   (test-begin
     #:name known-type-generalization
@@ -70,33 +65,25 @@
   (pattern {~or* {~datum ->}
                  {~datum ->*}}))
 
-(define (drop-ho-function-args stx mutation-index counter)
-  (define (drop-last-arg-if-arrow stx mutation-index counter)
-    (syntax-parse stx
-      [(inner-arrow:Arrow
-        argTs ... argT resultT)
-       (mdo* (def mutated-argTs
-               (maybe-mutate #'[argTs ... argT]
-                             #'[argTs ...]
-                             mutation-index
-                             counter))
-             [return
-              (quasisyntax/loc stx
-                (inner-arrow #,@mutated-argTs resultT))])]
-      [else (no-mutation stx mutation-index counter)]))
+(define-mutator (drop-ho-function-args stx mutation-index counter)
+  #:type "drop-ho-function-arg"
 
-  (log-mutation-type "drop-ho-function-arg")
+  (define-simple-mutator (drop-last-arg-if-arrow stx)
+    #:type (current-mutator-type)
+    #:pattern (inner-arrow:Arrow argTs ... argT resultT)
+    #'(inner-arrow argTs ... resultT))
+
   (syntax-parse stx
     [(outer-arrow:Arrow
       arg-or-resT ...)
-     (mdo* (def mutated-arg-or-resTs
-             (mutate-in-seq (attribute arg-or-resT)
-                            mutation-index
-                            counter
-                            drop-last-arg-if-arrow))
-           [return
-            (quasisyntax/loc stx
-              (outer-arrow #,@mutated-arg-or-resTs))])]
+     (mutated-do-single
+      [mutated-arg-or-resTs (mutate-in-sequence (attribute arg-or-resT)
+                                                mutation-index
+                                                counter
+                                                drop-last-arg-if-arrow)]
+      #:return
+      (quasisyntax/loc stx
+        (outer-arrow #,@mutated-arg-or-resTs)))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -118,7 +105,16 @@
                    #'(Class ClassTop (Any . -> . Any))
                    (list #'(Class ClassTop (Any . -> . Any))))))
 
-(define (drop-union-branch stx mutation-index counter)
+(define-simple-mutator (drop-union-branch stx)
+  #:pattern ({~and {~or {~datum Union} {~datum U}} u} branch ...)
+  (let ([branches (attribute branch)])
+    (for/stream ([i (in-range (length branches))])
+      (quasisyntax/loc stx
+        (u #,@(list-drop branches i))))))
+(define (list-drop l i)
+  (define-values {left i+rest} (split-at l i))
+  (append left (rest i+rest)))
+#;(define (drop-union-branch stx mutation-index counter)
   (define (drop-branch stx mutation-index counter)
     (maybe-mutate stx
                   #'[]
@@ -128,16 +124,16 @@
   (log-mutation-type "drop-union-branch")
   (syntax-parse stx
     [({~and {~or {~datum Union} {~datum U}} u} branch ...)
-     (mdo* (def mutated-branches
-             (mutate-in-seq (syntax->list #'([branch] ...))
-                            mutation-index
-                            counter
-                            drop-branch))
-           [return
-            (syntax-parse mutated-branches
-              [({~or* [branch*] []} ...)
-               (syntax/loc stx
-                 (u {~? branch*} ...))])])]
+     (mutated-do-single
+      [mutated-branches (mutate-in-seq (syntax->list #'([branch] ...))
+                                       mutation-index
+                                       counter
+                                       drop-branch)]
+      #:return
+      (syntax-parse mutated-branches
+        [({~or* [branch*] []} ...)
+         (syntax/loc stx
+           (u {~? branch*} ...))]))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -160,8 +156,10 @@
                    #'(Class ClassTop (Any . -> . Any))
                    (list #'(Class ClassTop (Any . -> . Any))))))
 
-(define (drop-class-methods stx mutation-index counter)
-  (define (drop-if-public-method stx mutation-index counter)
+(define-mutator (drop-class-methods stx mutation-index counter)
+  #:type "class:drop-method"
+  (define-mutator (drop-if-public-method stx mutation-index counter)
+    #:type (current-mutator-type)
     (syntax-parse stx
       [([{~not {~or* {~datum init}
                      {~datum init-field}
@@ -176,19 +174,18 @@
       [else
        (no-mutation stx mutation-index counter)]))
 
-  (log-mutation-type "class:drop-method")
   (syntax-parse stx
     [({~and class {~datum Class}} clause ...)
-     (mdo* (def mutated-clauses
-             (mutate-in-seq (syntax->list #'([clause] ...))
-                            mutation-index
-                            counter
-                            drop-if-public-method))
-           [return
-            (syntax-parse mutated-clauses
-              [({~or* [clause*] []} ...)
-               (syntax/loc stx
-                 (class {~? clause*} ...))])])]
+     (mutated-do-single
+      [mutated-clauses (mutate-in-sequence (syntax->list #'([clause] ...))
+                                           mutation-index
+                                           counter
+                                           drop-if-public-method)]
+      #:return
+      (syntax-parse mutated-clauses
+        [({~or* [clause*] []} ...)
+         (syntax/loc stx
+           (class {~? clause*} ...))]))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -228,21 +225,21 @@
                    #'(Class ClassTop (field [a Ta]))
                    (list #'(Class ClassTop (field [a Ta]))))))
 
-(define (swap-class-implements stx mutation-index counter)
-  (log-mutation-type "class:swap-implements")
+(define-mutator (swap-class-implements stx mutation-index counter)
+  #:type "class:swap-implements"
   (syntax-parse stx
     [({~and {~datum Class} class} before ... #:implements T after ...)
-     (mdo* (def mutated-implements-stx
-             (maybe-mutate (attribute T)
-                           #'ClassTop
-                           mutation-index
-                           counter))
-           [return
-            (quasisyntax/loc stx
-              (class
-                before ...
-                #:implements #,mutated-implements-stx
-                after ...))])]
+     (mutated-do-single
+      [mutated-implements-stx (maybe-mutate (attribute T)
+                                            #'ClassTop
+                                            mutation-index
+                                            counter)]
+      #:return
+      (quasisyntax/loc stx
+        (class
+          before ...
+          #:implements #,mutated-implements-stx
+          after ...)))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -269,8 +266,8 @@
                    #'(Class ClassTop (field [a Ta]))
                    (list #'(Class ClassTop (field [a Ta]))))))
 
-(define (make-optional-args-mandatory stx mutation-index counter)
-  (log-mutation-type "optional-args-mandatory")
+(define-mutator (make-optional-args-mandatory stx mutation-index counter)
+  #:type "optional-args-mandatory"
   (syntax-parse stx
     [({~and {~datum ->*} arrow} (mandatory-dom ...) optional-doms
                                 {~optional
@@ -308,8 +305,8 @@
                    #'(Class ClassTop (field [a Ta]))
                    (list #'(Class ClassTop (field [a Ta]))))))
 
-(define (replace-with-Any stx mutation-index counter)
-  (log-mutation-type "replace-with-Any")
+(define-mutator (replace-with-Any stx mutation-index counter)
+  #:type "replace-with-Any"
   (maybe-mutate stx
                 (syntax/loc stx Any)
                 mutation-index
@@ -335,26 +332,28 @@
                    (list #'Any
                          #'(Class ClassTop (field [a Ta]))))))
 
-(define (drop-case->-cases stx mutation-index counter)
-  (define (drop-case stx mutation-index counter)
-    {maybe-mutate stx
+(define-mutator (drop-case->-cases stx mutation-index counter)
+  #:type "drop-case->-case"
+  (define-mutator (drop-case stx mutation-index counter)
+    #:type (current-mutator-type)
+    (maybe-mutate stx
                   #'[]
                   mutation-index
-                  counter})
+                  counter))
 
-  (log-mutation-type "drop-case->-case")
   (syntax-parse stx
     [({~and arrow {~datum case->}}
       case ...)
-     (mdo* (def mutated-cases (mutate-in-seq (syntax->list #'([case] ...))
-                                             mutation-index
-                                             counter
-                                             drop-case))
-           [return
-            (syntax-parse mutated-cases
-              [({~or* [case*] []} ...)
-               (syntax/loc stx
-                 (arrow {~? case*} ...))])])]
+     (mutated-do-single
+      [mutated-cases (mutate-in-sequence (syntax->list #'([case] ...))
+                                         mutation-index
+                                         counter
+                                         drop-case)]
+      #:return
+      (syntax-parse mutated-cases
+        [({~or* [case*] []} ...)
+         (syntax/loc stx
+           (arrow {~? case*} ...))]))]
     [else
      (no-mutation stx mutation-index counter)]))
 
@@ -396,7 +395,7 @@
                     replace-with-Any
                     drop-case->-cases))
 
-(define (mutate-type-if-inside-annotation stx mutation-index counter)
+(define (mutate-type-if-inside-annotation stx mutation-index [counter 0])
   (define mutate (if (currently-inside-type-annotation?)
                      mutate-type
                      no-mutation))
@@ -452,24 +451,26 @@
                           #:top-level-select
                           [top-level-selector select-type-annotations+define-body]
                           #:expression-select
-                          [expression-selector select-type-annotation-exprs])
+                          [expression-selector select-type-annotation-exprs]
+                          #:transform [transformer identity])
   (define mutate-expr
     (make-expr-mutator mutate-type-if-inside-annotation
                        #:select expression-selector))
   (define mutate-program
-    (make-program-mutator mutate-expr
-                          top-level-selector))
+    (transformer
+     (make-program-mutator mutate-expr
+                           #:select top-level-selector)))
   (mutate-program module-body-stxs mutation-index))
 
 (module+ test
-  (define mutate-syntax (syntax-only mutate-benchmark))
+  (define mutate-syntax (curry mutate-benchmark #:transform syntax-only))
   (define-test (test-mutation index orig-prog new-prog)
-    (with-handlers ([mutation-index-exception?
-                     (λ _
-                       (fail "Mutation index exceeded"))])
-      (test-programs-equal?
-       (mutate-syntax orig-prog index)
-       new-prog)))
+    (define mutated (mutate-syntax orig-prog index))
+    (if (equal? mutated no-more-mutations-flag)
+        (fail "Mutation index exceeded")
+        (test-programs-equal?
+         mutated
+         new-prog)))
   (define-test (test-mutation/sequence orig-program expects)
     (for/and/test ([expect (in-list expects)])
                   (match-define (list mutation-index expected) expect)
@@ -689,7 +690,5 @@
                                                 (define y-l (string-length y))
                                                 (+ x y-l)])
                                          (f 78)}]))
-       (with-handlers ([mutation-index-exception? (const #t)])
-         (mutate-syntax p 12)
-         #f))
+       (equal? (mutate-syntax p 12) no-more-mutations-flag))
       @~a{ (define-f-with-body: @(object-name define-f-with-body))}))))

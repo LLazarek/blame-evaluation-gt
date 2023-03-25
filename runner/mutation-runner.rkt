@@ -15,8 +15,8 @@
          (only-in typed-racket/utils/tc-utils delay-errors?)
          "mutation-runner-data.rkt"
          "../configurables/configurables.rkt"
-         "../mutate/mutated.rkt"
-         "../mutate/mutate-program.rkt"
+         mutate/low-level
+         mutate/traversal
          "../util/path-utils.rkt"
          "../util/ctc-utils.rkt"
          "../util/read-module.rkt"
@@ -34,6 +34,10 @@
 
 (define current-mutated-program-exn-recordor (make-parameter #f))
 
+(struct mutation-index-exception exn:fail ())
+(define (raise-mutation-index-exception)
+  (raise (mutation-index-exception "" (current-continuation-marks))))
+
 (define (mutate-module the-module mutation-index #:in the-program)
   (define mutate-benchmark (configured:mutate-benchmark))
   (log-mutation-runner-info
@@ -42,12 +46,20 @@
     #:datum-literals [module]
     [(module name lang {~and mod-body (mod-begin body ...)})
      #:do [(define program-stx #'{body ...})
+           (define mutated-b (mutate-benchmark program-stx
+                                               mutation-index
+                                               #:program the-program))
+           (when (equal? mutated-b no-more-mutations-flag)
+             (log-mutation-runner-warning
+              @~a{
+                  configured mutator @mutate-benchmark has no mutant @;
+                  @the-module @"@" @mutation-index
+                  })
+             (raise-mutation-index-exception))
            (match-define (mutated (mutated-program program-stx/mutated
                                                    mutated-id)
                                   _)
-             (mutate-benchmark program-stx
-                               mutation-index
-                               #:program the-program))]
+             mutated-b)]
      #:with program/mutated program-stx/mutated
      #:with mutated-mod-stx
      (datum->syntax #'mod-body

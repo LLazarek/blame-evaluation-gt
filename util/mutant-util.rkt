@@ -22,7 +22,7 @@
           [max-mutation-index-exceeded?
            (path-to-existant-file? natural? program/c . -> . boolean?)]
           [extract-mutation
-           (mod/c natural? program/c . -> . (list/c symbol? (list/c any/c any/c)))]
+           (mod/c natural? program/c . -> . (list/c symbol? string? (list/c any/c any/c)))]
 
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
@@ -32,8 +32,8 @@
 (require racket/runtime-path
          racket/logging
          syntax/parse
-         "../mutate/logger.rkt"
-         "../mutate/expression-selectors.rkt"
+         mutate/logger
+         mutate/traversal
          "../configurations/configure-benchmark.rkt"
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
@@ -157,8 +157,8 @@
   (define mutated-id
     (with-intercepted-logging
       (match-lambda
-        [(vector _ _ (list before after) _)
-         (set-box! mutated-expr (list before after))]
+        [(vector _ _ (and l (list type before after)) _)
+         (set-box! mutated-expr l)]
         [other (void)])
       (thunk
        (define-values {_ id}
@@ -166,9 +166,13 @@
        id)
       #:logger mutate-logger
       'info))
-  (define mutated-expr/annotations-stripped
-    (normalize (unbox mutated-expr)))
+  (define-values {mutation-type mutated-expr/annotations-stripped}
+    (match (unbox mutated-expr)
+      [(list type before after)
+       (values type (normalize (list before after)))]
+      [else (values #f #f)]))
   (list mutated-id
+        mutation-type
         mutated-expr/annotations-stripped))
 
 (define (strip-annotations mutated-expr)
@@ -245,11 +249,11 @@
                                        (define x (+ 'a 'b))))))
             (define test-prog (program test-mod empty)))
     (test-equal? (extract-mutation test-mod 1 test-prog)
-                 '(x (+ -)))
+                 '(x "arithmetic-op-swap" (+ -)))
     (ignore (define test-mod-typed (mod "test.rkt"
                                   #'(module test racket
                                       (#%module-begin
                                        (define x ((ann + T) 'a 'b))))))
             (define test-prog-typed (program test-mod-typed empty)))
     (test-equal? (extract-mutation test-mod-typed 1 test-prog-typed)
-                 '(x (+ -)))))
+                 '(x "arithmetic-op-swap" (+ -)))))
