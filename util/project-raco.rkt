@@ -12,21 +12,15 @@
 ;;   - uses *-progress.log files to report on the progress of operations
 ;;   - for the main experiment, it can count how many mutants have completed
 
-(require file/glob)
+(require setup/getinfo)
 
 (define-runtime-paths
   [blame-evaluation-gt "../"])
-(define glob-patterns-to-ignore
-  '("mutation-analysis/plot-*mutation-analyses.rkt"
-    "mutation-analysis/categorize-mutants.rkt"
-    "util/places-suck-demonstration.rkt"
-    "util/mutation-index-cache-performance-check.rkt"
-    "data-analysis/*"
-    "configurables/errortrace-configs/*"
-    "configurables/code-mutation-configs/*"))
+(define patterns-to-ignore
+  ((get-info/full blame-evaluation-gt) 'compile-omit-paths))
 (define (ignored-path? p)
-  (ormap (λ (pat) (glob-match? pat p))
-         glob-patterns-to-ignore))
+  (ormap (λ (pat) (regexp-match? pat p))
+         patterns-to-ignore))
 (define raco (build-path blame-evaluation-gt ".." "racket" "bin" "raco"))
 
 (main

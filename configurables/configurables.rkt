@@ -1,11 +1,4 @@
-#lang at-exp racket
-
-(provide configure!
-         install-configuration!
-         current-configuration-path
-         call-with-configuration)
-
-(require "configurable-implementation.rkt")
+#lang configurable/definition
 
 (define-configurable mutation
   #:provides [mutate-benchmark active-mutator-names]

@@ -199,3 +199,4 @@
            #:width 1700
            #:height 1000)))
 
+(module test racket/base)

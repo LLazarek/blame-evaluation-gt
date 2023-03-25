@@ -15,6 +15,7 @@
                "https://github.com/LLazarek/ruinit.git"
                "https://github.com/LLazarek/process-queue.git"
                "https://github.com/LLazarek/mutate.git"
+               "https://github.com/LLazarek/configurable.git"
 
                ;; data analysis
                "complot"
@@ -29,13 +30,15 @@
 
 (define scribblings '())
 
-(define test-omit-paths '("util/setup.rkt"
-                          "mutation-analysis/plot-mutation-analyses.rkt"
-                          "mutation-analysis/plot-new-mutation-analyses.rkt"
-                          "mutation-analysis/categorize-mutants.rkt"
-                          "data-analysis"
-                          "configurables/code-mutation-configs"
-                          "configurables/errortrace-configs"))
-(define compile-omit-paths '("mutation-analysis/plot-mutation-analyses.rkt"
-                             "mutation-analysis/plot-new-mutation-analyses.rkt"
-                             "data-analysis/spot-checking.rkt"))
+(define all-setup-ignore-paths
+  '("util/places-suck-demonstration.rkt"
+    "util/mutation-index-cache-performance-check.rkt"
+    "mutation-analysis/plot-mutation-analyses.rkt"
+    "mutation-analysis/plot-new-mutation-analyses.rkt"
+    #rx"configurables/.*-configs"
+    "data-analysis"))
+
+(define test-omit-paths (append '("util/setup.rkt")
+                                all-setup-ignore-paths))
+(define compile-omit-paths (append '("data-analysis/spot-checking.rkt")
+                                   all-setup-ignore-paths))

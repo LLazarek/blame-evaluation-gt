@@ -124,6 +124,8 @@
            "../configurables.rkt")
 
   (define-runtime-path type-api-mutators.rkt "../../mutation-adapter/mutation-adapter.rkt")
+  (define-runtime-path interface-adapter-test-config.rkt
+    "interface-adapter-test-config.rkt")
 
   (define (make-test-resolved-mod path stx)
     (resolved-module path #f #f #f stx))
@@ -162,7 +164,7 @@
       (test-equal? type type:function-arg-swap))
 
     ;; Now test some real mutation logging
-    (ignore (configure! mutation type-interface-mistakes)
+    (ignore (install-configuration! interface-adapter-test-config.rkt)
             (define the-program
               (program
                (mod "main.rkt" #'(module main racket
