@@ -14,7 +14,7 @@
                "https://github.com/LLazarek/rscript.git"
                "https://github.com/LLazarek/ruinit.git"
                "https://github.com/LLazarek/process-queue.git?path=process-queue"
-               "https://github.com/LLazarek/mutate.git?path=mutate-lib"
+               "https://github.com/LLazarek/mutate.git?path=mutate"
                "https://github.com/LLazarek/configurable.git?path=configurable"))
 
 (define scribblings '())
