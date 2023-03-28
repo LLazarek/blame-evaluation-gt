@@ -161,6 +161,9 @@
                                       (hash)
                                       (hash)
                                       0)
+                             < ;; lower priority value means schedule sooner (this was
+                               ;; unconfigurable with the original implementation, now just
+                               ;; stick to that original default)
                              #:kill-older-than (let-values ([{max-timeout _}
                                                              (increased-limits bench)])
                                                  (+ max-timeout 30)))])
@@ -748,7 +751,7 @@ Giving up.
   ;; lower priority means schedule sooner
   (define this-mutant-priority
     (if test-mutant?
-        ; test mutants have the lowest priority: we want to finish mutants faster
+        ; test mutants have the worst priority: we want to finish mutants faster
         1
         ; mutants progressing along a blame trail should be prioritized to finish the trail quickly
         (- (length (blame-trail-parts mutant-blame-trail)))))

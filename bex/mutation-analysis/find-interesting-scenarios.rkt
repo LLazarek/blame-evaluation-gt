@@ -345,6 +345,7 @@
    (for/fold ([q (make-process-queue process-limit
                                  ; (listof (list/c benchmark-name? scenario?))
                                  empty
+                                 <
                                  #:kill-older-than (* 5 60))])
              ([benchmark-name (in-list (db:keys summaries-db))])
      (define benchmark-path (build-path benchmarks-dir benchmark-name))
