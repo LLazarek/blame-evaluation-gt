@@ -127,6 +127,91 @@
 (define (failure-msg failure-type m)
   (string-append "***** " (~a failure-type) " *****\n" m "\n**********"))
 
+;; Main entry point of the factory
+(define/contract (run-all-gradual bench
+                                  #:log-progress log-progress!
+                                  #:load-progress load-result-cache)
+  (benchmark/c
+   #:log-progress (module-name? natural? natural? path-to-existant-file? . -> . any)
+   #:load-progress (-> (module-name? natural? natural? . -> . (or/c #f path-to-existant-file?)))
+   . -> .
+   boolean? ; experiment complete and sanity checks pass?
+   )
+
+  (parameterize ([current-progress-logger log-progress!]
+                 [current-result-cache (load-result-cache)])
+    (log-factory info @~a{Running on benchmark @bench})
+
+    (define max-config (make-max-bench-config bench))
+    (log-factory info "Benchmark has mutatable modules:~n~a"
+                 mutatable-module-names)
+
+    (unless (directory-exists? (data-output-dir))
+      (log-factory debug "Creating output directory ~a." (data-output-dir))
+      (make-directory (data-output-dir)))
+
+    (define N-samples-please
+      ((configured:make-bt-root-sampler) (factory-bench the-factory)
+                                         mutant-program))
+    (define samples (N-samples-please (sample-size)))
+    (define (resample a-factory)
+      (first (N-samples-please 1)))
+    (define select-mutants (configured:select-mutants))
+    (define process-q
+      (for/fold ([process-q (make-process-queue
+                             (process-limit)
+                             (factory (bench-info bench max-config)
+                                      (hash)
+                                      (hash)
+                                      0)
+                             < ;; lower priority value means schedule sooner (this was
+                               ;; unconfigurable with the original implementation, now just
+                               ;; stick to that original default)
+                             #:kill-older-than (let-values ([{max-timeout _}
+                                                             (increased-limits bench)])
+                                                 (+ max-timeout 30)))])
+                ([sampled-config (in-list samples)]
+                 [sample-number (in-naturals)]
+                 #:when #t
+                 [test-set (in-list ???)])
+        (run-all-mutants process-q
+                         sampled-config
+                         (λ (process-q)
+                           (calculate-mutation-score)
+                           ;; remove tests, add new processes
+                           ))))
+
+    (log-factory info "Finished enqueing all test mutants. Waiting...")
+    (define process-q-finished (process-queue-wait process-q))
+    (report-completion/sanity-checks bench
+                                     select-mutants
+                                     (load-result-cache))))
+
+;; total-mutants-spawned: natural?
+;;     Count of the total number of mutants spawned by this factory.
+;;     This is primarily useful to making every new mutant file unique.
+(struct factory (bench   ;; benchmark/c
+                 results ;; map from config to pair: number of failures, number of total mutants
+                 total-mutants-spawned)
+  #:transparent)
+
+(define (run-all-mutants process-q
+                         config
+                         will)
+  (define bench (bench-info-benchmark (factory-bench (process-queue-data process-q))))
+  (define select-modules (configured:select-modules-to-mutate))
+  (define mutatable-module-names (select-modules bench))
+  (for/fold ([process-q process-q])
+            ([module-to-mutate-name mutatable-module-names]
+             #:when #t
+             [mutation-index (select-mutants module-to-mutate-name
+                                             bench)])
+    (spawn-mutant process-q
+                      module-to-mutate-name
+                      mutation-index
+                      config
+                      will
+                      #:test-mutant? #f)))
 
 ;; Main entry point of the factory
 (define/contract (run-all-mutants*configs bench
