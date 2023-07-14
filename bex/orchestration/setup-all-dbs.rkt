@@ -135,22 +135,32 @@
   -s (~a dyn-err-summaries.rktdb)
   -o #:result (outpath "interesting-mutant-summaries.rktdb"))
 
-(define/racket-runner (sample-mutants! outdir interesting-mutants.rktdb)
+(define/racket-runner (sample-mutants! outdir
+                                       number-of-mutants
+                                       #:from-interesting [interesting-mutants.rktdb #f]
+                                       #:from-dyn-err     [dyn-err-summaries.rktdb #f])
   ../configurables/mutant-sampling/generate-samples-within-mutators.rkt
   -c (~a TR-config)
-  ;; -s (build-path outdir "dyn-err-summaries.rktdb")
-  -S (~a interesting-mutants.rktdb)
+  (cond [interesting-mutants.rktdb
+         `(-S ,interesting-mutants.rktdb)]
+        [dyn-err-summaries.rktdb
+         `(-s ,dyn-err-summaries.rktdb)]
+        [else
+         (error 'sample-mutants!
+                "Missing #:from-* keyword specificying from which set to sample mutants.")])
   -b (~a benchmarks-dir)
-  -n 10000 ;; just a big number. We want all of the mutants right now.
+  -n (~a number-of-mutants)
   -o #:result (build-path outdir "mutant-samples.rktdb"))
 
-(define/racket-runner (select-bt-roots! outdir mutant-samples.rktdb interesting-scenarios.rktdb)
+(define/racket-runner (select-bt-roots! outdir mutant-samples.rktdb [interesting-scenarios.rktdb #f])
   #:helper (define (outpath name)
              (build-path outdir name))
   ../configurables/bt-root-sampling/pre-select-bt-roots.rkt
   -d (~a mutant-samples.rktdb)
   -c (~a TR-config)
-  -i (~a interesting-scenarios.rktdb)
+  (if interesting-scenarios.rktdb
+      (list "-i" interesting-scenarios.rktdb)
+      empty)
   -o (outpath "pre-selected-bt-roots.rktdb"))
 
 (define (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir mutant-samples.rktdb)
@@ -169,6 +179,7 @@
 (main
  #:arguments ([(hash-table ['no-viz? no-viz?]
                            ['viz-only? viz-only?]
+                           ['interesting-scenario-search? interesting-scenario-search?]
                            _ ...)
                (list outdir)]
               #:once-each
@@ -187,9 +198,16 @@
                "Only generate visualizations."
                #:record
                #:conflicts '(no-viz?)]
+              [("-i" "--search-for-interesting-scenarios")
+               'interesting-scenario-search?
+               "Instead of considering interesting all scenarios in the lattice of interesting mutants, run mutation-analysis/find-interesting-scenarios.rkt to find them."
+               #:record]
               #:args [outdir])
  #:check [(natural? (cpus))
           @~a{CPUs must be a natural number.}]
+
+ (file-stream-buffer-mode (current-output-port) 'line)
+
  (rebuild!)
 
  (define (viz!)
@@ -206,18 +224,29 @@
 
         (unless no-viz? (viz!))
 
-        ;; todo: reify the alternative flow here where mutants are sampled without info
-        ;; about interesting scenarios? (ie assuming all scenarios in the lattice are
-        ;; interesting)
-        (displayln "Searching for interesting scenarios...")
-        (define interesting-scenarios.rktdb (find-interesting-scenarios! outdir
-                                                                         dyn-err-summaries.rktdb))
-        (displayln "Summarizing interesting mutants from scenarios...")
-        (define interesting-mutants.rktdb (summarize-interesting-mutants! outdir
-                                                                          interesting-scenarios.rktdb
-                                                                          dyn-err-summaries.rktdb))
-        (displayln "Sampling interesting mutants...")
-        (define mutant-samples.rktdb (sample-mutants! outdir interesting-mutants.rktdb))
+        (define-values {mutant-samples.rktdb interesting-scenarios.rktdb}
+          (cond [interesting-scenario-search?
+                 (displayln "Searching for interesting scenarios...")
+                 (define interesting-scenarios.rktdb
+                   (find-interesting-scenarios! outdir
+                                                dyn-err-summaries.rktdb))
+                 (displayln "Summarizing interesting mutants from scenarios...")
+                 (define interesting-mutants.rktdb
+                   (summarize-interesting-mutants! outdir
+                                                   interesting-scenarios.rktdb
+                                                   dyn-err-summaries.rktdb))
+                 (displayln "Sampling interesting mutants...")
+                 (define mutant-samples.rktdb
+                   (sample-mutants! outdir 1000
+                                    #:from-interesting interesting-mutants.rktdb))
+                 (values mutant-samples.rktdb interesting-scenarios.rktdb)]
+                [else
+                 (displayln "Sampling mutants...")
+                 (define mutant-samples.rktdb
+                   (sample-mutants! outdir 1000
+                                    #:from-dyn-err dyn-err-summaries.rktdb))
+                 (values mutant-samples.rktdb
+                         #f)]))
         (displayln "Selecting BT roots for mutant samples...")
         (select-bt-roots! outdir mutant-samples.rktdb interesting-scenarios.rktdb)
         (displayln "Pre-computing mutant results for erasure...")
