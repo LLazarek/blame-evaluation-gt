@@ -12,7 +12,7 @@
          "random-config.rkt")
 
 (define-runtime-paths
-  [default-benchmarks-dir "../../../gtp-benchmarks/benchmarks"])
+  [default-benchmarks-dir "../../../../gtp-benchmarks/benchmarks"])
 
 ;; benchmark/c
 ;; (hash/c mod-name? (listof mutation-index?))
