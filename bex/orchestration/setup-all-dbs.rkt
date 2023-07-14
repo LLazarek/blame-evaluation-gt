@@ -6,7 +6,7 @@
          file/glob
          syntax/parse/define)
 
-(define cpus 5)
+(define cpus (make-parameter 5))
 (define-runtime-paths
   [mutation-analysis-config "../configurables/configs/mutation-type-error-analysis.rkt"]
   [mutation-analysis-dir "../mutation-analysis"]
@@ -67,7 +67,7 @@
   #:pre-flags [-O "debug@mutation-analysis" -W "warning@mutation-analysis"]
   ../mutation-analysis/analyze-mutation.rkt
   -b (build-path benchmarks-dir bench-name)
-  -n (~a cpus)
+  -n (~a (cpus))
   -e (outpath 'errs.log)
   -l #:result (outpath 'progress.log)
   -c (~a mutation-analysis-config)
@@ -89,7 +89,7 @@
   -b (~a benchmarks-dir)
   -l (outpath "dyn-err-summaries-progress.log")
   -d (~a scratch-dir)
-  -j (~a cpus)
+  -j (~a (cpus))
   -m natural-bot
   -o #:result (outpath "dyn-err-summaries.rktdb"))
 
@@ -122,7 +122,7 @@
   -b (~a benchmarks-dir)
   -l (outpath "interesting-scenarios-progress.log")
   -d (~a scratch-dir)
-  -j (~a cpus)
+  -j (~a (cpus))
   -o #:result (outpath "interesting-scenarios.rktdb"))
 
 (define/racket-runner (summarize-interesting-mutants! outdir
@@ -167,33 +167,59 @@
   (build-path benchmarks-dir bench-name))
 
 (main
- #:arguments ([(hash-table)
+ #:arguments ([(hash-table ['no-viz? no-viz?]
+                           ['viz-only? viz-only?]
+                           _ ...)
                (list outdir)]
+              #:once-each
+              [("-j" "--cpus")
+               'cpus
+               ("How many CPUs to use when possible."
+                @~a{Default: @(cpus)})
+               #:collect {"N" (set-parameter cpus string->number) (cpus)}]
+              [("-v" "--no-viz")
+               'no-viz?
+               "Skip generating visualizations."
+               #:record
+               #:conflicts '(viz-only?)]
+              [("-V" "--viz-only")
+               'viz-only?
+               "Only generate visualizations."
+               #:record
+               #:conflicts '(no-viz?)]
               #:args [outdir])
+ #:check [(natural? (cpus))
+          @~a{CPUs must be a natural number.}]
  (rebuild!)
- (displayln "Analyzing mutation...")
- (define progress-logs (analyze-mutation/all-benchmarks! outdir))
- (displayln "Summarizing mutation analysis...")
- (define type-err-summaries.rktdb (summarize-mutation-analyses! outdir progress-logs))
- (displayln "Filtering mutants for dynamic errors...")
- (define dyn-err-summaries.rktdb  (filter-mutants-for-dynamic-errors! outdir type-err-summaries.rktdb))
- (displayln "Plotting results...")
- (plot-mutation-analysis-results! outdir)
 
- ;; todo: reify the alternative flow here where mutants are sampled without info
- ;; about interesting scenarios? (ie assuming all scenarios in the lattice are
- ;; interesting)
- (displayln "Searching for interesting scenarios...")
- (define interesting-scenarios.rktdb (find-interesting-scenarios! outdir
-                                                                  dyn-err-summaries.rktdb))
- (displayln "Summarizing interesting mutants from scenarios...")
- (define interesting-mutants.rktdb (summarize-interesting-mutants! outdir
-                                                                   interesting-scenarios.rktdb
-                                                                   dyn-err-summaries.rktdb))
- (displayln "Sampling interesting mutants...")
- (define mutant-samples.rktdb (sample-mutants! outdir interesting-mutants.rktdb))
- (displayln "Selecting BT roots for mutant samples...")
- (select-bt-roots! outdir mutant-samples.rktdb interesting-scenarios.rktdb)
- (displayln "Pre-computing mutant results for erasure...")
- (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir mutant-samples.rktdb)
- (displayln "DB set up complete."))
+ (define (viz!)
+   (displayln "Plotting results...")
+   (plot-mutation-analysis-results! outdir))
+ (cond [viz-only? (viz!)]
+       [else
+        (displayln "Analyzing mutation...")
+        (define progress-logs (analyze-mutation/all-benchmarks! outdir))
+        (displayln "Summarizing mutation analysis...")
+        (define type-err-summaries.rktdb (summarize-mutation-analyses! outdir progress-logs))
+        (displayln "Filtering mutants for dynamic errors...")
+        (define dyn-err-summaries.rktdb  (filter-mutants-for-dynamic-errors! outdir type-err-summaries.rktdb))
+
+        (unless no-viz? (viz!))
+
+        ;; todo: reify the alternative flow here where mutants are sampled without info
+        ;; about interesting scenarios? (ie assuming all scenarios in the lattice are
+        ;; interesting)
+        (displayln "Searching for interesting scenarios...")
+        (define interesting-scenarios.rktdb (find-interesting-scenarios! outdir
+                                                                         dyn-err-summaries.rktdb))
+        (displayln "Summarizing interesting mutants from scenarios...")
+        (define interesting-mutants.rktdb (summarize-interesting-mutants! outdir
+                                                                          interesting-scenarios.rktdb
+                                                                          dyn-err-summaries.rktdb))
+        (displayln "Sampling interesting mutants...")
+        (define mutant-samples.rktdb (sample-mutants! outdir interesting-mutants.rktdb))
+        (displayln "Selecting BT roots for mutant samples...")
+        (select-bt-roots! outdir mutant-samples.rktdb interesting-scenarios.rktdb)
+        (displayln "Pre-computing mutant results for erasure...")
+        (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir mutant-samples.rktdb)
+        (displayln "DB set up complete.")]))
