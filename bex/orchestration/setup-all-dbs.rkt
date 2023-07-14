@@ -80,7 +80,9 @@
   -o #:result (build-path outdir "type-err-summaries.rktdb")
   (values progress-logs))
 
-(define/racket-runner (filter-mutants-for-dynamic-errors! outdir type-err-summaries.rktdb)
+(define/racket-runner (filter-mutants-for-dynamic-errors! outdir
+                                                          type-err-summaries.rktdb
+                                                          filtering-mode)
   #:helper (define (outpath name)
              (build-path outdir name))
   #:pre-flags [-O "info@mutant-dynamic-errors"]
@@ -90,7 +92,7 @@
   -l (outpath "dyn-err-summaries-progress.log")
   -d (~a scratch-dir)
   -j (~a (cpus))
-  -m natural-bot
+  -m (~a filtering-mode)
   -o #:result (outpath "dyn-err-summaries.rktdb"))
 
 (define (plot-mutation-analysis-results! outdir)
@@ -180,6 +182,7 @@
  #:arguments ([(hash-table ['no-viz? no-viz?]
                            ['viz-only? viz-only?]
                            ['interesting-scenario-search? interesting-scenario-search?]
+                           ['dyn-err-filtering-mode dyn-err-filtering-mode]
                            _ ...)
                (list outdir)]
               #:once-each
@@ -198,6 +201,12 @@
                "Only generate visualizations."
                #:record
                #:conflicts '(no-viz?)]
+              [("-d" "--dyn-err-filtering-mode")
+               'dyn-err-filtering-mode
+               ("Mode for filtering dynamic errors."
+                "See mutation-analysis/filter-mutants-for-dynamic-errors.rkt"
+                "Default: erasure-any")
+               #:collect {"name" take-latest "erasure-any"}]
               [("-i" "--search-for-interesting-scenarios")
                'interesting-scenario-search?
                "Instead of considering interesting all scenarios in the lattice of interesting mutants, run mutation-analysis/find-interesting-scenarios.rkt to find them."
@@ -220,7 +229,9 @@
         (displayln "Summarizing mutation analysis...")
         (define type-err-summaries.rktdb (summarize-mutation-analyses! outdir progress-logs))
         (displayln "Filtering mutants for dynamic errors...")
-        (define dyn-err-summaries.rktdb  (filter-mutants-for-dynamic-errors! outdir type-err-summaries.rktdb))
+        (define dyn-err-summaries.rktdb  (filter-mutants-for-dynamic-errors! outdir
+                                                                             type-err-summaries.rktdb
+                                                                             dyn-err-filtering-mode))
 
         (unless no-viz? (viz!))
 
