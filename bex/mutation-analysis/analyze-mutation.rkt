@@ -139,9 +139,10 @@
     #;(system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f})
     (file->string f))
   (define output-regexp
+    ;; assumption: mutation types don't have spaces in them
     (pregexp @~a{
                  (?m:@;
-                 ^mutate: Mutating with (.+) : .+ -> .+$
+                 ^mutate: Mutating with ([^ ]+) : .+ -> .+$
                  (#s\(run-status.+)$@;
                  )
            }))
