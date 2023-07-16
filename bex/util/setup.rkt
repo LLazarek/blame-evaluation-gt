@@ -7,7 +7,8 @@
 (define-runtime-paths
   [repo-parent-path "../../.."]
   [repo-path "../.."]
-  [dbs-dir "../dbs"])
+  [dbs-dir "../dbs"]
+  [this-mod "setup.rkt"])
 
 ;; ==================================================
 ;;  Modify these to configure setup
@@ -271,7 +272,7 @@
             '(interface for first from (only-in racket first))))
   (define modified-TR-active?
     (with-handlers ([exn:fail:contract:blame? error-has-interface-from?])
-      (dynamic-require `(submod (file ,(quote-source-file)) check-modified-TR) #f)
+      (dynamic-require `(submod (file ,(~a this-mod)) check-modified-TR) #f)
       #f))
 
   (define transient-lang-accepted?
