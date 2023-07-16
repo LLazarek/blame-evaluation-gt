@@ -9,7 +9,7 @@
 
 (define-runtime-paths
   [configs-dir "../configurables"]
-  [experiment-launch-dir "../.."])
+  [experiment-launch-dir "../../.."])
 
 (define (guess-path #:fail-thunk fail-f . parts)
   (define path (apply build-path parts))
