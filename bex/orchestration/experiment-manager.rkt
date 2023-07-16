@@ -62,7 +62,7 @@
                             host-project-path)
                 (field [data-store-path (build-path store-path (~a hostname ".rktd"))]
                        [host-racket-path (build-path host-project-path "racket" "bin" "racket")]
-                       [host-utilities-path (build-path host-project-path "blame-evaluation-gt" "util")]
+                       [host-utilities-path (build-path host-project-path "blame-evaluation-gt" "bex" "util")]
                        [host-data-path (build-path host-project-path "experiment-output")])
                 (define/public (custom-write port) (write hostname port))
                 (define/public (custom-display port) (display hostname port))
