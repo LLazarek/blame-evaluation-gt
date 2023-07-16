@@ -217,13 +217,12 @@
 
  (file-stream-buffer-mode (current-output-port) 'line)
 
- (rebuild!)
-
  (define (viz!)
    (displayln "Plotting results...")
    (plot-mutation-analysis-results! outdir))
  (cond [viz-only? (viz!)]
        [else
+        (rebuild!)
         (displayln "Analyzing mutation...")
         (define progress-logs (analyze-mutation/all-benchmarks! outdir))
         (displayln "Summarizing mutation analysis...")
