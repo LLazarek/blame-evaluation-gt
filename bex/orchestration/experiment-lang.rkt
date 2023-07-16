@@ -101,11 +101,9 @@
               "Unless manually managing outcome recording with #:manual-outcome-recording, the first mode run must be TR so that later modes can perform outcome parity checks."
   #:with maybe-host-update (if (attribute skip-setup-kw)
                                #'(void)
-                               #'(begin
-                                   (notify-phone! "Updating a host, need github login.")
-                                   (update-host! the-host
-                                                 the-dbs
-                                                 (handle-host-update-failure! the-dbs))))
+                               #'(update-host! the-host
+                                               the-dbs
+                                               (handle-host-update-failure! the-dbs)))
   (module+ main
     (let ([the-host host]
           [the-dbs (experiment-config-dbs-dir configuration)]
