@@ -117,29 +117,26 @@
  #:arguments {[(hash-table ['interactive? interactive?]
                            ['parallel?    parallel?]
                            ['config       config-path]
+                           ['mutant-samples-db mutant-samples-db-path]
+                           ['summaries-db summaries-db-path]
+                           ['bt-root-db bt-root-db-path]
                            _ ...)
                dirs-to-check]
               #:once-each
               [("-s" "--samples-db")
                'mutant-samples-db
                ("Mutant samples db to check against.")
-               #:collect ["path"
-                          (set-parameter pre-selected-mutant-samples-db)
-                          #f]
+               #:collect {"path" take-latest #f}
                #:mandatory]
               [("-S" "--summaries-db")
                'summaries-db
                ("Summaries db to check against.")
-               #:collect ["path"
-                          (set-parameter mutation-analysis-summaries-db)
-                          #f]
+               #:collect {"path" take-latest #f}
                #:mandatory]
               [("-r" "--bt-root-samples-db")
                'bt-root-db
                ("BT root sample db to check against.")
-               #:collect ["path"
-                          (set-parameter pre-selected-bt-root-db)
-                          #f]
+               #:collect {"path" take-latest #f}
                #:mandatory]
               [("-i" "--interactive")
                'interactive?
@@ -167,11 +164,11 @@
                               racket
                               me
                               "-s"
-                              (pre-selected-mutant-samples-db)
+                              mutant-samples-db-path
                               "-S"
-                              (mutation-analysis-summaries-db)
+                              summaries-db-path
                               "-r"
-                              (pre-selected-bt-root-db)
+                              bt-root-db-path
                               "-c"
                               config-path
                               dir))
@@ -195,9 +192,9 @@
         (install-configuration! config-path)
         (file-stream-buffer-mode (current-output-port) 'line)
 
-        (define mutants-by-mutator (read-mutants-by-mutator (mutation-analysis-summaries-db)))
-        (define mutant-samples-db (db:get (pre-selected-mutant-samples-db)))
-        (define root-samples-db (db:get (pre-selected-bt-root-db)))
+        (define mutants-by-mutator (read-mutants-by-mutator summaries-db-path))
+        (define mutant-samples-db (db:get mutant-samples-db-path))
+        (define root-samples-db (db:get bt-root-db-path))
         (for ([dir-to-check (in-list dirs-to-check)])
           (displayln (~a "⟶ " dir-to-check))
           (for ([bench-name (in-list benchmarks)])

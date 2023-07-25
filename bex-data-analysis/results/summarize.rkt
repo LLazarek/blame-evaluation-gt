@@ -18,7 +18,8 @@
          syntax/parse/define)
 
 (define-runtime-paths
-  [data-analysis-dir "."])
+  [check-for-missing-mutants-or-trails.rkt "check-for-missing-mutants-or-trails.rkt"]
+  [check-for-errors.rkt "check-for-errors.rkt"])
 
 (define summary/c
   (hash/c symbol? any/c))
@@ -479,7 +480,8 @@
                #:mandatory]
               [("-S" "--mutant-summaries")
                'summaries-db
-               ("Path to the db containing summaries of the mutants in the data.")
+               ("Path to the db containing summaries of the mutants in the data."
+                "(Typically, type-err-summaries.rktdb.)")
                #:collect {"path" take-latest #f}
                #:mandatory]
               [("-s" "--mutant-samples")
@@ -509,6 +511,8 @@
  (install-configuration! config-path)
  (define full-config-path (simple-form-path config-path))
 
+ (define racket-exe (simple-form-path (find-system-path 'exec-file)))
+
  (for ([data-dir (in-list data-dirs)])
    (displayln @~a{-------------------- @(basename data-dir) --------------------})
    (define summary (summarize data-dir summaries-db-path))
@@ -518,22 +522,19 @@
      (define missing-mutants-output (open-output-string))
      (define errors-output (open-output-string))
      (parameterize ([current-output-port missing-mutants-output]
-                    [current-error-port missing-mutants-output]
-                    [current-directory data-analysis-dir])
-       (system* "/usr/bin/fish"
-                "-c"
-                @~a{
-                    cd @data-analysis-dir > /dev/null ; @;
-                    rt check-for-missing-mutants-or-trails.rkt -s @mutant-samples-db-path -S @summaries-db-path -r @root-samples-db-path -c '@full-config-path' -p '@data-dir'
-                    }))
+                    [current-error-port missing-mutants-output])
+       (system* racket-exe
+                check-for-missing-mutants-or-trails.rkt
+                "-s" mutant-samples-db-path
+                "-S" summaries-db-path
+                "-r" root-samples-db-path
+                "-c" full-config-path
+                "-p" data-dir))
      (parameterize ([current-output-port errors-output]
                     [current-error-port errors-output])
-       (system* "/usr/bin/fish"
-                "-c"
-                @~a{
-                    cd @data-analysis-dir > /dev/null ; @;
-                    rt check-for-errors.rkt '@data-dir'
-                    }))
+       (system* racket-exe
+                check-for-errors.rkt
+                data-dir))
      (displayln @~a{
                     check-for-missing-mutants:
                     @(get-output-string missing-mutants-output)
