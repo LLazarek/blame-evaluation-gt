@@ -164,9 +164,10 @@
                              < ;; lower priority value means schedule sooner (this was
                                ;; unconfigurable with the original implementation, now just
                                ;; stick to that original default)
-                             #:kill-older-than (let-values ([{max-timeout _}
-                                                             (increased-limits bench)])
-                                                 (+ max-timeout 30)))])
+                             ;; #:kill-older-than (let-values ([{max-timeout _}
+                             ;;                                 (increased-limits bench)])
+                             ;;                     (+ max-timeout 30))
+                             )])
                 ([module-to-mutate-name mutatable-module-names]
                  #:when #t
                  [mutation-index (select-mutants module-to-mutate-name
