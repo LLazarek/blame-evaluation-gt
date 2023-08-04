@@ -96,7 +96,7 @@
            Getenv = True
 
            Arguments = "@; close "
-@(string-join (map (λ (s) (~a "'" s "'"))
+@(string-join (map (λ (s) (~a "'" (string-replace (~a s) "\"" "\"\"") "'")) ; condor escapes quotes with double
 (flatten (list
 (if timeout/s (* 1.5 timeout/s) 0)
 (if log-mutation-info?
@@ -139,25 +139,33 @@ mutant-runner-path
            })
      (match (with-output-to-string
               (thunk
-               (with-input-from-string job-file-contents
-                 (thunk (system* condor_submit
-                                 "-verbose"
-                                 "-")))))
+               (parameterize ([current-error-port (current-output-port)])
+                 (with-input-from-string job-file-contents
+                   (thunk (system* condor_submit
+                                   "-verbose"
+                                   "-"))))))
        [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id))
+        (define (get-proc-status)
+          (match (with-output-to-string
+                   (thunk (system* condor_q)))
+            [(and (regexp "-- Schedd: peroni.cs.northwestern.edu")
+                  condor-dump)
+             (define raw-info
+               (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
+                              condor-dump
+                              #:match-select cddr))
+             (if (member id (map third raw-info))
+                 'running
+                 'done-ok)]))
         (match-lambda ['status
-                       (match (with-output-to-string
-                                (thunk (system* condor_q)))
-                         [(and (regexp "-- Schedd: peroni.cs.northwestern.edu")
-                               condor-dump)
-                          (define raw-info
-                            (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
-                                           condor-dump
-                                           #:match-select cddr))
-                          (if (member id (map third raw-info))
-                              'running
-                              'done-ok)])]
+                       (get-proc-status)]
                       ['kill
-                       (system* condor_rm id)]
+                       (void (with-output-to-string (thunk (system* condor_rm id))))]
+                      ['wait
+                       (let loop ()
+                         (when (equal? (get-proc-status) 'running)
+                           (sleep 1)
+                           (loop)))]
                       [other (raise-internal-experiment-error
                               'spawn-mutant-runner
                               @~a{unimplemented process ctl for: @other})])]
