@@ -142,7 +142,7 @@
     ;; assumption: mutation types don't have spaces in them
     (pregexp @~a{
                  (?m:@;
-                 ^mutate: Mutating with ([^ ]+) : .+ -> .+$
+                 ^mutate: Mutating with ([^ ]+) : .* -> .*$
                  (#s\(run-status.+)$@;
                  )
            }))
