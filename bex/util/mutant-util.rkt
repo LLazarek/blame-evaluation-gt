@@ -106,7 +106,8 @@
            Getenv = True
 
            Arguments = "@; close "
-@(bytes-join (map (λ (arg) (base64-encode (string->bytes/utf-8 (~a arg)) #""))
+'@racket-timeout-b64-path' @;
+@(string-join (map (λ (arg) (bytes->string/utf-8 (base64-encode (string->bytes/utf-8 (~a arg)) #"")))
 (flatten (list
 (if timeout/s (* 1.5 timeout/s) 0)
 "--"
@@ -128,11 +129,10 @@ mutant-runner-path
 (if force-module-write?
     '("-f")
     empty)
-)))
-             #" ")"
+))))"
 @; close "
 
-           Executable = @racket-path
+           Executable = /project/blgt/racket.sh
            Error = @(mutant-error-log)
            Output = @outfile
            Log = condor-log.txt
