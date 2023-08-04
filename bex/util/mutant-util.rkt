@@ -76,13 +76,10 @@
   (cond
     [(current-run-with-condor-machines)
      (define condor_submit
-       "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/dummy-condor.sh"#;
        (find-executable-path "condor_submit"))
      (define condor_q
-       "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/dummy-condor.sh"#;
        (find-executable-path "condor_q"))
      (define condor_rm
-       "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/dummy-condor.sh"#;
        (find-executable-path "condor_rm"))
      (when log-mutation-info?
        (log-error "log-mutation-info? is not supported for condor runs"))
@@ -106,7 +103,6 @@
            Getenv = True
 
            Arguments = "@; close "
-'@racket-timeout-b64-path' @;
 @(string-join (map (λ (arg) (bytes->string/utf-8 (base64-encode (string->bytes/utf-8 (~a arg)) #"")))
 (flatten (list
 (if timeout/s (* 1.5 timeout/s) 0)
@@ -132,7 +128,7 @@ mutant-runner-path
 ))))"
 @; close "
 
-           Executable = /project/blgt/racket.sh
+           Executable = /project/blgt/racket-timeout-b64.sh
            Error = @(mutant-error-log)
            Output = @outfile
            Log = condor-log.txt
