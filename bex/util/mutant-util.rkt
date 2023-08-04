@@ -26,11 +26,13 @@
 
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
-          [default-timeout/s (parameter/c (and/c number? positive?))])
+          [default-timeout/s (parameter/c (and/c number? positive?))]
+          [current-run-with-condor-machines (parameter/c (or/c #f (listof string?)))])
          (struct-out mutant))
 
 (require racket/runtime-path
          racket/logging
+         net/base64
          syntax/parse
          mutate/logger
          mutate/traversal
@@ -40,9 +42,11 @@
          "../util/read-module.rkt"
          "../util/binary-search.rkt"
          "../util/program.rkt"
-         "../configurables/configurables.rkt")
+         "../configurables/configurables.rkt"
+         "experiment-exns.rkt")
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
+(define-runtime-path racket-timeout-b64-path "run-racket-with-timeout-b64.rkt")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
 (define timeout-path (find-executable-path "timeout"))
 
@@ -50,6 +54,10 @@
 
 (define default-memory-limit/gb (make-parameter 3))
 (define default-timeout/s (make-parameter (* 5 60)))
+
+(define current-run-with-condor-machines
+  (make-parameter (and (getenv "BEX_CONDOR_MACHINES")
+                       (string-split (getenv "BEX_CONDOR_MACHINES")))))
 
 (define (spawn-mutant-runner a-benchmark-configuration
                              module-to-mutate-name
@@ -66,46 +74,155 @@
   (define module-to-mutate
     (resolve-configured-benchmark-module a-benchmark-configuration
                                          module-to-mutate-name))
-  (call-with-output-file outfile #:mode 'text #:exists 'replace
-    (λ (outfile-port)
-      (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
-        (λ (error-log-port)
-          (match-define (list #f runner-in _ #f runner-ctl)
-            (apply process*/ports
-                   outfile-port #f error-log-port
+  (cond
+    [(current-run-with-condor-machines)
+     (define condor_submit
+       (find-executable-path "condor_submit"))
+     (define condor_q
+       (find-executable-path "condor_q"))
+     (define condor_rm
+       (find-executable-path "condor_rm"))
+     (when log-mutation-info?
+       (log-error "log-mutation-info? is not supported for condor runs"))
+     (define job-file-contents
+       @~a{
+           # Set the universe
+           Universe = vanilla
 
-                   ;; workaround for runner sometimes getting stuck outside
-                   ;; sandbox without any clear explanation
-                   ;; 0 means no timeout: see `man timeout`
-                   ;; -k 5 means send SIGKILL 5 sec after polite exit signal
-                   timeout-path "-k" "5" (~a (if timeout/s (* 1.5 timeout/s) 0))
+           # Describe the target machine
+           Requirements = (@(string-join (for/list ([name (in-list (current-run-with-condor-machines))])
+                                           @~a{(Machine == "@|name|.cs.northwestern.edu")})
+                                         " || "))
 
-                   racket-path
-                   (append
-                    (if log-mutation-info?
-                        (list "-O" "info@mutate")
-                        empty)
-                    (list "--"
-                          mutant-runner-path
-                          "-b" (serialize-benchmark-configuration a-benchmark-configuration)
-                          "-M" module-to-mutate
-                          "-i" (~a mutation-index)
-                          "-t" (~a (or timeout/s
-                                       (default-timeout/s)))
-                          "-g" (~a (or memory/gb
-                                       (default-memory-limit/gb)))
-                          "-c" config-path)
-                    (if output-path
-                        (list "-O" output-path)
-                        empty)
-                    (if dump-dir-path
-                        (list "-w" dump-dir-path)
-                        empty)
-                    (if force-module-write?
-                        '("-f")
-                        empty))))
-          (close-output-port runner-in)
-          runner-ctl)))))
+           Rank = TARGET.Mips
+           Copy_To_Spool = False
+
+           # Notification
+           Notification = error
+
+           # Set the environment
+           Getenv = True
+
+           Arguments = "@; close "
+@(string-join (map (λ (arg) (bytes->string/utf-8 (base64-encode (string->bytes/utf-8 (~a arg)) #"")))
+(flatten (list
+(if timeout/s (* 1.5 timeout/s) 0)
+"--"
+mutant-runner-path
+"-b" (serialize-benchmark-configuration a-benchmark-configuration)
+"-M" module-to-mutate
+"-i" (~a mutation-index)
+"-t" (~a (or timeout/s
+             (default-timeout/s)))
+"-g" (~a (or memory/gb
+             (default-memory-limit/gb)))
+"-c" config-path
+(if output-path
+    (list "-O" output-path)
+    empty)
+(if dump-dir-path
+    (list "-w" dump-dir-path)
+    empty)
+(if force-module-write?
+    '("-f")
+    empty)
+))))"
+@; close "
+
+           Executable = /project/blgt/racket-timeout-b64.sh
+           Error = @(mutant-error-log)
+           Output = @outfile
+           Log = condor-log.txt
+           # Ask Condor to kill any jobs that are taking so long they must be stuck
+           @; from https://stackoverflow.com/questions/5900400/maximum-run-time-in-condor
+           periodic_remove = (CommittedTime - CommittedSuspensionTime) > @(* (default-timeout/s) 3)
+
+           +IsWholeMachineJob = false
+           +IsSuspensionJob = false
+
+           Queue
+
+           })
+     (match (with-output-to-string
+              (thunk
+               (parameterize ([current-error-port (current-output-port)])
+                 (with-input-from-string job-file-contents
+                   (thunk (system* condor_submit
+                                   "-verbose"
+                                   "-"))))))
+       [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id))
+        (define (get-proc-status)
+          (match (with-output-to-string
+                   (thunk (system* condor_q)))
+            [(and (regexp "-- Schedd: peroni.cs.northwestern.edu")
+                  condor-dump)
+             (define raw-info
+               (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
+                              condor-dump
+                              #:match-select cddr))
+             (if (member id (map third raw-info))
+                 'running
+                 'done-ok)]))
+        (match-lambda ['status
+                       (get-proc-status)]
+                      ['kill
+                       (void (with-output-to-string (thunk (system* condor_rm id))))]
+                      ['wait
+                       (let loop ()
+                         (when (equal? (get-proc-status) 'running)
+                           (sleep 1)
+                           (loop)))]
+                      [other (raise-internal-experiment-error
+                              'spawn-mutant-runner
+                              @~a{unimplemented process ctl for: @other})])]
+       [something-else
+        (raise-internal-experiment-error
+         'spawn-mutant-runner
+         @~a{
+             failed to submit condor job, it said:
+             @something-else
+             })])]
+    [else
+     (call-with-output-file outfile #:mode 'text #:exists 'replace
+       (λ (outfile-port)
+         (call-with-output-file (mutant-error-log) #:mode 'text #:exists 'append
+           (λ (error-log-port)
+             (match-define (list #f runner-in _ #f runner-ctl)
+               (apply process*/ports
+                      outfile-port #f error-log-port
+
+                      ;; workaround for runner sometimes getting stuck outside
+                      ;; sandbox without any clear explanation
+                      ;; 0 means no timeout: see `man timeout`
+                      ;; -k 5 means send SIGKILL 5 sec after polite exit signal
+                      timeout-path "-k" "5" (~a (if timeout/s (* 1.5 timeout/s) 0))
+
+                      racket-path
+                      (append
+                       (if log-mutation-info?
+                           (list "-O" "info@mutate")
+                           empty)
+                       (list "--"
+                             mutant-runner-path
+                             "-b" (serialize-benchmark-configuration a-benchmark-configuration)
+                             "-M" module-to-mutate
+                             "-i" (~a mutation-index)
+                             "-t" (~a (or timeout/s
+                                          (default-timeout/s)))
+                             "-g" (~a (or memory/gb
+                                          (default-memory-limit/gb)))
+                             "-c" config-path)
+                       (if output-path
+                           (list "-O" output-path)
+                           empty)
+                       (if dump-dir-path
+                           (list "-w" dump-dir-path)
+                           empty)
+                       (if force-module-write?
+                           '("-f")
+                           empty))))
+             (close-output-port runner-in)
+             runner-ctl))))]))
 
 (define (resolve-configured-benchmark-module a-benchmark-configuration
                                              a-module-name)

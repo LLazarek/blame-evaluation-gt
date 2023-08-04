@@ -164,9 +164,10 @@
                              < ;; lower priority value means schedule sooner (this was
                                ;; unconfigurable with the original implementation, now just
                                ;; stick to that original default)
-                             #:kill-older-than (let-values ([{max-timeout _}
-                                                             (increased-limits bench)])
-                                                 (+ max-timeout 30)))])
+                             #:kill-older-than (and (not (current-run-with-condor-machines))
+                                                    (let-values ([{max-timeout _}
+                                                                  (increased-limits bench)])
+                                                      (+ max-timeout 30))))])
                 ([module-to-mutate-name mutatable-module-names]
                  #:when #t
                  [mutation-index (select-mutants module-to-mutate-name
@@ -1046,35 +1047,37 @@ Mutant: [~a] ~a @ ~a with config:
                  id mod index
                  (serialize-config config))
     eof)
-  (with-handlers ([exn:fail:read? report-malformed-output])
-    (match (with-input-from-file path read)
-      [(and (or (struct* run-status
-                         ([outcome (or 'completed
-                                       'syntax-error
-                                       'timeout
-                                       'oom)]
-                          [blamed #f]
-                          [errortrace-stack #f]
-                          [context-stack #f]))
-                (struct* run-status
-                         ([outcome 'type-error]
-                          [blamed (not #f)]
-                          [errortrace-stack #f]
-                          [context-stack #f]))
-                (struct* run-status
-                         ([outcome (or 'blamed
-                                       'runtime-error)]
-                          [blamed (not #f)]
-                          [errortrace-stack (? list?)]
-                          [context-stack (? list?)]))
-                (struct* run-status
-                         ([outcome 'runtime-error]
-                          [blamed #f]
-                          [errortrace-stack (? list?)]
-                          [context-stack (? list?)])))
-            result/well-formed)
-       result/well-formed]
-      [else (report-malformed-output)])))
+  (if (file-exists? path)
+      (with-handlers ([exn:fail:read? report-malformed-output])
+        (match (with-input-from-file path read)
+          [(and (or (struct* run-status
+                             ([outcome (or 'completed
+                                           'syntax-error
+                                           'timeout
+                                           'oom)]
+                              [blamed #f]
+                              [errortrace-stack #f]
+                              [context-stack #f]))
+                    (struct* run-status
+                             ([outcome 'type-error]
+                              [blamed (not #f)]
+                              [errortrace-stack #f]
+                              [context-stack #f]))
+                    (struct* run-status
+                             ([outcome (or 'blamed
+                                           'runtime-error)]
+                              [blamed (not #f)]
+                              [errortrace-stack (? list?)]
+                              [context-stack (? list?)]))
+                    (struct* run-status
+                             ([outcome 'runtime-error]
+                              [blamed #f]
+                              [errortrace-stack (? list?)]
+                              [context-stack (? list?)])))
+                result/well-formed)
+           result/well-formed]
+          [else (report-malformed-output)]))
+      eof))
 
 ;; dead-mutant-process? -> run-outcome/c
 (define (process-outcome dead-proc)
