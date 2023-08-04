@@ -31,6 +31,7 @@
 
 (require racket/runtime-path
          racket/logging
+         net/base64
          syntax/parse
          mutate/logger
          mutate/traversal
@@ -44,6 +45,7 @@
          "experiment-exns.rkt")
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
+(define-runtime-path racket-timeout-b64-path "run-racket-with-timeout-b64.rkt")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
 (define timeout-path (find-executable-path "timeout"))
 
@@ -73,9 +75,17 @@
                                          module-to-mutate-name))
   (cond
     [(current-run-with-condor-machines)
-     (define condor_submit (find-executable-path "condor_submit"))
-     (define condor_q (find-executable-path "condor_q"))
-     (define condor_rm (find-executable-path "condor_rm"))
+     (define condor_submit
+       "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/dummy-condor.sh"#;
+       (find-executable-path "condor_submit"))
+     (define condor_q
+       "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/dummy-condor.sh"#;
+       (find-executable-path "condor_q"))
+     (define condor_rm
+       "/home/lukas/github_sync/grad/projects/blame-gradual-typing/src/dummy-condor.sh"#;
+       (find-executable-path "condor_rm"))
+     (when log-mutation-info?
+       (log-error "log-mutation-info? is not supported for condor runs"))
      (define job-file-contents
        @~a{
            # Set the universe
@@ -96,12 +106,9 @@
            Getenv = True
 
            Arguments = "@; close "
-@(string-join (map (λ (s) (~a "'" (string-replace (~a s) "\"" "\"\"") "'")) ; condor escapes quotes with double
+@(bytes-join (map (λ (arg) (base64-encode (string->bytes/utf-8 (~a arg)) #""))
 (flatten (list
 (if timeout/s (* 1.5 timeout/s) 0)
-(if log-mutation-info?
-    (list "-O" "info@mutate")
-    "")
 "--"
 mutant-runner-path
 "-b" (serialize-benchmark-configuration a-benchmark-configuration)
@@ -121,9 +128,11 @@ mutant-runner-path
 (if force-module-write?
     '("-f")
     empty)
-))))"
+)))
+             #" ")"
 @; close "
-           Executable = /project/blgt/run-one-mutant.sh
+
+           Executable = @racket-path
            Error = @(mutant-error-log)
            Output = @outfile
            Log = condor-log.txt
@@ -131,7 +140,7 @@ mutant-runner-path
            @; from https://stackoverflow.com/questions/5900400/maximum-run-time-in-condor
            periodic_remove = (CommittedTime - CommittedSuspensionTime) > @(* (default-timeout/s) 3)
 
-           +IsWholeMachineJob = true
+           +IsWholeMachineJob = false
            +IsSuspensionJob = false
 
            Queue
