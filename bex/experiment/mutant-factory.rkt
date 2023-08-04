@@ -1047,35 +1047,37 @@ Mutant: [~a] ~a @ ~a with config:
                  id mod index
                  (serialize-config config))
     eof)
-  (with-handlers ([exn:fail:read? report-malformed-output])
-    (match (with-input-from-file path read)
-      [(and (or (struct* run-status
-                         ([outcome (or 'completed
-                                       'syntax-error
-                                       'timeout
-                                       'oom)]
-                          [blamed #f]
-                          [errortrace-stack #f]
-                          [context-stack #f]))
-                (struct* run-status
-                         ([outcome 'type-error]
-                          [blamed (not #f)]
-                          [errortrace-stack #f]
-                          [context-stack #f]))
-                (struct* run-status
-                         ([outcome (or 'blamed
-                                       'runtime-error)]
-                          [blamed (not #f)]
-                          [errortrace-stack (? list?)]
-                          [context-stack (? list?)]))
-                (struct* run-status
-                         ([outcome 'runtime-error]
-                          [blamed #f]
-                          [errortrace-stack (? list?)]
-                          [context-stack (? list?)])))
-            result/well-formed)
-       result/well-formed]
-      [else (report-malformed-output)])))
+  (if (file-exists? path)
+      (with-handlers ([exn:fail:read? report-malformed-output])
+        (match (with-input-from-file path read)
+          [(and (or (struct* run-status
+                             ([outcome (or 'completed
+                                           'syntax-error
+                                           'timeout
+                                           'oom)]
+                              [blamed #f]
+                              [errortrace-stack #f]
+                              [context-stack #f]))
+                    (struct* run-status
+                             ([outcome 'type-error]
+                              [blamed (not #f)]
+                              [errortrace-stack #f]
+                              [context-stack #f]))
+                    (struct* run-status
+                             ([outcome (or 'blamed
+                                           'runtime-error)]
+                              [blamed (not #f)]
+                              [errortrace-stack (? list?)]
+                              [context-stack (? list?)]))
+                    (struct* run-status
+                             ([outcome 'runtime-error]
+                              [blamed #f]
+                              [errortrace-stack (? list?)]
+                              [context-stack (? list?)])))
+                result/well-formed)
+           result/well-formed]
+          [else (report-malformed-output)]))
+      eof))
 
 ;; dead-mutant-process? -> run-outcome/c
 (define (process-outcome dead-proc)

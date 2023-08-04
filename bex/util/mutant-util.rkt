@@ -124,8 +124,8 @@ mutant-runner-path
 ))))"
 @; close "
            Executable = /project/blgt/run-one-mutant.sh
-           Error = condor-output.txt
-           Output = condor-output.txt
+           Error = @(mutant-error-log)
+           Output = @outfile
            Log = condor-log.txt
            # Ask Condor to kill any jobs that are taking so long they must be stuck
            @; from https://stackoverflow.com/questions/5900400/maximum-run-time-in-condor
