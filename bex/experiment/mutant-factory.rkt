@@ -164,10 +164,11 @@
                              < ;; lower priority value means schedule sooner (this was
                                ;; unconfigurable with the original implementation, now just
                                ;; stick to that original default)
-                             #:kill-older-than (and (not (current-run-with-condor-machines))
-                                                    (let-values ([{max-timeout _}
-                                                                  (increased-limits bench)])
-                                                      (+ max-timeout 30))))])
+                             #:kill-older-than (if (current-run-with-condor-machines)
+                                                   (* 2 60 60) ;; condor ought to run jobs pretty quick, so after 2h it's very likely stuck
+                                                   (let-values ([{max-timeout _}
+                                                                 (increased-limits bench)])
+                                                     (+ max-timeout 30))))])
                 ([module-to-mutate-name mutatable-module-names]
                  #:when #t
                  [mutation-index (select-mutants module-to-mutate-name

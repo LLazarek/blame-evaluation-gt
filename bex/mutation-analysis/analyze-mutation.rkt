@@ -7,7 +7,7 @@
          "../util/progress-log.rkt"
          "../util/mutant-util.rkt"
          "../configurables/configurables.rkt"
-         process-queue/functional
+         process-queue/priority
          racket/runtime-path)
 
 (define process-limit (make-parameter 3))
@@ -42,7 +42,8 @@
   (define q
     (for/fold ([q (make-process-queue proc-limit
                                       ; (hash/c name? (hash/c 'type-error natural? 'total natural?))
-                                      (hash))])
+                                      (hash)
+                                      #:kill-older-than (* 30 60))])
               ([module-to-mutate-name mutatable-module-names]
                [i-1 (in-naturals)]
                #:when #t
@@ -89,16 +90,9 @@
                                       module-to-mutate-name
                                       index
                                       id)))
-  (define ctl (parameterize ([mutant-error-log outfile])
-                (spawn-mutant-runner the-benchmark-configuration
-                                     module-to-mutate-name
-                                     index
-                                     outfile
-                                     (current-configuration-path)
-                                     #:log-mutation-info? #t)))
-  (log-mutation-analysis-info
-   @~a{Spawned mutant @module-to-mutate-name @"@" @index})
-  (define (will:record-type-error q* info)
+  (define FAILURE-RETRIES 2)
+  (define TYPE-ERROR-CONFIRMATION-RETRIES 2)
+  (define ((will:record-type-error failure-retry-number type-error-retry-number) q* info)
     (log-mutation-analysis-debug
      @~a{
          Executing will. Q size: @;
@@ -107,19 +101,59 @@
           waiting: @(process-queue-waiting-count q*) @;
           }
          })
-    (define-values {type-error? mutation-type}
-      (extract-mutation-type-and-result outfile max-config (list module-to-mutate-name
-                                                                 index)))
-    (log-progress! module-to-mutate-name
-                   index
-                   type-error?
-                   mutation-type)
-    (add-mutation-type-result q*
-                              type-error?
-                              mutation-type))
-  (process-info #f
-                ctl
-                will:record-type-error))
+    (cond [(file-exists? outfile)
+           (define-values {type-error? mutation-type}
+             (extract-mutation-type-and-result outfile max-config (list module-to-mutate-name
+                                                                        index)))
+           (cond [(and type-error?
+                       (<= type-error-retry-number TYPE-ERROR-CONFIRMATION-RETRIES))
+                  (log-mutation-analysis-info
+                   @~a{
+                       Confirming type-error for @module-to-mutate-name @"@" @index @;
+                       (@(add1 type-error-retry-number)/@TYPE-ERROR-CONFIRMATION-RETRIES)
+                       })
+                  (process-queue-enqueue q*
+                                         (λ _ (spawn-mutant! failure-retry-number
+                                                             (add1 type-error-retry-number)))
+                                         2)]
+                 [else
+                  (log-progress! module-to-mutate-name
+                                 index
+                                 type-error?
+                                 mutation-type)
+                  (add-mutation-type-result q*
+                                            type-error?
+                                            mutation-type)])]
+          [else
+           (log-mutation-analysis-info
+            @~a{Retrying mutant @module-to-mutate-name @"@" @index due to failure (no outfile)})
+           (process-queue-enqueue q*
+                                  (λ _ (spawn-mutant! (add1 failure-retry-number)
+                                                      type-error-retry-number))
+                                  1)]))
+  (define (spawn-mutant! failure-retry-number type-error-retry-number)
+    (cond [(<= failure-retry-number FAILURE-RETRIES)
+           (define ctl (parameterize ([mutant-error-log outfile])
+                         (spawn-mutant-runner the-benchmark-configuration
+                                              module-to-mutate-name
+                                              index
+                                              outfile
+                                              (current-configuration-path)
+                                              #:log-mutation-info? #t)))
+           (log-mutation-analysis-info
+            @~a{Spawned mutant @module-to-mutate-name @"@" @index})
+           (process-info #f
+                         ctl
+                         (will:record-type-error failure-retry-number type-error-retry-number))]
+          [else
+           (raise-user-error
+            'analyze-mutation
+            @~a{
+                Failed to get mutation info for @;
+                @bench @module-to-mutate-name @"@" @index @;
+                after @FAILURE-RETRIES tries. Giving up.
+                })]))
+  (spawn-mutant! 1 1))
 
 (define (add-mutation-type-result q type-error? mutation-type)
   (define (update-inner-hash h)

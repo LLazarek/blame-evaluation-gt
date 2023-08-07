@@ -82,8 +82,6 @@
        (find-executable-path "condor_q"))
      (define condor_rm
        (find-executable-path "condor_rm"))
-     (when log-mutation-info?
-       (log-error "log-mutation-info? is not supported for condor runs"))
      (define job-file-contents
        @~a{
            # Set the universe
@@ -107,6 +105,9 @@
 @(string-join (map (λ (arg) (bytes->string/utf-8 (base64-encode (string->bytes/utf-8 (~a arg)) #"")))
 (flatten (list
 (if timeout/s (* 1.5 timeout/s) 0)
+(if log-mutation-info?
+    (list "-O" "info@mutate")
+    empty)
 "--"
 mutant-runner-path
 "-b" (serialize-benchmark-configuration a-benchmark-configuration)
