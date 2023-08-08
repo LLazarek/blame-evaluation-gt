@@ -131,12 +131,12 @@
       (match condor-dump
         [(regexp "-- Schedd: peroni.cs.northwestern.edu")
          (define raw-info
-           (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
+           (regexp-match* @pregexp{([1_])\s+[1_]\s+1 (\d{7}\.0)}
                           condor-dump
-                          #:match-select cddr))
+                          #:match-select rest))
          (define all-jobs
            (for/list ([parts (in-list raw-info)])
-             (job (third parts) (string=? (first parts) "1"))))
+             (job (second parts) (string=? (first parts) "1"))))
          (expunge-old-jobs! all-jobs)
          all-jobs]
         [else

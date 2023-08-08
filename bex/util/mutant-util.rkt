@@ -59,6 +59,34 @@
   (make-parameter (and (getenv "BEX_CONDOR_MACHINES")
                        (string-split (getenv "BEX_CONDOR_MACHINES")))))
 
+(define condor_submit
+  (find-executable-path "condor_submit"))
+(define condor_q
+  (find-executable-path "condor_q"))
+(define condor_rm
+  (find-executable-path "condor_rm"))
+(define get-condor-job-info
+  ;; to avoid polling condor too frequently, and parsing/reparsing the same
+  ;; output, cache the results and only refresh every `CACHE-EXPIRATION-SECS`
+  (let ([last-poll-time (current-inexact-monotonic-milliseconds)]
+        [cached-output #f]
+        [CACHE-EXPIRATION-SECS 1])
+    (thunk
+     (cond [(or (not cached-output)
+                (> (- (current-inexact-monotonic-milliseconds)
+                      last-poll-time)
+                   (* CACHE-EXPIRATION-SECS 1000)))
+            (define condor-dump
+              (with-output-to-string
+                (thunk (system* condor_q))))
+            (set! cached-output
+                  (and (regexp-match? "-- Schedd: peroni.cs.northwestern.edu" condor-dump)
+                       (regexp-match* @pregexp{([1_])\s+[1_]\s+1 (\d{7}\.0)}
+                                      condor-dump
+                                      #:match-select rest)))
+            cached-output]
+           [else cached-output]))))
+
 (define (spawn-mutant-runner a-benchmark-configuration
                              module-to-mutate-name
                              mutation-index
@@ -76,12 +104,6 @@
                                          module-to-mutate-name))
   (cond
     [(current-run-with-condor-machines)
-     (define condor_submit
-       (find-executable-path "condor_submit"))
-     (define condor_q
-       (find-executable-path "condor_q"))
-     (define condor_rm
-       (find-executable-path "condor_rm"))
      (define job-file-contents
        @~a{
            # Set the universe
@@ -153,17 +175,9 @@ mutant-runner-path
                                    "-"))))))
        [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id))
         (define (get-proc-status)
-          (match (with-output-to-string
-                   (thunk (system* condor_q)))
-            [(and (regexp "-- Schedd: peroni.cs.northwestern.edu")
-                  condor-dump)
-             (define raw-info
-               (regexp-match* @pregexp{(?m:^(\S+\s+){6}([1_])\s+([1_])\s+1\s+([\d.]+)$)}
-                              condor-dump
-                              #:match-select cddr))
-             (if (member id (map third raw-info))
-                 'running
-                 'done-ok)]))
+          (if (member id (map second (get-condor-job-info)))
+              'running
+              'done-ok))
         (match-lambda ['status
                        (get-proc-status)]
                       ['kill
