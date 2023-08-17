@@ -1,0 +1,82 @@
+* blame-evaluation-gt
+This repo houses the infrastructure implementation for rational programmer experiments.
+
+* Installation
+After cloining, install the package and its dependencies with
+: raco pkg install blame-evaluation-gt/bex/
+
+There is also an second package for analysis and visualization of data produced by the experiment,
+: raco pkg install blame-evaluation-gt/bex-data-analysis/
+
+* Structure
+The repository is structured into two packages, each in a subdirectory
+- bex
+- bex-data-analysis
+
+The =bex= package (short for Blame EXperiment) contains the full experiment implementation and associated programs.
+The =bex-data-analysis= package has analysis and visualization tools for the experimental data.
+
+** bex
+The top level entry point of the infrastructure, implementing the experiment, is at
+: bex/experiment/mutant-factory.rkt
+This module expects a variety of commandline arguments configuring how to run the experiment.
+Run it with =-h= to see them all.
+
+There are three salient pieces to point out about this implementation:
+1. it is highly parallel; it can use (practically) as many cores as you have available, and there's no practically-reachable limit at which it's not productive to use more. It runs thousands (or millions) of essentially independent processes.
+2. it is interruptable (with the =progress-log= flags), so it can be killed and resumed at any time with minimal loss of progress.
+3. it is configurable, with an extensive set of configurable features that change how the experiment works or what it does.
+
+
+Configuration is done via a mandatory configuration file that selects implementations of various configurable features.
+The features that can be configured, and the implementations available for each, are described in
+: bex/configurables/configurables.rkt
+Typically, a config file must select an implementation for all of the configurable features there.
+
+A set of pre-defined configurations, used by previous experiments, are in the directories
+: bex/configurables/{bltym-configs,blutil-configs}
+
+To read more about the configuration system (e.g. to understand how to add a new configurable feature, or to add a new implementation) refer to the [[https://docs.racket-lang.org/configurable/index.html][configurable library documentation]].
+
+The rest of the package implements various components in support of the main experiment, or programs for experimental setup or orchestration.
+
+** The structure of an experiment in abstract terms
+At a high level, an experiment abstractly consists of
+1. starting from a set of seed programs ([[https://docs.racket-lang.org/gtp-benchmarks/index.html][the GTP benchmarks]]),
+2. mutating the seed programs to obtain a large population of potentially-buggy versions (mutants),
+3. filtering the mutant population to obtain a subset of interest (interesting mutants),
+4. sampling configurations from the configuration lattice (each configuration serves as a debugging scenario),
+5. running the experiment with a given semantics and algorithm for responding to information (a mode),
+6. repeating for all modes of interest,
+7. analyzing the resulting data to compare modes
+
+
+- [[file:bex/experiment/mutant-factory.rkt][bex/experiment/mutant-factory.rkt]] primarily implements step 5, but with certain configurations can perform steps 1-4 as well.
+- [[file:bex/orchestration/setup-all-dbs.rkt][bex/orchestration/setup-all-dbs.rkt]] implements the more standard approach for steps 1-4.
+- [[file:bex/orchestration/orchestrate-experiment.rkt][bex/orchestration/orchestrate-experiment.rkt]] implements step 6.
+- [[file:bex-data-analysis][bex-data-analysis]] contains various programs for step 7 (see its own readme for more details).
+
+* How to set up and run an experiment
+The setup necessary to run an experiment depends on the configuration of the experiment that you want to run.
+Some choices of configuration require no setup at all (besides writing the configuration file itself), while others involve pre-generating databases that guide the experiment when it runs.
+
+The latest incarnations of the experiment involve testing multiple modes -- which correspond to different configurations of the experiment.
+In order to create comparable results across these runs of the experiment, each run needs to test the same set of debugging scenarios.
+To support that, there's a process to generate and select those debugging scenarios, and then save them in a database on disk so that the experiment when run can simply pull the scenarios from the database.
+Every run of the experiment (for each mode) will pull from the same database and thus test the same set of debugging scenarios.
+
+Databases are also generated prior to running the experiment for a few other small things, such as optimizing erasure modes (the results of all configurations of a given mutant are the same under erasure, so we pre-compute and stash them in a database).
+
+The workflow for setting up the full set of databases storing debugging scenarios and the other minor things is captured by [[file:bex/orchestration/setup-all-dbs.rkt][bex/orchestration/setup-all-dbs.rkt]]
+
+Once these databases are set up, there are two readily available options to run an experiment:
+1. Run it locally on your machine. Simply run [[file:bex/experiment/mutant-factory.rkt][bex/experiment/mutant-factory.rkt]] once per mode, providing the appropriate flags.
+2. Run it on a remote machine.
+make a copy of or modify [[file:bex/orchestration/orchestrate-experiment.rkt][bex/orchestration/orchestrate-experiment.rkt]] to create an experiment orchestration program.
+This program can then be run (with =racket=) to pretty-much automatically run a whole experiment.
+
+* Bibliography
+This infrastructure was, in some version, used to produce the results of the following papers.
+
+
+
