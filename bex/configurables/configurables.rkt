@@ -10,7 +10,10 @@
     #:module "mutation/mutate-types.rkt")
 
   (define-implementation type-interface-mistakes
-    #:module "mutation/mutate-type-interface.rkt"))
+    #:module "mutation/mutate-type-interface.rkt")
+
+  (define-implementation code-mistakes
+    #:module "mutation/mutate-for-module-level-ctcs.rkt"))
 
 (define-configurable mutant-sampling
   #:provides [select-mutants all-mutants-should-have-trails?]
@@ -51,7 +54,10 @@
     #:parameters [transient-special-cases-db])
 
   (define-implementation erasure-types
-    #:module "module-instrumentation/type-with-erasure.rkt"))
+    #:module "module-instrumentation/type-with-erasure.rkt")
+
+  (define-implementation add-ctc-level
+    #:module "module-instrumentation/add-ctc-level.rkt"))
 
 ;; Controls how all instrumentation is applied to a program.
 ;; Thus also has the opportunity to transform the program as part of "instrumentation".

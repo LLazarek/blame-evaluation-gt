@@ -8,9 +8,9 @@
 
 (define cpus (make-parameter 5))
 (define-runtime-paths
-  [mutation-analysis-config "../configurables/configs/mutation-type-error-analysis.rkt"]
+  [mutation-analysis-config "../configurables/blutil-configs/mutation-code-mistake-analysis.rkt"]
   [mutation-analysis-dir "../mutation-analysis"]
-  [TR-config "../configurables/configs/TR.rkt"]
+  [TR-config "../configurables/blutil-configs/blame.rkt"]
   [scratch-dir "../../tmp/scratch"]
   [pre-compute-config "../configurables/configs/erasure-pre-compute-benchmark-results.rkt"])
 
@@ -178,11 +178,12 @@
   -o (build-path outdir "pre-computed-mutant-results.rktdb")
   (build-path benchmarks-dir bench-name))
 
-(main
+ (main
  #:arguments ([(hash-table ['no-viz? no-viz?]
                            ['viz-only? viz-only?]
                            ['interesting-scenario-search? interesting-scenario-search?]
                            ['dyn-err-filtering-mode dyn-err-filtering-mode]
+                           ['no-erasure? no-erasure?]
                            _ ...)
                (list outdir)]
               #:once-each
@@ -210,6 +211,10 @@
               [("-i" "--search-for-interesting-scenarios")
                'interesting-scenario-search?
                "Instead of considering interesting all scenarios in the lattice of interesting mutants, run mutation-analysis/find-interesting-scenarios.rkt to find them."
+               #:record]
+              [("-n" "--no-erasure")
+               'no-erasure?
+               "Do not precompute benchmark results for erasure."
                #:record]
               #:args [outdir])
  #:check [(natural? (cpus))
@@ -260,5 +265,6 @@
         (displayln "Selecting BT roots for mutant samples...")
         (select-bt-roots! outdir mutant-samples.rktdb interesting-scenarios.rktdb)
         (displayln "Pre-computing mutant results for erasure...")
-        (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir mutant-samples.rktdb)
+        (unless no-erasure?
+          (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir mutant-samples.rktdb))
         (displayln "DB set up complete.")]))

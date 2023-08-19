@@ -27,17 +27,13 @@
 (define scenario-samples-per-mutant 100)
 
 (define experiment-benchmarks
-  '("acquire"
-    "gregor"
+  '("dungeon"
+    "forth"
     "kcfa"
-    "quadT"
-    "quadU"
-    ;; "sieve"
-    "snake"
-    "suffixtree"
-    "synth"
-    "take5"
-    "tetris"))
+    "mbta"
+    "morsecode"
+    "sieve"
+    "snake"))
 
 (define experiment-modes
   '("TR-null"
