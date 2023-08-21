@@ -6,7 +6,7 @@
 (configure! mutant-sampling          pre-selected
             "../dbs/code-mutations/mutant-samples.rktdb")
 (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
-(configure! module-selection-for-mutation interface-module-only)
+(configure! module-selection-for-mutation all-regular-modules)
 (configure! benchmark-runner         load-pre-computed-result "../dbs/code-mutations/pre-computed-mutant-results.rktdb")
 (configure! interface-blame-translation
             to-value-source)
@@ -22,7 +22,5 @@
 (configure! trail-completion         any-type-error/blamed-at-max)
 (configure! configurations           module-types)
 
-(configure! module-instrumentation   none)
-;; We need to insert the TR adapter module to check for a type error, but we
-;; won't use that TR adapter to run since we're loading pre-computed results anyway.
+(configure! module-instrumentation   none) ;; irrelevant since we'll just load pre-computed results
 (configure! program-instrumentation  just-instrument-modules)

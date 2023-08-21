@@ -6,7 +6,7 @@
 (configure! mutant-sampling          pre-selected
             "../dbs/code-mutations/mutant-samples.rktdb")
 (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
-(configure! module-selection-for-mutation interface-module-only)
+(configure! module-selection-for-mutation all-regular-modules)
 (configure! benchmark-runner         run-it)
 (configure! interface-blame-translation
             to-value-source)
