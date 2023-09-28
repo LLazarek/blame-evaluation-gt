@@ -176,6 +176,9 @@
   -c (~a pre-compute-config)
   -m (~a mutant-samples.rktdb)
   -o (build-path outdir "pre-computed-mutant-results.rktdb")
+  -l (build-path outdir "pre-computed-mutant-results-progress.log")
+  -j (~a (cpus))
+  -d (~a scratch-dir)
   (build-path benchmarks-dir bench-name))
 
 (main
