@@ -99,7 +99,7 @@
   (define full-outdir (simple-form-path outdir))
   (parameterize ([current-directory mutation-analysis-dir])
     (plot-mutant-attrition!/assuming-right-dir full-outdir))
-  (plot-mutant-population! outdir))
+  #;(plot-mutant-population! outdir))
 
 (define/racket-runner (plot-mutant-attrition!/assuming-right-dir outdir)
   ../../bex-data-analysis/mutation/plot-new-mutation-analyses.rkt
@@ -109,6 +109,7 @@
   -o (build-path outdir "mutant-attrition.pdf")
   (glob (~a (build-path outdir "mutation-analyses" "*-debug.log"))))
 
+;; only relevant for the bltym experiment
 (define/racket-runner (plot-mutant-population! outdir)
   ../../bex-data-analysis/mutation/categorize-mutants.rkt
   -c (~a TR-config)
@@ -138,7 +139,7 @@
   -o #:result (outpath "interesting-mutant-summaries.rktdb"))
 
 (define/racket-runner (sample-mutants! outdir
-                                       number-of-mutants
+                                       [number-of-mutants #f]
                                        #:from-interesting [interesting-mutants.rktdb #f]
                                        #:from-dyn-err     [dyn-err-summaries.rktdb #f])
   ../configurables/mutant-sampling/generate-samples-within-mutators.rkt
@@ -151,7 +152,9 @@
          (error 'sample-mutants!
                 "Missing #:from-* keyword specificying from which set to sample mutants.")])
   -b (~a benchmarks-dir)
-  -n (~a number-of-mutants)
+  (if number-of-mutants
+      (list "-n" (~a number-of-mutants))
+      empty)
   -o #:result (build-path outdir "mutant-samples.rktdb"))
 
 (define/racket-runner (select-bt-roots! outdir mutant-samples.rktdb [interesting-scenarios.rktdb #f])
@@ -250,13 +253,13 @@
                                                    dyn-err-summaries.rktdb))
                  (displayln "Sampling interesting mutants...")
                  (define mutant-samples.rktdb
-                   (sample-mutants! outdir 1000
+                   (sample-mutants! outdir 80 ; to match blgt paper
                                     #:from-interesting interesting-mutants.rktdb))
                  (values mutant-samples.rktdb interesting-scenarios.rktdb)]
                 [else
                  (displayln "Sampling mutants...")
                  (define mutant-samples.rktdb
-                   (sample-mutants! outdir 1000
+                   (sample-mutants! outdir 80 ; to match blgt paper
                                     #:from-dyn-err dyn-err-summaries.rktdb))
                  (values mutant-samples.rktdb
                          #f)]))
