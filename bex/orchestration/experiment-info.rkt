@@ -10,6 +10,8 @@
   "../../../experiment-data/dbs/code-mutations-natural-biased")
 (define-runtime-path dbs:erasure-biased-2
   "../../../experiment-data/dbs/code-mutations-erasure-biased-2")
+(define-runtime-path dbs:blgt-erasure-biased-thesis
+  "../../../experiment-data/dbs/code-mutations-erasure-biased-thesis")
 (define-runtime-path dbs:type-api-mutations
   "../../../experiment-data/dbs/type-api-mutations")
 
@@ -19,8 +21,10 @@
   "../../../experiment-data/results/code-mutations-erasure-biased-2")
 (define-runtime-path data:type-api-mistakes
   "../../../experiment-data/results/type-api-mutations")
+(define-runtime-path data:blgt-erasure-biased-thesis
+  "../../../experiment-data/results/code-mutations-erasure-biased-thesis")
 
-(define remote-host-db-installation-directory-name "type-api-mutations")
+(define remote-host-db-installation-directory-name "code-mutations")
 
 (define-runtime-path benchmarks-dir "../../../gtp-benchmarks/benchmarks")
 
