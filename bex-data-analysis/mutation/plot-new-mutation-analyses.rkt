@@ -39,7 +39,10 @@
                        @~a{Given file that doesn't look like a log: @path})]))
 
 (define (log->data path)
-  (match (file->string path)
+  (match (system/string @~a{
+                            awk '/^#hash/{buf=""; a=1} a{buf=buf $0 ORS} END{printf "%s", buf}' @;
+                            '@path'
+                            })
     [(regexp @regexp{#hash.+$}
              (list data-hash-str))
      (hash-update
@@ -169,9 +172,14 @@
                                                    [4 (list "black" "gray" '(242 242 242) "red")])
                             #:auto-label? #f)
               (legend)))
-    (void (render the-plot outpath
-                  #:width 1700
-                  #:height 1000))]
+    (local-require (only-in plot
+                            plot-x-tick-label-anchor
+                            plot-x-tick-label-angle))
+    (parameterize ([plot-x-tick-label-anchor 'top-right]
+                   [plot-x-tick-label-angle  30])
+      (void (render the-plot outpath
+                    #:width 1700
+                    #:height 1000)))]
    [other (raise-user-error 'cli @~a{No plot type named @~s[other]})]))
 
 (module test racket)
