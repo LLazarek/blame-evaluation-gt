@@ -19,8 +19,9 @@
 
 (define-runtime-paths
   [store-path "../../../experiment-data/experiment-manager"]
-  [default-data-path "../../../experiment-data/results/type-api-mutations"]
-  [default-dbs-path "../../../experiment-data/dbs/type-api-mutations"])
+  [default-data-path "../../../experiment-data/results/code-mutations"]
+  [default-dbs-path "../../../experiment-data/dbs/code-mutations"]
+  [std-experiment-runner-template "./standard-experiment-runner-script-template.sh"])
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -113,7 +114,9 @@
                    host-data-path)
     (init-field [host-jobdir-path "."])
     (field [host-jobfile-path (build-path host-jobdir-path "job.sub")]
-           [enabled-machines '("fix" "allagash" "piraat")])
+           [enabled-machines '("fix" "allagash" "piraat")]
+           [host-experiment-runner-script-path (build-path host-project-path "generated-run-experiment.sh")]
+           [host-experiment-runner-script-uploaded? #f])
 
     (define/public (get-jobs [active? #t])
       (option-let*
@@ -157,10 +160,13 @@
                                 #:mode [record/check-mode 'check]
                                 #:cpus [cpus "decide"]
                                 #:name [name benchmark])
+      (define (check-success exit-code/bool)
+        (match exit-code/bool
+          [(or 0 #t) #t]
+          [else absent]))
       (define job-uploaded?
         (with-temp-file job.sub
           (display-to-file
-           ;; lltodo: remove dependency on run-experiment.sh
            @~a{
                # Set the universe
                Universe = vanilla
@@ -179,8 +185,8 @@
                # Set the environment
                Getenv = True
 
-               Arguments = "'@benchmark' '@|config-name|.rkt' '@record/check-mode' '@cpus' '@name'"
-               Executable = /project/blgt/run-experiment.sh
+               Arguments = "'@benchmark' '@|config-name|.rkt' '@record/check-mode' '@(current-remote-host-db-installation-directory-name)' '@cpus' '@name'"
+               Executable = @host-experiment-runner-script-path
                Error = condor-output.txt
                Output = condor-output.txt
                Log = condor-log.txt
@@ -193,10 +199,24 @@
                }
            job.sub
            #:exists 'replace)
-          (match (scp #:from-local job.sub #:to-host host-jobfile-path)
-            [0 #t]
-            [else absent])))
+          (check-success (scp #:from-local job.sub #:to-host host-jobfile-path))))
+      (define experiment-script-uploaded?
+        (or host-experiment-runner-script-uploaded?
+            (with-temp-file run-experiment.sh
+              (display-to-file
+               (string-replace (file->string std-experiment-runner-template)
+                               "<<project-path>>"
+                               host-project-path)
+               run-experiment.sh
+               #:exists 'replace)
+              (and/option
+               (check-success
+                (scp #:from-local run-experiment.sh #:to-host host-experiment-runner-script-path))
+               (check-success
+                (system/host @~a{chmod u+x @host-experiment-runner-script-path}))
+               (set! host-experiment-runner-script-uploaded? #t)))))
       (option-let* ([_ job-uploaded?]
+                    [_ experiment-script-uploaded?]
                     [id (match (system/host/string
                                 @~a{condor_submit -verbose @host-jobfile-path})
                           [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id)) id]
@@ -437,7 +457,7 @@
 
 (define zythos (new condor-host%
                     [hostname "zythos"]
-                    [host-project-path "./blgt"]
+                    [host-project-path "/project/blgt"]
                     [host-jobdir-path "./proj/jobctl"]))
 (define benbox (new direct-access-host%
                     [hostname "benbox"]
@@ -605,6 +625,11 @@
       (raise-user-error 'download-completed-benchmarks!
                         "Can't download results with empty archive name"))
     (define projdir (get-field host-project-path a-host))
+    (when (and include-configuration-outcomes?
+               (false? (current-remote-host-db-installation-directory-name)))
+      (raise-user-error
+       'download-completed-benchmarks!
+       "No experiment config selected, `current-remote-host-db-installation-directory-name` is not configured."))
     (void (send a-host
                 system/host
                 @~a{
@@ -612,7 +637,7 @@
                     @(if include-configuration-outcomes?
                          @~a{
                              cp -r @;
-                             ./blame-evaluation-gt/bex/dbs/@|remote-host-db-installation-directory-name|/configuration-outcomes @;
+                             ./blame-evaluation-gt/bex/dbs/@(current-remote-host-db-installation-directory-name)/configuration-outcomes @;
                              ./experiment-output/configuration-outcomes &&@" "
                              }
                          "") @;
@@ -765,7 +790,7 @@
     (handle-failure! @~a{Failed to upload db archive to @a-host}))
 
   (define host-dbs-unpacked-dir-path (build-path host-dbs-destination
-                                                 remote-host-db-installation-directory-name))
+                                                 (current-remote-host-db-installation-directory-name)))
   (define host-repo-path
     (build-path (get-field host-project-path a-host)
                 "blame-evaluation-gt"))
@@ -965,17 +990,25 @@
 (main
  #:arguments {[(hash-table ['status? status?]
                            ['download (app (mapper host-by-name) download-targets)]
-                           ['download-directory download-directory]
+                           ['download-directory download-directory-override]
                            ['launch (app (mapper string->benchmark-spec) launch-targets)]
                            ['cancel (app (mapper string->benchmark-spec) cancel-targets)]
                            ['watch-for-stuck-jobs watch-for-stuck-jobs?]
                            ['queue Q-path]
                            ['resume-queue resume-Q/host]
                            ['update (app (mapper host-by-name) update-targets)]
-                           ['dbs-path dbs-path]
-                           ['launch-outcome-checking-mode (app string->symbol outcome-checking-mode)])
+                           ['dbs-path dbs-path-override]
+                           ['launch-outcome-checking-mode (app string->symbol outcome-checking-mode)]
+                           ['orchestration-config maybe-orchestration-config-id])
                args]
               #:once-each
+              [("-c" "--orchestration-config")
+               'orchestration-config
+               ("Obtain db, download/data locations, and current db set name from"
+                "the specified experiment config in `experiment-info.rkt`."
+                "Mandatory for most operations.")
+               #:collect ["name" take-latest #f]
+               #:mandatory-unless (λ (flags) (member flags '((status?) (cancel))))]
               [("-s" "--status")
                'status?
                "Check the experiment status on all active hosts."
@@ -993,9 +1026,27 @@
               [("-D" "--download-destination")
                'download-directory
                ("Download results to the given directory."
+                "Overrides the information obtained from the experiment config flag if specified."
                 "Only has an effect when -d or -q supplied."
-                @~a{Default: @default-data-path})
-               #:collect ["path" take-latest default-data-path]]
+                @~a{Default: whatever the experiment config identified by -c specifies})
+               #:collect ["path" take-latest #f]]
+              [("-B" "--dbs")
+               'dbs-path
+               ("Install the given db set when updating a host's implementation."
+                "Overrides the information obtained from the experiment config flag if specified."
+                "Only has an effect when -u is supplied."
+                @~a{Default: whatever the experiment config identified by -c specifies})
+               #:collect ["path" take-latest #f]]
+              [("-L" "--launch-outcome-checking-mode")
+               'launch-outcome-checking-mode
+               ("Outcome checking mode for benchmarks to be launched."
+                "Only has an effect when -l is supplied."
+                "Default: check")
+               #:collect ["record/check" take-latest "check"]]
+              [("-w" "--watch-for-stuck-jobs")
+               'watch-for-stuck-jobs
+               "Watch for stuck jobs on all hosts and restart them as they get stuck."
+               #:record]
               #:multi
               [("-d" "--download-results")
                'download
@@ -1005,32 +1056,37 @@
                'launch
                ("Launch the specified benchmarks on a host for a mode.")
                #:collect ["(host mode benchmark ...)" cons empty]]
-              [("-c" "--cancel")
+              [("-C" "--cancel")
                'cancel
                ("Cancel the specified benchmarks on a host for a mode.")
                #:collect ["(host mode benchmark ...)" cons empty]]
-              [("-w" "--watch-for-stuck-jobs")
-               'watch-for-stuck-jobs
-               "Watch for stuck jobs on all hosts and restart them as they get stuck."
-               #:record]
               [("-u" "--update")
                'update
                "Update the given hosts implementation of the experiment."
-               #:collect ["host" cons empty]]
-              [("-B" "--dbs")
-               'dbs-path
-               ("Install the given db set when updating a host's implementation."
-                "Only has an effect when -u is supplied."
-                @~a{Default: @default-dbs-path})
-               #:collect ["path" take-latest default-dbs-path]]
-              [("-L" "--launch-outcome-checking-mode")
-               'launch-outcome-checking-mode
-               ("Outcome checking mode for benchmarks to be launched."
-                "Only has an effect when -l is supplied."
-                "Default: check")
-               #:collect ["record/check" take-latest "check"]]}
+               #:collect ["host" cons empty]]}
  #:check [(or (not Q-path) (path-to-existant-file? Q-path))
           @~a{Unable to find queue spec at @Q-path}]
+
+ (define orchestration-config
+   (and maybe-orchestration-config-id
+        (dynamic-require "experiment-info.rkt"
+                         maybe-orchestration-config-id
+                         (λ _ (raise-user-error
+                               @~a{
+                                   No experiment config found in experiment-info.rkt @;
+                                   named @maybe-orchestration-config-id
+                                   })))))
+ (define download-directory
+   (or download-directory-override
+       (and orchestration-config
+            (orchestration-config-download-dir orchestration-config))))
+ (define dbs-path
+   (or dbs-path-override
+       (and orchestration-config
+            (orchestration-config-dbs-dir orchestration-config))))
+ (when orchestration-config
+   (current-remote-host-db-installation-directory-name
+    (orchestration-config-dbs-dir-name orchestration-config)))
 
  (define (for-each-target targets action name)
    (for ([target (in-list targets)])

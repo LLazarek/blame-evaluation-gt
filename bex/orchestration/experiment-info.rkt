@@ -1,8 +1,11 @@
 #lang at-exp racket
 
-(provide (all-defined-out))
+(provide (all-defined-out)
+         (struct-out orchestration-config))
 
 (require racket/runtime-path)
+
+(struct orchestration-config (dbs-dir dbs-dir-name download-dir))
 
 (define-runtime-path dbs:icfp
   "../../../experiment-data/dbs/code-mutations-icfp")
@@ -24,7 +27,17 @@
 (define-runtime-path data:blgt-erasure-biased-thesis
   "../../../experiment-data/results/code-mutations-erasure-biased-thesis")
 
-(define remote-host-db-installation-directory-name "code-mutations")
+;; this needs to match up with whatever the experiment configs look for!
+(define current-remote-host-db-installation-directory-name (make-parameter #f))
+
+(define type-mistakes
+  (orchestration-config dbs:type-api-mutations
+                        "type-api-mutations"
+                        data:type-api-mistakes))
+(define code-mistakes
+  (orchestration-config dbs:blgt-erasure-biased-thesis
+                        "code-mutations"
+                        data:blgt-erasure-biased-thesis))
 
 (define-runtime-path benchmarks-dir "../../../gtp-benchmarks/benchmarks")
 

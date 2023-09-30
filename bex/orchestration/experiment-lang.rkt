@@ -3,7 +3,6 @@
 (provide (except-out (all-from-out racket)
                      #%module-begin)
          (rename-out [module-begin #%module-begin])
-         (struct-out experiment-config)
          define-runtime-path
          with-configuration
          zythos
@@ -13,9 +12,8 @@
          racket/stxparam
          racket/runtime-path
          racket/date
-         "experiment-manager.rkt")
-
-(struct experiment-config (dbs-dir download-dir))
+         "experiment-manager.rkt"
+         "experiment-info.rkt")
 
 (begin-for-syntax
   (require racket/runtime-path
@@ -106,16 +104,18 @@
                                                (handle-host-update-failure! the-dbs)))
   (module+ main
     (let ([the-host host]
-          [the-dbs (experiment-config-dbs-dir configuration)]
-          [the-download-dir (experiment-config-download-dir configuration)]
+          [the-dbs (orchestration-config-dbs-dir configuration)]
+          [the-download-dir (orchestration-config-download-dir configuration)]
           [the-status-file {~? status-file-path #f}])
-      maybe-host-update
-      (syntax-parameterize ([current-host (syntax-id-rules () [_ the-host])]
-                            [current-dbs  (syntax-id-rules () [_ the-dbs])]
-                            [current-download-dir (syntax-id-rules () [_ the-download-dir])]
-                            [current-status-file (syntax-id-rules () [_ the-status-file])])
-        first-mode.implementation
-        more-modes.implementation ...))))
+      (parameterize ([current-remote-host-db-installation-directory-name
+                      (orchestration-config-dbs-dir-name configuration)])
+        maybe-host-update
+        (syntax-parameterize ([current-host (syntax-id-rules () [_ the-host])]
+                              [current-dbs  (syntax-id-rules () [_ the-dbs])]
+                              [current-download-dir (syntax-id-rules () [_ the-download-dir])]
+                              [current-status-file (syntax-id-rules () [_ the-status-file])])
+          first-mode.implementation
+          more-modes.implementation ...)))))
 
 (define ((handle-host-update-failure! dbs-path) msg)
   (unless (help!:continue? msg
