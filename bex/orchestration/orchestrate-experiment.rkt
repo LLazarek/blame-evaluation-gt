@@ -2,7 +2,7 @@
 
 (require "experiment-info.rkt")
 
-(define-runtime-path status-file "../../experiment-status.txt")
+(define-runtime-path status-file "../../../experiment-status.txt")
 
 (provide type-mistakes)
 (define type-mistakes

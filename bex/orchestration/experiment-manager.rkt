@@ -612,7 +612,7 @@
                     @(if include-configuration-outcomes?
                          @~a{
                              cp -r @;
-                             ./blame-evaluation-gt/dbs/@|remote-host-db-installation-directory-name|/configuration-outcomes @;
+                             ./blame-evaluation-gt/bex/dbs/@|remote-host-db-installation-directory-name|/configuration-outcomes @;
                              ./experiment-output/configuration-outcomes &&@" "
                              }
                          "") @;
