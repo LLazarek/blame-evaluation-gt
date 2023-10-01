@@ -281,7 +281,7 @@
                   [(regexp @pregexp{(?m:^\S+\s+(\d+)\s+(\S+\s+){5}/bin/bash .*run-experiment.sh (\S+) (\S+).rkt)}
                            (list _ pid _ benchmark config-name))
                    (list (list* benchmark config-name (if with-pid? (list pid) empty)))]
-                  [(regexp #px"^llazarek") empty]
+                  [(regexp #px"grep[^\n]+run-experiment.sh") empty]
                   [else absent])])
 
        (match active?
@@ -298,6 +298,8 @@
                                 #:mode [record/check-mode 'check]
                                 #:cpus [cpus cpu-count]
                                 #:name [name benchmark])
+      ;; todo: remove the dep on external run-experiment.sh like condor-host%
+      (error 'direct-access-host% "Necessary updates to direct-access-host% unimplemented")
       (setup-job-management!)
       (option-let*
        ([_ (thread-send queueing-thd
