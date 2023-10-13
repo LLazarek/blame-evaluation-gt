@@ -21,7 +21,8 @@
   [store-path "../../../experiment-data/experiment-manager"]
   [default-data-path "../../../experiment-data/results/code-mutations"]
   [default-dbs-path "../../../experiment-data/dbs/code-mutations"]
-  [std-experiment-runner-template "./standard-experiment-runner-script-template.sh"])
+  [std-experiment-runner-template "./standard-experiment-runner-script-template.sh"]
+  [experiment-info.rkt "experiment-info.rkt"])
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -1071,8 +1072,8 @@
 
  (define orchestration-config
    (and maybe-orchestration-config-id
-        (dynamic-require "experiment-info.rkt"
-                         maybe-orchestration-config-id
+        (dynamic-require experiment-info.rkt
+                         (string->symbol maybe-orchestration-config-id)
                          (λ _ (raise-user-error
                                @~a{
                                    No experiment config found in experiment-info.rkt @;
