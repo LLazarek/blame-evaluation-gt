@@ -10,7 +10,8 @@
          notify-phone!
 
          zythos
-         benbox)
+         benbox
+         local)
 
 (require syntax/parse/define
          racket/date
@@ -19,10 +20,11 @@
 
 (define-runtime-paths
   [store-path "../../../experiment-data/experiment-manager"]
-  [default-data-path "../../../experiment-data/results/code-mutations"]
-  [default-dbs-path "../../../experiment-data/dbs/code-mutations"]
   [std-experiment-runner-template "./standard-experiment-runner-script-template.sh"]
-  [experiment-info.rkt "experiment-info.rkt"])
+  [experiment-info.rkt "experiment-info.rkt"]
+  [project-path "../../.."])
+
+(define-logger experiment-manager)
 
 ;; if it's not running?, it's pending
 (struct job (id running?) #:transparent)
@@ -64,8 +66,12 @@
                             host-project-path)
                 (field [data-store-path (build-path store-path (~a hostname ".rktd"))]
                        [host-racket-path (build-path host-project-path "racket" "bin" "racket")]
-                       [host-utilities-path (build-path host-project-path "blame-evaluation-gt" "bex" "util")]
-                       [host-data-path (build-path host-project-path "experiment-output")])
+                       [host-utilities-path
+                        (build-path host-project-path "blame-evaluation-gt" "bex" "util")]
+                       [host-data-path (build-path host-project-path "experiment-output")]
+                       [host-experiment-runner-script-path
+                        (build-path host-project-path "generated-run-experiment.sh")]
+                       [host-experiment-runner-script-uploaded? #f])
                 (define/public (custom-write port) (write hostname port))
                 (define/public (custom-display port) (display hostname port))
 
@@ -100,24 +106,56 @@
                                   @~a{@|hostname|:'@from-remote' '@to-local'}]
                                  [{#f #f from-local to-remote}
                                   @~a{'@from-local' @|hostname|:'@to-remote'}]
-                                 [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))))
+                                 [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))
+                (define/public (upload-experiment-script!)
+                  (or host-experiment-runner-script-uploaded?
+                      (with-temp-file run-experiment.sh
+                        (display-to-file
+                         (string-replace (file->string std-experiment-runner-template)
+                                         "<<project-path>>"
+                                         (~a host-project-path))
+                         run-experiment.sh
+                         #:exists 'replace)
+                        (and/option
+                         (check-success
+                          (send this scp
+                                #:from-local run-experiment.sh
+                                #:to-host host-experiment-runner-script-path))
+                         (check-success
+                          (send this system/host @~a{chmod u+x @host-experiment-runner-script-path}))
+                         (set! host-experiment-runner-script-uploaded? #t)))))
+
+                (define/public (make-experiment-runner-script-args benchmark
+                                                                   config-name ; without .rkt
+                                                                   record/check-mode
+                                                                   cpus
+                                                                   name)
+                  @~a{
+                      '@benchmark' @;
+                      '@|config-name|.rkt' @;
+                      '@record/check-mode' @;
+                      '@(current-remote-host-db-installation-directory-name)' @;
+                      '@cpus' @;
+                      '@name'
+                      })))
 (define condor-host%
   (class* host% (writable<%> host<%>)
     (super-new)
     (inherit system/host
              system/host/string
-             scp)
+             scp
+             upload-experiment-script!
+             make-experiment-runner-script-args)
     (inherit-field hostname
                    host-project-path
                    data-store-path
                    host-racket-path
                    host-utilities-path
-                   host-data-path)
+                   host-data-path
+                   host-experiment-runner-script-path)
     (init-field [host-jobdir-path "."])
     (field [host-jobfile-path (build-path host-jobdir-path "job.sub")]
-           [enabled-machines '("fix" "allagash" "piraat")]
-           [host-experiment-runner-script-path (build-path host-project-path "generated-run-experiment.sh")]
-           [host-experiment-runner-script-uploaded? #f])
+           [enabled-machines '("fix" "allagash" "piraat")])
 
     (define/public (get-jobs [active? #t])
       (option-let*
@@ -161,10 +199,6 @@
                                 #:mode [record/check-mode 'check]
                                 #:cpus [cpus "decide"]
                                 #:name [name benchmark])
-      (define (check-success exit-code/bool)
-        (match exit-code/bool
-          [(or 0 #t) #t]
-          [else absent]))
       (define job-uploaded?
         (with-temp-file job.sub
           (display-to-file
@@ -186,7 +220,7 @@
                # Set the environment
                Getenv = True
 
-               Arguments = "'@benchmark' '@|config-name|.rkt' '@record/check-mode' '@(current-remote-host-db-installation-directory-name)' '@cpus' '@name'"
+               Arguments = "@(make-experiment-runner-script-args benchmark config-name record/check-mode cpus name)"
                Executable = @host-experiment-runner-script-path
                Error = condor-output.txt
                Output = condor-output.txt
@@ -201,23 +235,8 @@
            job.sub
            #:exists 'replace)
           (check-success (scp #:from-local job.sub #:to-host host-jobfile-path))))
-      (define experiment-script-uploaded?
-        (or host-experiment-runner-script-uploaded?
-            (with-temp-file run-experiment.sh
-              (display-to-file
-               (string-replace (file->string std-experiment-runner-template)
-                               "<<project-path>>"
-                               host-project-path)
-               run-experiment.sh
-               #:exists 'replace)
-              (and/option
-               (check-success
-                (scp #:from-local run-experiment.sh #:to-host host-experiment-runner-script-path))
-               (check-success
-                (system/host @~a{chmod u+x @host-experiment-runner-script-path}))
-               (set! host-experiment-runner-script-uploaded? #t)))))
       (option-let* ([_ job-uploaded?]
-                    [_ experiment-script-uploaded?]
+                    [_ (upload-experiment-script!)]
                     [id (match (system/host/string
                                 @~a{condor_submit -verbose @host-jobfile-path})
                           [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id)) id]
@@ -254,6 +273,10 @@
       (display-lines-to-file (map ~s data)
                              data-store-path
                              #:exists 'replace))))
+(define (check-success exit-code/bool)
+  (match exit-code/bool
+    [(or 0 #t) #t]
+    [else absent]))
 (define (bool->option v)
   (or v absent))
 (define direct-access-host%
@@ -261,14 +284,18 @@
     (super-new)
     (inherit system/host
              system/host/string
-             scp)
+             scp
+             upload-experiment-script!
+             make-experiment-runner-script-args)
     (inherit-field hostname
                    data-store-path
                    host-project-path
                    host-racket-path
                    host-utilities-path
-                   host-data-path)
-    (init-field [cpu-count 1])
+                   host-data-path
+                   host-experiment-runner-script-path)
+    (init-field [cpu-count 1]
+                [env-vars ""])
     (field [run-screen-name "experiment-run"]
            [management-screen-name "experiment-manage"]
            [queueing-thd #f])
@@ -276,13 +303,22 @@
     (define/override (setup-job-management!)
       (unless (thread? queueing-thd)
         (set! queueing-thd (make-direct-access-host-queue-manager))))
+
+    (define experiment-script-name (basename host-experiment-runner-script-path))
     (define/public (get-jobs [active? #t] #:with-pid? [with-pid? #f])
       (option-let*
-       ([active (match (system/host/string "ps -ef | grep run-experiment.sh")
-                  [(regexp @pregexp{(?m:^\S+\s+(\d+)\s+(\S+\s+){5}/bin/bash .*run-experiment.sh (\S+) (\S+).rkt)}
-                           (list _ pid _ benchmark config-name))
-                   (list (list* benchmark config-name (if with-pid? (list pid) empty)))]
-                  [(regexp #px"grep[^\n]+run-experiment.sh") empty]
+       ([active (match (system/host/string @~a{ps -ef | grep @experiment-script-name})
+                  [(regexp (pregexp @~a{(?m:^\S+\s+(\d+)\s+(\S+\s+){5}/bin/bash .*@experiment-script-name (\S+) (\S+).rkt)})
+                           (list _ script-pid _ benchmark config-name))
+                   (list (list* benchmark
+                                config-name
+                                (if with-pid?
+                                    ;; get the mutant-factory pid, since that's what actually needs to be killed to cancel the job
+                                    (regexp-match* (pregexp @~a{(\d+)\s+@script-pid .*mutant-factory.rkt})
+                                                   (system/host/string @~a{ps -ef | grep @script-pid})
+                                                   #:match-select cadr)
+                                    empty)))]
+                  [(regexp (pregexp @~a{grep[^@"\n"]+@experiment-script-name})) empty]
                   [else absent])])
 
        (match active?
@@ -299,8 +335,6 @@
                                 #:mode [record/check-mode 'check]
                                 #:cpus [cpus cpu-count]
                                 #:name [name benchmark])
-      ;; todo: remove the dep on external run-experiment.sh like condor-host%
-      (error 'direct-access-host% "Necessary updates to direct-access-host% unimplemented")
       (setup-job-management!)
       (option-let*
        ([_ (thread-send queueing-thd
@@ -322,15 +356,16 @@
                                  name)
       (define run-cmd
         @~a{
-            cd ~/blgt; @;
-            ./run-experiment.sh "@benchmark" "@|config-name|.rkt" @record/check-mode @cpus "@name"
+            @env-vars @;
+            '@host-experiment-runner-script-path' @;
+            @(make-experiment-runner-script-args benchmark config-name record/check-mode cpus name)
             })
+      (log-experiment-manager-debug @~a{launching job with cmd: @run-cmd})
       (option-let*
        ([_ (ensure-screen-setup!)]
-        [_ (bool->option
-            (system/host @~a{
-                             screen -S @run-screen-name -p 0 -X stuff '@|run-cmd|\r'
-                             }))])
+        [_ (upload-experiment-script!)]
+        [_ (check-success
+            (system/host @~a{screen -S @run-screen-name -p 0 -X stuff "@|run-cmd|\r"}))])
        (void)))
     (define/private (cancel-currently-running-job!)
       (option-let*
@@ -338,17 +373,12 @@
         [_ (bool->option (not (empty? active-jobs)))]
         [pid (match active-jobs
                [`((,_ ,_ ,pid)) pid]
-               [else absent])]
-        [_ (bool->option (system/host @~a{kill @pid}))])
-       (void))
-      #;(option-let*
-       ([_ (ensure-screen-setup!)]
-        [_ (bool->option
-            (system/host @~a{
-                             screen -S @run-screen-name -p 0 -X stuff '\'^C\''
-                             }))]
-        [active-jobs (get-jobs #t)]
-        [_ (bool->option (empty? active-jobs))])
+               [else
+                (log-experiment-manager-error
+                 @~a{unexpected shape of active jobs: @~s[active-jobs]})
+                absent])]
+        [_ (log-experiment-manager-debug @~a{killing active job with pid @pid})]
+        [_ (check-success (system/host @~a{kill @pid}))])
        (void)))
 
     (define/private (ensure-screen-setup!)
@@ -356,7 +386,7 @@
       (define (session-exists? name)
         (regexp-match? @~a{[0-9]+\.@name} screens-output))
       (define (launch-screen! name)
-        (system/host @~a{screen -dmS @name}))
+        (system/host @~a{screen -dmS @name bash}))
       (define run-ok?
         (unless (session-exists? run-screen-name) (launch-screen! run-screen-name)))
       (define management-ok?
@@ -376,16 +406,19 @@
           (with-data-store-lock
             (thunk (write-data-store! (append (read-data-store)
                                               (list spec))))
-            (thunk (displayln @~a{Failed to enqueu job @spec, couldn't get data store lock}))))
+            (thunk (displayln @~a{Failed to enqueue job @spec, couldn't get data store lock}))))
         (define (cancel-job! id)
+          (log-experiment-manager-debug @~a{canceling job @id})
           (match-define (list benchmark config-name) id)
           (with-data-store-lock
             (thunk
              (match (get-jobs #t)
                [(list running-job-id)
                 #:when (equal? running-job-id id)
+                (log-experiment-manager-debug @~a{... which is currently running})
                 (cancel-currently-running-job!)]
-               [(? list?)
+               [(? list? running-jobs)
+                (log-experiment-manager-debug @~a{... which is still in the queue (running: @running-jobs)})
                 (define current-q (read-data-store))
                 (define new-q (remf (match-lambda [(list* (== benchmark) (== config-name) _) #t]
                                                   [else #f])
@@ -451,6 +484,31 @@
                                    fail-thunk
                                    #:max-delay 1))))
 
+(define local-host%
+  (class direct-access-host%
+    (super-new)
+    (define/override (system/host #:interactive? [interactive? #f] . parts)
+      (define cmd-str (apply ~a (add-between parts " ")))
+      (system cmd-str))
+    (define/override (system/host/string #:interactive? [interactive? #f] . parts)
+      (define out-str (open-output-string))
+      (parameterize ([current-output-port out-str]
+                     [current-error-port out-str])
+        (system/host #:interactive? interactive? . parts))
+      (get-output-string out-str))
+    (define/override (scp #:from-host [from-host-path #f]
+                          #:to-local [to-local-path #f]
+                          #:from-local [from-local-path #f]
+                          #:to-host [to-host-path #f])
+      (match (list from-host-path
+                   to-local-path
+                   from-local-path
+                   to-host-path)
+        [(or (list from to #f #f)
+             (list #f #f from to))
+         (system/exit-code @~a{cp -r '@from' '@to'})]
+        [else (raise-user-error 'scp "Bad argument combination")]))))
+
 (define-simple-macro (with-temp-file name body ...)
   (call-with-temp-file (λ (name) body ...)))
 (define (call-with-temp-file f)
@@ -465,7 +523,11 @@
 (define benbox (new direct-access-host%
                     [hostname "benbox"]
                     [host-project-path "./blgt"]))
-(define hosts (list zythos))
+(define local (new local-host%
+                   [cpu-count 2]
+                   [hostname "local"]
+                   [host-project-path project-path]))
+(define hosts (list zythos local))
 
 ;; host<%> -> (option/c results?)
 (define (get-results a-host)
