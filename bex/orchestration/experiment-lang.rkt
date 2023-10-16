@@ -5,8 +5,15 @@
          (rename-out [module-begin #%module-begin])
          define-runtime-path
          with-configuration
+
+         condor-host%
+         direct-access-host%
+         local-host%
+
          zythos
-         benbox)
+         zythos-direct
+         benbox
+         local)
 
 (require syntax/parse/define
          racket/stxparam

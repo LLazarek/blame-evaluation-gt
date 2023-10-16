@@ -9,7 +9,12 @@
          help!:continue?
          notify-phone!
 
+         condor-host%
+         direct-access-host%
+         local-host%
+
          zythos
+         zythos-direct
          benbox
          local)
 
@@ -302,6 +307,15 @@
 
     (define/override (setup-job-management!)
       (unless (thread? queueing-thd)
+        (when (and (not (empty? (read-data-store)))
+                   (user-prompt!
+                    @~a{
+                        Found existing job data in persistent queue @;
+                        (at @data-store-path). @;
+                        Do you want to clear it before continuing? @;
+                        (Answering no means the old job data will be executed *before* any new.)
+                        }))
+          (delete-file data-store-path))
         (set! queueing-thd (make-direct-access-host-queue-manager))))
 
     (define experiment-script-name (basename host-experiment-runner-script-path))
@@ -314,7 +328,7 @@
                                 config-name
                                 (if with-pid?
                                     ;; get the mutant-factory pid, since that's what actually needs to be killed to cancel the job
-                                    (regexp-match* (pregexp @~a{(\d+)\s+@script-pid .*mutant-factory.rkt})
+                                    (regexp-match* (pregexp @~a{\s(\d+)\s+@script-pid .*mutant-factory.rkt})
                                                    (system/host/string @~a{ps -ef | grep @script-pid})
                                                    #:match-select cadr)
                                     empty)))]
@@ -520,6 +534,12 @@
                     [hostname "zythos"]
                     [host-project-path "/project/blgt"]
                     [host-jobdir-path "./proj/jobctl"]))
+(define zythos-direct
+  (new direct-access-host%
+       [hostname "zythos-direct"]
+       [host-project-path "/project/blgt"]
+       [cpu-count 150]
+       [env-vars "BEX_CONDOR_MACHINES='fix allagash piraat'"]))
 (define benbox (new direct-access-host%
                     [hostname "benbox"]
                     [host-project-path "./blgt"]))
@@ -527,7 +547,7 @@
                    [cpu-count 2]
                    [hostname "local"]
                    [host-project-path project-path]))
-(define hosts (list zythos local))
+(define hosts (list zythos local zythos-direct))
 
 ;; host<%> -> (option/c results?)
 (define (get-results a-host)
