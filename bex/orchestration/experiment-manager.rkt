@@ -9,12 +9,9 @@
          help!:continue?
          notify-phone!
 
-         condor-host%
-         direct-access-host%
-         local-host%
-
          zythos
          zythos-direct
+         zythos-local
          benbox
          local)
 
@@ -65,84 +62,97 @@
                                       #:name string?}
                                      any)]
                   [cancel-job! (->m string? string? any)]))
-(define host% (class object%
-                (super-new)
-                (init-field hostname
-                            host-project-path)
-                (field [data-store-path (build-path store-path (~a hostname ".rktd"))]
-                       [host-racket-path (build-path host-project-path "racket" "bin" "racket")]
-                       [host-utilities-path
-                        (build-path host-project-path "blame-evaluation-gt" "bex" "util")]
-                       [host-data-path (build-path host-project-path "experiment-output")]
-                       [host-experiment-runner-script-path
-                        (build-path host-project-path "generated-run-experiment.sh")]
-                       [host-experiment-runner-script-uploaded? #f])
-                (define/public (custom-write port) (write hostname port))
-                (define/public (custom-display port) (display hostname port))
+(define host%
+  (class object%
+    (super-new)
+    (init-field hostname
+                host-project-path)
+    (field [data-store-path (build-path store-path (~a hostname ".rktd"))]
+           [host-racket-path (build-path host-project-path "racket" "bin" "racket")]
+           [host-utilities-path
+            (build-path host-project-path "blame-evaluation-gt" "bex" "util")]
+           [host-data-path (build-path host-project-path "experiment-output")]
+           [host-experiment-runner-script-path
+            (build-path host-project-path "generated-run-experiment.sh")]
+           [host-experiment-runner-script-uploaded? #f])
+    (define/public (custom-write port) (write hostname port))
+    (define/public (custom-display port) (display hostname port))
 
-                (define/public (setup-job-management!) (void))
+    (define/public (setup-job-management!) (void))
 
-                (define/public (system/host #:interactive? [interactive? #f] . parts)
-                  ;; lltodo: implement a persistent connection here to prevent being blocked
-                  ;; by zythos for opening too many connections too quickly
-                  ;; > Tried this and gave up after a few hours. It's hard.
-                  ;; Instead, I should think about batching these calls higher up in the logic.
-                  (define cmd-str (apply ~a (add-between parts " ")))
-                  (define cmd-str-escaped (string-replace cmd-str "\"" "\\\""))
-                  (system @~a{ssh @(if interactive? "-t" "") @hostname "@cmd-str-escaped"}))
+    (define/public (system/host #:interactive? [interactive? #f] . parts)
+      ;; lltodo: implement a persistent connection here to prevent being blocked
+      ;; by zythos for opening too many connections too quickly
+      ;; > Tried this and gave up after a few hours. It's hard.
+      ;; Instead, I should think about batching these calls higher up in the logic.
+      (define cmd-str (apply ~a (add-between parts " ")))
+      (define cmd-str-escaped (string-replace cmd-str "\"" "\\\""))
+      (system @~a{ssh @(if interactive? "-t" "") @hostname "@cmd-str-escaped"}))
 
-                (define/public (system/host/string #:interactive? [interactive? #f] . parts)
-                  (define out-str (open-output-string))
-                  (parameterize ([current-output-port out-str]
-                                 [current-error-port out-str])
-                    (send this system/host #:interactive? interactive? . parts))
-                  (get-output-string out-str))
+    (define/public (system/host/string #:interactive? [interactive? #f] . parts)
+      (define out-str (open-output-string))
+      (parameterize ([current-output-port out-str]
+                     [current-error-port out-str])
+        (send this system/host #:interactive? interactive? . parts))
+      (get-output-string out-str))
 
-                (define/public (scp #:from-host [from-host-path #f]
-                                    #:to-local [to-local-path #f]
-                                    #:from-local [from-local-path #f]
-                                    #:to-host [to-host-path #f])
-                  (system/exit-code
-                   @~a{scp -q @(match* {from-host-path
-                                        to-local-path
-                                        from-local-path
-                                        to-host-path}
-                                 [{from-remote to-local #f #f}
-                                  @~a{@|hostname|:'@from-remote' '@to-local'}]
-                                 [{#f #f from-local to-remote}
-                                  @~a{'@from-local' @|hostname|:'@to-remote'}]
-                                 [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))
-                (define/public (upload-experiment-script!)
-                  (or host-experiment-runner-script-uploaded?
-                      (with-temp-file run-experiment.sh
-                        (display-to-file
-                         (string-replace (file->string std-experiment-runner-template)
-                                         "<<project-path>>"
-                                         (~a host-project-path))
-                         run-experiment.sh
-                         #:exists 'replace)
-                        (and/option
-                         (check-success
-                          (send this scp
-                                #:from-local run-experiment.sh
-                                #:to-host host-experiment-runner-script-path))
-                         (check-success
-                          (send this system/host @~a{chmod u+x @host-experiment-runner-script-path}))
-                         (set! host-experiment-runner-script-uploaded? #t)))))
+    (define/public (scp #:from-host [from-host-path #f]
+                        #:to-local [to-local-path #f]
+                        #:from-local [from-local-path #f]
+                        #:to-host [to-host-path #f])
+      (system/exit-code
+       @~a{scp -q @(match* {from-host-path
+                            to-local-path
+                            from-local-path
+                            to-host-path}
+                     [{from-remote to-local #f #f}
+                      @~a{@|hostname|:'@from-remote' '@to-local'}]
+                     [{#f #f from-local to-remote}
+                      @~a{'@from-local' @|hostname|:'@to-remote'}]
+                     [{_ _ _ _} (raise-user-error 'scp "Bad argument combination")])}))
+    (define/public (upload-experiment-script!)
+      (or host-experiment-runner-script-uploaded?
+          (with-temp-file run-experiment.sh
+            (display-to-file
+             (string-replace (file->string std-experiment-runner-template)
+                             "<<project-path>>"
+                             (~a host-project-path))
+             run-experiment.sh
+             #:exists 'replace)
+            (and/option
+             (check-success
+              (send this scp
+                    #:from-local run-experiment.sh
+                    #:to-host host-experiment-runner-script-path))
+             (check-success
+              (send this system/host @~a{chmod u+x @host-experiment-runner-script-path}))
+             (set! host-experiment-runner-script-uploaded? #t)))))
 
-                (define/public (make-experiment-runner-script-args benchmark
-                                                                   config-name ; without .rkt
-                                                                   record/check-mode
-                                                                   cpus
-                                                                   name)
-                  @~a{
-                      '@benchmark' @;
-                      '@|config-name|.rkt' @;
-                      '@record/check-mode' @;
-                      '@(current-remote-host-db-installation-directory-name)' @;
-                      '@cpus' @;
-                      '@name'
-                      })))
+    (define/public (make-experiment-runner-script-args benchmark
+                                                       config-name ; without .rkt
+                                                       record/check-mode
+                                                       cpus
+                                                       name)
+      @~a{
+          '@benchmark' @;
+          '@|config-name|.rkt' @;
+          '@record/check-mode' @;
+          '@(current-remote-host-db-installation-directory-name)' @;
+          '@cpus' @;
+          '@name'
+          })
+
+    (define/public (ensure-store!)
+      (make-directory* (path-only data-store-path))
+      (unless (file-exists? data-store-path)
+        (system @~a{touch '@data-store-path'})))
+    (define/public (read-data-store)
+      (ensure-store!)
+      (file->list data-store-path))
+    (define/public (write-data-store! data)
+      (display-lines-to-file (map ~s data)
+                             data-store-path
+                             #:exists 'replace))))
 (define condor-host%
   (class* host% (writable<%> host<%>)
     (super-new)
@@ -150,7 +160,10 @@
              system/host/string
              scp
              upload-experiment-script!
-             make-experiment-runner-script-args)
+             make-experiment-runner-script-args
+             ensure-store!
+             read-data-store
+             write-data-store!)
     (inherit-field hostname
                    host-project-path
                    data-store-path
@@ -266,18 +279,7 @@
       (ensure-store!)
       (for*/option ([{bench+config id} (in-dict (file->list data-store-path))]
                     #:when (string=? id target-id))
-                   bench+config))
-
-    (define/private (ensure-store!)
-      (make-directory* (path-only data-store-path))
-      (unless (file-exists? data-store-path)
-        (system @~a{touch '@data-store-path'})))
-    (define/private (read-data-store)
-      (file->list data-store-path))
-    (define/private (write-data-store! data)
-      (display-lines-to-file (map ~s data)
-                             data-store-path
-                             #:exists 'replace))))
+                   bench+config))))
 (define (check-success exit-code/bool)
   (match exit-code/bool
     [(or 0 #t) #t]
@@ -291,7 +293,10 @@
              system/host/string
              scp
              upload-experiment-script!
-             make-experiment-runner-script-args)
+             make-experiment-runner-script-args
+             ensure-store!
+             read-data-store
+             write-data-store!)
     (inherit-field hostname
                    data-store-path
                    host-project-path
@@ -315,7 +320,7 @@
                         Do you want to clear it before continuing? @;
                         (Answering no means the old job data will be executed *before* any new.)
                         }))
-          (delete-file data-store-path))
+          (write-data-store! empty))
         (set! queueing-thd (make-direct-access-host-queue-manager))))
 
     (define experiment-script-name (basename host-experiment-runner-script-path))
@@ -449,6 +454,7 @@
           (empty? (read-data-store)))
 
         (define (launch-next-job!)
+          (log-experiment-manager-debug @~a{@hostname launching next job})
           (with-data-store-lock
             (thunk (define current-q (read-data-store))
                    (define new-q (rest current-q))
@@ -463,34 +469,24 @@
                                   because couldn't get data store lock
                                   }))))
 
+        (log-experiment-manager-debug @~a{@hostname direct-access queue thread launched})
         (let loop ()
-          (cond [(thread-try-receive)
-                 => (match-lambda [`(submit ,job-spec)
-                                   (enqueue-job! job-spec)
-                                   (thread-send main-thd #t)]
-                                  [`(cancel ,job-id)
-                                   (cancel-job! job-id)
-                                   (thread-send main-thd #t)])]
-                [else
-                 (if (and (current-job-done?)
-                          (not (queue-empty?)))
-                     (launch-next-job!)
-                     (sync/timeout (* 5 60) message-evt))])
+          (match (thread-try-receive)
+            [`(submit ,job-spec)
+             (enqueue-job! job-spec)
+             (thread-send main-thd #t)
+             (log-experiment-manager-debug @~a{@hostname received @job-spec})]
+            [`(cancel ,job-id)
+             (cancel-job! job-id)
+             (thread-send main-thd #t)
+             (log-experiment-manager-debug @~a{@hostname canceled @job-id})]
+            [else (void)])
+          (if (and (current-job-done?)
+                   (not (queue-empty?)))
+              (launch-next-job!)
+              (sync/timeout (* 5 60) message-evt))
           (loop)))))
 
-    (define/private (ensure-store!)
-      (make-directory* (path-only data-store-path))
-      (unless (file-exists? data-store-path)
-        (system @~a{touch '@data-store-path'})))
-    ;; -> (listof any/c)
-    (define/private (read-data-store)
-      (ensure-store!)
-      (file->list data-store-path))
-    ;; (listof any/c) -> void
-    (define/private (write-data-store! data-list)
-      (display-lines-to-file (map ~s data-list)
-                             data-store-path
-                             #:exists 'replace))
     (define/private (with-data-store-lock thunk fail-thunk)
       (call-with-file-lock/timeout data-store-path
                                    'exclusive
@@ -498,8 +494,8 @@
                                    fail-thunk
                                    #:max-delay 1))))
 
-(define local-host%
-  (class direct-access-host%
+(define (local-version-mixin c)
+  (class c
     (super-new)
     (define/override (system/host #:interactive? [interactive? #f] . parts)
       (define cmd-str (apply ~a (add-between parts " ")))
@@ -523,6 +519,9 @@
          (system/exit-code @~a{cp -r '@from' '@to'})]
         [else (raise-user-error 'scp "Bad argument combination")]))))
 
+(define local-direct-host% (local-version-mixin direct-access-host%))
+(define local-condor-host% (local-version-mixin condor-host%))
+
 (define-simple-macro (with-temp-file name body ...)
   (call-with-temp-file (λ (name) body ...)))
 (define (call-with-temp-file f)
@@ -543,10 +542,14 @@
 (define benbox (new direct-access-host%
                     [hostname "benbox"]
                     [host-project-path "./blgt"]))
-(define local (new local-host%
+(define local (new local-direct-host%
                    [cpu-count 2]
                    [hostname "local"]
                    [host-project-path project-path]))
+(define zythos-local (new local-condor-host%
+                          [hostname "zythos-local"]
+                          [host-project-path "/project/blgt"]
+                          [host-jobdir-path (expand-user-path "~/proj/jobctl")]))
 (define hosts (list zythos local zythos-direct))
 
 ;; host<%> -> (option/c results?)
@@ -1199,12 +1202,16 @@
                          (λ (a-host benchmark config-name)
                            (send a-host submit-job! benchmark config-name
                                  #:mode outcome-checking-mode))
-                         "submit")]
+                         "submit")
+        ;; in case it's a direct/local host, the other thread needs a chance to do the job
+        (sleep 1)]
        [(not (empty? cancel-targets))
         (for-each-target cancel-targets
                          (λ (a-host benchmark config-name)
                            (send a-host cancel-job! benchmark config-name))
-                         "cancel")]
+                         "cancel")
+        ;; in case it's a direct/local host, the other thread needs a chance to do the job
+        (sleep 1)]
        [watch-for-stuck-jobs?
         (for ([host (in-list hosts)])
           (send host setup-job-management!))

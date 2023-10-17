@@ -6,14 +6,7 @@
          define-runtime-path
          with-configuration
 
-         condor-host%
-         direct-access-host%
-         local-host%
-
-         zythos
-         zythos-direct
-         benbox
-         local)
+         (all-from-out "experiment-manager.rkt"))
 
 (require syntax/parse/define
          racket/stxparam
