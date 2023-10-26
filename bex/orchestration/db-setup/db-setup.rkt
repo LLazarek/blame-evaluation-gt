@@ -279,10 +279,11 @@
                            mutation-analysis-config
                            mutant-samples.rktdb
                            interesting-scenarios.rktdb)
-         (displayln "Pre-computing mutant results for erasure...")
-         (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir
-                                                                    mutant-samples.rktdb
-                                                                    pre-compute-config)
+         (when pre-compute-config
+           (displayln "Pre-computing mutant results for erasure...")
+           (pre-compute-benchmark-results-for-erasure/all-benchmarks! outdir
+                                                                      mutant-samples.rktdb
+                                                                      pre-compute-config))
          (displayln "DB set up complete.")]))
 
 (define-simple-macro (db-setup-script

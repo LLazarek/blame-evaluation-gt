@@ -529,29 +529,6 @@
   (begin0 (f temp)
     (when (file-exists? temp) (delete-file temp))))
 
-(define zythos (new condor-host%
-                    [hostname "zythos"]
-                    [host-project-path "/project/blgt"]
-                    [host-jobdir-path "./proj/jobctl"]))
-(define zythos-direct
-  (new direct-access-host%
-       [hostname "zythos-direct"]
-       [host-project-path "/project/blgt"]
-       [cpu-count 150]
-       [env-vars "BEX_CONDOR_MACHINES='fix allagash piraat'"]))
-(define benbox (new direct-access-host%
-                    [hostname "benbox"]
-                    [host-project-path "./blgt"]))
-(define local (new local-direct-host%
-                   [cpu-count 2]
-                   [hostname "local"]
-                   [host-project-path project-path]))
-(define zythos-local (new local-condor-host%
-                          [hostname "zythos-local"]
-                          [host-project-path "/project/blgt"]
-                          [host-jobdir-path (expand-user-path "~/proj/jobctl")]))
-(define hosts (list zythos local zythos-direct))
-
 ;; host<%> -> (option/c results?)
 (define (get-results a-host)
   (define info-str
@@ -1074,6 +1051,36 @@
   (call-with-values (thunk e)
                     (λ vals (f vals))))
 (define ((mapper f) l) (map f l))
+
+
+;; ----------------------------------------------------------------
+;; ---------- Host options for orchestrating experiments ----------
+;; ----------------------------------------------------------------
+
+(define zythos (new condor-host%
+                    [hostname "zythos"]
+                    [host-project-path "/project/blgt"]
+                    [host-jobdir-path "./proj/jobctl"]))
+(define zythos-direct
+  (new direct-access-host%
+       [hostname "zythos-direct"]
+       [host-project-path "/project/blgt"]
+       [cpu-count 150]
+       [env-vars "BEX_CONDOR_MACHINES='fix allagash piraat'"]))
+(define benbox (new direct-access-host%
+                    [hostname "benbox"]
+                    [host-project-path "./blgt"]))
+(define local (new local-direct-host%
+                   [cpu-count 2]
+                   [hostname "local"]
+                   [host-project-path project-path]))
+(define zythos-local (new local-condor-host%
+                          [hostname "zythos-local"]
+                          [host-project-path "/project/blgt"]
+                          [host-jobdir-path (expand-user-path "~/proj/jobctl")]))
+(define hosts (list zythos local zythos-direct))
+
+
 
 (main
  #:arguments {[(hash-table ['status? status?]
