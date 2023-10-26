@@ -139,7 +139,7 @@ mutant-runner-path
              (default-timeout/s)))
 "-g" (~a (or memory/gb
              (default-memory-limit/gb)))
-"-c" config-path
+"-c" (~a (simple-form-path config-path))
 (if output-path
     (list "-O" output-path)
     empty)

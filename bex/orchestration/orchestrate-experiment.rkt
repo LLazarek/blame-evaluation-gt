@@ -2,18 +2,13 @@
 
 (require "experiment-info.rkt")
 
-(define-runtime-path status-file "../../experiment-status.txt")
-
-(provide type-mistakes)
-(define type-mistakes
-  (experiment-config dbs:type-api-mutations
-                     data:type-api-mistakes))
+(define-runtime-path status-file "../../../experiment-status.txt")
 
 (with-configuration [(begin0 zythos
                        (set-field! enabled-machines
                                    zythos
                                    '("fix" "allagash")))
-                     type-mistakes]
+                     code-mistakes]
   #:status-in status-file
   (run-mode TR)
   (run-mode TR-stack-first)

@@ -5,7 +5,8 @@
          option/c
          in-option
          for*/option
-         option-let*)
+         option-let*
+         and/option)
 
 (require racket/contract/base
          racket/list
@@ -37,3 +38,8 @@
     (if (absent? name)
         absent
         result-expr)))
+
+(define-simple-macro (and/option e ...)
+  (option-let* ([res #t]
+                [res e] ...)
+               res))

@@ -1,7 +1,7 @@
 #lang configurable/config "../configurables.rkt"
 
 (configure! mutation                 type-mistakes-in-code)
-(configure! module-selection-for-mutation interface-module-only)
+(configure! module-selection-for-mutation all-regular-modules)
 (configure! benchmark-runner         run-it)
 (configure! configurations           module-types)
 

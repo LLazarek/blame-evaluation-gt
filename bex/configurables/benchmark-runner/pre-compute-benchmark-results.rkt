@@ -7,15 +7,22 @@
          "../../runner/mutation-runner.rkt"
          "../../runner/unify-program.rkt"
          "../../util/mutant-util.rkt"
-         "../../util/path-utils.rkt")
+         "../../util/path-utils.rkt"
+         "../../util/run-mutants-in-parallel.rkt"
+         process-queue/priority)
 
 ;; db layout is:
 ;; bench-name? -> (hash/c mutant/c run-status?)
 
+(define-logger pre-compute)
+
 (main
  #:arguments {[(hash-table ['out-db results-db-path]
                            ['config config-path]
-                           ['mutants-db-path mutants-db-path])
+                           ['mutants-db-path mutants-db-path]
+                           ['progress-log progress-log]
+                           ['process-limit (app string->number process-limit)]
+                           ['working-dir working-dir])
                bench-paths]
               #:once-each
               [("-c" "--config")
@@ -34,6 +41,22 @@
                ("Path to the db to populate with pre-computed results.")
                #:collect ["path" take-latest #f]
                #:mandatory]
+              [("-l" "--progress-log")
+               'progress-log
+               ("Record progress in the given log file."
+                "If it exists and is not empty, resume from the point reached in the log.")
+               #:collect {"path" take-latest #f}
+               #:mandatory]
+              [("-j" "--process-limit")
+               'process-limit
+               ("How many parallel processes to use."
+                "Default: 1")
+               #:collect {"N" take-latest "1"}]
+              [("-d" "--working-dir")
+               'working-dir
+               ("Set the working directory for storing temporary data."
+                @~a{Default: pre-compute-benchmark-results-scratch})
+               #:collect {"path" take-latest "pre-compute-benchmark-results-scratch"}]
               #:args bench-paths}
 
  #:check [(not (empty? bench-paths))
@@ -50,6 +73,12 @@
 
  (unless (db:path-to-db? results-db-path)
    (db:new! results-db-path))
+
+ (when (directory-exists? working-dir)
+   (log-pre-compute-info @~a{Deleting old working dir at @working-dir})
+   (delete-directory/files working-dir))
+ (make-directory* working-dir)
+
  (define results-db (db:get results-db-path))
 
  (for ([bench-path (in-list bench-paths)])
@@ -58,39 +87,31 @@
    (define config
      (for/hash ([{mod _} (in-hash (make-max-bench-config the-benchmark))])
        (values mod 'none)))
-   (match-define (struct* benchmark-configuration
-                          ([main main-path]
-                           [others others-paths]))
-     (configure-benchmark the-benchmark config))
    (define mutants-by-mod (db:read mutants-db bench-name))
 
-   (displayln @~a{Computing result of @bench-name ...})
+   (log-pre-compute-info @~a{Computing results for @bench-name ...})
    (define mutant-results-hash
-     (for*/hash ([mod-name (in-list (benchmark->mutatable-modules the-benchmark))]
-                 [index (in-list (hash-ref mutants-by-mod mod-name empty))])
-       (display @~a{@mod-name @"@" @index                              @"\r"})
-       (define module-to-mutate-path
-         (pick-file-by-name (list* main-path others-paths)
-                            mod-name))
-       (define the-program (make-unified-program main-path
-                                                 others-paths))
-       (define the-program-mods (program->mods the-program))
-       (define the-module-to-mutate
-         (find-unified-module-to-mutate module-to-mutate-path
-                                        the-program-mods))
-       (define rs (run-with-mutated-module the-program
-                                           the-module-to-mutate
-                                           index
-                                           config
-                                           #:timeout/s (default-timeout/s)
-                                           #:memory/gb (default-memory-limit/gb)
-                                           #:suppress-output? #t))
-       (when (equal? (run-status-outcome rs) 'syntax-error)
-         (eprintf @~a{
+     (collect-mutant-results (list the-benchmark)
+                             config-path
+                             (λ (mod) (hash-ref mutants-by-mod mod empty))
+                             (λ _ config)
+                             process-limit
+                             (λ (mutant-output-file the-mutant)
+                               (match (with-handlers ([exn:fail? (λ _ (raise-bad-mutant-result))])
+                                        (file->value mutant-output-file))
+                                 [(? run-status? rs)
+                                  (log-pre-compute-info @~a{@bench-name @the-mutant => @(run-status-outcome rs)})
+                                  (when (equal? (run-status-outcome rs) 'syntax-error)
+                                    (eprintf @~a{
 
-                      Warning: @bench-name @mod-name @"@" @index produces syntax-error
+                                                 Warning: @bench-name @the-mutant produces syntax-error
 
-                      }))
-       (values (mutant #f mod-name index)
-               rs)))
-   (db:set! results-db bench-name mutant-results-hash)))
+                                                 }))
+                                  rs]
+                                 [else (raise-bad-mutant-result)]))
+                             #:progress-logging (list 'auto progress-log)
+                             #:working-dir working-dir
+                             #:failure-retries 3))
+   (log-pre-compute-info @~a{@bench-name done})
+   (db:set! results-db bench-name mutant-results-hash))
+ (log-pre-compute-info @~a{Done.}))

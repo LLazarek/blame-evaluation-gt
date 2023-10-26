@@ -18,10 +18,6 @@
          racket/hash
          racket/random)
 
-(define-runtime-paths
-  [erasure-config-path "../configurables/configs/dynamic-error-analysis-erasure.rkt"]
-  [natural-config-path "../configurables/configs/dynamic-error-analysis-natural.rkt"])
-
 (define working-dir (make-parameter "find-mutant-dynamic-errors-scratch"))
 
 (define-logger mutant-dynamic-errors)
@@ -68,8 +64,8 @@
 
 (define (blamed-is-interesting? blamed-list a-config mutant)
   (match (current-mode)
-    [(or 'erasure-any 'natural-top 'natural-bot) #t]
-    ['erasure-interesting
+    [(list _ _ #f) #t]
+    [else
      (define blamed-mods-in-program
        (filter (λ (blamed) (hash-has-key? a-config blamed)) blamed-list))
      (define 3-unique-mods-on-stack?
@@ -112,15 +108,14 @@
                               (values mod 'none)))
   (define-values {run-configuration config-path}
     (match (current-mode)
-      [(or 'erasure-interesting 'erasure-any)
-       (values min-configuration
-               erasure-config-path)]
-      ['natural-top
-       (values (hash-set max-configuration (mutant-module mutant) 'none)
-               natural-config-path)]
-      ['natural-bot
-       (values min-configuration
-               natural-config-path)]))
+      [(list experiment-config-path lattice-config-id _)
+       (values
+        (match lattice-config-id
+         ['bot min-configuration]
+         ['top max-configuration]
+         ['top-less-mutated
+          (hash-set max-configuration (mutant-module mutant) 'none)])
+          experiment-config-path)]))
 
   (define ((mutant-spawner config will))
     (define configured-benchmark
@@ -186,7 +181,7 @@
                          old-mod-summary
                          [valid-indices new-indices-by-mutator]))))
 
-(define current-mode (make-parameter 'erasure-interesting))
+(define current-mode (make-parameter #f))
 
 (main
  #:arguments ({(hash-table ['summaries-db summaries-db-path]
@@ -195,7 +190,9 @@
                            ['progress-log progress-log-path]
                            ['working-dir _]
                            ['process-limit (app string->number process-limit)]
-                           ['mode _])
+                           ['experiment-config-path experiment-config-path]
+                           ['lattice-config (app string->symbol lattice-config-id)]
+                           ['interesting filter-for-interesting?])
                args}
               #:once-each
               [("-s" "--summaries-db")
@@ -233,24 +230,32 @@
                 "Default: 1")
                #:collect {"N" take-latest "1"}]
 
-              [("-m" "--mode")
-               'mode
-               ("Set the mode of filtering. Options are:"
-                "  erasure-interesting : using erasure, interesting dynamic errors"
-                "  erasure-any : using erasure, any dynamic errors"
-                "  natural-top : using natural with all but mutated @ types, any dynamic error"
-                "  natural-bot : using natural with all @ none, any dynamic error"
-                @~a{Default: @(current-mode)})
-               #:collect {"name" (set-parameter current-mode string->symbol) #f}])
+              [("-c" "--config")
+               'experiment-config-path
+               ("The experiment config with which to execute mutants for filtering."
+                "Mandatory.")
+                #:mandatory
+                #:collect {"path" take-latest #f}]
+              [("-L" "--lattice-config")
+               'lattice-config
+               ("The lattice config to execute for filtering mutants. One of `bot, top, top-less-mutated`"
+                "Mandatory.")
+                #:mandatory
+                #:collect {"bot|top|top-less-mutated" take-latest #f}]
+              [("-I" "--interesting")
+               'interesting
+               "Filter for mutants with interesting dynamic errors."
+                #:record])
 
  #:check [(db:path-to-db? summaries-db-path)
           @~a{Can't find db at @summaries-db-path}]
- #:check [(member (current-mode) '(erasure-interesting erasure-any natural-top natural-bot))
-          @~a{@(current-mode) isn't a valid mode}]
+ #:check [(member lattice-config-id '(bot top top-less-mutated))
+          @~a{@lattice-config-id is not a valid lattice config.}]
 
- (install-configuration! erasure-config-path)
+ (install-configuration! experiment-config-path)
+ (current-mode (list experiment-config-path lattice-config-id filter-for-interesting?))
 
- (log-mutant-dynamic-errors-info @~a{Mode: @(current-mode)})
+ (log-mutant-dynamic-errors-info @~a{Mode: @experiment-config-path, @(current-mode)})
 
  (define progress
    (match progress-log-path
