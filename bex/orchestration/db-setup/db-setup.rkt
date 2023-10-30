@@ -295,13 +295,17 @@
                       #:dynamic-error-interestingness-filter? dynamic-error-interestingness-filter?
                       #:search-for-interesting-scenarios? search-for-interesting-scenarios?
                       #:mutants-to-sample-per-benchmark mutants-to-sample-per-benchmark
-                      #:pre-compute-config pre-compute-config-rel-path)
+                      {~or* {~seq #:pre-compute-config pre-compute-config-rel-path}
+                            #:no-erasure-mode})
+  #:with [{~optional pre-compute-config-id}] (if (attribute pre-compute-config-rel-path)
+                                                 #'[pre-compute-config]
+                                                 #'[])
   (begin
     (define-runtime-paths
       [mutation-analysis-config mutation-analysis-config-rel-path]
       [experiment-config-with-which-analyze-mutants-dynamic-errors
        experiment-config-with-which-analyze-mutants-dynamic-errors-rel-path]
-      [pre-compute-config pre-compute-config-rel-path])
+      {~? [pre-compute-config-id pre-compute-config-rel-path]})
     (main
      #:arguments ([(hash-table ['no-viz? no-viz?]
                                ['viz-only? viz-only?]
@@ -341,5 +345,5 @@
                      experiment-config-with-which-analyze-mutants-dynamic-errors
                      dynamic-error-filtering-lattice-config-id
                      dynamic-error-interestingness-filter?
-                     pre-compute-config))))
+                     {~? pre-compute-config-id #f}))))
 
