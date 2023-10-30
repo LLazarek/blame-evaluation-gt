@@ -6,7 +6,7 @@
           [make-extract-blamed-locations
            (blamed-location-extractor/c-for exn:fail:contract:blame?)]))
 
-(require typed-racket/utils/shallow-contract-struct
+(require "../../util/transient-wrapper.rkt"
          "../../util/path-utils.rkt"
          "../../configurables/configurables.rkt")
 
