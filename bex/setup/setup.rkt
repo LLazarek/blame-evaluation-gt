@@ -14,14 +14,7 @@
 ;;  Modify these to configure setup
 ;; ==================================================
 
-(define PKG-DEPENDENCIES
-  '("require-typed-check"
-    "custom-load"
-    "https://github.com/LLazarek/ruinit.git"
-    "https://github.com/LLazarek/rscript.git"
-    "https://github.com/LLazarek/process-queue.git"))
-
-(define racket-version "8.6") ;; minimum needed for TR bug fixes
+(define racket-version "8.9") ;; minimum needed for TR bug fixes
 (define racket-download-url
   @~a{https://mirror.racket-lang.org/installers/@|racket-version|/racket-@|racket-version|-x86_64-linux-cs.sh})
 
@@ -35,9 +28,11 @@
                                "transient-special-cases.rktdb" #f))
   (hash))
 
-(define expected-TR-branch "transient-blame2")
-(define expected-gtp-branch "library-split")
-(define expected-blgt-branch "dev")
+(define expected-TR-branch #f)
+(define gtp-repo-url #f)
+(define expected-gtp-branch #f)
+(define expected-blgt-branch #f)
+(define with-TR+transient? #f)
 
 ;; ==================================================
 
@@ -132,16 +127,14 @@
          (shell* "rm" racket-installer-name))])))
 
 (define (install-pkg-dependencies raco-path)
-  (displayln "Installing dependencies...")
-  (begin0 (apply shell*
-
-                 raco-path
-                 "pkg"
-                 "install"
-                 "-D"
-                 "-j" "2"
-                 "--skip-installed"
-                 PKG-DEPENDENCIES)
+  (displayln "Installing package and dependencies...")
+  (begin0 (shell* raco-path
+                  "pkg"
+                  "install"
+                  "-j" "2"
+                  "--skip-installed"
+                  "--auto"
+                  (build-path repo-path "bex"))
     (displayln "Done.")))
 
 (define (download-TR raco-path TR-dir)
@@ -247,7 +240,7 @@
   (parameterize ([current-directory parent])
     (shell* "git"
             "clone"
-            "https://github.com/llazarek/gtp-benchmarks.git"))
+            gtp-repo-url))
   (parameterize ([current-directory gtp-dir])
     (shell* "git"
             "checkout"
@@ -427,9 +420,9 @@
   (define gtp-up-to-date? (repo-branch-up-to-date-with-remote? gtp-dir gtp-active-branch))
 
   (displayln "Checking TR repo...")
-  (define TR-active-branch (get-repo-current-branch TR-dir))
-  (define TR-branch-ok? (equal? TR-active-branch expected-TR-branch))
-  (define TR-up-to-date? (repo-branch-up-to-date-with-remote? TR-dir TR-active-branch))
+  (define TR-active-branch (or (not with-TR+transient?) (get-repo-current-branch TR-dir)))
+  (define TR-branch-ok? (or (not with-TR+transient?) (equal? TR-active-branch expected-TR-branch)))
+  (define TR-up-to-date? (or (not with-TR+transient?) (repo-branch-up-to-date-with-remote? TR-dir TR-active-branch)))
 
   (displayln "Checking dbs...")
   (define dbs-ok? (check-expected-dbs))
@@ -463,9 +456,21 @@
     (check-db/keys db-path (and should-have-all-expected-benchmarks?
                                 expected-benchmark-names))))
 
+(define (install-setup-config! path)
+  (set! expected-TR-branch (dynamic-require path 'expected-TR-branch))
+  (set! expected-gtp-branch (dynamic-require path 'expected-gtp-branch))
+  (set! expected-blgt-branch (dynamic-require path 'expected-blgt-branch))
+  (set! with-TR+transient? (dynamic-require path 'with-TR+transient?))
+  (set! gtp-repo-url (dynamic-require path 'gtp-repo-url)))
+
 (main
  #:arguments {[flags args]
               #:once-each
+              [("-c" "--setup-config")
+               'setup-config
+               "Configuration to setup. Mandatory."
+               #:mandatory
+               #:collect ["path" take-latest #f]]
               [("-v" "--verify-install")
                'verify-install
                ("Verify the current installation to ensure that"
@@ -508,6 +513,8 @@
    (simple-form-path (or (hash-ref flags 'gtp-path)
                          (build-path root "gtp-benchmarks"))))
 
+ (install-setup-config! (hash-ref flags 'setup-config))
+
  (define (verify-install!)
    (match (check-install-configuration racket-dir TR-dir gtp-dir)
      [#t
@@ -526,11 +533,12 @@
 
  (define raco-path (build-path racket-dir "bin" "raco"))
 
- (unless (directory-exists? TR-dir)
-   (download-TR raco-path TR-dir))
- (modify-TR TR-dir)
- (unless (check-TR-install racket-dir TR-dir)
-   (setup-existing-TR-dir! raco-path TR-dir))
+ (when with-TR+transient?
+   (unless (directory-exists? TR-dir)
+     (download-TR raco-path TR-dir))
+   (modify-TR TR-dir)
+   (unless (check-TR-install racket-dir TR-dir)
+     (setup-existing-TR-dir! raco-path TR-dir)))
 
  ;; Note: this must come AFTER installing TR, so that the pkgs which use TR use
  ;; the modified version of TR (which will behave the same as normal TR for the

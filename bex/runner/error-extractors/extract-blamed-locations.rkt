@@ -83,7 +83,7 @@
     ;; Specifically `require/contract` must be modified to change
     ;; the positive party, by extending the list with
     ;; ```from #,(syntax->datum #'lib)```
-    ;; util/setup.rkt makes this modification automatically.
+    ;; setup/setup.rkt makes this modification automatically.
     [(or 'cast
          'typed-world
          ;; Submods just get location from the blame positive path

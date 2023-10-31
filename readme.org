@@ -2,11 +2,23 @@
 This repo houses the infrastructure implementation for rational programmer experiments.
 
 * Installation
-After cloining, install the package and its dependencies with
-: raco pkg install blame-evaluation-gt/bex/
+Clone this repo.
+/Suggestion/: create a new directory and clone it in there.
 
-There is also an second package for analysis and visualization of data produced by the experiment,
-: raco pkg install blame-evaluation-gt/bex-data-analysis/
+After cloning, run
+: blame-evaluation-gt/bex/setup/install-racket-and-setup.sh
+with two arguments:
+1. The "project root".
+   Typically, this should be the parent directory into which you cloned this repo.
+2. A setup config, typically one of =blame-evaluation-gt/bex/setup/*-setup-config.rkt=.
+
+This setup script will
+1. Download and set up a fresh copy of racket dedicated for running the experiment in the "project root",
+2. Download, install, and set up the experiment dependencies in the "project root",
+3. Check the installation setup, and
+4. Ask if you want to run the experiment tests.
+
+If you answer yes to run the tests, and they all pass, then you should be all set up to run experiments.
 
 * Structure
 The repository is structured into two packages, each in a subdirectory
