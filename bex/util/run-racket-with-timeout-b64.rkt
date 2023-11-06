@@ -14,3 +14,6 @@
                        (first args)
                        racket)
                  (rest args)))
+
+(module test racket/base)
+

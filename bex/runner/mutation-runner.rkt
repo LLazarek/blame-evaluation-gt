@@ -24,6 +24,7 @@
          "sandbox-runner.rkt"
          "../util/program.rkt"
          "../util/experiment-exns.rkt"
+         "../util/transient-wrapper.rkt"
          "instrumented-runner.rkt"
          "error-extractors/extract-type-error-source.rkt"
          "error-extractors/extract-errortrace-stack.rkt"
@@ -69,16 +70,6 @@
      (values (strip-context
               #'(module name lang mutated-mod-stx))
              mutated-id)]))
-
-;; Returns the predicate recognizing transient blame exns if the module is
-;; available, otherwise #f
-(define (try-dynamic-require-transient-blame-exn-predicate!)
-  (with-handlers ([exn:fail:filesystem:missing-module?
-                   ;; if we can't load the transient exn module, it's not
-                   ;; installed and we definitely can't get transient blames
-                   (const #f)])
-    (dynamic-require 'typed-racket/utils/shallow-contract-struct
-                     'exn:fail:contract:blame:transient?)))
 
 (define (no-TR-delayed-errors-instrumenter a-mod)
   (match a-mod

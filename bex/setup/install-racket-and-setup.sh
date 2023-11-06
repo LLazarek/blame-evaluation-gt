@@ -1,18 +1,26 @@
 #!/bin/bash
 
+function help(){
+	echo "First argument must be project root (usually the parent of `blame-evaluation-gt`), and second must be the setup config (one of `blame-evaluation-gt/bex/setup/*-setup-config.rkt`)"
+	exit 1
+}
+
 case "$1" in
     ""|"-h"|"--help"|"h"|"help" )
-	echo "First argument must be project root"
-	exit 1
+	help
 	;;
     * )
 	;;
 esac
 
+if [ "$2" == "" ]; then
+    help
+fi
+
 pushd "$1"
 
 printf "Installing Racket if necessary\n\n\n"
-VERSION="8.6"
+VERSION="8.9"
 if [ -d "./racket" ]; then
     echo "$(pwd)/racket already exists; skipping installing racket"
 else
@@ -26,9 +34,9 @@ no
 EOF
 fi
 
-./racket/bin/raco pkg install --auto blame-evaluation-gt/bex/
+./racket/bin/raco pkg install --auto "https://github.com/LLazarek/rscript.git"
 
 printf "Running setup script\n\n\n"
-./racket/bin/racket -l bex/util/setup
+./racket/bin/racket blame-evaluation-gt/bex/setup/setup.rkt -c "$2"
 
 popd

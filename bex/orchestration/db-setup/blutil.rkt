@@ -10,5 +10,5 @@
  #:dynamic-error-interestingness-filter? #t
  #:search-for-interesting-scenarios? #f
  #:mutants-to-sample-per-benchmark 80
- #:pre-compute-config #f)
+ #:no-erasure-mode)
 

@@ -6,7 +6,7 @@
           [make-extract-blamed-locations
            (blamed-location-extractor/c-for exn:fail:contract:blame?)]))
 
-(require typed-racket/utils/shallow-contract-struct
+(require "../../util/transient-wrapper.rkt"
          "../../util/path-utils.rkt"
          "../../configurables/configurables.rkt")
 
@@ -83,7 +83,7 @@
     ;; Specifically `require/contract` must be modified to change
     ;; the positive party, by extending the list with
     ;; ```from #,(syntax->datum #'lib)```
-    ;; util/setup.rkt makes this modification automatically.
+    ;; setup/setup.rkt makes this modification automatically.
     [(or 'cast
          'typed-world
          ;; Submods just get location from the blame positive path

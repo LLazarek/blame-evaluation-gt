@@ -1248,19 +1248,20 @@ Mutant: [~a] ~a @ ~a with config:
    #:once-each
    [("-b" "--benchmark")
     path
-    "Path to benchmark to run."
+    "Path to benchmark to run. Mandatory."
     (bench-path-to-run path)]
    [("-c" "--config")
     path
-    "Path to the configuration to use."
+    "Path to the configuration to use. Mandatory."
     (configuration-path path)]
    [("-o" "--output-dir")
     dir
-    "Data output directory."
+    "Data output directory. Mandatory."
     (data-output-dir dir)]
    [("-n" "--process-limit")
     n
-    "Number of processes to have running at once."
+    ("Number of processes to have running at once."
+     @~a{Default: @(process-limit)})
     (process-limit (string->number n))]
    [("-e" "--error-log")
     path
@@ -1276,7 +1277,8 @@ Mutant: [~a] ~a @ ~a with config:
    [("-l" "--progress-log")
     path
     ("Record progress in the given log file."
-     "If it exists and is not empty, resume from the point reached in the log.")
+     "If it exists and is not empty, resume from the point reached in the log."
+     "Mandatory.")
     (progress-log path)]
    [("-m" "--metadata")
     path
@@ -1301,6 +1303,10 @@ Mutant: [~a] ~a @ ~a with config:
     (raise-user-error 'mutant-factory "Error: must provide benchmark to run."))
   (unless (configuration-path)
     (raise-user-error 'mutant-factory "Error: must provide a configuration."))
+  (unless (data-output-dir)
+    (raise-user-error 'mutant-factory "Error: must provide a data output dir."))
+  (unless (progress-log)
+    (raise-user-error 'mutant-factory "Error: must provide a progress-log."))
 
   (install-configuration! (configuration-path))
 

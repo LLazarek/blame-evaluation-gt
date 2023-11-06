@@ -27,6 +27,6 @@
     "mutation-analysis/plot-new-mutation-analyses.rkt"
     #rx"configurables/.*-configs"))
 
-(define test-omit-paths (append '("util/setup.rkt")
+(define test-omit-paths (append '("setup/setup.rkt")
                                 all-setup-ignore-paths))
 (define compile-omit-paths all-setup-ignore-paths)
