@@ -2,6 +2,8 @@
 This repo houses the infrastructure implementation for rational programmer experiments.
 
 * Installation
+
+** on Linux
 Clone this repo.
 /Suggestion/: create a new directory and clone it in there.
 
@@ -131,6 +133,13 @@ See the section below on [[*Experiment configs][experiment configs]].
 ** Running the experiment
 There are two options for running the experiment:
 
+*** A single benchmark and mode
+To run the experiment for a single benchmark and mode, you can run [[file:bex/experiment/mutant-factory.rkt][bex/experiment/mutant-factory.rkt]] with the appropriate flags (again see =-h/--help=).
+
+The experiment has pretty extensive logging of what it is doing, so it may also be useful to ask Racket to print those logs as it runs.
+To do that, run the mutant factory like this:
+: ./racket/bin/racket -O info@factory bex/experiment/mutant-factory.rkt <flags ...>
+
 *** The full shebang with =orchestrate-experiment.rkt=
 To run the whole experiment, for as many modes as needed:
 1. Make a copy of or modify [[file:bex/orchestration/orchestrate-experiment.rkt][bex/orchestration/orchestrate-experiment.rkt]] to create an experiment orchestration program.
@@ -173,9 +182,6 @@ The only drawback to the latter choice is that the tweaks will not be visible if
   /Only use this option if you are certain you want it!/
 - =#:manual-outcome-recording= - do not automatically manage sanity spot-checks while running the experiment.
   /If using this option, you should either specify =#:record-outcomes= in your first =run-mode= clause, or be sure you know what you're doing!/
-
-*** A single benchmark and mode
-To run the experiment for a single benchmark and mode, you can run [[file:bex/experiment/mutant-factory.rkt][bex/experiment/mutant-factory.rkt]] with the appropriate flags (again see =-h/--help=).
 
 * TODO Experiment configs
 Check out the [[https://docs.racket-lang.org/configurable/index.html][configurable library documentation]] for an overview of the system by which the experiment can be configured.

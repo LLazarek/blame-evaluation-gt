@@ -407,7 +407,10 @@
   (define racket-version-str
     (system/string @~a{@|racket-dir|/bin/racket --version}))
   (define racket-version-ok?
-    (regexp-match? @~a{Racket v@(regexp-quote racket-version) \[cs\]} racket-version-str))
+    (< (string->number racket-version)
+       (if (regexp-match? @~a{Racket v.* \[cs\]} racket-version-str)
+           (string->number (first (regexp-match @pregexp{\d+\.\d+} racket-version-str)))
+           0)))
 
   (displayln "Checking blgt repo ...")
   (define blgt-active-branch (get-repo-current-branch repo-path))
@@ -431,7 +434,7 @@
     (displayln
      @~a{
 
-         ERROR: The installed racket has the wrong version.
+         Warning: The installed racket has an old version that may not work with the experiment.
          installed: @racket-version-str
          required:  Racket v@racket-version [cs]
          }))
