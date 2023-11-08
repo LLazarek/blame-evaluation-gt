@@ -3,172 +3,80 @@
 (require "../configurations/configure-benchmark.rkt"
          "../runner/mutation-runner.rkt"
          "../util/path-utils.rkt"
-         "../util/read-module.rkt"
-         "../util/progress-log.rkt"
+         "../util/for.rkt"
          "../util/mutant-util.rkt"
+         "../util/run-mutants-in-parallel.rkt"
          "../configurables/configurables.rkt"
-         process-queue/priority
-         racket/runtime-path)
-
-(define process-limit (make-parameter 3))
-(define data-output-dir (make-parameter "./mutant-data"))
-(define check-type-error-blame? (make-parameter #f))
+         racket/hash)
 
 (define-logger mutation-analysis)
 
 (define/contract (mutation-info-for-all-mutants bench
+                                                any-error? ; #f means type error only
                                                 #:process-limit proc-limit
-                                                #:log-progress log-progress!
-                                                #:resume-cache cached-results-for)
-  ({benchmark/c
-    #:process-limit natural?
+                                                #:working-dir working-dir
+                                                #:log-progress progress-log-path)
+  (benchmark/c
+   boolean?
+   #:process-limit natural?
+   #:working-dir path-to-existant-directory?
+   #:log-progress path-string?
 
-    #:log-progress
-    (module-name? natural? boolean? string? . -> . any)
-
-    #:resume-cache
-    (module-name? natural? . -> . (or/c #f (list/c boolean? string?)))}
-   {}
-   . ->* . any)
+   . -> . any)
 
   (define mutatable-module-names ((configured:select-modules-to-mutate) bench))
 
   (log-mutation-analysis-info
    @~a{Configured mutatable modules: @~s[mutatable-module-names]})
 
-  (unless (directory-exists? (data-output-dir))
-    (make-directory (data-output-dir)))
-
-  (define q
-    (for/fold ([q (make-process-queue proc-limit
-                                      ; (hash/c name? (hash/c 'type-error natural? 'total natural?))
-                                      (hash)
-                                      #:kill-older-than (* 30 60))])
-              ([module-to-mutate-name mutatable-module-names]
-               [i-1 (in-naturals)]
-               #:when #t
-               [index (in-mutation-indices module-to-mutate-name
-                                           bench)]
-               [i-2 (in-naturals)])
-      (match (cached-results-for module-to-mutate-name index)
-        [#f (process-queue-enqueue
-             q
-             (λ _ (mutation-info-for bench
-                                     module-to-mutate-name
-                                     index
-                                     (~a i-1 '- i-2)
-                                     #:progress-logger log-progress!)))]
-        [(list type-error? mutation-type)
-         (log-mutation-analysis-info
-          @~a{
-              Pulling cached result for @;
-              @module-to-mutate-name @"@" @index
-              })
-         (add-mutation-type-result q type-error? mutation-type)])))
-
-  (log-mutation-analysis-info
-   @~a{
-       Done enqueuing mutants. @;
-       Q has @(process-queue-active-count q) active and @(process-queue-waiting-count q) waiting. @;
-       Waiting...})
-
-  (define q* (process-queue-wait q))
-  (log-mutation-analysis-info "Done waiting.")
-  (pretty-display (process-queue-get-data q*)))
-
-(define (mutation-info-for bench
-                           module-to-mutate-name
-                           index
-                           id
-                           #:progress-logger log-progress!)
-  (define max-config (make-max-bench-config bench))
-  (define the-benchmark-configuration
-    (configure-benchmark bench
-                         max-config))
-  (define outfile (build-path (data-output-dir)
-                              (format "~a_index~a_~a.rktd"
-                                      module-to-mutate-name
-                                      index
-                                      id)))
-  (define FAILURE-RETRIES 2)
-  (define TYPE-ERROR-CONFIRMATION-RETRIES 2)
-  (define ((will:record-type-error failure-retry-number type-error-retry-number) q* info)
-    (log-mutation-analysis-debug
-     @~a{
-         Executing will. Q size: @;
-         { @;
-          active: @(process-queue-active-count q*), @;
-          waiting: @(process-queue-waiting-count q*) @;
-          }
-         })
+  (define (mutant-outfile->result outfile the-mutant)
     (cond [(file-exists? outfile)
-           (define-values {type-error? mutation-type}
-             (extract-mutation-type-and-result outfile max-config (list module-to-mutate-name
-                                                                        index)))
-           (cond [(and type-error?
-                       (<= type-error-retry-number TYPE-ERROR-CONFIRMATION-RETRIES))
-                  (log-mutation-analysis-info
-                   @~a{
-                       Confirming type-error for @module-to-mutate-name @"@" @index @;
-                       (@(add1 type-error-retry-number)/@TYPE-ERROR-CONFIRMATION-RETRIES)
-                       })
-                  (process-queue-enqueue q*
-                                         (λ _ (spawn-mutant! failure-retry-number
-                                                             (add1 type-error-retry-number)))
-                                         2)]
-                 [else
-                  (log-progress! module-to-mutate-name
-                                 index
-                                 type-error?
-                                 mutation-type)
-                  (add-mutation-type-result q*
-                                            type-error?
-                                            mutation-type)])]
-          [else
+           (define-values {result mutation-type}
+             (extract-mutation-type-and-result outfile the-mutant))
+           (define mutation-good?
+             (member result
+                     (if any-error?
+                         '(type-error runtime-error blame)
+                         '(type-error))))
            (log-mutation-analysis-info
-            @~a{Retrying mutant @module-to-mutate-name @"@" @index due to failure (no outfile)})
-           (process-queue-enqueue q*
-                                  (λ _ (spawn-mutant! (add1 failure-retry-number)
-                                                      type-error-retry-number))
-                                  1)]))
-  (define (spawn-mutant! failure-retry-number type-error-retry-number)
-    (cond [(<= failure-retry-number FAILURE-RETRIES)
-           (define ctl (parameterize ([mutant-error-log outfile])
-                         (spawn-mutant-runner the-benchmark-configuration
-                                              module-to-mutate-name
-                                              index
-                                              outfile
-                                              (current-configuration-path)
-                                              #:log-mutation-info? #t)))
-           (log-mutation-analysis-info
-            @~a{Spawned mutant @module-to-mutate-name @"@" @index})
-           (process-info #f
-                         ctl
-                         (will:record-type-error failure-retry-number type-error-retry-number))]
-          [else
-           (raise-user-error
-            'analyze-mutation
             @~a{
-                Failed to get mutation info for @;
-                @bench @module-to-mutate-name @"@" @index @;
-                after @FAILURE-RETRIES tries. Giving up.
-                })]))
-  (spawn-mutant! 1 1))
+                @the-mutant {@mutation-type} => @(if mutation-good? 'hit 'miss)
+                })
+           (if (equal? result 'type-error)
+               (retry (list mutation-good? mutation-type) "confirm type error")
+               (list mutation-good? mutation-type))]
+          [else (raise-bad-mutant-result)]))
 
-(define (add-mutation-type-result q type-error? mutation-type)
-  (define (update-inner-hash h)
-    (hash-update h mutation-type add1 0))
-  (define (update h)
-    (define h* (hash-update h "total" add1 0))
-    (hash-update h*
-                 (if type-error? "success" "fail")
-                 update-inner-hash
-                 (hash)))
-  (process-queue-set-data q (update (process-queue-get-data q))))
+  (define mutant-results
+    (parameterize ([current-mutant-runner-log-mutation-info? #t])
+      (collect-mutant-results
+       (list bench)
+       (current-configuration-path)
+       (λ (module-to-mutate-name)
+         (range (add1 (max-mutation-index module-to-mutate-name bench))))
+       (const (make-max-bench-config bench))
+       proc-limit
+       mutant-outfile->result
+       #:progress-logging `(auto ,progress-log-path)
+       #:working-dir working-dir
+       #:failure-retries 3
+       #:other-retries 2))) ;; confirm type errors
 
-(define multiple-blamed-mutants?
-  (box #f))
-(define (extract-mutation-type-and-result f max-config mutant)
+  (define success+fails
+    (for/hash/fold ([{mutant result} (in-hash mutant-results)])
+      #:combine (λ (a b) (hash-union a b #:combine +))
+      #:default (hash)
+      (values (if (first result)
+                  'success
+                  'fail)
+              (hash (second result) 1))))
+  (hash-set success+fails
+            'total
+            (for*/sum ([key '(success fail)]
+                       [{_ n} (hash-ref success+fails key (hash))])
+              n)))
+
+(define (extract-mutation-type-and-result f mutant)
   (define trimmed-output
     #;(system/string @~a{grep -B 1 -E "mutate: Mutating|run-status" @f})
     (file->string f))
@@ -180,40 +88,11 @@
                  (#s\(run-status.+)$@;
                  )
            }))
-  #;(displayln (list output-regexp
-                   (file->string f)
-                   (regexp-match output-regexp
-                                 (file->string f))))
   (match trimmed-output
     [(regexp output-regexp
              (list _ mutation-type rs-string))
      (define the-run-status (with-input-from-string rs-string read))
-     (define type-error? (equal? (run-status-outcome the-run-status)
-                                 'type-error))
-     (define blamed-is-in-program?
-       (match (run-status-blamed the-run-status)
-         [(list blamed)
-          (and (member blamed (hash-keys max-config)) #t)]
-         [else
-          #:when type-error?
-          (log-mutation-analysis-warning
-           @~a{Found type error with non-single blamed: @~v[the-run-status]})
-          (set-box! multiple-blamed-mutants? #t)
-          #f]
-         [else
-          #f]))
-     (values (and type-error?
-                  (implies (check-type-error-blame?) blamed-is-in-program?))
-             mutation-type)]
-    [(and (regexp "generate-adapter-ctcs-for-mutation: Mutated a type definition,")
-          (regexp (pregexp @~a{
-                               (?m:@;
-                               mutate: type: (\S+)$
-                               mutate: Mutating.+$@;
-                               )
-                               })
-                  (list _ mutation-type)))
-     (values #f mutation-type)]
+     (values (run-status-outcome the-run-status) mutation-type)]
     [other-contents
      (raise-user-error @~a{
                            Unable to match against file contents for @mutant in @|f|:
@@ -222,79 +101,54 @@
                            -----
                            })]))
 
-(define (set-parameter p [transform values])
-  (λ (new _) (p (transform new))))
 (main
  #:arguments {[flags args]
               #:once-each
               [("-b" "--benchmark")
                'bench-to-run
-               "Path to benchmark to run."
+               "Path to benchmark to run. Mandatory."
                #:mandatory
                #:collect ["path" take-latest #f]]
               [("-c" "--config")
                'config-path
-               "The config to use for generating mutants."
+               "The config to use for generating mutants. Mandatory."
                #:mandatory
                #:collect ["path" take-latest #f]]
+              [("-l" "--progress-log")
+               'progress-log
+               ("Record progress in the given log file."
+                "If it exists and is not empty, resume from the point reached in the log."
+                "Mandatory.")
+               #:collect ["path" take-latest #f]
+               #:mandatory]
               [("-o" "--output-dir")
                'data-output-dir
-               "Data output directory."
-               #:collect ["path" (set-parameter data-output-dir) #f]]
+               "Data output directory. Mandatory."
+               #:collect ["path" take-latest #f]
+               #:mandatory]
               [("-n" "--process-limit")
                'process-limit
-               "Number of processes to have running at once."
-               #:collect ["N" (set-parameter process-limit string->number) #f]]
+               "Number of processes to have running at once. Default: 2"
+               #:collect ["N" take-latest "2"]]
               [("-e" "--error-log")
                'error-log
                "File to which to append mutant errors. Default: ./mutant-errors.txt"
                #:collect ["path" (set-parameter mutant-error-log) #f]]
-              [("-l" "--progress-log")
-               'progress-log
-               ("Record progress in the given log file."
-                "If it exists and is not empty, resume from the point reached in the log.")
-               #:collect ["path" take-latest #f]
-               #:mandatory]
-              [("--check-type-error-blame")
-               'check-type-error-blame?
-               ("Check and only consider successful type erros that blame a typeable module"
-                "Default: consider any type error a success")
+              [("-a" "--any-error")
+               'check-for-any-error?
+               ("Consider a mutant that causes any kind of error in the top lattice-config to be good."
+                "By default, only mutants that cause *type errors* are considered good.")
                #:record]}
  (install-configuration! (hash-ref flags 'config-path))
- (check-type-error-blame? (hash-ref flags 'check-type-error-blame?))
- (define progress-log (hash-ref flags 'progress-log))
- (define progress
-   (match progress-log
-     [(? file-exists? path) (make-hash (file->list path))]
-     [else (hash)]))
- (define-values {log-progress!/raw finalize-log!}
-   (initialize-progress-log! progress-log
-                             #:exists 'append))
- (define (log-progress! module-to-mutate-name mutation-index type-error? mutation-type)
-   (log-mutation-analysis-info
-    @~a{
-        Mutant @module-to-mutate-name @"@" @mutation-index @;
-        {@mutation-type} => @(if type-error?
-                                 'hit
-                                 'miss)
-        })
-   (log-progress!/raw (cons (list module-to-mutate-name
-                                  mutation-index)
-                            (list type-error?
-                                  mutation-type))))
- (define (cached-results-for module-to-mutate-name mutation-index)
-   (hash-ref progress
-             (list module-to-mutate-name mutation-index)
-             #f))
- (mutation-info-for-all-mutants (read-benchmark (hash-ref flags 'bench-to-run))
-                                #:process-limit (process-limit)
-                                #:log-progress log-progress!
-                                #:resume-cache cached-results-for)
- (finalize-log!)
- (log-mutation-analysis-info
-  "Mutation analysis complete.")
- (when (unbox multiple-blamed-mutants?)
-   (log-mutation-analysis-warning
-    "But found mutants with type errors blaming not a single location.")))
+ (define data-output-dir (hash-ref flags 'data-output-dir))
+ (make-directory* data-output-dir)
+ (define result
+   (mutation-info-for-all-mutants (read-benchmark (hash-ref flags 'bench-to-run))
+                                  (hash-ref flags 'check-for-any-error?)
+                                  #:process-limit (string->number (hash-ref flags 'process-limit))
+                                  #:working-dir data-output-dir
+                                  #:log-progress (hash-ref flags 'progress-log)))
+ (log-mutation-analysis-info "Mutation analysis complete.")
+ (pretty-display result))
 
 (module test racket/base)

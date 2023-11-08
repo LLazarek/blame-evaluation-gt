@@ -55,13 +55,13 @@
 (define/racket-runner (rebuild!)
   ../../util/project-raco.rkt -c)
 
-(define (analyze-mutation/all-benchmarks! outdir mutation-analysis-config)
+(define (analyze-mutation/all-benchmarks! outdir mutation-analysis-config check-for-any-error?)
   (define analyses-outdir (build-path outdir "mutation-analyses"))
   (make-directory* analyses-outdir)
   (for/list ([bench (in-list experiment-benchmarks)])
-    (analyze-mutation! bench analyses-outdir mutation-analysis-config)))
+    (analyze-mutation! bench analyses-outdir mutation-analysis-config check-for-any-error?)))
 
-(define/racket-runner (analyze-mutation! bench-name outdir mutation-analysis-config)
+(define/racket-runner (analyze-mutation! bench-name outdir mutation-analysis-config check-for-any-error?)
   #:helper (define (outpath suffix)
              (build-path outdir (~a bench-name '- suffix)))
   #:pre-flags [-O "debug@mutation-analysis" -W "warning@mutation-analysis"]
@@ -72,6 +72,9 @@
   -l #:result (outpath 'progress.log)
   -c (~a mutation-analysis-config)
   -o (outpath 'data)
+  (if check-for-any-error?
+      "-a"
+      '())
   >> (outpath 'debug.log)
   2> (outpath 'errs.log))
 
@@ -203,7 +206,8 @@
   -d (~a scratch-dir)
   (build-path benchmarks-dir bench-name))
 
-(define (setup-all-dbs! search-for-interesting-scenarios?
+(define (setup-all-dbs! mutation-analysis:check-for-any-error?
+                        search-for-interesting-scenarios?
                         mutants-to-sample-per-benchmark/or-all
                         outdir
                         viz-mode
@@ -233,7 +237,9 @@
          (rebuild!)
          (displayln "Analyzing mutation...")
          (define progress-logs
-           (analyze-mutation/all-benchmarks! outdir mutation-analysis-config))
+           (analyze-mutation/all-benchmarks! outdir
+                                             mutation-analysis-config
+                                             mutation-analysis:check-for-any-error?))
          (displayln "Summarizing mutation analysis...")
          (define type-err-summaries.rktdb (summarize-mutation-analyses! outdir progress-logs))
          (displayln "Filtering mutants for dynamic errors...")
@@ -289,6 +295,7 @@
 (define-simple-macro (db-setup-script
                       ;; each of these configs should be relative paths from here
                       #:mutation-analysis-config mutation-analysis-config-rel-path
+                      #:mutation-analysis-error-type mutation-analysis-error-type
                       #:analyze-type-mutation-categories? analyze-type-mutation-categories?
                       #:experiment-config-with-which-analyze-mutants-dynamic-errors experiment-config-with-which-analyze-mutants-dynamic-errors-rel-path
                       #:dynamic-error-filtering-lattice-config-id dynamic-error-filtering-lattice-config-id
@@ -333,7 +340,8 @@
 
      (file-stream-buffer-mode (current-output-port) 'line)
 
-     (setup-all-dbs! search-for-interesting-scenarios?
+     (setup-all-dbs! (equal? mutation-analysis-error-type 'any-error)
+                     search-for-interesting-scenarios?
                      mutants-to-sample-per-benchmark
                      outdir
                      (cond [no-viz? 'no-viz]

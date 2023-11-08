@@ -4,6 +4,7 @@
 
 (db-setup-script
  #:mutation-analysis-config "../../configurables/blutil-configs/mutation-type-error-analysis.rkt"
+ #:mutation-analysis-error-type 'any-error
  #:analyze-type-mutation-categories? #f
  #:experiment-config-with-which-analyze-mutants-dynamic-errors "../../configurables/blutil-configs/dynamic-error-analysis.rkt"
  #:dynamic-error-filtering-lattice-config-id 'bot
