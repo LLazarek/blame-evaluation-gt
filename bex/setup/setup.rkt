@@ -404,13 +404,16 @@
 
 (define (check-install-configuration racket-dir TR-dir gtp-dir)
   (displayln "Checking racket version...")
-  (define racket-version-str
+  (define racket-version-output
     (system/string @~a{@|racket-dir|/bin/racket --version}))
+  (define racket-version-str (regexp-match @pregexp{\d+\.\d+} racket-version-output))
+  (define (version-str->nums s)
+    (map string->number (regexp-match* @pregexp{\d+} s)))
   (define racket-version-ok?
-    (< (string->number racket-version)
-       (if (regexp-match? @~a{Racket v.* \[cs\]} racket-version-str)
-           (string->number (first (regexp-match @pregexp{\d+\.\d+} racket-version-str)))
-           0)))
+    (and (not (empty? racket-version-str))
+         (andmap (λ (a b) (>= a b))
+                 (version-str->nums (first racket-version-str))
+                 (version-str->nums racket-version))))
 
   (displayln "Checking blgt repo ...")
   (define blgt-active-branch (get-repo-current-branch repo-path))

@@ -27,7 +27,8 @@
           [mutant-error-log (parameter/c path-string?)]
           [default-memory-limit/gb (parameter/c (and/c number? positive?))]
           [default-timeout/s (parameter/c (and/c number? positive?))]
-          [current-run-with-condor-machines (parameter/c (or/c #f (listof string?)))])
+          [current-run-with-condor-machines (parameter/c (or/c #f (listof string?)))]
+          [current-mutant-runner-log-mutation-info? (parameter/c boolean?)])
          (struct-out mutant))
 
 (require racket/runtime-path
@@ -87,6 +88,7 @@
             cached-output]
            [else cached-output]))))
 
+(define current-mutant-runner-log-mutation-info? (make-parameter #f))
 (define (spawn-mutant-runner a-benchmark-configuration
                              module-to-mutate-name
                              mutation-index
@@ -94,7 +96,7 @@
                              config-path
                              #:timeout/s [timeout/s #f]
                              #:memory/gb [memory/gb #f]
-                             #:log-mutation-info? [log-mutation-info? #f]
+                             #:log-mutation-info? [log-mutation-info? (current-mutant-runner-log-mutation-info?)]
                              #:save-output [output-path #f]
 
                              #:write-modules-to [dump-dir-path #f]

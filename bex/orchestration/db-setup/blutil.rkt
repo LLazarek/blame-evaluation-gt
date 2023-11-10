@@ -4,8 +4,9 @@
 
 (db-setup-script
  #:mutation-analysis-config "../../configurables/blutil-configs/mutation-code-mistake-analysis.rkt"
+ #:mutation-analysis-error-type 'any-error
  #:analyze-type-mutation-categories? #f
- #:experiment-config-with-which-analyze-mutants-dynamic-errors "../../configurables/blutil-configs/blame.rkt"
+ #:experiment-config-with-which-analyze-mutants-dynamic-errors "../../configurables/blutil-configs/mutation-code-mistake-analysis.rkt"
  #:dynamic-error-filtering-lattice-config-id 'bot
  #:dynamic-error-interestingness-filter? #t
  #:search-for-interesting-scenarios? #f

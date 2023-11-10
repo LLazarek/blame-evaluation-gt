@@ -4,6 +4,7 @@
 
 (db-setup-script
  #:mutation-analysis-config "../../configurables/blgt-configs/mutation-type-error-analysis.rkt"
+ #:mutation-analysis-error-type 'type-error
  #:analyze-type-mutation-categories? #f
  #:experiment-config-with-which-analyze-mutants-dynamic-errors "../../configurables/blgt-configs/dynamic-error-analysis-natural.rkt"
  #:dynamic-error-filtering-lattice-config-id 'bot

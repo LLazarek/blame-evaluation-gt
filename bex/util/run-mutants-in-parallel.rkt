@@ -14,7 +14,7 @@
              (string? . -> . (listof natural?))
              (mutant? . -> . config/c)
              natural?
-             (path-string? mutant? . -> . result-type/c)
+             (path-string? mutant? . -> . result-type/c) ; outfile->result
              #:progress-logging (or/c (list/c 'auto path-string?)
                                       (list/c
                                        ; log-progress!
@@ -25,9 +25,16 @@
                                        any/c)
                                       #f)
              #:working-dir path-string?}
-            {#:failure-retries natural?}
+            {#:failure-retries natural?
+             ;; outfile->result can request a run with some valid result to be
+             ;; retried up to this many times (e.g. to confirm a type error) by
+             ;; returning an instance of the `retry` struct containing the
+             ;; result. After the last such retry the inner result will be
+             ;; committed.
+             #:other-retries natural?}
             . ->* .
             (hash/c mutant? result-type/c))])
+         (struct-out retry)
          raise-bad-mutant-result
          exn:fail:bad-mutant-result?
          mutant-results-logger)
@@ -43,6 +50,8 @@
 
 (define-logger mutant-results)
 
+(struct retry (result reason))
+
 (define (collect-mutant-results benchmarks
                                 experiment-config-path
                                 mutants-for-mod
@@ -51,7 +60,8 @@
                                 outfile->result ;; should raise an exn:fail:bad-mutant-result? on error / bad/failure result
                                 #:progress-logging maybe-progress-logging-fns
                                 #:working-dir working-dir
-                                #:failure-retries [failure-retries 3])
+                                #:failure-retries [failure-retries 3]
+                                #:other-retries [other-retries 3])
   (define-values {log-progress!
                   logged-progress
                   no-recorded-progress-value
@@ -82,9 +92,11 @@
                                         outfile->result
                                         #:log-progress log-progress!
                                         #:working-dir working-dir
-                                        #:failure-retries failure-retries)
+                                        #:failure-retries failure-retries
+                                        #:other-retries other-retries)
                                 0)]
         [already-computed-result
+         (log-mutant-results-debug @~a{Pulling logged result for @the-mutant})
          (process-queue-update-data q (λ (h) (hash-set h the-mutant already-computed-result)))])))
   (begin0 (process-queue-get-data (process-queue-wait q))
     (finalize-log!)))
@@ -122,9 +134,11 @@
                 outfile->result
                 #:log-progress log-progress!
                 #:working-dir working-dir
-                #:failure-retries failure-retries)
+                #:failure-retries failure-retries
+                #:other-retries other-retries)
   (define the-benchmark-name (benchmark->name the-benchmark))
   (match-define (mutant _ mod-to-mutate index) the-mutant)
+  (define the-mutant+bench (mutant the-benchmark-name mod-to-mutate index))
   (define the-benchmark-configuration (configure-benchmark the-benchmark
                                                            config-to-run))
   (define ((mutant-spawner will))
@@ -132,7 +146,7 @@
       (make-temporary-file @~a{@|the-benchmark-name|-~a}
                            #f
                            working-dir))
-    (log-mutant-results-info @~a{Spawned @the-benchmark-name @the-mutant})
+    (log-mutant-results-info @~a{Spawned @the-mutant+bench})
     (define ctl
       (parameterize ([mutant-error-log outfile])
         (spawn-mutant-runner the-benchmark-configuration
@@ -141,30 +155,52 @@
                              outfile
                              experiment-config-path)))
     (process-info outfile ctl will))
-  (define ((make-will:record-outcome! retries-so-far) q info)
-    (log-mutant-results-info @~a{Mutant @the-benchmark-name @the-mutant done})
+  (define ((make-will:record-outcome! failure-retries-so-far other-retries-so-far) q info)
+    (log-mutant-results-debug @~a{
+                                  Queue size: { @;
+                                  active: @(process-queue-active-count q), @;
+                                  waiting: @(process-queue-waiting-count q) @;
+                                  }
+                                  })
+    (log-mutant-results-info @~a{@the-mutant+bench done})
     (with-handlers ([exn:fail:bad-mutant-result?
                      (λ _
                        (log-mutant-results-info
                         @~a{Failed to extract result from @the-benchmark-name @the-mutant})
-                       (cond [(< retries-so-far failure-retries)
+                       (cond [(< failure-retries-so-far failure-retries)
                               (log-mutant-results-info
                                @~a{
                                    Retrying @the-benchmark-name @the-mutant @;
-                                   (@retries-so-far / @failure-retries)
+                                   (@(add1 failure-retries-so-far) / @failure-retries)
                                    })
                               (process-queue-enqueue
                                q
-                               (mutant-spawner (make-will:record-outcome! (add1 retries-so-far)))
-                               (add1 retries-so-far))]
+                               (mutant-spawner (make-will:record-outcome! (add1 failure-retries-so-far)
+                                                                          other-retries-so-far))
+                               (+ 1 failure-retries-so-far other-retries-so-far))]
                              [else
                               (error 'collect-mutant-results
                                      @~a{
                                          Unable to extract result from @the-mutant @;
                                          despite @failure-retries tries
                                          })]))])
-      (define result (outfile->result (process-info-data info) the-mutant))
-      (log-progress! the-benchmark-name mod-to-mutate index result)
-      (process-queue-update-data q (λ (h) (hash-set h the-mutant result)))))
+      (match (outfile->result (process-info-data info) the-mutant)
+        [(retry _ reason)
+         #:when (< other-retries-so-far other-retries)
+         (log-mutant-results-info
+                               @~a{
+                                   Retrying @the-benchmark-name @the-mutant @;
+                                   for reason: @reason @;
+                                   (@(add1 other-retries-so-far) / @other-retries)
+                                   })
+         (process-queue-enqueue
+          q
+          (mutant-spawner (make-will:record-outcome! 0
+                                                     (add1 other-retries-so-far)))
+          (+ 1 failure-retries-so-far other-retries-so-far))]
+        [(or (retry result _)
+             result)
+         (log-progress! the-benchmark-name mod-to-mutate index result)
+         (process-queue-update-data q (λ (h) (hash-set h the-mutant result)))])))
 
-  (mutant-spawner (make-will:record-outcome! 0)))
+  (mutant-spawner (make-will:record-outcome! 0 0)))

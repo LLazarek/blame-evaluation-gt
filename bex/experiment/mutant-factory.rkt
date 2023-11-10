@@ -1035,7 +1035,7 @@ Attempting revival ~a / ~a
   (define (report-malformed-output . _)
     (match-define (mutant-process (mutant _ mod index) config _ id _ _ _)
       mutant-proc)
-    (log-factory error
+    (log-factory warning
                  "Result read from mutant output not of the expected shape.
 Expected: a run-status with a valid pair of outcome/blamed
 Found: ~v
