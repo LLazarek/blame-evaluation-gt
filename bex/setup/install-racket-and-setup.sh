@@ -36,6 +36,8 @@ fi
 
 ./racket/bin/raco pkg install --auto "https://github.com/LLazarek/rscript.git"
 
+find blame-evaluation-gt/ -name compiled -type d -prune -exec rm -r '{}' ';'
+
 printf "Running setup script\n\n\n"
 ./racket/bin/racket blame-evaluation-gt/bex/setup/setup.rkt -c "$2"
 

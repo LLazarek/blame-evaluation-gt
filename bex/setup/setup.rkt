@@ -8,7 +8,8 @@
   [repo-parent-path "../../.."]
   [repo-path "../.."]
   [dbs-dir "../dbs"]
-  [this-mod "setup.rkt"])
+  [this-mod "setup.rkt"]
+  [project-raco "../util/project-raco.rkt"])
 
 ;; ==================================================
 ;;  Modify these to configure setup
@@ -538,6 +539,7 @@
    (exit 1))
 
  (define raco-path (build-path racket-dir "bin" "raco"))
+ (define racket-path (build-path racket-dir "bin" "racket"))
 
  (when with-TR+transient?
    (unless (directory-exists? TR-dir)
@@ -554,6 +556,9 @@
 
  (unless (directory-exists? gtp-dir)
    (install-gtp-repo gtp-dir))
+
+ (displayln "Building project...")
+ (void (shell* racket-path project-raco "-c"))
 
  (when (user-prompt!
         @~a{
