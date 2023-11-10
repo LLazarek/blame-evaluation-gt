@@ -22,5 +22,5 @@
 (configure! trail-completion         any-type-error/blamed-at-max)
 (configure! configurations           module-export-ctcs)
 
-(configure! module-instrumentation   add-ctc-level)
+(configure! module-instrumentation   none)
 (configure! program-instrumentation  just-instrument-modules)

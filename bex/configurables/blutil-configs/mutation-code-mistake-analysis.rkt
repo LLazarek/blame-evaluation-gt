@@ -7,5 +7,5 @@
 (configure! module-selection-for-mutation all-regular-modules)
 (configure! benchmark-runner run-it)
 (configure! configurations module-export-ctcs)
-(configure! module-instrumentation add-ctc-level)
+(configure! module-instrumentation   none)
 (configure! program-instrumentation just-instrument-modules)
