@@ -1,0 +1,22 @@
+Instructions for setup
+
+* Installation
+
+** on Linux
+Clone this repo.
+/Suggestion/: create a new directory and clone it in there.
+
+After cloning, run
+: blame-evaluation-gt/bex/setup/install-racket-and-setup.sh
+with two arguments:
+1. The "project root".
+   Typically, this should be the parent directory into which you cloned this repo.
+2. A setup config, typically one of =blame-evaluation-gt/bex/setup/*-setup-config.rkt=.
+
+This setup script will
+1. Download and set up a fresh copy of racket dedicated for running the experiment in the "project root",
+2. Download, install, and set up the experiment dependencies in the "project root",
+3. Check the installation setup, and
+4. Ask if you want to run the experiment tests.
+
+If you answer yes to run the tests, and they all pass, then you should be all set up to run experiments.
