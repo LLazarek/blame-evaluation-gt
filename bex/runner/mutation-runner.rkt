@@ -417,7 +417,7 @@
     (hash "a.rkt" 'none
           "b.rkt" 'none
           "c.rkt" 'none))
-  #;(test-begin
+  (test-begin
     #:name run-with-mutated-module/mutations
     (ignore
      (define a (mod "./test-mods/a.rkt"
@@ -518,7 +518,7 @@
                                    #:memory/gb 1))
      (λ (r) (test-match r (struct* run-status ([outcome 'oom]))))))
 
-  #;(test-begin
+  (test-begin
     #:name run-with-mutated-module/ctc-violations
     (ignore
      (define main (mod "./test-mods/main.rkt"
@@ -567,7 +567,7 @@
     (mod path
          (replace-stx-location stx path)))
 
-  #;(test-begin
+  (test-begin
     #:name run-with-mutated-module/type-error
     (ignore
      (define a (mod/loc "./test-mods/a.rkt"
@@ -708,7 +708,7 @@
                           (+ (- x) z))
                         }]))
   (require "../util/read-module.rkt")
-  #;(test-begin
+  (test-begin
     #:name mod/loc-vs-file
     #:before (setup-test-env!)
     #:after (cleanup-test-env!)
@@ -772,7 +772,7 @@
                                                [blamed #f]
                                                [errortrace-stack (list* "a.rkt" _)]
                                                [context-stack (list* "a.rkt" _)]))))))
-  #;(test-begin
+  (test-begin
     #:name run-with-mutated-module/runtime-error-locations
     ;; #:before (setup-test-env!)
     ;; #:after (cleanup-test-env!)
@@ -880,7 +880,7 @@
                                                [context-stack (list* "d.rkt" _)]))))))
 
 
-  #;(test-begin
+  (test-begin
     #:name run-with-mutated-module/runtime-error-locations-with-blame
     (ignore
      (define a (mod/loc (simple-form-path "./test-mods/a.rkt")
