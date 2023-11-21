@@ -93,13 +93,7 @@
              (list _ mutation-type rs-string))
      (define the-run-status (with-input-from-string rs-string read))
      (values (run-status-outcome the-run-status) mutation-type)]
-    [other-contents
-     (raise-user-error @~a{
-                           Unable to match against file contents for @mutant in @|f|:
-                           -----
-                           @other-contents
-                           -----
-                           })]))
+    [else (raise-bad-mutant-result)]))
 
 (main
  #:arguments {[flags args]
