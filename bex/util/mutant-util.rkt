@@ -47,7 +47,7 @@
          "experiment-exns.rkt")
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
-(define-runtime-path racket-timeout-b64-path "run-racket-with-timeout-b64.rkt")
+(define-runtime-path timeout-b64-path "timeout-b64.sh")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
 (define timeout-path (find-executable-path "timeout"))
 
@@ -120,7 +120,7 @@
            Copy_To_Spool = False
 
            # Notification
-           Notification = error
+           Notification = never
 
            # Set the environment
            Getenv = True
@@ -129,6 +129,7 @@
 @(string-join (map (λ (arg) (bytes->string/utf-8 (base64-encode (string->bytes/utf-8 (~a arg)) #"")))
 (flatten (list
 (if timeout/s (* 1.5 timeout/s) 0)
+racket-path
 (if log-mutation-info?
     (list "-O" "info@mutate")
     empty)
@@ -154,7 +155,7 @@ mutant-runner-path
 ))))"
 @; close "
 
-           Executable = /project/blgt/racket-timeout-b64.sh
+           Executable = @(simple-form-path timeout-b64-path)
            Error = @(mutant-error-log)
            Output = @outfile
            Log = condor-log.txt
