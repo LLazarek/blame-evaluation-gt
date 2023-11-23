@@ -33,7 +33,6 @@
 
 (require racket/runtime-path
          racket/logging
-         net/base64
          syntax/parse
          mutate/logger
          mutate/traversal
@@ -43,11 +42,11 @@
          "../util/read-module.rkt"
          "../util/binary-search.rkt"
          "../util/program.rkt"
+         "../util/condor.rkt"
          "../configurables/configurables.rkt"
          "experiment-exns.rkt")
 
 (define-runtime-path mutant-runner-path "../experiment/mutant-runner.rkt")
-(define-runtime-path timeout-b64-path "timeout-b64.sh")
 (define racket-path (find-executable-path (find-system-path 'exec-file)))
 (define timeout-path (find-executable-path "timeout"))
 
@@ -55,38 +54,6 @@
 
 (define default-memory-limit/gb (make-parameter 3))
 (define default-timeout/s (make-parameter (* 5 60)))
-
-(define current-run-with-condor-machines
-  (make-parameter (and (getenv "BEX_CONDOR_MACHINES")
-                       (string-split (getenv "BEX_CONDOR_MACHINES")))))
-
-(define condor_submit
-  (find-executable-path "condor_submit"))
-(define condor_q
-  (find-executable-path "condor_q"))
-(define condor_rm
-  (find-executable-path "condor_rm"))
-(define get-condor-job-info
-  ;; to avoid polling condor too frequently, and parsing/reparsing the same
-  ;; output, cache the results and only refresh every `CACHE-EXPIRATION-SECS`
-  (let ([last-poll-time (current-inexact-monotonic-milliseconds)]
-        [cached-output #f]
-        [CACHE-EXPIRATION-SECS 1])
-    (thunk
-     (cond [(or (not cached-output)
-                (> (- (current-inexact-monotonic-milliseconds)
-                      last-poll-time)
-                   (* CACHE-EXPIRATION-SECS 1000)))
-            (define condor-dump
-              (with-output-to-string
-                (thunk (system* condor_q))))
-            (set! cached-output
-                  (and (regexp-match? "-- Schedd: peroni.cs.northwestern.edu" condor-dump)
-                       (regexp-match* @pregexp{([1_])\s+[1_]\s+1 (\d{7}\.0)}
-                                      condor-dump
-                                      #:match-select rest)))
-            cached-output]
-           [else cached-output]))))
 
 (define current-mutant-runner-log-mutation-info? (make-parameter #f))
 (define (spawn-mutant-runner a-benchmark-configuration
@@ -106,100 +73,20 @@
                                          module-to-mutate-name))
   (cond
     [(current-run-with-condor-machines)
-     (define job-file-contents
-       @~a{
-           # Set the universe
-           Universe = vanilla
+     (spawn-condor-mutant-runner a-benchmark-configuration
+                                 module-to-mutate
+                                 mutation-index
+                                 outfile
+                                 config-path
+                                 mutant-runner-path
+                                 (mutant-error-log)
+                                 #:timeout/s (or timeout/s (default-timeout/s))
+                                 #:memory/gb (or memory/gb (default-memory-limit/gb))
+                                 #:log-mutation-info? (current-mutant-runner-log-mutation-info?)
+                                 #:save-output output-path
 
-           # Describe the target machine
-           Requirements = (@(string-join (for/list ([name (in-list (current-run-with-condor-machines))])
-                                           @~a{(Machine == "@|name|.cs.northwestern.edu")})
-                                         " || "))
-
-           Rank = TARGET.Mips
-           Copy_To_Spool = False
-
-           # Notification
-           Notification = never
-
-           # Set the environment
-           Getenv = True
-
-           Arguments = "@; close "
-@(string-join (map (λ (arg) (bytes->string/utf-8 (base64-encode (string->bytes/utf-8 (~a arg)) #"")))
-(flatten (list
-(if timeout/s (* 1.5 timeout/s) 0)
-racket-path
-(if log-mutation-info?
-    (list "-O" "info@mutate")
-    empty)
-"--"
-mutant-runner-path
-"-b" (serialize-benchmark-configuration a-benchmark-configuration)
-"-M" module-to-mutate
-"-i" (~a mutation-index)
-"-t" (~a (or timeout/s
-             (default-timeout/s)))
-"-g" (~a (or memory/gb
-             (default-memory-limit/gb)))
-"-c" (~a (simple-form-path config-path))
-(if output-path
-    (list "-O" output-path)
-    empty)
-(if dump-dir-path
-    (list "-w" dump-dir-path)
-    empty)
-(if force-module-write?
-    '("-f")
-    empty)
-))))"
-@; close "
-
-           Executable = @(simple-form-path timeout-b64-path)
-           Error = @(mutant-error-log)
-           Output = @outfile
-           Log = condor-log.txt
-           # Ask Condor to kill any jobs that are taking so long they must be stuck
-           @; from https://stackoverflow.com/questions/5900400/maximum-run-time-in-condor
-           periodic_remove = (CommittedTime - CommittedSuspensionTime) > @(* (default-timeout/s) 3)
-
-           +IsWholeMachineJob = false
-           +IsSuspensionJob = false
-
-           Queue
-
-           })
-     (match (with-output-to-string
-              (thunk
-               (parameterize ([current-error-port (current-output-port)])
-                 (with-input-from-string job-file-contents
-                   (thunk (system* condor_submit
-                                   "-verbose"
-                                   "-"))))))
-       [(regexp @pregexp{\*\* Proc ([\d.]+):} (list _ id))
-        (define (get-proc-status)
-          (if (member id (map second (get-condor-job-info)))
-              'running
-              'done-ok))
-        (match-lambda ['status
-                       (get-proc-status)]
-                      ['kill
-                       (void (with-output-to-string (thunk (system* condor_rm id))))]
-                      ['wait
-                       (let loop ()
-                         (when (equal? (get-proc-status) 'running)
-                           (sleep 1)
-                           (loop)))]
-                      [other (raise-internal-experiment-error
-                              'spawn-mutant-runner
-                              @~a{unimplemented process ctl for: @other})])]
-       [something-else
-        (raise-internal-experiment-error
-         'spawn-mutant-runner
-         @~a{
-             failed to submit condor job, it said:
-             @something-else
-             })])]
+                                 #:write-modules-to dump-dir-path
+                                 #:force-module-write? force-module-write?)]
     [else
      (call-with-output-file outfile #:mode 'text #:exists 'replace
        (λ (outfile-port)
