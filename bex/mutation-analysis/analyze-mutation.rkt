@@ -1,7 +1,7 @@
 #lang at-exp rscript
 
 (require "../configurations/configure-benchmark.rkt"
-         "../runner/mutation-runner.rkt"
+         "../runner/mutation-runner-data.rkt"
          "../util/path-utils.rkt"
          "../util/for.rkt"
          "../util/mutant-util.rkt"
@@ -10,6 +10,13 @@
          racket/hash)
 
 (define-logger mutation-analysis)
+
+(define/contract type-error-results
+  (listof run-outcome/c)
+  '(type-error))
+(define/contract any-error-results
+  (listof run-outcome/c)
+  '(type-error runtime-error blamed))
 
 (define/contract (mutation-info-for-all-mutants bench
                                                 any-error? ; #f means type error only
@@ -36,8 +43,8 @@
            (define mutation-good?
              (member result
                      (if any-error?
-                         '(type-error runtime-error blame)
-                         '(type-error))))
+                         any-error-results
+                         type-error-results)))
            (log-mutation-analysis-info
             @~a{
                 @the-mutant {@mutation-type} => @(if mutation-good? 'hit 'miss)
@@ -48,7 +55,8 @@
           [else (raise-bad-mutant-result)]))
 
   (define mutant-results
-    (parameterize ([current-mutant-runner-log-mutation-info? #t])
+    (parameterize ([current-mutant-runner-log-mutation-info? #t]
+                   [default-timeout/s (* 60 3)])
       (collect-mutant-results
        (list bench)
        (current-configuration-path)
