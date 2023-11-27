@@ -44,8 +44,8 @@
 
 (struct exn:fail:bad-mutant-result exn:fail ())
 
-(define (raise-bad-mutant-result)
-  (raise (exn:fail:bad-mutant-result "oops, internal bad-mutant-result exn should be caught!"
+(define (raise-bad-mutant-result [msg "<missing>"])
+  (raise (exn:fail:bad-mutant-result msg
                                      (current-continuation-marks))))
 
 (define-logger mutant-results)
@@ -143,7 +143,7 @@
                                                            config-to-run))
   (define ((mutant-spawner will))
     (define outfile
-      (make-temporary-file @~a{@|the-benchmark-name|-~a}
+      (make-temporary-file @~a{@|the-benchmark-name|-@|mod-to-mutate|-@|index|-~a}
                            #f
                            working-dir))
     (log-mutant-results-info @~a{Spawned @the-mutant+bench})
@@ -164,7 +164,7 @@
                                   })
     (log-mutant-results-info @~a{@the-mutant+bench done})
     (with-handlers ([exn:fail:bad-mutant-result?
-                     (λ _
+                     (λ (e)
                        (log-mutant-results-info
                         @~a{Failed to extract result from @the-benchmark-name @the-mutant})
                        (cond [(< failure-retries-so-far failure-retries)
@@ -182,7 +182,8 @@
                               (error 'collect-mutant-results
                                      @~a{
                                          Unable to extract result from @the-mutant @;
-                                         despite @failure-retries tries
+                                         despite @failure-retries tries. Failure reason: @;
+                                         @(exn-message e)
                                          })]))])
       (match (outfile->result (process-info-data info) the-mutant)
         [(retry _ reason)

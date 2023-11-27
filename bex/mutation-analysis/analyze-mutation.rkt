@@ -52,7 +52,7 @@
            (if (equal? result 'type-error)
                (retry (list mutation-good? mutation-type) "confirm type error")
                (list mutation-good? mutation-type))]
-          [else (raise-bad-mutant-result)]))
+          [else (raise-bad-mutant-result @~a{output @outfile doesn't exist})]))
 
   (define mutant-results
     (parameterize ([current-mutant-runner-log-mutation-info? #t]
@@ -101,7 +101,10 @@
              (list _ mutation-type rs-string))
      (define the-run-status (with-input-from-string rs-string read))
      (values (run-status-outcome the-run-status) mutation-type)]
-    [else (raise-bad-mutant-result)]))
+    [else (raise-bad-mutant-result @~a{
+                                       output (below) doesn't match expected shape
+                                       @trimmed-output
+                                       })]))
 
 (main
  #:arguments {[flags args]
