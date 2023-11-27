@@ -37,13 +37,23 @@
 
 (define condor_q-cache-expiration-secs 1)
 
-;; -> (listof job-id-string?)
+;; inexact? -> (or/c (listof job-id-string?) #f)
 (define get-condor-job-info
-  ;; to avoid polling condor too frequently, and parsing/reparsing the same
-  ;; output, cache the results and only refresh every `CACHE-EXPIRATION-SECS`
+  ;; To avoid polling condor too frequently, and parsing/reparsing the same
+  ;; output, cache the results and only refresh periodically.
+  ;;
+  ;; This creates a tricky race condition tho: we might launch a condor job,
+  ;; and then try to check its status before we've refreshed the cache.
+  ;; Then we'd think that the job is finished when it isn't actually.
+  ;; So we need to pass along a kind of freshness limiter that means
+  ;; "only give me results at least as old as this timestamp";
+  ;; otherwise, we return #f with the interpretation "come back later".
+  ;;
+  ;; An alternative design might just refresh the cache if the limiter is too
+  ;; recent, but I'd rather wait a second extra than possibly overload condor.
   (let ([last-poll-time (current-inexact-monotonic-milliseconds)]
         [cached-output #f])
-    (thunk
+    (λ (min-time)
      (cond [(or (not cached-output)
                 (> (- (current-inexact-monotonic-milliseconds)
                       last-poll-time)
@@ -57,6 +67,7 @@
                                            condor-dump
                                            #:match-select rest))))
             cached-output]
+           [(< last-poll-time min-time) #f]
            [else cached-output]))))
 
 (struct mutant-run-info (args ; (listof string?)
@@ -68,6 +79,7 @@
 
 (struct batch-condor-job (id ; string?
                           script ; (or/c path-to-existant-file? #f)
+                          submit-time ; inexact? from (current-inexact-monotonic-milliseconds)
                           )
   #:transparent)
 
@@ -119,8 +131,9 @@
      (displayln "#!/bin/bash\n")
      (for ([info (in-list submissions)])
        (match-define (mutant-run-info args timeout outfile error-file) info)
+       ;; timeout+30: we want a `timeout` result rather than "user break"
        (displayln @~a{
-                      timeout -k 5 @(inexact->exact (round timeout)) @;
+                      timeout -k 5 @(inexact->exact (+ (round timeout) 30)) @;
                       '@this-racket-exe-path' @(string-join (map ~s args) " ") @;
                       > @outfile @;
                       2> @error-file
@@ -128,7 +141,7 @@
                       }))
      ;; workaround: there's some kind of race condition with jobs finishing and
      ;; their results not being written to disk yet
-     (displayln "\nsleep 5s\n")))
+     (displayln "\nsleep 1s\n")))
   (file-or-directory-permissions script 511)
   (batch-condor-job
    (condor-submit!
@@ -162,7 +175,8 @@
         Queue
 
         })
-   script))
+   script
+   (current-inexact-monotonic-milliseconds)))
 
 (define (spawn-condor-mutant-runner a-benchmark-configuration
                                     module-to-mutate
@@ -210,15 +224,18 @@
     (define id (unbox id-box))
     (match id
       [#f 'running] ; waiting in batcher queue
-      [(batch-condor-job condor-id _)
-       #:when (member condor-id (get-condor-job-info))
-       'running]
-      [(batch-condor-job condor-id script-path)
-       ;; Clean up the script now that it's done
-       (when (path-string? script-path)
-         (delete-file script-path)
-         (set-box! id-box (batch-condor-job condor-id #f)))
-       'done-ok]))
+      [(batch-condor-job condor-id
+                         script-path
+                         (and launch-time (app get-condor-job-info maybe-condor-job-info)))
+       (cond [(or (false? maybe-condor-job-info) ; too early
+                  (member condor-id maybe-condor-job-info))
+              'running]
+             [else
+              ;; Clean up the script now that it's done
+              (when (path-string? script-path)
+                (delete-file script-path)
+                (set-box! id-box (batch-condor-job condor-id #f launch-time)))
+              'done-ok])]))
   (match-lambda ['status
                  (get-proc-status)]
                 ['kill

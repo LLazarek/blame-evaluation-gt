@@ -16,13 +16,13 @@
               ([mutation (in-list contents)])
       (define new-max-indices
         (match mutation
-          [(list (list mod-name index) _ _)
+          [(list (list benchmark mod-name index) _ _)
            (hash-update max-indices
                         mod-name
                         (λ (x) (max x index))
                         -1)]))
       (match mutation
-        [(list (list mod-name index) #t mutator)
+        [(list (list benchmark mod-name index) (not #f) mutator)
          (values (hash-update info
                               mod-name
                               (add-to-list (list index mutator))
