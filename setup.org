@@ -20,3 +20,35 @@ This setup script will
 4. Ask if you want to run the experiment tests.
 
 If you answer yes to run the tests, and they all pass, then you should be all set up to run experiments.
+
+** on Mac
+Clone this repo.
+/Suggestion/: create a new directory and clone it in there.
+
+Make sure you have Racket 8.9 downloaded
+
+Copy the app into your working directory, run the following command on terminal
+: cp -r /Applications/Racket\ v8.9 ./racket
+
+Confirm that you have a working and correct version by running
+: ./racket/bin/racket --version
+
+If you do not have homebrew installed follow these [[https://docs.brew.sh/Installation][instructions]]  
+ 
+Next install the correct dependencies by running
+: brew install coreutils  
+
+
+Afterwards run this script
+: ./blame-evaluation-gt/bex/setup/install-racket-and-setup.sh . blame-evaluation-gt/bex/setup/blutil-setup-config.rkt
+with two arguments:
+1. The "project root".
+   Typically, this should be the parent directory into which you cloned this repo.
+2. A setup config, typically one of =blame-evaluation-gt/bex/setup/*-setup-config.rkt=.
+
+This setup script will
+1. Download, install, and set up the experiment dependencies in the "project root",
+2. Check the installation setup, and
+3. Ask if you want to run the experiment tests.
+
+If you answer yes to run the tests, and they all pass, then you should be all set up to run experiments.
