@@ -101,11 +101,13 @@
                                #'(void)
                                #'(update-host! the-host
                                                the-dbs
+                                               the-setup-config
                                                (handle-host-update-failure! the-dbs)))
   (module+ main
     (let ([the-host host]
           [the-dbs (orchestration-config-dbs-dir configuration)]
           [the-download-dir (orchestration-config-download-dir configuration)]
+          [the-setup-config (orchestration-config-setup-config configuration)]
           [the-status-file {~? status-file-path #f}])
       (parameterize ([current-remote-host-db-installation-directory-name
                       (orchestration-config-dbs-dir-name configuration)])

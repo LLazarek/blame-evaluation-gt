@@ -10,8 +10,9 @@
          notify-phone!
 
          zythos
-         zythos-direct
-         zythos-local
+         zythos-ssh/one-job-per-mutant
+         zythos-local/one-job-per-mode
+         zythos-local/one-job-per-mutant/batched
          benbox
          local)
 
@@ -153,6 +154,7 @@
       (display-lines-to-file (map ~s data)
                              data-store-path
                              #:exists 'replace))))
+;; runs each mode as a job, submitting all modes at once
 (define condor-host%
   (class* host% (writable<%> host<%>)
     (super-new)
@@ -233,7 +235,7 @@
                Copy_To_Spool = False
 
                # Notification
-               Notification = error
+               Notification = never
 
                # Set the environment
                Getenv = True
@@ -286,6 +288,7 @@
     [else absent]))
 (define (bool->option v)
   (or v absent))
+;; runs one mode of the experiment at a time, each having all `cpu-count` cpus
 (define direct-access-host%
   (class* host% (writable<%> host<%>)
     (super-new)
@@ -833,7 +836,7 @@
    (unless (summary-empty? summary)
      (handle-not-empty!))))
 
-(define (update-host! a-host dbs-dir
+(define (update-host! a-host dbs-dir setup-config-name ; assumed to be in bex/setup/
                       [handle-failure! (λ (reason)
                                          (raise-user-error 'update-host! reason))])
   (define host-dbs-destination
@@ -849,6 +852,7 @@
       (handle-failure! "Failed to zip dbs directory, giving up.")))
   (displayln "Uploading dbs archive...")
   (define host-db-archive-upload-path (build-path host-dbs-destination archive-name))
+  (send a-host system/host @~a{mkdir -p @host-dbs-destination})
   (unless (zero? (send a-host scp
                        #:from-local (~a (build-path dbs-dir-parent archive-name))
                        #:to-host (~a host-db-archive-upload-path)))
@@ -862,6 +866,12 @@
   (define host-benchmarks-path
     (build-path (get-field host-project-path a-host)
                 "gtp-benchmarks"))
+  (define host-setup-config-path
+    (build-path (get-field host-project-path a-host)
+                "blame-evaluation-gt"
+                "bex"
+                "setup"
+                setup-config-name))
   (for ([step (in-list '("Stashing current dbs..."
                          "Unpacking dbs..."
                          "Updating implementation..."
@@ -891,7 +901,7 @@
                    }
                @~a{
                    @(get-field host-racket-path a-host) -l bex/util/project-raco -- -Cc && @;
-                   @(get-field host-racket-path a-host) -l bex/util/setup -- -v && @;
+                   @(get-field host-racket-path a-host) -l bex/setup/setup -- -c '@host-setup-config-path' -v && @;
                    echo "Done."
                    }))])
     (displayln step)
@@ -1057,11 +1067,14 @@
 ;; ---------- Host options for orchestrating experiments ----------
 ;; ----------------------------------------------------------------
 
+;; ----- these hosts should be used locally -----
 (define zythos (new condor-host%
                     [hostname "zythos"]
                     [host-project-path "/project/blgt"]
                     [host-jobdir-path "./proj/jobctl"]))
-(define zythos-direct
+;; orchestrates/manages the experiment from the local machine, ssh'ing into zythos to
+;; run the experiment, one mode at a time, on peroni -- offloading all mutants to condor
+(define zythos-ssh/one-job-per-mutant
   (new direct-access-host%
        [hostname "zythos-direct"]
        [host-project-path "/project/blgt"]
@@ -1073,12 +1086,26 @@
 (define local (new local-direct-host%
                    [cpu-count 2]
                    [hostname "local"]
-                   [host-project-path project-path]))
-(define zythos-local (new local-condor-host%
+                   [host-project-path (simple-form-path project-path)]))
+
+;; ----- these hosts should be used on peroni directly -----
+;; runs the experiment with each mode as a whole machine condor job, all modes submitted at once
+(define zythos-local/one-job-per-mode (new local-condor-host%
                           [hostname "zythos-local"]
-                          [host-project-path "/project/blgt"]
+                          [host-project-path (simple-form-path project-path)]
                           [host-jobdir-path (expand-user-path "~/proj/jobctl")]))
-(define hosts (list zythos local zythos-direct))
+;; runs the experiment, one mode at a time, on peroni, offloading all mutants to condor
+;; cpu-count is how many cpus the mode-experiment gets to use
+;; (i.e. `cpu-count / batch-size` condor jobs)
+(define zythos-local/one-job-per-mutant/batched
+  (new local-direct-host%
+       [cpu-count 10]
+       [hostname "zythos-local-batch"]
+       [host-project-path (simple-form-path project-path)]
+       [env-vars "BEX_CONDOR_MACHINES='fix allagash piraat maudite tremens guldendraak' BEX_CONDOR_BATCH_SIZE=5"]))
+
+
+(define hosts (list zythos-local/one-job-per-mutant/batched))
 
 
 
@@ -1291,5 +1318,7 @@
                 (displayln "Aborting queue.")
                 (void)])]))]
        [(not (empty? update-targets))
+        (raise-user-error
+         "unimplemented update to this cli interface: updating now needs a setup config")
         (for ([a-host (in-list update-targets)])
           (update-host! a-host dbs-path))]))

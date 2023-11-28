@@ -464,11 +464,12 @@
                                 expected-benchmark-names))))
 
 (define (install-setup-config! path)
-  (set! expected-TR-branch (dynamic-require path 'expected-TR-branch))
-  (set! expected-gtp-branch (dynamic-require path 'expected-gtp-branch))
-  (set! expected-blgt-branch (dynamic-require path 'expected-blgt-branch))
-  (set! with-TR+transient? (dynamic-require path 'with-TR+transient?))
-  (set! gtp-repo-url (dynamic-require path 'gtp-repo-url)))
+  (define mod-path `(file ,path))
+  (set! expected-TR-branch (dynamic-require mod-path 'expected-TR-branch))
+  (set! expected-gtp-branch (dynamic-require mod-path 'expected-gtp-branch))
+  (set! expected-blgt-branch (dynamic-require mod-path 'expected-blgt-branch))
+  (set! with-TR+transient? (dynamic-require mod-path 'with-TR+transient?))
+  (set! gtp-repo-url (dynamic-require mod-path 'gtp-repo-url)))
 
 (main
  #:arguments {[flags args]
