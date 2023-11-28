@@ -135,8 +135,8 @@
        (displayln @~a{
                       timeout -k 5 @(inexact->exact (+ (round timeout) 30)) @;
                       '@this-racket-exe-path' @(string-join (map ~s args) " ") @;
-                      > @outfile @;
-                      2> @error-file
+                      > @(simple-form-path outfile) @;
+                      2> @(simple-form-path error-file)
 
                       }))
      ;; workaround: there's some kind of race condition with jobs finishing and
