@@ -4,11 +4,8 @@
 
 (define-runtime-path status-file "../../../experiment-status.txt")
 
-(with-configuration [(begin0 zythos
-                       (set-field! enabled-machines
-                                   zythos
-                                   '("fix" "allagash")))
-                     code-mistakes]
+(with-configuration [zythos-local/one-job-per-mutant/batched
+                     blutil]
   #:status-in status-file
   #:manual-outcome-recording
   (run-mode blame #:record-outcomes)
