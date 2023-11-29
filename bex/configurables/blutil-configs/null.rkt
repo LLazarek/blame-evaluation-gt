@@ -5,7 +5,7 @@
 (configure! mutation                 code-mistakes)
 (configure! mutant-sampling          pre-selected
             "../dbs/blutil/mutant-samples.rktdb")
-(configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
+(configure! mutant-filtering         none)
 (configure! module-selection-for-mutation all-regular-modules)
 (configure! benchmark-runner         run-it)
 (configure! interface-blame-translation

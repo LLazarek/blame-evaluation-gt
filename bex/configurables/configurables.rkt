@@ -28,6 +28,8 @@
 (define-configurable mutant-filtering
   #:provides [should-sample-mutant-blame-trails?]
 
+  (define-implementation none
+    #:module "mutant-filtering/none.rkt")
   (define-implementation select-type-erroring-max-config-mutants
     #:module "mutant-filtering/type-error.rkt")
   (define-implementation select-type/runtime/ctc-erroring-max-config-mutants
