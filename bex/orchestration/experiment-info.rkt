@@ -69,11 +69,6 @@
     "snake"))
 
 (define experiment-modes
-  '("TR-null"
-    "TR"
-    "TR-stack-first"
-    "transient-newest"
-    "transient-oldest"
-    #;"transient-all"
-    "transient-stack-first"
-    "erasure-stack-first"))
+  '("blame"
+    "stack"
+    "null"))
