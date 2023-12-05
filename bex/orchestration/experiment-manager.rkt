@@ -693,6 +693,7 @@
       (raise-user-error 'download-completed-benchmarks!
                         "Can't download results with empty archive name"))
     (define projdir (get-field host-project-path a-host))
+    (define pack-script-path (build-path (get-field host-utilities-path a-host) "pack-dir-to-archive.sh"))
     (when (and include-configuration-outcomes?
                (false? (current-remote-host-db-installation-directory-name)))
       (raise-user-error
@@ -709,7 +710,7 @@
                              ./experiment-output/configuration-outcomes &&@" "
                              }
                          "") @;
-                    ./pack.sh experiment-output @archive-name @;
+                    @pack-script-path experiment-output @archive-name @;
                     }))
     (define archive-name+ext (~a archive-name ".tar.gz"))
     (match (send a-host scp
@@ -733,7 +734,7 @@
                      Do you want to download the results anyway? 
                      }))
      (download-results! (or name config-name)
-                        #:include-configuration-outcomes? (equal? config-name "TR"))]
+                        #:include-configuration-outcomes? (member config-name '("TR" "blame")))]
     [else
      #:when (user-prompt!
              @~a{
