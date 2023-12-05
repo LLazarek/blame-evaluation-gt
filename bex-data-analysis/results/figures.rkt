@@ -13,6 +13,39 @@
          use-disk-data-cache?
          collect-max-error-margin?)
 
+(require plot
+         (except-in pict-util line)
+         (except-in pict pict?)
+         pict-util/file
+         bex/configurables/configurables
+         bex/util/for
+
+         "plot-common.rkt"
+         "read-data.rkt"
+
+         "bt-violations.rkt"
+         "bt-length-distributions.rkt"
+         "adds-value-over.rkt"
+         "experiment-info.rkt"
+         "stratified-proportion-estimation.rkt"
+         "bt-ids.rkt")
+
+;; To run visualization for a different experiment, need to:
+;; - [ ] edit these paths,
+;; - [ ] make sure the configs symlink is right,
+;; - [ ] edit paths in `sizes.rkt`,
+;; - [ ] make sure `experiment-info.rkt` is right,
+;; - [ ] make sure gtp-benchmarks is on the right branch
+;;
+;; todo: this is a whole lotta shit! easy to lose track. make it easier.
+(define-runtime-paths
+  [data-dirs "../../../experiment-data/results/type-api-mutations"]
+  [mutant-summaries-db-path "../../bex/dbs/type-api-mutations/type-err-summaries.rktdb"]
+  [TR-config "../../bex/configurables/configs/TR.rkt"]
+  [outdir "../../../experiment-data/results/type-api-mutations"]
+  [data-cache "./data-cache"]
+  [venn-template "venn-template.svg"])
+
 (define (rename-mode mode-name)
   (hash-ref (hash "TR" "Natural blame"
                   "TR-stack-first" "Natural exceptions"
@@ -49,31 +82,6 @@
 (define (record-error-margin! e)
   (when (> e (unbox max-error-margin))
     (set-box! max-error-margin e)))
-
-(require plot
-         (except-in pict-util line)
-         (except-in pict pict?)
-         pict-util/file
-         bex/configurables/configurables
-         bex/util/for
-
-         "plot-common.rkt"
-         "read-data.rkt"
-
-         "bt-violations.rkt"
-         "bt-length-distributions.rkt"
-         "adds-value-over.rkt"
-         "experiment-info.rkt"
-         "stratified-proportion-estimation.rkt"
-         "bt-ids.rkt")
-
-(define-runtime-paths
-  [data-dirs "../../../experiment-data/results/type-api-mutations"]
-  [mutant-summaries-db-path "../../bex/dbs/type-api-mutations/type-err-summaries.rktdb"]
-  [TR-config "../../bex/configurables/configs/TR.rkt"]
-  [outdir "../../../experiment-data/results/type-api-mutations"]
-  [data-cache "./data-cache"]
-  [venn-template "venn-template.svg"])
 
 (define plot-name-prefix (basename data-dirs))
 
