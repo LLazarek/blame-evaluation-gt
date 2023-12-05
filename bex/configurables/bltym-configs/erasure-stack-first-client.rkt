@@ -8,8 +8,8 @@
 (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
 (configure! module-selection-for-mutation interface-module-only)
 (configure! benchmark-runner         load-pre-computed-result "../dbs/type-api-mutations/pre-computed-mutant-results.rktdb")
-(configure! interface-blame-translation
-            to-module-that-declared-the-type)
+(configure! blame-translation
+            TR-interface-to-module-that-declared-the-type)
 (configure! blame-following          pick-some
             ; runtime-error-with-blame
             select-top-of-context/filter-typed+library

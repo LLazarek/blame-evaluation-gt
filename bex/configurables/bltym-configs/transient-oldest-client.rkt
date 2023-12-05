@@ -8,8 +8,8 @@
 (configure! mutant-filtering         select-type/runtime/ctc-erroring-max-config-mutants)
 (configure! module-selection-for-mutation interface-module-only)
 (configure! benchmark-runner         run-it)
-(configure! interface-blame-translation
-            to-module-that-declared-the-type)
+(configure! blame-translation
+            TR-interface-to-module-that-declared-the-type)
 (configure! blame-following          pick-some
             ; runtime-error-with-blame
             select-all-blamed/filter-library

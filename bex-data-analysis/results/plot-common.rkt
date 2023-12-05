@@ -201,7 +201,7 @@
                 (and (member mode '("TR.rkt" "transient-newest.rkt" "transient-oldest.rkt"))
                      (equal? outcome 'runtime-error)))
      (define stack/no-typed-mods
-       (filter (λ (m) (equal? (hash-ref config m 'untyped) 'untyped))
+       (filter (λ (m) (equal? (hash-ref config m 'none) 'none))
                stack))
      (match stack/no-typed-mods
        [(list* (? type-interface-mod?) _) #t]

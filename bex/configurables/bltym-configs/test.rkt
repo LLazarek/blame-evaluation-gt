@@ -8,8 +8,8 @@
 (configure! module-selection-for-mutation all-regular-modules)
 (configure! module-instrumentation   none)
 (configure! benchmark-runner         run-it)
-(configure! interface-blame-translation
-            to-value-source)
+(configure! blame-translation
+            TR-interface-to-value-source)
 (configure! blame-following          pick-some
             ; runtime-error-with-blame
             select-all-blamed

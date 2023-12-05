@@ -102,14 +102,18 @@
 
 ;; How to handle blame that has this shape: (interface for <id>)
 ;; TR produces blame like this when a value imported with require/typed doesn't live up to its type.
-(define-configurable interface-blame-translation
-  #:provides [translate-blame-from-interface-to-source?]
+(define-configurable blame-translation
+  #:provides [translate-blame-from-TR-interface-to-source?
+              translate-configurable-ctc-middleman-blame-to-source?]
 
-  (define-implementation to-module-that-declared-the-type
-    #:module "interface-blame-translation/to-module-that-declared-the-type.rkt")
+  (define-implementation TR-interface-to-module-that-declared-the-type
+    #:module "blame-translation/TR-interface-to-module-that-declared-the-type.rkt")
 
-  (define-implementation to-value-source
-    #:module "interface-blame-translation/to-value-source.rkt"))
+  (define-implementation TR-interface-to-value-source
+    #:module "blame-translation/TR-interface-to-value-source.rkt")
+
+  (define-implementation configurable-ctc-middleman-mod-to-source
+    #:module "blame-translation/configurable-ctc-middleman-mod-to-source.rkt"))
 
 (define-configurable trail-completion
   #:provides [blame-trail-ended-normally?]
