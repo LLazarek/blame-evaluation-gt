@@ -8,8 +8,8 @@
 (configure! mutant-filtering         none)
 (configure! module-selection-for-mutation all-regular-modules)
 (configure! benchmark-runner         run-it)
-(configure! interface-blame-translation
-            to-value-source)
+(configure! blame-translation
+            configurable-ctc-middleman-mod-to-source)
 (configure! blame-following          null)
 (configure! bt-root-sampling         pre-selected
             "../dbs/blutil/pre-selected-bt-roots.rktdb")
