@@ -1,6 +1,7 @@
 #lang at-exp racket
 
 (require "../../util/optional-contracts.rkt"
+         "../../util/experiment-exns.rkt"
          "blamed-location-extractor.rkt")
 (provide (contract-out
           [make-extract-blamed-locations
@@ -101,7 +102,76 @@
            (? symbol? (app symbol->string submod-name)))
      #:when (and (regexp-match? #rx"^middleman-.+.rkt" submod-name)
                  (configured:translate-configurable-ctc-middleman-blame-to-source?))
-     (string-trim submod-name "middleman-")]
+     (define the-exporting-mod (string-trim submod-name "middleman-"))
+     (define the-importing-mod (file-name-string-from-path path))
+     ;; It's necessary to consider the direction from which the blame is coming
+     ;; to translate properly here. If it's coming from the importing mod, then
+     ;; it should translate through to the exporter.
+     ;; If it's coming from the exporter, it should translate through to the
+     ;; importer.
+
+     ;; use the-mod-which-attached-the-ctc to figure out the direction.
+     (define the-mod-which-attached-the-ctc (file-name-string-from-path blame-positive-source))
+     ;; note: comparing file names rather than paths to avoid any issues with relative paths
+     ;; of course that leans heavily on the assumed structure of the benchmarks (flat dir w/ unique filenames)
+     ;; which the configurations already lean on too, so whatever
+     (cond [(equal? the-mod-which-attached-the-ctc
+                    the-importing-mod)
+            ;; Blame coming from the importer.
+            ;; Example situation:
+            ;;
+            ;;   +--the-importing-mod-----+         +-the-exporting-mod-+
+            ;;   |  level: max            |         |  level: none      |
+            ;;   |                        |         |                   |
+            ;;   |    +-the-middleman-+   |         |                   |
+            ;;   |    |  adds max/c <-|---|---------|  buggy f          |
+            ;;   |  <-|               |   |         |                   |
+            ;;   |  ↑ +---------------+   |         |                   |
+            ;;   | violated    blame ↑    |         |                   |
+            ;;   +------------------------+         +-------------------+
+            the-exporting-mod]
+           [(equal? the-mod-which-attached-the-ctc
+                    the-exporting-mod)
+            ;; Blame coming from the exporter.
+            ;; Example situation:
+            ;;
+            ;;   +--the-importing-mod-----+         +-the-exporting-mod-+
+            ;;   |  level: none           |         |  level: max       |
+            ;;   |  bug                   | violated|                   |
+            ;;   |    +-the-middleman-+   |   v     |                   |
+            ;;   |    |  no-op      <-|---|---------|        f          |
+            ;;   |  <-|               |<--|- blame  |                   |
+            ;;   |    +---------------+   |         |                   |
+            ;;   |                        |         |                   |
+            ;;   +------------------------+         +-------------------+
+            the-importing-mod]
+           [else
+            ;; any other situation looks like this
+            ;;   +--the-importing-mod-----+         +-the-exporting-mod-+
+            ;;   |  level: max            |         |  level: max       |
+            ;;   |                        | violated|                   |
+            ;;   |    +-the-middleman-+   |   v     |                   |
+            ;;   |    |  adds max/c <-|---|---------|  buggy f          |
+            ;;   |  <-|               |   | blame ->|                   |
+            ;;   |    +---------------+   |         |                   |
+            ;;   |                        |         |                   |
+            ;;   +------------------------+         +-------------------+
+            ;;
+            ;; or this
+            ;;   +--the-importing-mod-----+         +-the-exporting-mod-+
+            ;;   |  level: max            |         |  level: max       |
+            ;;   |  bug                   |         |                   |
+            ;;   |    +-the-middleman-+   |         |                   |
+            ;;   |    |  adds max/c <-|---|---------|        f          |
+            ;;   |  <-|               |   |         |                   |
+            ;;   |  ↑ +---------------+   |         |                   |
+            ;;   | violated               |         |                   |
+            ;;   +------------------------+         +-------------------+
+            ;;     ↑ blame
+            ;;
+            ;; so the middleman doesn't get blamed and we won't hit this case.
+            ;; Also the "both are none" case can't happen -- there's no ctc violation.
+            (raise-internal-experiment-error 'extract-blamed-mod-name "should never get here")])]
     [(or (? path-string? path)
          ;; a submod
          (list (? path-string? path)
