@@ -95,8 +95,8 @@
                        {~var first-mode (run-mode-spec (not (attribute skip-record-outcomes-kw)))}
                        {~var more-modes (run-mode-spec #f)} ...)
   #:fail-when (not (or (attribute skip-record-outcomes-kw)
-                       (string=? (attribute first-mode.compile-time-mode-name-str) "TR")))
-              "Unless manually managing outcome recording with #:manual-outcome-recording, the first mode run must be TR so that later modes can perform outcome parity checks."
+                       (member (attribute first-mode.compile-time-mode-name-str) '("TR" "blame"))))
+              "Unless manually managing outcome recording with #:manual-outcome-recording, the first mode run must be TR/blame so that later modes can perform outcome parity checks."
   #:with maybe-host-update (if (attribute skip-setup-kw)
                                #'(void)
                                #'(update-host! the-host
