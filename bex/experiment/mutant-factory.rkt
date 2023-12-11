@@ -1173,10 +1173,10 @@ Mutant: [~a] ~a @ ~a with config:
 
 (define (outcome-compatible-with? recorded actual)
   (match (list recorded actual)
-    [(list (no-recorded-outcome) _)                 #t]
-    [(list-no-order 'syntax-error _)                #f]
-    [(list 'type-error 'type-error)                 #t]
-    [(list-no-order 'type-error (not 'type-error )) #f]
+    [(list (or (== (no-recorded-outcome)) 'timeout 'oom) _) #t]
+    [(list-no-order 'syntax-error _)                        #f]
+    [(list 'type-error 'type-error)                         #t]
+    [(list-no-order 'type-error (not 'type-error ))         #f]
     [else
      ;; all other modes should be 'weaker' than TR's recorded result
      (define ordering '(blamed runtime-error completed))
