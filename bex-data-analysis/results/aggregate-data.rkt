@@ -47,7 +47,7 @@ PRIMARY KEY (mode, benchmark, mutant, id)
                 (blame-trail-trail-id bt)
                 (~s (blame-trail-mutant-summaries bt))
                 mutator
-                (if (satisfies-BT-hypothesis? bt) 1 0))))
+                (if (blame-trail-succeeded? bt) 1 0))))
 
 (define (read-blame-trail-db->df db-path [query "SELECT * FROM trails"])
   (define conn (sqlite3-connect #:database db-path

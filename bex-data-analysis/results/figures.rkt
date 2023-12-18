@@ -16,6 +16,7 @@
 (require plot
          (except-in pict-util line)
          (except-in pict pict?)
+         db
          pict-util/file
          bex/configurables/configurables
          bex/util/for
@@ -23,9 +24,8 @@
          "plot-common.rkt"
          "read-data.rkt"
 
-         "bt-violations.rkt"
          "bt-length-distributions.rkt"
-         "adds-value-over.rkt"
+         "util.rkt"
          "experiment-info.rkt"
          "stratified-proportion-estimation.rkt"
          "bt-ids.rkt")
@@ -39,7 +39,7 @@
 ;;
 ;; todo: this is a whole lotta shit! easy to lose track. make it easier.
 (define-runtime-paths
-  [data-dirs "../../../experiment-data/results/type-api-mutations"]
+  [data-db "../../../experiment-data/results/type-api-mutations/data.sqlite"]
   [mutant-summaries-db-path "../../bex/dbs/type-api-mutations/type-err-summaries.rktdb"]
   [TR-config "../../bex/configurables/configs/TR.rkt"]
   [outdir "../../../experiment-data/results/type-api-mutations"]
@@ -83,24 +83,23 @@
   (when (> e (unbox max-error-margin))
     (set-box! max-error-margin e)))
 
-(define plot-name-prefix (basename data-dirs))
+(define plot-name-prefix "")
 
 ;; for getting mutator names
 (install-configuration! TR-config)
 
+(define db-conn (sqlite3-connect #:database data-db
+                                 #:mode 'read-only))
 
-(define mutant-mutators
-  (read-mutants-by-mutator mutant-summaries-db-path))
 (define get-bts-by-mutator-for-mode
   (simple-memoize
    (λ (mode-name)
      (cond [(and (get-bts-by-mutator-for-mode-backdoor)
                  ((get-bts-by-mutator-for-mode-backdoor) mode-name)) => values]
            [else
-            (define mode-data-dir (build-path data-dirs mode-name))
             (add-missing-active-mutators
-             (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir
-                                                                 mutant-mutators))]))))
+             (read-blame-trails-by-mutator/across-all-benchmarks db-conn
+                                                                 mode-name))]))))
 (define get-bts-by-mutator-for-mode-backdoor (make-parameter #f))
 
 (define make-bt-by-benchmark+mutant-getter-for-mode
@@ -203,8 +202,8 @@
             (match-lambda [(list bt)
                            (and (= (bt-length/memo bt #t) length)
                                 (if successful?
-                                    (satisfies-BT-hypothesis? bt)
-                                    (not (satisfies-BT-hypothesis? bt))))])))
+                                    (blame-trail-succeeded? bt)
+                                    (not (blame-trail-succeeded? bt))))])))
          (when (collect-max-error-margin?)
            (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
                                                             1.96)))
@@ -283,15 +282,15 @@
             (list top-mode bottom-mode)
             (match-lambda [(list top-bt bot-bt)
                            #:when (equal? Δ -inf.0)
-                           (and (satisfies-BT-hypothesis? top-bt)
-                                (not (satisfies-BT-hypothesis? bot-bt)))]
+                           (and (blame-trail-succeeded? top-bt)
+                                (not (blame-trail-succeeded? bot-bt)))]
                           [(list top-bt bot-bt)
                            #:when (equal? Δ +inf.0)
-                           (and (not (satisfies-BT-hypothesis? top-bt))
-                                (satisfies-BT-hypothesis? bot-bt))]
+                           (and (not (blame-trail-succeeded? top-bt))
+                                (blame-trail-succeeded? bot-bt))]
                           [(list top-bt bot-bt)
-                           (and (satisfies-BT-hypothesis? top-bt)
-                                (satisfies-BT-hypothesis? bot-bt)
+                           (and (blame-trail-succeeded? top-bt)
+                                (blame-trail-succeeded? bot-bt)
                                 (= (- (bt-length/memo top-bt #t)
                                       (bt-length/memo bot-bt #t))
                                    Δ))])))
@@ -438,8 +437,8 @@
           (list top-mode bottom-mode)
           (match-lambda
             [(list top-bt bottom-bt)
-             (and (satisfies-BT-hypothesis? top-bt)
-                  (not (satisfies-BT-hypothesis? bottom-bt)))])))
+             (and (blame-trail-succeeded? top-bt)
+                  (not (blame-trail-succeeded? bottom-bt)))])))
        (define p (hash-ref estimate 'proportion-estimate))
        (define error-margin (variance->margin-of-error (hash-ref estimate 'variance)
                                                        1.96))
@@ -502,7 +501,7 @@
      (λ (mode-name)
        (define estimate (bt-wise-strata-proportion-estimate
                          (list mode-name)
-                         (match-lambda [(list bt) (satisfies-BT-hypothesis? bt)])))
+                         (match-lambda [(list bt) (blame-trail-succeeded? bt)])))
        (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
                                                         1.96))
        (hash-ref estimate 'proportion-estimate))))
@@ -659,7 +658,7 @@
      (λ (mode-name)
        (define estimate (bt-wise-strata-proportion-estimate
                          (list mode-name)
-                         (match-lambda [(list bt) (and (satisfies-BT-hypothesis? bt)
+                         (match-lambda [(list bt) (and (blame-trail-succeeded? bt)
                                                        (not (types-server-side? bt)))])))
        (record-error-margin! (variance->margin-of-error (hash-ref estimate 'variance)
                                                         1.96))
@@ -771,42 +770,42 @@
                                                             1.96))
            (hash-ref estimate 'proportion-estimate))
          (define all-3-succeed-%
-           (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
-                                        (? satisfies-BT-hypothesis?)
-                                        (? satisfies-BT-hypothesis?)) #t]
+           (trio-% (match-lambda [(list (? blame-trail-succeeded?)
+                                        (? blame-trail-succeeded?)
+                                        (? blame-trail-succeeded?)) #t]
                                  [_ #f])))
 
          (define top-only-%
-           (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
-                                        (not (? satisfies-BT-hypothesis?))
-                                        (not (? satisfies-BT-hypothesis?))) #t]
+           (trio-% (match-lambda [(list (? blame-trail-succeeded?)
+                                        (not (? blame-trail-succeeded?))
+                                        (not (? blame-trail-succeeded?))) #t]
                                  [_ #f])))
          (define top-bot-%
-           (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
-                                        (? satisfies-BT-hypothesis?)
-                                        (not (? satisfies-BT-hypothesis?))) #t]
+           (trio-% (match-lambda [(list (? blame-trail-succeeded?)
+                                        (? blame-trail-succeeded?)
+                                        (not (? blame-trail-succeeded?))) #t]
                                  [_ #f])))
          (define top-erasure-%
-           (trio-% (match-lambda [(list (? satisfies-BT-hypothesis?)
-                                        (not (? satisfies-BT-hypothesis?))
-                                        (? satisfies-BT-hypothesis?)) #t]
+           (trio-% (match-lambda [(list (? blame-trail-succeeded?)
+                                        (not (? blame-trail-succeeded?))
+                                        (? blame-trail-succeeded?)) #t]
                                  [_ #f])))
 
          (define bot-only-%
-           (trio-% (match-lambda [(list (not (? satisfies-BT-hypothesis?))
-                                        (? satisfies-BT-hypothesis?)
-                                        (not (? satisfies-BT-hypothesis?))) #t]
+           (trio-% (match-lambda [(list (not (? blame-trail-succeeded?))
+                                        (? blame-trail-succeeded?)
+                                        (not (? blame-trail-succeeded?))) #t]
                                  [_ #f])))
          (define bot-erasure-%
-           (trio-% (match-lambda [(list (not (? satisfies-BT-hypothesis?))
-                                        (? satisfies-BT-hypothesis?)
-                                        (? satisfies-BT-hypothesis?)) #t]
+           (trio-% (match-lambda [(list (not (? blame-trail-succeeded?))
+                                        (? blame-trail-succeeded?)
+                                        (? blame-trail-succeeded?)) #t]
                                  [_ #f])))
 
          (define erasure-only-%
-           (trio-% (match-lambda [(list (not (? satisfies-BT-hypothesis?))
-                                        (not (? satisfies-BT-hypothesis?))
-                                        (? satisfies-BT-hypothesis?)) #t]
+           (trio-% (match-lambda [(list (not (? blame-trail-succeeded?))
+                                        (not (? blame-trail-succeeded?))
+                                        (? blame-trail-succeeded?)) #t]
                                  [_ #f])))
 
          (utility-comparison all-3-succeed-%

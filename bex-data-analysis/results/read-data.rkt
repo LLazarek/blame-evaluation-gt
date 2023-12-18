@@ -2,6 +2,7 @@
 
 (provide find-data-files
          read-blame-trails-by-mutator/across-all-benchmarks
+         read-blame-trails-by-mutator/across-all-benchmarks/from-data-files
          mutator-names
          read-mutants-by-mutator
          blame-trail-summaries->blame-trails
@@ -19,17 +20,13 @@
          bex/configurations/config
          "data-adapter.rkt"
          "experiment-info.rkt"
+         "blame-trails.rkt"
          racket/hash
-         rscript)
+         (only-in rscript
+                  path-to-existant-directory?
+                  path-to-existant-file?))
 
 (struct benchmark-data-files (name data-dir log progress-log metadata)
-  #:transparent)
-
-(struct blame-trail (mutant-id
-                     trail-id
-                     mode-config-name
-                     ; Note: summaries are in reverse order! Last summary of trail is first.
-                     mutant-summaries)
   #:transparent)
 
 ;; mode-data-dir := a directory containing data for each benchmark, all of which
@@ -88,7 +85,7 @@
     ['() (find-old-format-data)]
     [some-data some-data]))
 
-(define/contract (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir mutant-mutators)
+(define/contract (read-blame-trails-by-mutator/across-all-benchmarks/from-data-files mode-data-dir mutant-mutators)
   (path-to-existant-directory?
    (hash/c mutant? mutator-name?)
    . -> .
@@ -101,6 +98,36 @@
                 (read-blame-trails-by-mutator a-benchmark-data-files
                                               mutant-mutators)
                 #:combine append)))
+
+(require db
+         bex/util/for
+         "util.rkt")
+(define/contract (read-blame-trails-by-mutator/across-all-benchmarks db-conn [mode #f] [use-pre-computed-success? #t])
+  ({connection?}
+   {(or/c string? #f)
+    boolean?}
+   . ->* .
+   (hash/c mutator-name? (listof blame-trail?)))
+
+  (for/hash/fold ([{mutator mutant trail-id mode mutant-summaries success?}
+                   (apply in-query
+                          db-conn
+                          (~a "select mutator, mutant, id, mode, mutant_summaries, success from trails"
+                              (if mode
+                                  " where mode = $1"
+                                  ""))
+                          (or (list mode) empty))])
+    #:combine cons
+    #:default empty
+    (define summaries (string->value mutant-summaries))
+    (values mutator
+            (blame-trail (string->value mutant)
+                         trail-id
+                         mode
+                         summaries
+                         (if use-pre-computed-success?
+                             (= success? 1)
+                             (satisfies-BT-hypothesis? summaries mode))))))
 
 (define ((append-to-list new-elements) a-list)
   (append a-list new-elements))
@@ -169,12 +196,15 @@
                                            index
                                            id
                                            mutant-summaries)
+                      (define summaries
+                        (map (compose1 deserialize-mutant-summary
+                                       adapt-mutant-summary)
+                             mutant-summaries))
                       (blame-trail (mutant benchmark-name mod-name index)
                                    id
                                    mode-config-name
-                                   (map (compose1 deserialize-mutant-summary
-                                                  adapt-mutant-summary)
-                                        mutant-summaries))])
+                                   summaries
+                                   (satisfies-BT-hypothesis? summaries mode-config-name))])
        trail-summaries))
 
 (define (mutator-names data)

@@ -66,7 +66,7 @@
 
   (define partitioner
     (if partition-by-success?
-        satisfies-BT-hypothesis?
+        blame-trail-succeeded?
         (const #t)))
   (define trails-grouped-by-length
     (group-by trail-length trails))
