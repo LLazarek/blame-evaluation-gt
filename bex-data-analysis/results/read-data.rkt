@@ -6,6 +6,7 @@
          mutator-names
          read-mutants-by-mutator
          blame-trail-summaries->blame-trails
+         deserialize-mutant-summary
 
          (struct-out mutant)
          (struct-out blame-trail)
@@ -101,33 +102,75 @@
 
 (require db
          bex/util/for
+         data-frame
          "util.rkt")
-(define/contract (read-blame-trails-by-mutator/across-all-benchmarks db-conn [mode #f] [use-pre-computed-success? #t])
-  ({connection?}
+(define (read-blame-trail-db->df db-path-or-conn [query "SELECT * FROM trails"])
+  (define conn (if (connection? db-path-or-conn)
+                   db-path-or-conn
+                   (sqlite3-connect #:database db-path-or-conn
+                                    #:mode 'read-only)))
+  (define cache (make-hash))
+  (define (make/get-mutant-summary-deserializer benchmark-name)
+    (cond [(hash-ref cache benchmark-name #f) => values]
+          [else
+           (define benchmark-struct
+             (string->value (query-value conn
+                                         "SELECT benchmark FROM benchmarks WHERE name = $1"
+                                         benchmark-name)))
+           (define d (deserialize-mutant-summary benchmark-struct))
+           (hash-set! cache benchmark-name d)
+           d]))
+  (begin0 (for/data-frame {mode benchmark mutant id mutant-summaries mutator success}
+            ([{m b mt id m-s mu ok?} (in-query conn query)])
+            (define serialized-m-s (string->value m-s))
+            (values m
+                    b
+                    (string->value mt)
+                    id
+                    (map (make/get-mutant-summary-deserializer b) serialized-m-s)
+                    mu
+                    (= ok? 1)))
+    (unless (connection? db-path-or-conn)
+      (disconnect conn))))
+(define/contract (read-blame-trails-by-mutator/across-all-benchmarks db-path-or-conn [mode #f] [use-pre-computed-success? #t])
+  ({(or/c connection? path-to-existant-file?)}
    {(or/c string? #f)
     boolean?}
    . ->* .
    (hash/c mutator-name? (listof blame-trail?)))
 
+  (define db-conn (if (connection? db-path-or-conn)
+                      db-path-or-conn
+                      (sqlite3-connect #:database db-path-or-conn
+                                       #:mode 'read-only)))
   (for/hash/fold ([{mutator mutant trail-id mode mutant-summaries success?}
-                   (apply in-query
+                   #;(apply in-query
                           db-conn
                           (~a "select mutator, mutant, id, mode, mutant_summaries, success from trails"
                               (if mode
                                   " where mode = $1"
                                   ""))
-                          (or (list mode) empty))])
+                          (or (list mode) empty))
+                   (in-data-frame (read-blame-trail-db->df
+                                   db-conn
+                                   (if mode
+                                       (bind-prepared-statement
+                                        (prepare db-conn
+                                                 "SELECT * FROM trails where mode = $1")
+                                        (list mode))
+                                       "SELECT * FROM trails"))
+                                  "mutator" "mutant" "id" "mode" "mutant-summaries" "success")])
+    #:init (make-immutable-hash (map list (query-list db-conn "select distinct name from mutators")))
     #:combine cons
     #:default empty
-    (define summaries (string->value mutant-summaries))
     (values mutator
-            (blame-trail (string->value mutant)
+            (blame-trail mutant
                          trail-id
                          mode
-                         summaries
+                         mutant-summaries
                          (if use-pre-computed-success?
-                             (= success? 1)
-                             (satisfies-BT-hypothesis? summaries mode))))))
+                             success?
+                             (satisfies-BT-hypothesis? mutant-summaries mode))))))
 
 (define ((append-to-list new-elements) a-list)
   (append a-list new-elements))
@@ -173,6 +216,19 @@
                  (append-to-list mutant-trails)
                  empty)))
 
+(define ((deserialize-mutant-summary benchmark) ms)
+  (match ms
+    [(struct* mutant-summary ([config (? serialized-config? n)]))
+     (struct-copy mutant-summary ms [config (deserialize-config n #:benchmark benchmark)])]
+    [(struct* mutant-summary ([config (? hash? n)])) ms]
+    [else
+     (error 'blame-trail-summaries->blame-trails
+            @~a{
+                Got a mutant summary with a config that satisfies neither @;
+                `serialized-config?` nor `hash?`:
+                @~s[ms]
+                })]))
+
 (define (blame-trail-summaries->blame-trails trail-summaries the-benchmark-data-files)
   (define benchmark-name (benchmark-data-files-name the-benchmark-data-files))
   (define benchmark (benchmark-name->benchmark benchmark-name))
@@ -180,24 +236,12 @@
                                 (metadata-id-config-name
                                  (file->value
                                   (benchmark-data-files-metadata the-benchmark-data-files)))))
-  (define (deserialize-mutant-summary ms)
-    (match ms
-      [(struct* mutant-summary ([config (? serialized-config? n)]))
-       (struct-copy mutant-summary ms [config (deserialize-config n #:benchmark benchmark)])]
-      [(struct* mutant-summary ([config (? hash? n)])) ms]
-      [else
-       (error 'blame-trail-summaries->blame-trails
-              @~a{
-                  Got a mutant summary with a config that satisfies neither @;
-                  `serialized-config?` nor `hash?`:
-                  @~s[ms]
-                  })]))
   (map (match-lambda [(blame-trail-summary mod-name
                                            index
                                            id
                                            mutant-summaries)
                       (define summaries
-                        (map (compose1 deserialize-mutant-summary
+                        (map (compose1 (deserialize-mutant-summary benchmark)
                                        adapt-mutant-summary)
                              mutant-summaries))
                       (blame-trail (mutant benchmark-name mod-name index)

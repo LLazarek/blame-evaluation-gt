@@ -9,6 +9,7 @@
          bex/runner/mutation-runner-data
          bex/util/for
          bex/configurables/program-instrumentation/type-interface-module-names
+         db
 
          "plot-common.rkt"
          "read-data.rkt"
@@ -17,19 +18,13 @@
          text-table
          syntax/parse/define)
 
-(define-runtime-paths
-  [check-for-missing-mutants-or-trails.rkt "check-for-missing-mutants-or-trails.rkt"]
-  [check-for-errors.rkt "check-for-errors.rkt"])
-
 (define summary/c
   (hash/c symbol? any/c))
 
-;; path-to-existant-directory? . -> . summary/c
-(define (summarize data-dir summaries-db-path)
+;; connection? . -> . summary/c
+(define (summarize data-db-conn mode)
   (define blame-trails-by-mutator/across-all-benchmarks
-    (directory->blame-trails-by-mutator/across-all-benchmarks
-     data-dir
-     #:summaries-db summaries-db-path))
+    (read-blame-trails-by-mutator/across-all-benchmarks data-db-conn mode))
 
   (define all-bts (append* (hash-values blame-trails-by-mutator/across-all-benchmarks)))
 
@@ -162,7 +157,7 @@
 (define (bt-failures-blaming-typed-code bts)
   (filter-not false?
               (for/list ([bt (in-list bts)]
-                         #:unless (satisfies-BT-hypothesis? bt))
+                         #:unless (blame-trail-succeeded? bt))
                 (match (first (blame-trail-mutant-summaries bt))
                   [(mutant-summary _
                                    (struct* run-status ([outcome 'blamed]
@@ -249,7 +244,7 @@
 
 (define (summarize-bt-failure-outcomes bts)
   (for/hash/fold ([bt (in-list bts)]
-                  #:when (not (satisfies-BT-hypothesis? bt)))
+                  #:when (not (blame-trail-succeeded? bt)))
     #:combine cons
     #:default empty
     (match-define (struct* blame-trail
@@ -463,89 +458,33 @@
   )
 
 (main
- #:arguments ([(hash-table ['config   config-path]
-                           ['summaries-db (app simple-form-path summaries-db-path)]
-                           ['mutant-samples-db (or (and #f mutant-samples-db-path)
-                                                   (app simple-form-path mutant-samples-db-path))]
-                           ['root-samples-db (or (and #f root-samples-db-path)
-                                                 (app simple-form-path root-samples-db-path))]
-                           ['run-checks? run-checks?]
+ #:arguments ([(hash-table ['config      config-path]
                            ['dump-values values-to-dump])
-               (app (λ (l) (map simple-form-path l)) data-dirs)]
+               (list data-db-path)]
               #:once-each
               [("-c" "--config")
                'config
                ("Config for obtaining active mutator names.")
                #:collect {"path" take-latest #f}
                #:mandatory]
-              [("-S" "--mutant-summaries")
-               'summaries-db
-               ("Path to the db containing summaries of the mutants in the data."
-                "(Typically, type-err-summaries.rktdb.)")
-               #:collect {"path" take-latest #f}
-               #:mandatory]
-              [("-s" "--mutant-samples")
-               'mutant-samples-db
-               ("Path to the db containing mutant samples."
-                "Mandatory when -C provided.")
-               #:collect {"path" take-latest #f}
-               #:mandatory-unless (λ (flags) (not (member 'run-checks? flags)))]
-              [("-r" "--bt-root-samples")
-               'root-samples-db
-               ("Path to the db containing bt root samples."
-                "Mandatory when -C provided.")
-               #:collect {"path" take-latest #f}
-               #:mandatory-unless (λ (flags) (not (member 'run-checks? flags)))]
-              [("-C" "--check")
-               'run-checks?
-               ("Run integrity checks in addition to summarizing the data.")
-               #:record]
               #:multi
               [("-D" "--dump")
                'dump-values
                ("Dump a given summary value to stdout after the summary.")
                #:collect {"summary value key" cons empty}]
-              #:args data-dirs)
- #:check [(andmap path-to-existant-directory? data-dirs)
-          @~a{Can't find @(filter-not path-to-existant-directory? data-dirs)}]
+              #:args [data-db-path])
+ #:check [(path-to-existant-file? data-db-path)
+          @~a{Can't find @data-db-path}]
+
  (install-configuration! config-path)
- (define full-config-path (simple-form-path config-path))
-
- (define racket-exe (simple-form-path (find-system-path 'exec-file)))
-
- (for ([data-dir (in-list data-dirs)])
-   (displayln @~a{-------------------- @(basename data-dir) --------------------})
-   (define summary (summarize data-dir summaries-db-path))
+ (define db-conn (sqlite3-connect #:database data-db-path #:mode 'read-only))
+ (define modes (query-list db-conn "SELECT DISTINCT mode FROM trails"))
+ (for ([mode (in-list modes)])
+   (displayln @~a{-------------------- @mode --------------------})
+   (define summary (summarize db-conn mode))
    (displayln (format-summary summary))
-   (newline)
-   (when run-checks?
-     (define missing-mutants-output (open-output-string))
-     (define errors-output (open-output-string))
-     (parameterize ([current-output-port missing-mutants-output]
-                    [current-error-port missing-mutants-output])
-       (system* racket-exe
-                check-for-missing-mutants-or-trails.rkt
-                "-s" mutant-samples-db-path
-                "-S" summaries-db-path
-                "-r" root-samples-db-path
-                "-c" full-config-path
-                "-p" data-dir))
-     (parameterize ([current-output-port errors-output]
-                    [current-error-port errors-output])
-       (system* racket-exe
-                check-for-errors.rkt
-                data-dir))
-     (displayln @~a{
-                    check-for-missing-mutants:
-                    @(get-output-string missing-mutants-output)
-
-                    check-for-errors:
-                    @(get-output-string errors-output)
-
-
-                    }))
-   (newline)
    (unless (empty? values-to-dump)
+     (newline)
      (displayln "-------------------- data dump --------------------")
      (pretty-write (for/hash ([key (in-list (map string->symbol values-to-dump))])
                      (values key (hash-ref summary key)))))))

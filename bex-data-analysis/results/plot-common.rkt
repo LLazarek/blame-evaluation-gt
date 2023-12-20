@@ -1,11 +1,6 @@
 #lang at-exp rscript
 
 (provide (contract-out
-          [directory->blame-trails-by-mutator/across-all-benchmarks
-           (path-to-existant-directory?
-            #:summaries-db db:path-to-db?
-            . -> .
-            (hash/c string? (listof blame-trail?)))]
           [make-distributions-plots
            ({({string?
                (hash/c string? (listof blame-trail?))}
@@ -13,8 +8,8 @@
               . ->* .
               pict?)
              #:breakdown-by (or/c "mutator" "benchmark")
-             #:summaries-db db:path-to-db?
-             #:data-directory path-to-existant-directory?}
+             #:data-db (or/c connection? path-to-existant-file?)
+             #:mode (or/c #f string?)}
             {#:dump-to-file (or/c path-string? boolean?)}
             . ->* .
             (hash/c string? pict?))]
@@ -25,8 +20,8 @@
               . ->* .
               pict?)
              #:breakdown-by (or/c "mutator" "benchmark")
-             #:summaries-db db:path-to-db?
-             #:data-directory path-to-existant-directory?}
+             #:data-db (or/c connection? path-to-existant-file?)
+             #:mode (or/c #f string?)}
             {#:dump-to-file (or/c path-string? boolean?)}
             . ->* .
             pict?)]
@@ -55,6 +50,7 @@
          add-to-list)
 
 (require plot
+         db
          (except-in pict-util line)
          bex/experiment/blame-trail-data
          (prefix-in db: bex/db/db)
@@ -68,24 +64,13 @@
 
 (define pict? any/c)
 
-(define (directory->blame-trails-by-mutator/across-all-benchmarks
-         data-dir
-         #:summaries-db mutation-analysis-summaries-db)
-  (define mutant-mutators
-    (read-mutants-by-mutator mutation-analysis-summaries-db))
-
-  (add-missing-active-mutators
-   (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
-
 (define (make-distributions-plots make-distribution-plot
                                   #:breakdown-by breakdown-dimension
-                                  #:summaries-db mutation-analysis-summaries-db
-                                  #:data-directory data-dir
+                                  #:data-db data-db-path-or-conn
+                                  #:mode mode
                                   #:dump-to-file [dump-path #f])
   (define blame-trails-by-mutator/across-all-benchmarks
-    (directory->blame-trails-by-mutator/across-all-benchmarks
-     data-dir
-     #:summaries-db mutation-analysis-summaries-db))
+    (read-blame-trails-by-mutator/across-all-benchmarks data-db-path-or-conn mode))
 
   (define all-mutator-names (mutator-names blame-trails-by-mutator/across-all-benchmarks))
 
@@ -123,14 +108,14 @@
 
 (define (make-distributions-table make-distribution-plot
                                   #:breakdown-by breakdown-dimension
-                                  #:summaries-db mutation-analysis-summaries-db
-                                  #:data-directory data-dir
+                                  #:data-db data-db-path-or-conn
+                                  #:mode mode
                                   #:dump-to-file [dump-path #f])
   (define distributions
     (make-distributions-plots make-distribution-plot
                               #:breakdown-by breakdown-dimension
-                              #:summaries-db mutation-analysis-summaries-db
-                              #:data-directory data-dir
+                              #:data-db data-db-path-or-conn
+                              #:mode mode
                               #:dump-to-file dump-path))
   (define distributions/sorted
     (map cdr (sort (hash->list distributions) string<? #:key car)))

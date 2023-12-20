@@ -40,7 +40,6 @@
 ;; todo: this is a whole lotta shit! easy to lose track. make it easier.
 (define-runtime-paths
   [data-db "../../../experiment-data/results/type-api-mutations/data.sqlite"]
-  [mutant-summaries-db-path "../../bex/dbs/type-api-mutations/type-err-summaries.rktdb"]
   [TR-config "../../bex/configurables/configs/TR.rkt"]
   [outdir "../../../experiment-data/results/type-api-mutations"]
   [data-cache "./data-cache"]

@@ -1,8 +1,9 @@
 #lang at-exp rscript
 
-(require bex/configurables/mutant-sampling/use-pre-selected-samples
-         bex/configurables/bt-root-sampling/pre-selected
-         bex/configurables/configurables
+(provide sanity-check-mutants
+         sanity-check-blame-trails)
+
+(require bex/configurables/configurables
          (prefix-in db: bex/db/db)
          "read-data.rkt"
          bex/mutation-analysis/mutation-analysis-summaries
@@ -12,19 +13,30 @@
          "experiment-info.rkt")
 
 (define (check-mutants bench-name bench-data expected-samples log-path)
+  (sanity-check-mutants bench-name
+                        (filter-map (match-lambda [(blame-trail (and id (mutant (== bench-name) _ _))
+                                                                _
+                                                                _
+                                                                _
+                                                                _)
+                                                   id]
+                                                  [else #f])
+                                    (flatten (hash-values bench-data)))
+                        expected-samples
+                        log-path))
+
+(define (check-blame-trails bench-name bench-data expected-bt-samples)
+  (sanity-check-blame-trails bench-name
+                             (map blame-trail-mutant-id
+                                  (flatten (hash-values bench-data)))
+                             expected-bt-samples))
+
+(define (sanity-check-mutants bench-name benchmark-mutants/dups expected-samples log-path)
+  (define benchmark-mutants (remove-duplicates benchmark-mutants/dups))
   (define expected-mutants
     (for*/list ([{mod-name indices} (in-hash expected-samples)]
                 [index (in-list indices)])
       (mutant bench-name mod-name index)))
-  (define benchmark-mutants
-    (remove-duplicates
-     (filter-map (match-lambda [(blame-trail (and id (mutant (== bench-name) _ _))
-                                             _
-                                             _
-                                             _)
-                                id]
-                               [else #f])
-                 (flatten (hash-values bench-data)))))
   (cond [(set=? expected-mutants benchmark-mutants)
          #f]
         [else
@@ -43,7 +55,8 @@
          (newline)
          (newline)]))
 
-(define (check-blame-trails bench-name bench-data expected-bt-samples)
+
+(define (sanity-check-blame-trails bench-name benchmark-mutants expected-bt-samples)
   (define expected-mutants (hash-keys expected-bt-samples))
   (define expected-bt-count
     (for/sum ([{mutant root-configs} (in-hash expected-bt-samples)])
@@ -53,9 +66,7 @@
          (member (struct-copy mutant m [benchmark #f])
                  expected-mutants)))
   (define actual-bt-count
-    (count
-     (compose1 expected-mutant? blame-trail-mutant-id)
-     (flatten (hash-values bench-data))))
+    (count expected-mutant? benchmark-mutants))
   (unless (= actual-bt-count expected-bt-count)
     (displayln
      @~a{
@@ -63,7 +74,7 @@
          There are @expected-bt-count bt roots in the db, but only @actual-bt-count bts in the data
          (of which @;
              @(count
-               (compose1 expected-mutant? blame-trail-mutant-id)
+               expected-mutant?
                (remove-duplicates (map (λ (bt1)
                                          (define (normalize-mutant-summary summary1)
                                            (struct-copy mutant-summary summary1
@@ -72,7 +83,7 @@
                                                       [mutant-summaries
                                                        (map normalize-mutant-summary
                                                             (blame-trail-mutant-summaries bt1))]))
-                                       (flatten (hash-values bench-data))))) @;
+                                       benchmark-mutants))) @;
              are unique)
 
          })))
@@ -202,7 +213,7 @@
               (display @~a{Checking @bench-name                     @"\r"}))
             (define bench-mutant-samples (db:read mutant-samples-db bench-name))
             (define bench-bt-root-samples (db:read root-samples-db bench-name))
-            (define bench-data (read-blame-trails-by-mutator/across-all-benchmarks dir-to-check mutants-by-mutator))
+            (define bench-data (read-blame-trails-by-mutator/across-all-benchmarks/from-data-files dir-to-check mutants-by-mutator))
             (check-mutants bench-name
                            bench-data
                            bench-mutant-samples

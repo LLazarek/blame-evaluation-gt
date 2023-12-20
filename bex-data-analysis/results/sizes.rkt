@@ -24,7 +24,7 @@
 (define dyn-err-summaries-db (db:get dyn-err-summaries-db-path))
 (define all-benchmarks (db:keys dyn-err-summaries-db))
 
-(define mutants-with-interesting-scenarios-count/by-benchmark
+#;(define mutants-with-interesting-scenarios-count/by-benchmark
   (for/hash ([benchmark (in-list all-benchmarks)])
     (define mutant-count
       (for*/sum ([{mod summary} (in-hash (db:read dyn-err-summaries-db benchmark))]
@@ -32,7 +32,7 @@
         (length indices)))
     (values benchmark mutant-count)))
 
-(define mutants-with-interesting-scenarios-count/by-benchmark+mutator
+#;(define mutants-with-interesting-scenarios-count/by-benchmark+mutator
   (for/fold ([h (hash)])
             ([benchmark (in-list all-benchmarks)])
     (define mutant-count-by-mutator
@@ -52,9 +52,10 @@
     (define max-config (benchmark-name->max-config benchmark))
     (define typeable-mod-count (hash-count max-config))
     (values benchmark
-            (expt 2 typeable-mod-count))))
+            (expt (length (configured:config-levels))
+                  typeable-mod-count))))
 
-(define all-possible-interesting-scenarios
+#;(define all-possible-interesting-scenarios
   (for/sum ([benchmark (in-list all-benchmarks)])
     (define mutants (hash-ref mutants-with-interesting-scenarios-count/by-benchmark
                               benchmark))
