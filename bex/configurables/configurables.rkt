@@ -140,6 +140,7 @@
               deserialize-config
               config-at-max-precision-for?
               increment-config-precision-for
+              config-levels
 
               benchmark-configuration->program
               benchmark->mutatable-modules
