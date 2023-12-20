@@ -124,13 +124,28 @@ benchmark NOT NULL
                          "SELECT mutant FROM trails WHERE mode = $1 AND benchmark = $2"
                          mode-to-check
                          bench-name)))
+      (define log-path
+        (build-path source-dir mode-to-check bench-name (~a bench-name ".log")))
       (sanity-check-mutants bench-name
                             mutants-in-db
                             bench-mutant-samples
-                            (build-path source-dir mode-to-check bench-name (~a bench-name ".log")))
+                            log-path)
       (sanity-check-blame-trails bench-name
                                  mutants-in-db
-                                 bench-bt-root-samples))))
+                                 bench-bt-root-samples)
+      (check-sanity-checks-in-log log-path))))
+
+(define (check-sanity-checks-in-log log-path)
+  (match (string-trim (system/string @~a{grep -E '⚠|failing sanity checks' '@log-path'}))
+    ["" (void)]
+    [errs
+     (displayln @~a{
+                    WARNING: @log-path reports failing sanity checks. @;
+                    That means that mode/benchmark's data has problems and can't be trusted!
+
+                    Found messages:
+                    @errs
+                    })]))
 
 (define (record-mutant/mutator-info-in-db! db-conn)
   (query-exec db-conn
