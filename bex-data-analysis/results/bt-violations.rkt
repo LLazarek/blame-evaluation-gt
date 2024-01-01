@@ -23,7 +23,7 @@
                                                 #:dump-to [dump-to #f])
   (define trails (hash-ref blame-trail-map key))
   (define total-trail-count (length trails))
-  (define-values {bt-satisfied bt-failed} (partition satisfies-BT-hypothesis? trails))
+  (define-values {bt-satisfied bt-failed} (partition blame-trail-succeeded? trails))
   (when (output-port? dump-to)
     (pretty-write (hash 'satisfied bt-satisfied
                         'failed bt-failed)

@@ -1,11 +1,6 @@
 #lang at-exp rscript
 
 (provide (contract-out
-          [directory->blame-trails-by-mutator/across-all-benchmarks
-           (path-to-existant-directory?
-            #:summaries-db db:path-to-db?
-            . -> .
-            (hash/c string? (listof blame-trail?)))]
           [make-distributions-plots
            ({({string?
                (hash/c string? (listof blame-trail?))}
@@ -13,8 +8,8 @@
               . ->* .
               pict?)
              #:breakdown-by (or/c "mutator" "benchmark")
-             #:summaries-db db:path-to-db?
-             #:data-directory path-to-existant-directory?}
+             #:data-db (or/c connection? path-to-existant-file?)
+             #:mode (or/c #f string?)}
             {#:dump-to-file (or/c path-string? boolean?)}
             . ->* .
             (hash/c string? pict?))]
@@ -25,8 +20,8 @@
               . ->* .
               pict?)
              #:breakdown-by (or/c "mutator" "benchmark")
-             #:summaries-db db:path-to-db?
-             #:data-directory path-to-existant-directory?}
+             #:data-db (or/c connection? path-to-existant-file?)
+             #:mode (or/c #f string?)}
             {#:dump-to-file (or/c path-string? boolean?)}
             . ->* .
             pict?)]
@@ -36,7 +31,6 @@
             . -> .
             (hash/c (or/c "always" "sometimes" "never")
                     (listof listof-blame-trails-for-same-mutant?)))]
-          [satisfies-BT-hypothesis? (blame-trail? . -> . boolean?)]
           [immediate-type-err-bt? (blame-trail? . -> . boolean?)]
           [add-missing-active-mutators
            ((hash/c mutator-name? (listof blame-trail?))
@@ -56,6 +50,7 @@
          add-to-list)
 
 (require plot
+         db
          (except-in pict-util line)
          bex/experiment/blame-trail-data
          (prefix-in db: bex/db/db)
@@ -69,24 +64,13 @@
 
 (define pict? any/c)
 
-(define (directory->blame-trails-by-mutator/across-all-benchmarks
-         data-dir
-         #:summaries-db mutation-analysis-summaries-db)
-  (define mutant-mutators
-    (read-mutants-by-mutator mutation-analysis-summaries-db))
-
-  (add-missing-active-mutators
-   (read-blame-trails-by-mutator/across-all-benchmarks data-dir mutant-mutators)))
-
 (define (make-distributions-plots make-distribution-plot
                                   #:breakdown-by breakdown-dimension
-                                  #:summaries-db mutation-analysis-summaries-db
-                                  #:data-directory data-dir
+                                  #:data-db data-db-path-or-conn
+                                  #:mode mode
                                   #:dump-to-file [dump-path #f])
   (define blame-trails-by-mutator/across-all-benchmarks
-    (directory->blame-trails-by-mutator/across-all-benchmarks
-     data-dir
-     #:summaries-db mutation-analysis-summaries-db))
+    (read-blame-trails-by-mutator/across-all-benchmarks data-db-path-or-conn mode))
 
   (define all-mutator-names (mutator-names blame-trails-by-mutator/across-all-benchmarks))
 
@@ -124,14 +108,14 @@
 
 (define (make-distributions-table make-distribution-plot
                                   #:breakdown-by breakdown-dimension
-                                  #:summaries-db mutation-analysis-summaries-db
-                                  #:data-directory data-dir
+                                  #:data-db data-db-path-or-conn
+                                  #:mode mode
                                   #:dump-to-file [dump-path #f])
   (define distributions
     (make-distributions-plots make-distribution-plot
                               #:breakdown-by breakdown-dimension
-                              #:summaries-db mutation-analysis-summaries-db
-                              #:data-directory data-dir
+                              #:data-db data-db-path-or-conn
+                              #:mode mode
                               #:dump-to-file dump-path))
   (define distributions/sorted
     (map cdr (sort (hash->list distributions) string<? #:key car)))
@@ -148,156 +132,6 @@
                  values
                  empty)))
 
-(define-logger bt-hypoth-options)
-(define (satisfies-BT-hypothesis? bt)
-  (define end-mutant-summary (first (blame-trail-mutant-summaries bt)))
-  (define mode (blame-trail-mode-config-name bt))
-  (define type-interface-mod?
-    (match-lambda [(or (== type-interface-file-name)
-                       (== type-interface-file-rename)) #t]
-                  [else #f]))
-  (match end-mutant-summary
-    [(mutant-summary _
-                     (struct* run-status ([mutated-module mutated-mod-name]
-                                          [outcome 'type-error]
-                                          [blamed blamed]))
-                     config)
-     ;; Original definition, changed to any type error because any type error
-     ;; should be good enough: see justification in notes
-     #;(and (equal? (hash-ref config mutated-mod-name) 'types)
-          (list? blamed)
-          (member mutated-mod-name blamed))
-     #t]
-    [(mutant-summary _
-                     (struct* run-status ([mutated-module mutated-mod-name]
-                                          [outcome 'blamed]
-                                          [blamed blamed]))
-                     config)
-     #:when (member mode '("TR.rkt" "transient-newest.rkt" "transient-oldest.rkt"))
-     (match* {mode blamed}
-       [{_ (list (? type-interface-mod?))}
-        #t]
-       [{"transient-newest.rkt" (or (list* (? type-interface-mod?) _)
-                                    (list* _ (? type-interface-mod?) _))}
-        #t]
-       [{"transient-oldest.rkt" (or (list _ ... (? type-interface-mod?))
-                                    (list _ ... (? type-interface-mod?) _))}
-        #t]
-       [{_ other-blamed-list}
-        (when (ormap type-interface-mod? other-blamed-list)
-          (log-bt-hypoth-options-info
-           @~a{mode @mode, blamed contains interface somewhere in middle}))
-        #f])]
-    [(mutant-summary _
-                     (struct* run-status ([mutated-module mutated-mod-name]
-                                          [outcome (and outcome
-                                                        (or 'runtime-error
-                                                            'blamed))]
-                                          [context-stack stack]))
-                     config)
-     #:when (or (member mode '("TR-stack-first.rkt"
-                               "transient-stack-first.rkt"
-                               "erasure-stack-first.rkt"))
-                (and (member mode '("TR.rkt" "transient-newest.rkt" "transient-oldest.rkt"))
-                     (equal? outcome 'runtime-error)))
-     (define stack/no-typed-mods
-       (filter (λ (m) (equal? (hash-ref config m 'none) 'none))
-               stack))
-     (match stack/no-typed-mods
-       [(list* (? type-interface-mod?) _) #t]
-       [else #f])]
-    [else #f]))
-
-(module+ test
-  (require ruinit
-           "data-adapter.rkt")
-  (test-begin
-    #:name satisfies-BT-hypothesis?
-    (satisfies-BT-hypothesis?
-     (blame-trail '#s(mutant "acquire" "board.rkt" 5659)
-                  87
-                  "TR.rkt"
-                  (map adapt-mutant-summary
-                       '(#s(mutant-summary 26565 #s(run-status "board.rkt" 5659 what-kind-of-spot type-error ("board.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . types) ("basics.rkt" . types) ("board.rkt" . types) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                         #s(mutant-summary 26454 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("board.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . types) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                         #s(mutant-summary 26345 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("auxiliaries.rkt") #f) #hash(("admin.rkt" . types) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                         #s(mutant-summary 26256 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("admin.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                         #s(mutant-summary 26167 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("state.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                         #s(mutant-summary 26093 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("basics.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                         #s(mutant-summary 26003 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("tree.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . none)))
-                         #s(mutant-summary 6350 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("strategy.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . none) ("tree.rkt" . none)))))))
-    (not (satisfies-BT-hypothesis?
-          (blame-trail '#s(mutant "acquire" "board.rkt" 5659)
-                       87
-                       "TR.rkt"
-                       (map adapt-mutant-summary
-                            '(#s(mutant-summary 26256 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("admin.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . types) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                              #s(mutant-summary 26167 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("state.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . types) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                              #s(mutant-summary 26093 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("basics.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . types)))
-                              #s(mutant-summary 26003 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("tree.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . types) ("tree.rkt" . none)))
-                              #s(mutant-summary 6350 #s(run-status "board.rkt" 5659 what-kind-of-spot runtime-error ("strategy.rkt") #f) #hash(("admin.rkt" . none) ("auxiliaries.rkt" . none) ("basics.rkt" . none) ("board.rkt" . none) ("main.rkt" . types) ("player.rkt" . types) ("state.rkt" . none) ("strategy.rkt" . none) ("tree.rkt" . none))))))))
-    (satisfies-BT-hypothesis? (blame-trail
-                               #s(mutant "quadU" "type-interface.rkt" 5)
-                               34
-                               "transient-oldest.rkt"
-                               '(#s(mutant-summary
-                                    4560
-                                    #s(run-status
-                                       "type-interface.rkt"
-                                       5
-                                       Quad
-                                       blamed
-                                       ("type-interface.rkt"
-                                        "type-interface.rkt"
-                                        "quick-sample.rkt"
-                                        "type-interface.rkt"
-                                        "type-interface.rkt")
-                                       ("main.rkt" "main.rkt" "main.rkt")
-                                       ("main.rkt" "main.rkt")
-                                       #f)
-                                    #hash(("hyphenate.rkt" . types)
-                                          ("main.rkt" . types)
-                                          ("measure.rkt" . types)
-                                          ("ocm-struct.rkt" . none)
-                                          ("ocm.rkt" . types)
-                                          ("penalty-struct.rkt" . none)
-                                          ("quad-main.rkt" . types)
-                                          ("quads.rkt" . none)
-                                          ("quick-sample.rkt" . types)
-                                          ("render.rkt" . none)
-                                          ("sugar-list.rkt" . none)
-                                          ("utils.rkt" . none)
-                                          ("world.rkt" . types)
-                                          ("wrap.rkt" . none)))
-                                 #s(mutant-summary
-                                    323
-                                    #s(run-status
-                                       "type-interface.rkt"
-                                       5
-                                       Quad
-                                       blamed
-                                       ("type-interface.rkt"
-                                        "type-interface.rkt"
-                                        "quick-sample.rkt"
-                                        "original-type-interface.rkt")
-                                       ("main.rkt" "main.rkt" "main.rkt")
-                                       ("main.rkt" "main.rkt")
-                                       #f)
-                                    #hash(("hyphenate.rkt" . types)
-                                          ("main.rkt" . types)
-                                          ("measure.rkt" . types)
-                                          ("ocm-struct.rkt" . none)
-                                          ("ocm.rkt" . types)
-                                          ("penalty-struct.rkt" . none)
-                                          ("quad-main.rkt" . types)
-                                          ("quads.rkt" . none)
-                                          ("quick-sample.rkt" . none)
-                                          ("render.rkt" . none)
-                                          ("sugar-list.rkt" . none)
-                                          ("utils.rkt" . none)
-                                          ("world.rkt" . types)
-                                          ("wrap.rkt" . none))))))))
-
 (define ((add-to-list v) l) (cons v l))
 
 ;; string? (hash/c string? (listof blame-trail?))
@@ -312,7 +146,7 @@
   (define trails-grouped-by-mutant (group-by blame-trail-mutant-id trails))
 
   (define (categorize-trail-set-reliability trail-set)
-    (define bt-success-count (count satisfies-BT-hypothesis? trail-set))
+    (define bt-success-count (count blame-trail-succeeded? trail-set))
     (match* {bt-success-count (length trail-set)}
       [{     0  (not 0)}                 "never"]
       [{s       n      } #:when (= s n)  "always"]

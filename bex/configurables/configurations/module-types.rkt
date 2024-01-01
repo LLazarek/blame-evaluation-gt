@@ -6,6 +6,7 @@
          deserialize-config
          config-at-max-precision-for?
          increment-config-precision-for
+         config-levels
 
          benchmark->mutatable-modules
          benchmark-configuration->program
@@ -27,6 +28,8 @@
          "../../util/program.rkt"
          "common.rkt")
 
+(define config-levels '(none types))
+
 (define/contract (config-for-benchmark/c b)
   (benchmark/c . -> . (any/c . -> . boolean?))
 
@@ -35,8 +38,9 @@
           (λ (config)
             (equal? (sort-file-names (map file-name-string-from-path
                                           (benchmark-typed b)))
-                    (sort-file-names (hash-keys config)))))
-   @~a{a config for @~v[b]}))
+                    (sort-file-names (hash-keys config))))
+          (hash/c string? (apply or/c config-levels)))
+   @~a{a module-types config for @~v[b]}))
 
 (define (sort-file-names names)
   (sort names string<?))

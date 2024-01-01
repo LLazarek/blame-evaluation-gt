@@ -70,7 +70,9 @@
      (define base (simple-form-path (build-path path "base")))
      (define both (simple-form-path (build-path path "both")))
      (match (and typed untyped)
-       [#f #f]
+       [#f
+        (log-warning @~a{Failed to read benchmark at @path})
+        #f]
        [else
         (define result
           (benchmark typed

@@ -21,8 +21,9 @@
                             #:middle-outcomes [mid-outcome-ok? #f]
                             #:end-outcome [end-outcome-ok? #f])
   (define mutant-mutators (read-mutants-by-mutator summaries-db-path))
-  (define bts-by-mutator (read-blame-trails-by-mutator/across-all-benchmarks mode-data-dir
-                                                                             mutant-mutators))
+  (define bts-by-mutator
+    (read-blame-trails-by-mutator/across-all-benchmarks/from-data-files mode-data-dir
+                                                                        mutant-mutators))
   (define all-bts (append* (hash-values bts-by-mutator)))
   (define filtered-bts (filter (λ (bt)
                                  (and (or (false? start-outcome-ok?)

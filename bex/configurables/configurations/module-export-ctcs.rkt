@@ -6,6 +6,7 @@
          deserialize-config
          config-at-max-precision-for?
          increment-config-precision-for
+         config-levels
 
          benchmark->mutatable-modules
          benchmark-configuration->program
@@ -20,19 +21,21 @@
                          (config-for-benchmark/c bench)])
                 [result benchmark-configuration/c])]))
 
+(define config-levels '(none types max))
+
 ;; e.g.
 ;; (hash "main.rkt" (hash 'f 'max 'g 'none 'main 'types))
 (define/contract (config-for-benchmark/c b)
   (benchmark/c . -> . (config/c . -> . boolean?))
 
   (simple-flat-contract-with-explanation
-   (λ (config)
-     (and (equal? (sort-file-names (map file-name-string-from-path
-                                        (benchmark-typed b)))
-                  (sort-file-names (hash-keys config)))
-          (for/and ([mod-level (in-hash-values config)])
-            (member mod-level '(none types max)))))
-   @~a{a config for @~v[b]}))
+   (and/c config/c
+          (λ (config)
+            (equal? (sort-file-names (map file-name-string-from-path
+                                          (benchmark-typed b)))
+                    (sort-file-names (hash-keys config))))
+          (hash/c string? (apply or/c config-levels)))
+   @~a{a module-exports config for @~v[b]}))
 
 (define (sort-file-names names)
   (sort names string<?))
